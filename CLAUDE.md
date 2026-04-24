@@ -1,0 +1,269 @@
+# CLAUDE.md — InterviewEra Project Rules & Context
+
+## ⚠️ MANDATORY: READ THIS BEFORE WRITING ANY CODE OR PLAN
+
+You are a senior full-stack engineer working on **InterviewEra** — an AI-powered placement 
+preparation SaaS for Indian students. This is a production project, not a tutorial or demo.
+
+---
+
+## PROJECT IDENTITY (NEVER FORGET)
+- **Product:** InterviewEra — AI Mock Interview + Feedback platform
+- **PRD Version:** 2.0 (March 31, 2026)
+- **Stage:** MVP Development — Phase 1 of 4
+- **Target Users:** Final-year B.Tech/BCA/MBA students, Tier 1–3 Indian colleges, age 20–24
+- **North Star Metric:** Interviews completed per user in first 14 days (target: 4+)
+
+---
+
+## TECH STACK — USE EXACTLY THIS, NO DEVIATIONS WITHOUT APPROVAL
+
+| Layer         | Technology                     | Version/Notes                        |
+|---------------|-------------------------------|--------------------------------------|
+| Frontend      | Next.js (App Router)          | v14+ with TypeScript                 |
+| Styling       | Tailwind CSS + shadcn/ui      | No other UI libraries unless asked   |
+| Backend       | Next.js API Routes + Server Actions | No separate Express/FastAPI   |
+| Database      | PostgreSQL via Supabase        | With Row Level Security (RLS)        |
+| Auth          | Supabase Auth                  | Email/password + Google OAuth        |
+| AI Layer      | GPT-4o-mini (OpenAI API only) | NO multi-provider in Phase 1–3       |
+| Payments      | Razorpay                       | UPI + card + netbanking              |
+| File Storage  | Supabase Storage               | For resume PDFs + exports            |
+| Hosting       | Vercel                         | Edge functions enabled               |
+| Analytics     | PostHog                        | Self-hosted not required for MVP     |
+| Email         | Resend                         | Transactional only                   |
+| PDF Parsing   | pdf-parse (npm)                | Phase 1 only                         |
+
+---
+
+## ARCHITECTURE PRINCIPLES — NEVER VIOLATE
+
+1. **DECOUPLED PARSING:** Resume parsing happens on UPLOAD, not on interview start.
+   - Parse once → store JSON in `resume_parsed_data` (JSONB column)
+   - Interview start reads from stored JSON, never re-parses
+   - Target: Parse completes < 8 seconds
+
+2. **TEXT-FIRST:** Voice/STT is P1 (Phase 3), NOT P0. Never implement voice in Phase 1–2.
+
+3. **SINGLE AI PROVIDER:** GPT-4o-mini only. No Mistral, no Llama, no fallback chains in Phase 1–3.
+   - Error handling: exponential backoff (1s → 2s → 4s), max 3 retries
+   - After all retries: show "AI temporarily unavailable. Try again in 30 seconds."
+
+4. **CREDIT-BASED MODEL:** No free trials. Credits only.
+   - Free: 5 credits (lifetime)
+   - Starter (₹99/mo): 12 credits/month
+   - Pro (₹249/mo): 30 credits/month
+   - Credits deduct on interview START, not completion
+
+5. **FIRST INTERVIEW = 6 QUESTIONS ONLY** (not 10). Reduces abandonment.
+
+6. **RLS ON EVERYTHING:** Every Supabase table must have RLS policies. Users see only their data.
+
+---
+
+## PRICING TIERS (MEMORIZE THIS)
+
+| Feature               | Free      | Starter ₹99/mo | Pro ₹249/mo | Campus ₹799/student/yr |
+|-----------------------|-----------|----------------|-------------|------------------------|
+| Interview Credits     | 5 (total) | 12/month        | 30/month    | Unlimited              |
+| Score Report          | Basic      | Full feedback   | Full + Analysis | Full + Cohort      |
+| Detailed Analysis     | BLURRED   | BLURRED         | ✅ Visible  | ✅ Visible             |
+| Model Answer Compare  | BLURRED   | BLURRED         | ✅ Visible  | ✅ Visible             |
+| PDF Export            | ❌        | ❌              | ✅          | ✅                     |
+| Interview Replay      | ❌        | ❌              | ✅          | ✅                     |
+
+---
+
+## DATABASE SCHEMA (CANONICAL — DO NOT ALTER WITHOUT EXPLICIT INSTRUCTION)
+
+```sql
+-- Core Tables (10 total)
+users (id, email, name, plan_tier, credits_remaining, placement_date, created_at)
+resumes (id, user_id, file_url, raw_text, parsed_data JSONB, status, created_at)
+interviews (id, user_id, resume_id, role, difficulty, question_count, status, started_at, completed_at)
+questions (id, interview_id, order_index, question_text, rubric JSONB, category)
+answers (id, question_id, answer_text, answer_mode, submitted_at)
+evaluations (id, answer_id, overall_score, dimension_scores JSONB, feedback_text, detailed_analysis JSONB)
+reports (id, interview_id, overall_score, radar_data JSONB, trend_data JSONB, generated_at)
+subscriptions (id, user_id, plan, razorpay_sub_id, status, current_period_start, current_period_end)
+referrals (id, referrer_id, referred_id, status, credited_at)
+credit_transactions (id, user_id, type, amount, reason, created_at)
+```
+
+---
+
+## EVALUATION DIMENSIONS (AI SCORING RUBRIC)
+
+| Dimension            | Weight | What It Measures                                      |
+|----------------------|--------|-------------------------------------------------------|
+| Communication Clarity | 20%   | Sentence structure, conciseness, professional language|
+| Technical Depth      | 25%   | Accuracy, depth of explanation, correct terminology   |
+| Answer Structure     | 20%   | Logical flow, STAR method, clear beginning/middle/end |
+| Confidence           | 15%   | Assertiveness, no hedging language, directness        |
+| Relevance            | 20%   | Alignment with question, use of relevant experience   |
+
+---
+
+## AI PROMPT TEMPLATES (USE EXACTLY, DO NOT IMPROVISE)
+
+### Template 1: Resume Parsing
+
+```
+You are a resume parsing engine. Extract structured information from the following resume text.
+Return ONLY valid JSON. No explanation, no markdown, no preamble.
+
+Schema:
+{
+  "name": string,
+  "email": string,
+  "phone": string,
+  "skills": string[],
+  "experience": [{
+    "company": string, "role": string, "duration": string, "description": string
+  }],
+  "projects": [{
+    "name": string, "tech_stack": string[], "description": string
+  }],
+  "education": [{
+    "degree": string, "institution": string, "year": string, "cgpa": string
+  }],
+  "target_roles": string[]
+}
+
+Resume text:
+{RESUME_TEXT}
+```
+
+### Template 2: Question Generation
+
+```
+You are an expert technical interviewer at a top Indian tech company.
+Generate exactly {QUESTION_COUNT} interview questions for a {ROLE} position.
+The candidate's profile: {PARSED_RESUME_SUMMARY}
+Difficulty level: {DIFFICULTY}
+
+Rules:
+- Questions must be specific to the candidate's actual projects and skills
+- Mix: 40% technical, 30% behavioral, 30% situation-based
+- No repetitive questions
+- Each question must have a rubric for evaluation
+
+Return ONLY valid JSON:
+{
+  "questions": [{
+    "order": number,
+    "question_text": string,
+    "category": "technical" | "behavioral" | "situational",
+    "rubric": {
+      "ideal_keywords": string[],
+      "ideal_structure": string,
+      "red_flags": string[]
+    }
+  }]
+}
+```
+
+### Template 3: Answer Evaluation
+
+```
+You are an expert interview evaluator. Score the following answer strictly and fairly.
+
+Question: {QUESTION_TEXT}
+Rubric: {RUBRIC_JSON}
+Candidate's Answer: {ANSWER_TEXT}
+
+Score each dimension from 1–10 (1=very poor, 10=excellent).
+Be strict. A score of 7+ means genuinely good. Do not inflate scores.
+
+Return ONLY valid JSON:
+{
+  "overall_score": number (weighted average),
+  "dimension_scores": {
+    "communication_clarity": number,
+    "technical_depth": number,
+    "answer_structure": number,
+    "confidence": number,
+    "relevance": number
+  },
+  "feedback_text": string (2–3 sentences, specific and actionable),
+  "detailed_analysis": {
+    "strengths": string[],
+    "improvements": string[],
+    "model_answer_hint": string,
+    "keywords_missing": string[]
+  }
+}
+```
+
+---
+
+## ANTI-HALLUCINATION RULES (CRITICAL)
+
+1. **NEVER invent libraries** not in the tech stack above
+2. **NEVER assume** Supabase table columns exist unless specified in schema above
+3. **NEVER skip** RLS policy when creating any new table
+4. **NEVER use** `any` type in TypeScript — always properly type everything
+5. **NEVER hardcode** API keys or secrets — always use environment variables
+6. **ALWAYS verify** that code compiles before presenting it (trace through mentally)
+7. **ALWAYS implement** error handling — no try/catch without proper error logging
+8. **NEVER implement** features beyond the current phase's scope
+9. **If unsure about a business rule:** stop and ask, don't invent
+
+---
+
+## PHASE TRACKER (Update this as we progress)
+
+- [ ] Phase 1 — Week 1–2: Project Setup + DB + Auth + Resume Upload
+- [ ] Phase 1 — Week 3–4: Interview Loop + AI Integration + Score Report
+- [ ] Phase 1 — Week 5–6: Payments + Free Tool + Referral + Landing Page
+- [ ] Phase 2 — Week 7–8: Pro Tier + Blurred Preview + Annual Plans
+- [ ] Phase 2 — Week 9–10: Email + ATS Tool + Analytics
+- [ ] Phase 3 — Week 11–12: Voice Mode + STAR Tool + Replay
+- [ ] Phase 3 — Week 13–14: Domain Packs + PDF Export + SEO
+- [ ] Phase 4 — Week 15–16: Campus Dashboard + B2B
+- [ ] Phase 4 — Week 17–20: Scale + Load Testing
+
+**CURRENT PHASE:** Phase 1 — Week 1 (Project Initialization)
+
+---
+
+## ENV VARIABLES REQUIRED (Always scaffold these)
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+# OpenAI
+OPENAI_API_KEY=
+
+# Razorpay
+RAZORPAY_KEY_ID=
+RAZORPAY_KEY_SECRET=
+NEXT_PUBLIC_RAZORPAY_KEY_ID=
+
+# Resend
+RESEND_API_KEY=
+
+# PostHog
+NEXT_PUBLIC_POSTHOG_KEY=
+NEXT_PUBLIC_POSTHOG_HOST=
+
+# App
+NEXT_PUBLIC_APP_URL=
+NODE_ENV=
+```
+
+---
+
+## SESSION START CHECKLIST
+
+Before writing any code in a new session, confirm:
+1. ✅ What phase and week are we in?
+2. ✅ What was completed in the last session?
+3. ✅ What is the single deliverable for THIS session?
+4. ✅ Are there any blockers or decisions pending?
+
+---
+
+*This CLAUDE.md is the single source of truth. If any instruction conflicts with this file, this file wins.*
