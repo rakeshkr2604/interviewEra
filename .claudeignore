@@ -51,10 +51,8 @@ public/images/
 # Generated types — auto-generated, not helpful
 src/types/database.types.ts
 
-# Load tests and docs — not relevant to AI coding tasks
+# Load tests — not relevant to AI coding tasks
 load-tests/
-Docs/
-audit_report.md
 
 # Markdown files — not useful for AI coding tasks (CLAUDE.md and README.md are exceptions)
 *.md

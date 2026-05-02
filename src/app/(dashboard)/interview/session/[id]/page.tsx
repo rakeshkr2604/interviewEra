@@ -59,10 +59,6 @@ export default function InterviewSessionPage() {
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
 
-  useEffect(() => {
-    console.log('Interviewer:', resolvedInterviewer)
-  }, [resolvedInterviewer])
-
   // ─── Avatar + TTS ─────────────────────────────────────────
   const { isSpeaking, currentWordIndex, speechError, speakQuestion, stopSpeaking } =
     useAvatarSync(resolvedInterviewerId)

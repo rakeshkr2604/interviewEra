@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.in'
+const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.com'
 const BRAND = 'InterviewEra'
 
 interface PageSeoParams {

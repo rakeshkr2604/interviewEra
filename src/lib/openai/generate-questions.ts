@@ -72,7 +72,6 @@ function isValidQuestionsResponse(
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
-  console.log('[AI] Using OpenAI for question generation');
   const response = await callWithRetry(() =>
     openai.chat.completions.create({
       model: 'gpt-4.1-mini',

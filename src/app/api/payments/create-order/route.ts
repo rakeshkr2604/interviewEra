@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createSubscriptionOrder } from '@/lib/razorpay/client';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { paymentCreateOrderSchema } from '@/lib/validations/schemas';
 import type { PlanTier } from '@/types/app.types';
 
@@ -24,6 +25,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Rate limiting (5 orders / 60s per user)
+  const rateLimit = await checkRateLimit(`payment:${user.id}`, 60, 5);
+  if (!rateLimit.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait before trying again.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rateLimit.resetInSeconds),
+          'X-RateLimit-Remaining': '0',
+        },
+      },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -44,7 +60,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   // Campus requires direct enrollment — not available via self-serve checkout
   if (plan === 'campus') {
     return NextResponse.json(
-      { error: 'Campus plan requires direct enrollment. Contact us at campus@interviewera.in' },
+      { error: 'Campus plan requires direct enrollment. Contact us at campus@interviewera.com' },
       { status: 400 },
     );
   }

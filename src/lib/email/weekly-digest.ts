@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Resend } from 'resend';
 import { createServiceClient } from '@/lib/supabase/server';
 import type { DimensionScores } from '@/types/app.types';
@@ -22,7 +22,10 @@ export function generateUnsubToken(userId: string): string {
 
 export function verifyUnsubToken(userId: string, token: string): boolean {
   try {
-    return generateUnsubToken(userId) === token;
+    const expected = Buffer.from(generateUnsubToken(userId), 'hex');
+    const actual = Buffer.from(token, 'hex');
+    if (expected.length !== actual.length) return false;
+    return timingSafeEqual(expected, actual);
   } catch {
     return false;
   }

@@ -19,20 +19,20 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch user data
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, plan_tier, credits_remaining, placement_date, created_at')
-    .eq('id', user.id)
-    .single()
-
-  // Fetch recent interviews
-  const { data: interviews } = await supabase
-    .from('interviews')
-    .select('id, role, difficulty, status, completed_at, started_at')
-    .eq('user_id', user.id)
-    .order('started_at', { ascending: false })
-    .limit(5)
+  // userData and interviews are independent — fetch in parallel
+  const [{ data: userData }, { data: interviews }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('name, plan_tier, credits_remaining, placement_date, created_at')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('interviews')
+      .select('id, role, difficulty, status, completed_at, started_at')
+      .eq('user_id', user.id)
+      .order('started_at', { ascending: false })
+      .limit(5),
+  ])
 
   // Fetch reports for avg score
   const { data: reports } = await supabase

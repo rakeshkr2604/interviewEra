@@ -139,7 +139,6 @@ function tryParseResponse(content: string): EvaluationResult | null {
 }
 
 async function evaluateWithOpenAI(prompt: string): Promise<EvaluationResult> {
-  console.log('[AI] Using OpenAI for evaluation');
   const response = await callWithRetry(() =>
     openai.chat.completions.create({
       model: 'gpt-4.1-mini',
@@ -168,7 +167,6 @@ async function evaluateWithOpenAI(prompt: string): Promise<EvaluationResult> {
 }
 
 async function evaluateWithMistral(prompt: string): Promise<EvaluationResult> {
-  console.log('[AI] Using Mistral for evaluation');
   const content = await callMistralChat(prompt, 0.3);
 
   const parsed = tryParseResponse(content);

@@ -34,6 +34,7 @@ export function AtsCheckerForm() {
       sessionStorage.setItem(ATS_RESULT_STORAGE_KEY, serializeAtsResult(state.result));
     } catch {
       redirectDoneRef.current = false;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInlineFallback(true);
       posthog.capture('tool_used', { toolName: 'ats-checker' });
       return;

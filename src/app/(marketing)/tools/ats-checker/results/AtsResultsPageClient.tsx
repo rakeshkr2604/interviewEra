@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { AtsResultsView } from '../AtsResultsView';
@@ -14,39 +14,25 @@ import { cn } from '@/lib/utils';
 
 export function AtsResultsPageClient() {
   const router = useRouter();
-  const [result, setResult] = useState<AtsResult | null>(null);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
-  const ran = useRef(false);
 
-  useEffect(() => {
-    if (ran.current) return;
-    ran.current = true;
-
-    if (typeof window === 'undefined') {
-      setStatus('missing');
-      return;
-    }
-
+  const [result] = useState<AtsResult | null>(() => {
     const raw = sessionStorage.getItem(ATS_RESULT_STORAGE_KEY);
-    if (!raw) {
-      setStatus('missing');
-      router.replace('/tools/ats-checker');
-      return;
-    }
-
+    if (!raw) return null;
     const parsed = parseStoredAtsResult(raw);
     if (!parsed) {
       sessionStorage.removeItem(ATS_RESULT_STORAGE_KEY);
-      setStatus('missing');
-      router.replace('/tools/ats-checker');
-      return;
+      return null;
     }
+    return parsed;
+  });
 
-    setResult(parsed);
-    setStatus('ready');
-  }, [router]);
+  useEffect(() => {
+    if (!result) {
+      router.replace('/tools/ats-checker');
+    }
+  }, [result, router]);
 
-  if (status === 'loading' || status === 'missing') {
+  if (!result) {
     return (
       <main
         className="ie-landing-type flex min-h-[50vh] items-center justify-center py-20"
@@ -62,5 +48,5 @@ export function AtsResultsPageClient() {
     );
   }
 
-  return <AtsResultsView result={result!} />;
+  return <AtsResultsView result={result} />;
 }

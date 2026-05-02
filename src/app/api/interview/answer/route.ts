@@ -19,7 +19,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // ── Step 2: Rate limiting (5 req / 10s per user) ──────────────────────────
-    const rateLimit = await checkRateLimit(user.id);
+    const rateLimit = await checkRateLimit(`answer:${user.id}`, 10, 5);
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many requests. Please wait a moment before submitting.' },
@@ -100,11 +100,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         rubric: question.rubric as QuestionRubric,
         answerText,
       });
-
-      // Log which AI provider handled this evaluation (for PostHog/monitoring)
-      console.info(
-        `[interview/answer] Evaluated by ${evaluationResult.provider} — score: ${evaluationResult.overall_score}`
-      );
 
       const { data: evaluation } = await serviceClient
         .from('evaluations')

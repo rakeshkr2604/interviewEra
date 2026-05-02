@@ -1,4 +1,10 @@
-# CLAUDE.md — InterviewEra Project Rules & Context
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+# InterviewEra Project Rules & Context
 
 ## ⚠️ MANDATORY: READ THIS BEFORE WRITING ANY CODE OR PLAN
 
@@ -284,6 +290,92 @@ Before writing any code in a new session, confirm:
 ---
 
 *This CLAUDE.md is the single source of truth. If any instruction conflicts with this file, this file wins.*
+
+---
+
+## DEVELOPMENT COMMANDS
+
+```bash
+npm run dev          # Start dev server with Turbopack (fast HMR)
+npm run dev:fresh    # Clean .next cache then start dev server
+npm run dev:webpack  # Start with Webpack (use if Turbopack causes issues)
+npm run build        # Production build
+npm run lint         # Run ESLint
+```
+
+There is no test suite — TypeScript type-checking is the primary correctness tool.
+
+---
+
+## ROUTE ARCHITECTURE
+
+Three Next.js App Router route groups:
+
+- `(auth)` — unauthenticated: `/login`, `/signup`, `/forgot-password`, `/reset-password`
+- `(dashboard)` — authenticated app: `/dashboard`, `/onboarding/*`, `/interview/*`, `/report/*`, `/upgrade`, `/settings`, `/history`, `/analytics`, `/feedback`
+- `(marketing)` — public pages: `/`, `/pricing`, `/campus`, `/about`, `/blog/*`, `/tools/*`
+
+`admin/` is a flat ungrouped route for campus B2B admin pages.
+
+---
+
+## SUPABASE CLIENT PATTERNS
+
+Four distinct clients — use the right one per context:
+
+| File | When to use |
+|------|------------|
+| `src/lib/supabase/client.ts` | Browser components (`createBrowserClient`) |
+| `src/lib/supabase/server.ts` — `createClient()` | Server components + API routes, auth-scoped queries |
+| `src/lib/supabase/server.ts` — `createServiceClient()` | API routes that must bypass RLS (write on behalf of any user) |
+| `src/lib/supabase/middleware.ts` | `middleware.ts` only — session refresh |
+
+Use `createServiceClient()` in API routes when writing after credit deduction or creating records for a user.
+
+---
+
+## TWO INTERVIEW SESSION FLOWS
+
+There are two distinct interview UIs — do not conflate them:
+
+1. **Avatar session** (`/interview/session/[id]`) — the primary user-facing flow. Full avatar video + Web Speech API TTS + real-time captions + filler word detection. Phase state machine: `loading → avatar_speaking → candidate_answering → submitting → feedback → completed`. Key hooks: `useAvatarSync`, `useTimer`, `useSpeechRecognition`.
+
+2. **Classic session** (`/interview/[id]`) — text-based fallback flow. `InterviewSession.tsx` owns state. No avatar, no TTS.
+
+Both flows POST to the same API routes: `/api/interview/answer` and `/api/interview/complete`.
+
+---
+
+## AI PROVIDER ROUTING
+
+Despite the "GPT-4o-mini only" rule above, a Mistral fallback exists at `src/lib/mistral/client.ts`. It activates when OpenAI throws `QuotaExhaustedError` (triggered by `insufficient_quota` from the OpenAI API). The circuit breaker in `src/lib/openai/client.ts` emits this error; callers in `evaluate-answer.ts` catch it and fall through to Mistral. This is the approved D3 fallback referenced by `MISTRAL_API_KEY` in the env vars.
+
+---
+
+## CREDIT DEDUCTION PATTERN
+
+Credits are deducted via a Supabase RPC (not a direct UPDATE) to prevent race conditions. Helper: `checkAndDeductCredit(userId)` in `src/lib/utils/credits.ts`. On any downstream failure after deduction (interview creation, question generation), call `refundCredit(userId)`. Never UPDATE `credits_remaining` directly from application code.
+
+---
+
+## QUESTION CACHING
+
+Generated questions are cached in Upstash Redis (`src/lib/redis/question-cache.ts`). Cache key is derived from role + difficulty + parsed resume. On cache hit, questions are shuffled and a subset is taken per `questionCount`. Cache writes are fire-and-forget (`void setCachedQuestions(...)`).
+
+---
+
+## ONBOARDING STATE
+
+Multi-step onboarding state is in a React Context, not the URL or database. Provider: `OnboardingProvider` in `src/lib/onboarding/store.ts`, mounted at `src/app/(dashboard)/onboarding/layout.tsx`. State is lost on hard refresh — intentional, users restart from step 1.
+
+---
+
+## THEME SYSTEM
+
+Theme (`light` | `dark`) is stored in `localStorage` under key `ie-theme`. A blocking inline `<script>` in `src/app/layout.tsx` reads this before React hydrates to prevent flash of wrong theme. The `data-theme` attribute on `<html>` is the CSS cascade hook. Use CSS variable tokens (not Tailwind `dark:` utilities) for new components.
+
+---
+
 ## AVATAR INTERVIEW SYSTEM (New Feature — InterviewIQ Upgrade)
 
 ### Avatar Config

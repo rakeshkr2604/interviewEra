@@ -1,4 +1,5 @@
 'use client'
+import Image from 'next/image'
 import { CheckCircle } from 'lucide-react'
 import { useState } from 'react'
 import type { Interviewer } from '@/lib/config/interviewers'
@@ -28,9 +29,11 @@ export function AvatarCard({ avatar, isSelected, onSelect }: AvatarCardProps) {
         />
       )}
       <div className="flex items-center gap-4">
-        <img
+        <Image
           src={imgSrc}
           alt={`${avatar.name} avatar`}
+          width={56}
+          height={56}
           className="h-14 w-14 rounded-full object-cover object-center ring-1 ring-(--card-border)"
           onError={(event) => {
             if (imgSrc !== '/default-avatar.png') {

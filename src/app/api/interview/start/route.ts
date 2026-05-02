@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { generateQuestions, QuestionGenerationError } from '@/lib/openai/generate-questions';
 import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
 
 import {
@@ -23,6 +24,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // ── Rate limiting (5 starts / 60s per user) ───────────────────────────────
+    const rateLimit = await checkRateLimit(`start:${user.id}`, 60, 5);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many interview starts. Please wait before trying again.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetInSeconds),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
     }
 
     // ── Validate input ────────────────────────────────────────────────────────
@@ -80,11 +96,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       .eq('id', resumeId)
       .eq('user_id', user.id)
       .maybeSingle();
-
-    console.info('[interview/start] Resume readiness check', {
-      resumeId,
-      status: resume?.status ?? 'not_found',
-    });
 
     if (!resume || resume.status !== 'parsed') {
       return NextResponse.json(

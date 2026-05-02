@@ -2,8 +2,6 @@ import OpenAI from 'openai';
 
 const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY ?? '';
 
-console.log('[mistral] API key loaded:', !!MISTRAL_API_KEY);
-
 const mistral = new OpenAI({
   apiKey: MISTRAL_API_KEY,
   baseURL: 'https://api.mistral.ai/v1',
@@ -25,8 +23,6 @@ export async function callMistralChat(
   if (!MISTRAL_API_KEY) {
     throw new Error('[mistral] API key missing — cannot call Mistral');
   }
-
-  console.log('[AI] Using Mistral fallback');
 
   let lastError: unknown;
   for (let attempt = 0; attempt < MISTRAL_MAX_ATTEMPTS; attempt++) {

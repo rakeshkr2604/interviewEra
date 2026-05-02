@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { parseResume } from '@/lib/openai/parse-resume';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { PDFParse } from 'pdf-parse';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
@@ -17,6 +18,21 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // ── Rate limiting (5 uploads / 5 min per user) ────────────────────────────
+    const rateLimit = await checkRateLimit(`upload:${user.id}`, 300, 5);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many uploads. Please wait a few minutes before trying again.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.resetInSeconds),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
     }
 
     // ── Step 2: Validate file ──────────────────────────────────────────────────

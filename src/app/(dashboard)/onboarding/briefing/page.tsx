@@ -36,7 +36,6 @@ export default function BriefingPage() {
     }
 
     try {
-      console.log('Calling interview start API')
       const payload = {
         resumeId: data.resumeId,
         role: data.role,
@@ -54,10 +53,6 @@ export default function BriefingPage() {
         interviewId?: string
         error?: string
       } | null
-      console.log('Interview start response', {
-        status: response.status,
-        body: responseData,
-      })
 
       if (response.status === 405) {
         setError('Internal API mismatch. Please contact support.')

@@ -48,7 +48,6 @@ function isValidParsedResume(data: unknown): data is ParsedResume {
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
-  console.log('[AI] Using OpenAI for resume parsing');
   const response = await callWithRetry(() =>
     openai.chat.completions.create({
       model: 'gpt-4.1-mini',

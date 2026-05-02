@@ -42,10 +42,9 @@ export function StarBuilderResultsView({
   const [copyState, setCopyState] = useState<'idle' | 'done' | 'error'>('idle');
 
   useEffect(() => {
-    if (copyState === 'done') {
-      const t = setTimeout(() => setCopyState('idle'), 2000);
-      return () => clearTimeout(t);
-    }
+    if (copyState !== 'done') return;
+    const t = setTimeout(() => setCopyState('idle'), 2000);
+    return () => clearTimeout(t);
   }, [copyState]);
 
   async function copyAnswer() {

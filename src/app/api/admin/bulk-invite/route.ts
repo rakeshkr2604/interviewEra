@@ -125,7 +125,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // ── Send invite emails via Resend ──────────────────────────────────────────
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.in';
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
     let emailErrors = 0;
 
     // Send in batches of 50 to respect Resend rate limits
@@ -135,7 +135,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const results = await Promise.allSettled(
         batch.map((invite) =>
           resend.emails.send({
-            from: 'InterviewEra Campus <campus@interviewera.in>',
+            from: 'InterviewEra Campus <campus@interviewera.com>',
             to: invite.email,
             subject: `You've been invited to InterviewEra by ${org.name}`,
             html: `

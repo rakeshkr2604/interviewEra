@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
+import { VoicePreferenceSelect } from '@/components/settings/VoicePreferenceSelect'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -69,20 +70,7 @@ export default async function SettingsPage() {
           <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
             Used for AI interviewer TTS when available.
           </p>
-          <select
-            className="w-full cursor-pointer appearance-none rounded-xl border-2 px-4 py-3 text-sm font-medium"
-            style={{
-              background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-              color: 'var(--text-primary)',
-              borderColor: 'var(--card-border)',
-            }}
-          >
-            <option value="female">Female (Priya)</option>
-            <option value="male">Male (Arjun)</option>
-          </select>
-          <p className="text-xs mt-3" style={{ color: 'var(--text-muted)' }}>
-            Note: Voice availability depends on your browser/device voices.
-          </p>
+          <VoicePreferenceSelect />
         </div>
 
         {/* Account info */}

@@ -83,7 +83,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
     setPermissionState('requesting');
     hasRequestedMicRef.current = true;
-    console.log('Requesting mic access...');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       stream.getTracks().forEach((track) => track.stop());
@@ -121,7 +120,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     if (!navigator?.permissions?.query) return 'unknown';
     try {
       const permission = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-      console.log('Permission state:', permission.state);
       if (permission.state === 'granted' || permission.state === 'prompt' || permission.state === 'denied') {
         return permission.state;
       }
@@ -175,7 +173,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
 
     recognition.onstart = () => {
       setIsListening(true);
-      console.log('Mic started');
       autoStopRef.current = setTimeout(() => recognition.stop(), AUTO_STOP_MS);
     };
 
@@ -189,7 +186,6 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       }
       if (finalChunk) setTranscript((prev) => prev + finalChunk);
       setInterimTranscript(interimChunk);
-      console.log('Transcript:', `${finalChunk}${interimChunk}`);
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {

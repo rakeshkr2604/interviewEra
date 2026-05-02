@@ -25,7 +25,7 @@ export default async function FeedbackPage() {
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <a
-            href="mailto:support@interviewera.app?subject=InterviewEra%20Feedback"
+            href="mailto:support@interviewera.com?subject=InterviewEra%20Feedback"
             className="landing-cta-lift rounded-[14px] px-4 py-2.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
             style={{
               background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
