@@ -3,8 +3,6 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { Resend } from 'resend';
 import { z } from 'zod';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const bodySchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
 });
@@ -125,6 +123,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // ── Send invite emails via Resend ──────────────────────────────────────────
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
     let emailErrors = 0;
 

@@ -3,8 +3,6 @@ import { Resend } from 'resend';
 import { createServiceClient } from '@/lib/supabase/server';
 import type { DimensionScores } from '@/types/app.types';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 const FROM_EMAIL = 'InterviewEra <transactional@interviewera.com>';
 const REPLY_TO = 'support@interviewera.com';
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
@@ -227,6 +225,7 @@ function buildEmailHtml(data: DigestData): string {
 // ─── Send digest to a single user ────────────────────────────────────────────
 
 async function sendDigest(data: DigestData): Promise<void> {
+  const resend = new Resend(process.env.RESEND_API_KEY);
   const date = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
