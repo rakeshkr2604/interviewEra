@@ -215,14 +215,24 @@ Return ONLY valid JSON:
 - [ ] Phase 1 — Week 1–2: Project Setup + DB + Auth + Resume Upload
 - [ ] Phase 1 — Week 3–4: Interview Loop + AI Integration + Score Report
 - [ ] Phase 1 — Week 5–6: Payments + Free Tool + Referral + Landing Page
-- [ ] Phase 2 — Week 7–8: Pro Tier + Blurred Preview + Annual Plans
-- [ ] Phase 2 — Week 9–10: Email + ATS Tool + Analytics
-- [ ] Phase 3 — Week 11–12: Voice Mode + STAR Tool + Replay
-- [ ] Phase 3 — Week 13–14: Domain Packs + PDF Export + SEO
-- [ ] Phase 4 — Week 15–16: Campus Dashboard + B2B
-- [ ] Phase 4 — Week 17–20: Scale + Load Testing
+- [x] Phase 2 — Week 7–8: Pro Tier + Blurred Preview + Annual Plans
+- [x] Phase 2 — Week 9–10: Email + ATS Tool + Analytics
+- [x] Phase 3 — Week 11–12: Voice Mode + STAR Tool + Replay
+- [x] Phase 3 — Week 13–14: Domain Packs + PDF Export + SEO
+- [x] Phase 4 — Week 15–16: Campus Dashboard + B2B
+- [x] Phase 4 — Week 17–20: Scale + Load Testing
 
-**CURRENT PHASE:** Phase 1 — Week 1 (Project Initialization)
+**CURRENT PHASE:** Phase 4 complete. All phases shipped.
+
+---
+
+## ACTIVE A/B TESTS
+
+| Flag | Control | Variant | Goal | Status |
+|------|---------|---------|------|--------|
+| `first_interview_questions` | 6 questions | 4 questions | Test if fewer Qs improve completion rate | ACTIVE — review at Phase 3 Week 12 |
+
+Note: `first_interview_questions = 4` is an approved deviation from the "first interview = 6 questions" rule in this file. The flag code enforces a hard floor of 4 and ceiling of 10 regardless of PostHog value.
 
 ---
 
@@ -249,6 +259,13 @@ RESEND_API_KEY=
 NEXT_PUBLIC_POSTHOG_KEY=
 NEXT_PUBLIC_POSTHOG_HOST=
 
+# Upstash Redis (rate limiting + question cache)
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
+
+# Mistral AI (evaluation fallback — D3)
+MISTRAL_API_KEY=
+
 # App
 NEXT_PUBLIC_APP_URL=
 NODE_ENV=
@@ -267,3 +284,42 @@ Before writing any code in a new session, confirm:
 ---
 
 *This CLAUDE.md is the single source of truth. If any instruction conflicts with this file, this file wins.*
+## AVATAR INTERVIEW SYSTEM (New Feature — InterviewIQ Upgrade)
+
+### Avatar Config
+- Female avatar: Priya (Senior Recruiter) — /public/avatars/female/female-ai.mp4
+- Male avatar: Arjun (Technical Lead) — /public/avatars/male/male-ai.mp4
+- Voice: Web Speech API SpeechSynthesis — female voice for Priya, male for Arjun
+- Video: 8-second seamless loop — plays continuously while TTS speaks
+- Lip-sync illusion: video loop + simultaneous TTS audio
+
+### Interview Flow — 4 Steps
+- Step 1: Onboarding (goal + role + experience + resume upload)
+- Step 2: Avatar Selection + Pre-interview briefing
+- Step 3: Live Interview Session (avatar video + TTS + captions + timer + mic)
+- Step 4: Report (scores + filler word analysis + speech patterns)
+
+### Filler Word Rules
+- Detection: post-answer only (never real-time during answer)
+- Safe threshold: ≤3 per minute (green)
+- Warning: 4–6 per minute (amber)
+- Severe: 7+ per minute (red)
+- Feedback: 1–1.5 lines max, motivational tone
+
+### Timer Rules
+- Timer starts: 0.5s AFTER TTS completes (not simultaneously)
+- Timer stops: when candidate clicks Submit or time runs out
+- Default time per question: 60 seconds
+- No timer during avatar speaking
+
+### Caption Rules
+- Avatar captions: word-by-word highlight as TTS speaks
+- Candidate transcript: real-time interim results from Web Speech API
+- Both visible simultaneously in split layout
+
+### Theme System
+- CSS variables driven (tokens.ts)
+- Default: system preference (prefers-color-scheme)
+- Toggle: navbar top-right sun/moon icon
+- Light mode bg: #F8FAFC (never pure white)
+- Transition: 200ms ease on all color properties

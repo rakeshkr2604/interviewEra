@@ -1,0 +1,65 @@
+# Dependencies — never needed
+node_modules/
+.pnpm-store/
+
+# Build output — generated files
+.next/
+out/
+dist/
+build/
+
+# Package locks — not useful for AI
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment files — security
+.env
+.env.local
+.env.production
+.env*.local
+
+# Git internals
+.git/
+
+# Cache
+.cache/
+.turbo/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Supabase local
+supabase/.branches/
+supabase/.temp/
+
+# Public assets — videos/images large hain
+public/avatars/
+public/icons/
+public/images/
+
+# Generated types — auto-generated, not helpful
+src/types/database.types.ts
+
+# Load tests and docs — not relevant to AI coding tasks
+load-tests/
+Docs/
+audit_report.md
+
+# Markdown files — not useful for AI coding tasks (CLAUDE.md and README.md are exceptions)
+*.md
+!CLAUDE.md
+!README.md
+
+# PWA manifest — static, not relevant to coding tasks
+public/manifest.json

@@ -12,7 +12,23 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // k6 load test scripts are plain JS — skip linting
+    "load-tests/**",
   ]),
+  {
+    rules: {
+      // Relax to only forbid chars that actually break JSX parsing (> and }).
+      // Apostrophes (') and quotes (") in prose text are cosmetically imperfect
+      // but never cause parse errors or XSS — enforcing them in blog/marketing
+      // pages with heavy prose creates excessive noise.
+      "react/no-unescaped-entities": ["error", { forbid: [">", "}"] }],
+      // Parameters prefixed with _ are intentionally unused stubs.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

@@ -1,0 +1,216 @@
+// ─── Enum-like types ──────────────────────────────────────────────────────────
+
+export type PlanTier = 'free' | 'starter' | 'pro' | 'campus' | 'campus_admin';
+
+export type InterviewStatus = 'pending' | 'in_progress' | 'completed' | 'abandoned';
+
+export type ResumeStatus = 'uploading' | 'parsing' | 'parsed' | 'failed';
+
+export type AnswerMode = 'text' | 'voice';
+
+export type CreditType = 'debit' | 'credit';
+
+export type ReferralStatus = 'pending' | 'completed' | 'credited';
+
+export type InterviewDifficulty = 'easy' | 'medium' | 'hard';
+
+export type QuestionCategory = 'technical' | 'behavioral' | 'situational';
+
+export type DomainPackDomain = 'dsa' | 'system_design' | 'hr';
+
+export interface DomainPack {
+  id: string;
+  name: string;
+  domain: DomainPackDomain;
+  description: string | null;
+  question_count: number | null;
+  is_active: boolean;
+}
+
+// ─── Core entities ────────────────────────────────────────────────────────────
+
+export interface User {
+  id: string;
+  email: string;
+  name: string | null;
+  plan_tier: PlanTier;
+  credits_remaining: number;
+  placement_date: string | null;
+  created_at: string;
+}
+
+export interface ParsedResumeExperience {
+  company: string;
+  role: string;
+  duration: string;
+  description: string;
+}
+
+export interface ParsedResumeProject {
+  name: string;
+  tech_stack: string[];
+  description: string;
+}
+
+export interface ParsedResumeEducation {
+  degree: string;
+  institution: string;
+  year: string;
+  cgpa: string;
+}
+
+export interface ParsedResume {
+  name: string;
+  email: string;
+  phone: string;
+  skills: string[];
+  experience: ParsedResumeExperience[];
+  projects: ParsedResumeProject[];
+  education: ParsedResumeEducation[];
+  target_roles: string[];
+}
+
+export interface Resume {
+  id: string;
+  user_id: string;
+  file_url: string | null;
+  raw_text: string | null;
+  parsed_data: ParsedResume | null;
+  status: ResumeStatus;
+  created_at: string;
+}
+
+export interface Interview {
+  id: string;
+  user_id: string;
+  resume_id: string;
+  interviewer_id: 'priya' | 'arjun';
+  role: string;
+  difficulty: InterviewDifficulty;
+  question_count: number;
+  status: InterviewStatus;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface QuestionRubric {
+  ideal_keywords: string[];
+  ideal_structure: string;
+  red_flags: string[];
+}
+
+export interface Question {
+  id: string;
+  interview_id: string;
+  order_index: number;
+  question_text: string;
+  rubric: QuestionRubric;
+  category: QuestionCategory;
+}
+
+export interface Answer {
+  id: string;
+  question_id: string;
+  answer_text: string;
+  answer_mode: AnswerMode;
+  submitted_at: string;
+}
+
+export interface DimensionScores {
+  communication_clarity: number;
+  technical_depth: number;
+  answer_structure: number;
+  confidence: number;
+  relevance: number;
+}
+
+export interface DetailedAnalysis {
+  strengths: string[];
+  improvements: string[];
+  model_answer_hint: string;
+  keywords_missing: string[];
+}
+
+export interface Evaluation {
+  id: string;
+  answer_id: string;
+  overall_score: number;
+  dimension_scores: DimensionScores;
+  feedback_text: string;
+  detailed_analysis: DetailedAnalysis;
+}
+
+export interface RadarDataPoint {
+  dimension: string;
+  score: number;
+}
+
+export interface Report {
+  id: string;
+  interview_id: string;
+  overall_score: number;
+  radar_data: RadarDataPoint[];
+  trend_data: RadarDataPoint[] | null;
+  generated_at: string;
+}
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan: PlanTier;
+  razorpay_sub_id: string | null;
+  status: 'active' | 'cancelled' | 'past_due';
+  current_period_start: string | null;
+  current_period_end: string | null;
+}
+
+export interface Referral {
+  id: string;
+  referrer_id: string;
+  referred_id: string;
+  status: ReferralStatus;
+  credited_at: string | null;
+}
+
+export interface CreditTransaction {
+  id: string;
+  user_id: string;
+  type: CreditType;
+  amount: number;
+  reason: string | null;
+  created_at: string;
+}
+
+// ─── Campus Admin types ───────────────────────────────────────────────────────
+
+export interface CampusOrganization {
+  id: string;
+  name: string;
+  admin_user_id: string | null;
+  seat_count: number;
+  plan_start: string | null;
+  plan_end: string | null;
+  razorpay_payment_id: string | null;
+  created_at: string;
+}
+
+export type CampusInviteStatus = 'pending' | 'accepted';
+
+export interface CampusInvite {
+  id: string;
+  org_id: string;
+  email: string;
+  token: string;
+  status: CampusInviteStatus;
+  invited_at: string;
+  accepted_at: string | null;
+}
+
+export interface CampusStudentRow {
+  id: string;
+  email: string;
+  name: string | null;
+  interviews_completed: number;
+  avg_score: number | null;
+  last_interview_at: string | null;
+}

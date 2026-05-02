@@ -1,0 +1,13 @@
+{
+  "name": "InterviewEra",
+  "short_name": "InterviewEra",
+  "description": "AI-powered mock interview practice for Indian students",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0A0F1E",
+  "theme_color": "#6366F1",
+  "orientation": "portrait",
+  "icons": [],
+  "categories": ["education", "productivity"],
+  "lang": "en-IN"
+}

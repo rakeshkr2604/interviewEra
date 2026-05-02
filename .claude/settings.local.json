@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npx shadcn*)",
+      "Bash(mkdir:*)",
+      "Bash(touch:*)",
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(cp:*)",
+      "Bash(mv:*)",
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(npx:*)",
+      "Bash(cmd /c \"taskkill /F /PID 14296 && echo KILLED\")",
+      "Bash(cmd /c \"wmic process where ProcessId=14296 get ProcessId,Name,CommandLine 2>&1\")",
+      "Bash(cmd /c \"netstat -ano | findstr \\\\\":3000\\\\\"\")",
+      "Bash(cmd /c \"netstat -ano | findstr \\\\\":3001\\\\\"\")"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(sudo:*)",
+      "Bash(git push:*)"
+    ]
+  }
+}
