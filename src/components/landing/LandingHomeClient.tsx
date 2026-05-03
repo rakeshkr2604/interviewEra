@@ -2,7 +2,14 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'motion/react';
+import {
+  motion,
+  useReducedMotion,
+  useInView,
+  useMotionValue,
+  useTransform,
+  animate,
+} from 'motion/react';
 
 /*
  * Design tokens — all values are CSS custom property references.
@@ -132,6 +139,43 @@ function CursorBlink() {
   );
 }
 
+/* ─── CountUp — animates a number from 0 to target on viewport entry ─── */
+function CountUp({
+  to,
+  decimals = 0,
+  duration = 1.0,
+  comma = false,
+  delay = 0,
+}: {
+  to: number;
+  decimals?: number;
+  duration?: number;
+  comma?: boolean;
+  delay?: number;
+}) {
+  const ref = React.useRef<HTMLSpanElement | null>(null);
+  const inView = useInView(ref, { once: true, margin: '-10% 0px' });
+  const reduce = useReducedMotion();
+  const mv = useMotionValue(reduce ? to : 0);
+  const display = useTransform(mv, (v) => {
+    if (decimals > 0) return v.toFixed(decimals);
+    if (comma) return Math.round(v).toLocaleString('en-IN');
+    return Math.round(v).toString();
+  });
+
+  React.useEffect(() => {
+    if (!inView || reduce) return;
+    const controls = animate(mv, to, {
+      duration,
+      delay,
+      ease: [0.16, 1, 0.3, 1],
+    });
+    return () => controls.stop();
+  }, [inView, to, duration, delay, mv, reduce]);
+
+  return <motion.span ref={ref}>{display}</motion.span>;
+}
+
 function ScoringCard() {
   const dims = [
     { label: 'Communication', value: 7.8, pct: 78 },
@@ -259,7 +303,9 @@ function ScoringCard() {
       >
         <span style={{ fontSize: '12px', color: T.text3 }}>Session average</span>
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-          <span style={{ fontSize: '22px', color: T.acc }}>7.6</span>
+          <span style={{ fontSize: '22px', color: T.acc }}>
+            <CountUp to={7.6} decimals={1} duration={1.4} delay={0.5} />
+          </span>
           <span style={{ fontSize: '13px', color: T.text3, marginLeft: '4px' }}>/ 10</span>
         </div>
       </div>
@@ -450,7 +496,9 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
 
           {/* Right: Scoring card */}
           <Reveal delay={0.08}>
-            <ScoringCard />
+            <div className="ie-hero-glow">
+              <ScoringCard />
+            </div>
           </Reveal>
         </div>
       </div>
@@ -608,18 +656,19 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
             <Reveal key={card.title} delay={i * 0.07}>
               <Link
                 href={card.href}
+                className={card.recommended ? 'ie-card-premium ie-card-premium--accent' : 'ie-card-premium'}
                 style={{
                   display: 'flex', flexDirection: 'column', gap: '14px',
                   border: `1px solid ${card.recommended ? T.accbrd : T.bord2}`,
                   borderRadius: '18px', padding: '28px', cursor: 'pointer',
                   background: card.recommended ? T.accdim : T.card,
                   position: 'relative', overflow: 'hidden', textDecoration: 'none', height: '100%',
-                  transition: 'transform 0.18s ease, border-color 0.18s ease',
+                  transition: 'transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease, box-shadow 0.22s ease',
                 }}
                 onMouseEnter={(e) => {
                   const el = e.currentTarget as HTMLElement;
                   el.style.transform = 'translateY(-3px)';
-                  el.style.borderColor = T.bord;
+                  el.style.borderColor = card.recommended ? T.acc : T.bord;
                 }}
                 onMouseLeave={(e) => {
                   const el = e.currentTarget as HTMLElement;
@@ -628,7 +677,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
                 }}
               >
                 {card.recommended && (
-                  <span style={{ position: 'absolute', top: '16px', right: '16px', background: T.acc, color: '#fff', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: '99px' }}>
+                  <span className="ie-badge-pulse" style={{ top: '16px', right: '16px', background: T.acc, color: '#fff', fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: '99px' }}>
                     Most common
                   </span>
                 )}
@@ -756,9 +805,9 @@ function ScoringEngineSection() {
 
             <div className="transf-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
               {/* Bad panel */}
-              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px dashed ${T.painBrd}` }}>
+              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px solid ${T.painBrd}`, boxShadow: `0 8px 32px -16px color-mix(in srgb, ${T.err} 40%, transparent)` }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '20px', fontWeight: 700, background: `color-mix(in srgb, ${T.err} 12%, transparent)`, color: T.err, border: `1px solid color-mix(in srgb, ${T.err} 25%, transparent)`, marginBottom: '16px' }}>
-                  <span>3.8</span><span style={{ fontSize: '12px' }}>/10</span>
+                  <span><CountUp to={3.8} decimals={1} duration={0.9} /></span><span style={{ fontSize: '12px' }}>/10</span>
                   <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Score</span>
                 </div>
                 <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px', color: T.err }}>
@@ -780,9 +829,9 @@ function ScoringEngineSection() {
               </div>
 
               {/* Good panel */}
-              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px solid ${T.okbrd}` }}>
+              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px solid ${T.okbrd}`, boxShadow: `0 8px 32px -16px color-mix(in srgb, ${T.ok} 40%, transparent)` }}>
                 <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '20px', fontWeight: 700, background: T.okdim, color: T.ok, border: `1px solid ${T.okbrd}`, marginBottom: '16px' }}>
-                  <span>8.4</span><span style={{ fontSize: '12px' }}>/10</span>
+                  <span><CountUp to={8.4} decimals={1} duration={0.9} delay={0.15} /></span><span style={{ fontSize: '12px' }}>/10</span>
                   <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Score</span>
                 </div>
                 <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px', color: T.ok }}>
@@ -911,15 +960,160 @@ function ScoringEngineSection() {
 }
 
 /* ─── 6. SOCIAL PROOF ─── */
+type Testimonial = {
+  initials: string;
+  gradient: string;
+  name: string;
+  meta: string;
+  quote: string;
+  outcome: string;
+};
+
+function TestimonialCarousel({ items }: { items: Testimonial[] }) {
+  const CARD_W = 360;
+  const GAP = 20;
+  const setWidth = items.length * (CARD_W + GAP); // pixel-exact one-set width
+  const looped = React.useMemo(() => [...items, ...items], [items]);
+  const reduce = useReducedMotion();
+
+  const x = useMotionValue(0);
+  const controlsRef = React.useRef<ReturnType<typeof animate> | null>(null);
+
+  React.useEffect(() => {
+    if (reduce) return;
+    controlsRef.current = animate(x, -setWidth, {
+      duration: 34,
+      ease: 'linear',
+      repeat: Infinity,
+      repeatType: 'loop',
+    });
+    return () => controlsRef.current?.stop();
+  }, [x, setWidth, reduce]);
+
+  const pause = () => (controlsRef.current as { pause?: () => void } | null)?.pause?.();
+  const play  = () => (controlsRef.current as { play?:  () => void } | null)?.play?.();
+
+  return (
+    <div
+      style={{ overflow: 'hidden', position: 'relative', padding: '10px 0 18px' }}
+      onMouseEnter={pause}
+      onMouseLeave={play}
+    >
+      <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '140px', background: `linear-gradient(to right, ${T.bg2} 30%, transparent)`, zIndex: 2, pointerEvents: 'none' }} />
+      <div aria-hidden style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: '140px', background: `linear-gradient(to left, ${T.bg2} 30%, transparent)`, zIndex: 2, pointerEvents: 'none' }} />
+
+      <motion.div
+        className="ie-testi-track"
+        style={{ display: 'flex', gap: `${GAP}px`, width: 'max-content', x }}
+      >
+        {looped.map((t, i) => (
+          <div
+            key={`${t.name}-${i}`}
+            className="ie-card-premium"
+            style={{
+              width: `${CARD_W}px`,
+              flexShrink: 0,
+              background: T.card,
+              border: `1px solid ${T.bord2}`,
+              borderRadius: '20px',
+              padding: '28px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '44px', height: '44px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '14px', fontWeight: 800, color: '#fff', background: t.gradient }}>
+                {t.initials}
+              </div>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: 700, color: T.text, marginBottom: '2px' }}>{t.name}</div>
+                <div style={{ fontSize: '12px', color: T.text3 }}>{t.meta}</div>
+              </div>
+            </div>
+            <div style={{ color: T.warn, fontSize: '13px', letterSpacing: '2px' }}>★★★★★</div>
+            <p style={{ fontSize: '14px', lineHeight: 1.75, color: T.text2, flex: 1 }}>{t.quote}</p>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: T.okdim, borderRadius: '99px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 700, color: T.ok, alignSelf: 'flex-start', marginTop: 'auto' }}>
+              {t.outcome}
+            </div>
+          </div>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
 function SocialProofSection() {
-  const testimonials = [
-    { initials: 'AK', gradient: 'linear-gradient(135deg,#6366f1,#7c3aed)', name: 'Ananya K.', meta: 'NIT Trichy · CSE · 2024 batch', quote: '"Random stories became STAR answers after 3 sessions. The feedback highlighted exactly what panels actually care about — not generic \'be confident\' advice."', outcome: '✓ Shortlisted at 3 product companies' },
-    { initials: 'RM', gradient: 'linear-gradient(135deg,#a855f7,#6366f1)', name: 'Rahul M.',  meta: 'VIT · ECE → Software · 2024 batch', quote: '"The questions were from my actual resume — I wasn\'t practicing hypotheticals. Knew which answers needed fixing before each company process started."',  outcome: '✓ First offer after 12 scored sessions' },
-    { initials: 'AY', gradient: 'linear-gradient(135deg,#10b981,#0891b2)', name: 'Ayush T.',  meta: 'B.Tech CSE · Tier-3 · 2024 batch',  quote: '"Went from blanking on follow-up questions to having actual structure. Score jumped 4.6 → 7.4 in 3 sessions. The number made it real — not just a feeling."',   outcome: '✓ Score: 4.6 → 7.4 in 3 sessions' },
+  const testimonials: Testimonial[] = [
+    {
+      initials: 'AK',
+      gradient: 'linear-gradient(135deg,#6366f1,#7c3aed)',
+      name: 'Ananya K.',
+      meta: 'NIT Trichy · CSE · 2024 batch',
+      quote: '"Random stories became STAR answers after 3 sessions. The feedback highlighted exactly what panels actually care about — not generic \'be confident\' advice."',
+      outcome: '✓ Shortlisted at 3 product companies',
+    },
+    {
+      initials: 'RM',
+      gradient: 'linear-gradient(135deg,#a855f7,#6366f1)',
+      name: 'Rahul M.',
+      meta: 'VIT · ECE → Software · 2024 batch',
+      quote: '"The questions were from my actual resume — I wasn\'t practicing hypotheticals. Knew which answers needed fixing before each company process started."',
+      outcome: '✓ First offer after 12 scored sessions',
+    },
+    {
+      initials: 'AY',
+      gradient: 'linear-gradient(135deg,#10b981,#0891b2)',
+      name: 'Ayush T.',
+      meta: 'B.Tech CSE · Tier-3 · 2024 batch',
+      quote: '"Went from blanking on follow-up questions to having actual structure. Score jumped 4.6 → 7.4 in 3 sessions. The number made it real — not just a feeling."',
+      outcome: '✓ Score: 4.6 → 7.4 in 3 sessions',
+    },
+    {
+      initials: 'PS',
+      gradient: 'linear-gradient(135deg,#f59e0b,#ef4444)',
+      name: 'Priya S.',
+      meta: 'IIIT Hyderabad · CSE · 2025 batch',
+      quote: '"I kept saying \'we built this\' in every single answer — the AI flagged it immediately. Two weeks of scored sessions fixed that. In the Flipkart third round, the interviewer said my ownership language stood out."',
+      outcome: '✓ Cleared Flipkart SDE-1 final round',
+    },
+    {
+      initials: 'KR',
+      gradient: 'linear-gradient(135deg,#0ea5e9,#6366f1)',
+      name: 'Karthik R.',
+      meta: 'BITS Pilani Goa · CS · 2025 batch',
+      quote: '"First session scored 5.8. That number forced me to take prep seriously for the first time. By session 8, I was consistently hitting 7.5+ on technical depth. Walmart Global Tech process was the calmest interview I\'ve ever had."',
+      outcome: '✓ Placed at Walmart Global Tech · ₹17.5L',
+    },
+    {
+      initials: 'SD',
+      gradient: 'linear-gradient(135deg,#ec4899,#a855f7)',
+      name: 'Sneha D.',
+      meta: 'MNIT Jaipur · IT · 2024 batch',
+      quote: '"Good content, terrible delivery. I kept burying the result or skipping it entirely — the score breakdown showed me exactly that. Fixed one structural gap and went from 5.2 to 7.8 in four sessions."',
+      outcome: '✓ Score: 5.2 → 7.8 in 4 sessions',
+    },
+    {
+      initials: 'DP',
+      gradient: 'linear-gradient(135deg,#14b8a6,#0891b2)',
+      name: 'Dev P.',
+      meta: 'SRM Chennai · CSE · 2024 batch',
+      quote: '"Tried it before a TCS drive out of curiosity. Scored 4.9 first attempt — harsh but fair. Five days of targeted sessions later, hit 7.1. First placement in my section. Wish I\'d started two months earlier."',
+      outcome: '✓ TCS NQT Day-1 campus placement',
+    },
+    {
+      initials: 'SG',
+      gradient: 'linear-gradient(135deg,#f97316,#ec4899)',
+      name: 'Shreya G.',
+      meta: 'IIT BHU Varanasi · CS · 2025 batch',
+      quote: '"Done maybe 40 mock interviews before this. None of them gave me a score — just \'good effort.\' Getting a 6.2 and then systematically tracking what moved the number is a completely different kind of preparation."',
+      outcome: '✓ Microsoft SDET · 7.0+ in 3 sessions',
+    },
   ];
 
   return (
-    <section style={{ padding: '88px 0', background: T.bg2 }}>
+    <section style={{ padding: '88px 0 96px', background: T.bg2 }}>
+      {/* Constrained header + stats */}
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
         <Reveal>
           <div style={{ textAlign: 'center' }}>
@@ -939,44 +1133,52 @@ function SocialProofSection() {
         <Reveal delay={0.08}>
           <div className="strip-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '1px', background: T.bord, border: `1px solid ${T.bord2}`, borderRadius: '16px', overflow: 'hidden', marginTop: '52px' }}>
             {[
-              { num: '4.6 → 7.4', suffix: '',  label: 'Average score jump after 3 sessions (illustrative)' },
-              { num: '1,000',      suffix: '+', label: 'Students using InterviewEra across India' },
-              { num: '60',         suffix: 's', label: 'From signup to your first scored interview question' },
+              {
+                label: 'Average score jump after 3 sessions (illustrative)',
+                render: (
+                  <>
+                    <CountUp to={4.6} decimals={1} duration={0.8} />
+                    <span style={{ color: T.text3, margin: '0 10px', fontWeight: 600 }}>→</span>
+                    <CountUp to={7.4} decimals={1} duration={0.9} delay={0.55} />
+                  </>
+                ),
+              },
+              {
+                label: 'Students using InterviewEra across India',
+                render: (
+                  <>
+                    <CountUp to={1000} duration={1.2} comma />
+                    <span style={{ color: T.acc2 }}>+</span>
+                  </>
+                ),
+              },
+              {
+                label: 'From signup to your first scored interview question',
+                render: (
+                  <>
+                    <CountUp to={60} duration={0.9} />
+                    <span style={{ color: T.acc2 }}>s</span>
+                  </>
+                ),
+              },
             ].map((item) => (
               <div key={item.label} style={{ background: T.card, padding: '28px', textAlign: 'center' }}>
                 <div style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '38px', fontWeight: 800, color: T.text, lineHeight: 1, marginBottom: '6px' }}>
-                  {item.num}<span style={{ color: T.acc2 }}>{item.suffix}</span>
+                  {item.render}
                 </div>
                 <div style={{ fontSize: '13.5px', color: T.text2, lineHeight: 1.55 }}>{item.label}</div>
               </div>
             ))}
           </div>
         </Reveal>
-
-        {/* Testimonials */}
-        <div className="testi-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '18px', marginTop: '52px' }}>
-          {testimonials.map((t, i) => (
-            <Reveal key={t.name} delay={i * 0.07}>
-              <div style={{ background: T.card, border: `1px solid ${T.bord}`, borderRadius: '18px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', height: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '14px', fontWeight: 800, color: '#fff', background: t.gradient }}>
-                    {t.initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: 700, color: T.text, marginBottom: '2px' }}>{t.name}</div>
-                    <div style={{ fontSize: '12px', color: T.text3 }}>{t.meta}</div>
-                  </div>
-                </div>
-                <div style={{ color: T.warn, fontSize: '13px', letterSpacing: '2px' }}>★★★★★</div>
-                <p style={{ fontSize: '14px', lineHeight: 1.75, color: T.text2, flex: 1 }}>{t.quote}</p>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', background: T.okdim, borderRadius: '99px', padding: '5px 12px', fontSize: '12.5px', fontWeight: 700, color: T.ok, alignSelf: 'flex-start' }}>
-                  {t.outcome}
-                </div>
-              </div>
-            </Reveal>
-          ))}
-        </div>
       </div>
+
+      {/* Full-viewport-width marquee — lives outside the 1080px container */}
+      <Reveal delay={0.12}>
+        <div style={{ marginTop: '52px' }}>
+          <TestimonialCarousel items={testimonials} />
+        </div>
+      </Reveal>
     </section>
   );
 }

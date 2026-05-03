@@ -1,14 +1,10 @@
-import type { Metadata } from 'next';
 import MarketingLayout from '@/app/(marketing)/layout';
 import { createClient } from '@/lib/supabase/server';
 import { getServerUser } from '@/lib/supabase/session';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
+import { PAGE_SEO } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
-  title: 'InterviewEra — Raise placement odds with resume-based AI interviews',
-  description:
-    'Structured mock interviews from your CV — STAR-aligned flow, five-dimension scoring, and progress built for Indian campus hiring. Start free, no card.',
-};
+export const metadata = PAGE_SEO.home;
 
 export default async function Page() {
   const supabase = await createClient();

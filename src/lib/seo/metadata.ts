@@ -3,6 +3,16 @@ import { Metadata } from 'next'
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.com'
 const BRAND = 'InterviewEra'
 
+export const siteConfig = {
+  name: BRAND,
+  url: BASE_URL,
+  defaultTitle: 'InterviewEra — Raise placement odds with resume-based AI interviews',
+  defaultDescription:
+    'Structured mock interviews from your CV — STAR-aligned flow, five-dimension scoring, and progress built for Indian campus hiring. Start free, no card.',
+  ogImage: `${BASE_URL}/og/default.png`,
+  locale: 'en_IN',
+} as const
+
 interface PageSeoParams {
   title: string
   description: string

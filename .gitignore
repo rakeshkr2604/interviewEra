@@ -39,3 +39,4 @@ supabase/.branches/
 
 # claude code — local machine-specific settings only
 .claude/settings.local.json
+.env.local
