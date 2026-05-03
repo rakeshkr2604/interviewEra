@@ -109,39 +109,18 @@ export default function OnboardingPage() {
       }
 
       setResumeId(result.resumeId)
-      setResumeData({
-        resumeText: '',
-        skills: result.parsedSummary?.skills ?? [],
-        projects: [],
+      setResumeData({ resumeText: '', skills: [], projects: [] })
+
+      // Trigger AI parsing in a separate fast request — don't await it.
+      // The useEffect polling loop (every 2s) will pick up the parsed status.
+      void fetch('/api/resume/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resumeId: result.resumeId }),
       })
 
       setResumeState('processing')
-      setStatusMessage('Processing your resume... this may take a few seconds')
-
-      const statusRes = await fetch(`/api/resume/status?id=${encodeURIComponent(result.resumeId)}`, {
-        method: 'GET',
-      })
-      const statusPayload = (await statusRes.json()) as { status?: string; error?: string }
-
-      if (!statusRes.ok) {
-        setResumeState('failed')
-        setError(statusPayload.error ?? 'Unable to verify resume status. Please retry.')
-        return
-      }
-
-      if (statusPayload.status === 'parsed') {
-        setResumeState('parsed')
-        setStatusMessage('Resume parsed successfully. You can continue now.')
-        return
-      }
-
-      if (statusPayload.status === 'failed') {
-        setResumeState('failed')
-        setError('Resume parsing failed. Please retry.')
-        return
-      }
-
-      setResumeState('processing')
+      setStatusMessage('Analyzing your resume — usually takes 10–20 seconds…')
     } catch {
       setResumeState('failed')
       setError('Resume upload failed. Please try again.')

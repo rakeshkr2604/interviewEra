@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { parseResume } from '@/lib/openai/parse-resume';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { PDFParse } from 'pdf-parse';
 
@@ -139,50 +138,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       .update({ raw_text: rawText, status: 'parsing' })
       .eq('id', resume.id);
 
-    // ── Step 7: AI parse resume (required for successful upload flow)
-    let parsedData: Awaited<ReturnType<typeof parseResume>>;
-    try {
-      parsedData = await parseResume(rawText);
-    } catch (err) {
-      console.error('[resume/upload] AI parsing failed:', err);
-      await supabase
-        .from('resumes')
-        .update({ status: 'failed' })
-        .eq('id', resume.id);
-      return NextResponse.json(
-        { error: 'Failed to parse resume. Please try again.' },
-        { status: 422 }
-      );
-    }
-
-    // ── Step 8: Update resume with parsed data
-    const finalStatus = 'parsed';
-    const { error: updateError } = await supabase
-      .from('resumes')
-      .update({
-        parsed_data: parsedData,
-        status: finalStatus,
-      })
-      .eq('id', resume.id);
-
-    if (updateError) {
-      console.error('[resume/upload] DB update error:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to save resume data.' },
-        { status: 500 }
-      );
-    }
-
-    // ── Step 9: Return response ────────────────────────────────────────────────
+    // ── Step 7: Return resumeId immediately — AI parsing runs in /api/resume/parse
+    // This keeps the upload handler well under the serverless timeout limit.
     return NextResponse.json({
       resumeId: resume.id,
-      status: finalStatus,
-      parsed: true,
-      parsedSummary: {
-        name: parsedData.name,
-        skills: parsedData.skills.slice(0, 10),
-        targetRoles: parsedData.target_roles,
-      },
+      status: 'parsing',
+      parsed: false,
     });
   } catch (err) {
     console.error('[resume/upload] Unexpected error:', err);
