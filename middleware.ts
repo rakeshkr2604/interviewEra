@@ -7,6 +7,8 @@ const PUBLIC_ROUTES = new Set([
   '/signup',
   '/forgot-password',
   '/reset-password',
+  '/pricing',
+  '/about',
   '/campus',
   '/join',
   '/auth/callback',
@@ -56,7 +58,9 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
   const isPublic =
-    PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/tools/');
+    PUBLIC_ROUTES.has(pathname) ||
+    pathname.startsWith('/tools/') ||
+    pathname.startsWith('/blog');
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) || (!isPublic && !isApi);
 
