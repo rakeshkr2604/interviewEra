@@ -1,34 +1,27 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/weekly-digest",
-      "schedule": "30 3 * * 1"
-    }
-  ],
   "headers": [
     {
-      "source": "/avatars/(.*)",
+      "source": "/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        }
       ]
-    },
+    }
+  ],
+  "redirects": [
     {
-      "source": "/icons/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/_next/static/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-store, no-cache" }
-      ]
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "header",
+          "key": "x-forwarded-proto",
+          "value": "http"
+        }
+      ],
+      "destination": "https://interviewera.com/:path*",
+      "permanent": true
     }
   ]
 }
