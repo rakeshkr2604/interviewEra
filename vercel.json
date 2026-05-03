@@ -19,6 +19,17 @@
       "source": "/:path*",
       "has": [
         {
+          "type": "host",
+          "value": "www.interviewera.com"
+        }
+      ],
+      "destination": "https://interviewera.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
           "type": "header",
           "key": "x-forwarded-proto",
           "value": "http"

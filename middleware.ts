@@ -57,6 +57,20 @@ function addSecurityHeaders(res: NextResponse): NextResponse {
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
+
+  // OAuth fallback — Supabase sometimes lands on the Site URL (`/`) with
+  // ?code=... when the redirect URL isn't whitelisted in the Supabase
+  // Dashboard. Forward any stray ?code= on non-callback routes to the
+  // proper /auth/callback handler so login still completes.
+  const code = request.nextUrl.searchParams.get('code');
+  if (code && pathname !== '/auth/callback' && !isApi) {
+    const callbackUrl = new URL('/auth/callback', request.url);
+    callbackUrl.searchParams.set('code', code);
+    const next = request.nextUrl.searchParams.get('next');
+    if (next) callbackUrl.searchParams.set('next', next);
+    return addSecurityHeaders(NextResponse.redirect(callbackUrl));
+  }
+
   const isPublic =
     PUBLIC_ROUTES.has(pathname) ||
     pathname.startsWith('/tools/') ||
