@@ -5,7 +5,6 @@ import { headers } from 'next/headers';
 import OpenAI from 'openai';
 import { completeFreeToolChatChain, getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
-import { PDFParse } from 'pdf-parse';
 import type { AtsResult, AtsState } from './ats-types';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
@@ -208,6 +207,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   try {
     if (ext === '.pdf') {
       const arrayBuffer = await file.arrayBuffer();
+      const { PDFParse } = await import('pdf-parse');
       const parser = new PDFParse({ data: arrayBuffer });
       try {
         const textResult = await parser.getText();

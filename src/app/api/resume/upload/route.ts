@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
-import { PDFParse } from 'pdf-parse';
+
+export const maxDuration = 30;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
@@ -99,6 +100,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (ext === '.pdf') {
       try {
         const arrayBuffer = await file.arrayBuffer();
+        const { PDFParse } = await import('pdf-parse');
         const parser = new PDFParse({ data: arrayBuffer });
         try {
           const textResult = await parser.getText();

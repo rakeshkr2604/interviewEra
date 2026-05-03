@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { parseResume } from '@/lib/openai/parse-resume';
 
+export const maxDuration = 60;
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const body = (await request.json()) as { resumeId?: string };
