@@ -3,6 +3,8 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -64,6 +66,8 @@ export default function RootLayout({
           <OfflineBanner />
           <PostHogProvider>{children}</PostHogProvider>
         </ThemeProvider>
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );
