@@ -55,6 +55,6 @@
   },
   "overrides": {
     "uuid": "^11.0.0",
-    "node-domexception": "file:packages/node-domexception"
+    "node-domexception": "2.0.2"
   }
 }
