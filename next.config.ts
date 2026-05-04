@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 86400,
   },
   // Prevents Next.js from bundling packages that need Node.js internals at load time
-  serverExternalPackages: ['pdf-parse', '@napi-rs/canvas', '@react-pdf/renderer'],
+  serverExternalPackages: ['pdf-parse', 'pdfjs-dist', '@napi-rs/canvas', '@react-pdf/renderer'],
   // Performance
   compress: true,
   poweredByHeader: false,

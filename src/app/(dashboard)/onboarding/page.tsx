@@ -94,10 +94,13 @@ export default function OnboardingPage() {
         resumeId?: string
         parsedSummary?: { skills?: string[] } | null
         error?: string
+        code?: 'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED'
       }
 
       if (!res.ok) {
         setResumeState('failed')
+        // Backend already returns user-readable strings for typed PDF errors;
+        // fall through to the generic message only if the server omitted both.
         setError(result.error ?? 'Resume upload failed. Please try again.')
         return
       }

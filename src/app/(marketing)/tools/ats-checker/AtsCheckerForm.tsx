@@ -18,14 +18,19 @@ function setInputFile(input: HTMLInputElement, file: File) {
   input.files = dt.files;
 }
 
+type JdMode = 'paste' | 'upload';
+
 export function AtsCheckerForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const jdFileInputRef = useRef<HTMLInputElement>(null);
   const redirectDoneRef = useRef(false);
   const [state, formAction, isPending] = useActionState(checkAtsAction, initialState);
   const [fileLabel, setFileLabel] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [inlineFallback, setInlineFallback] = useState(false);
+  const [jdMode, setJdMode] = useState<JdMode>('paste');
+  const [jdFileLabel, setJdFileLabel] = useState<string | null>(null);
 
   useEffect(() => {
     if (!state.result || redirectDoneRef.current) return;
@@ -146,28 +151,99 @@ export function AtsCheckerForm() {
           </div>
 
           <div className="space-y-2.5">
-            <label htmlFor="jobDescription" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
-              Job description{' '}
-              <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
-                (optional — improves keyword analysis)
-              </span>
-            </label>
-            <Textarea
-              id="jobDescription"
-              name="jobDescription"
-              placeholder="Paste the job description here…"
-              rows={5}
-              maxLength={3000}
-              className={cn(
-                'min-h-[120px] resize-y rounded-xl border-2 px-4 py-3 text-sm shadow-none transition-[color,box-shadow] sm:text-base',
-                'placeholder:opacity-80 focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-              )}
-              style={{
-                borderColor: 'var(--card-border)',
-                background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-                color: 'var(--text-primary)',
-              }}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <label htmlFor="jobDescription" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+                Job description{' '}
+                <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+                  (optional — improves keyword analysis)
+                </span>
+              </label>
+              <div
+                role="tablist"
+                aria-label="Job description input mode"
+                className="inline-flex rounded-lg border p-0.5 text-xs font-medium"
+                style={{ borderColor: 'var(--card-border)' }}
+              >
+                {(['paste', 'upload'] as const).map((m) => {
+                  const active = jdMode === m;
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setJdMode(m)}
+                      className="rounded-md px-3 py-1.5 transition-colors"
+                      style={{
+                        background: active ? 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' : 'transparent',
+                        color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {m === 'paste' ? 'Paste text' : 'Upload PDF'}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {jdMode === 'paste' ? (
+              <Textarea
+                id="jobDescription"
+                name="jobDescription"
+                placeholder="Paste the job description here…"
+                rows={5}
+                maxLength={3000}
+                className={cn(
+                  'min-h-[120px] resize-y rounded-xl border-2 px-4 py-3 text-sm shadow-none transition-[color,box-shadow] sm:text-base',
+                  'placeholder:opacity-80 focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
+                )}
+                style={{
+                  borderColor: 'var(--card-border)',
+                  background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            ) : (
+              <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    jdFileInputRef.current?.click();
+                  }
+                }}
+                onClick={() => jdFileInputRef.current?.click()}
+                className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-5 transition-colors"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--card-border) 85%, transparent)',
+                  background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)',
+                }}
+              >
+                <FileText className="size-5 shrink-0" aria-hidden style={{ color: 'var(--accent-primary)' }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {jdFileLabel ? 'Replace job description file' : 'Upload job description (PDF or TXT · max 5 MB)'}
+                  </p>
+                  {jdFileLabel ? (
+                    <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {jdFileLabel}
+                    </p>
+                  ) : null}
+                </div>
+                <input
+                  ref={jdFileInputRef}
+                  type="file"
+                  name="jobDescriptionFile"
+                  accept=".pdf,.txt"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    setJdFileLabel(f ? f.name : null);
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           {state.error && (

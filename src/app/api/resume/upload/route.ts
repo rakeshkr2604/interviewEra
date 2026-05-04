@@ -1,11 +1,35 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import {
+  extractText,
+  PDFCorruptError,
+  PDFEncryptedError,
+  PDFScannedNoTextError,
+  PDFUnsupportedError,
+  type PDFErrorCode,
+} from '@/lib/pdf/parser';
 
 export const maxDuration = 30;
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
+
+const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
+  ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
+  SCANNED_NO_TEXT:
+    'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
+  CORRUPT: 'This file appears corrupt. Try re-saving and uploading again.',
+  UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
+};
+
+function classifyPdfError(err: unknown): { code: PDFErrorCode; message: string } {
+  if (err instanceof PDFEncryptedError) return { code: 'ENCRYPTED', message: PDF_ERROR_MESSAGES.ENCRYPTED };
+  if (err instanceof PDFScannedNoTextError) return { code: 'SCANNED_NO_TEXT', message: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT };
+  if (err instanceof PDFCorruptError) return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+  if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
+  return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+}
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -100,24 +124,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (ext === '.pdf') {
       try {
         const arrayBuffer = await file.arrayBuffer();
-        const { PDFParse } = await import('pdf-parse');
-        const parser = new PDFParse({ data: arrayBuffer });
-        try {
-          const textResult = await parser.getText();
-          rawText = textResult.text;
-        } finally {
-          await parser.destroy();
-        }
+        rawText = await extractText(arrayBuffer);
       } catch (err) {
-        console.error('[resume/upload] PDF parse error:', err);
+        const { code, message } = classifyPdfError(err);
+        console.error(`[resume/upload] PDF parse failed (${code}):`, err);
         await supabase
           .from('resumes')
           .update({ status: 'failed' })
           .eq('id', resume.id);
-        return NextResponse.json(
-          { error: 'Failed to extract text from PDF. Ensure the file is not encrypted.' },
-          { status: 422 }
-        );
+        return NextResponse.json({ error: message, code }, { status: 422 });
       }
     } else {
       rawText = await file.text();
@@ -129,7 +144,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         .update({ status: 'failed' })
         .eq('id', resume.id);
       return NextResponse.json(
-        { error: 'File appears to be empty or unreadable.' },
+        {
+          error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
+          code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
+        },
         { status: 422 }
       );
     }

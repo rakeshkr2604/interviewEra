@@ -12,9 +12,23 @@ export interface AtsResult {
   issues: AtsIssue[];
 }
 
+export type AtsErrorCode =
+  | 'ENCRYPTED'
+  | 'SCANNED_NO_TEXT'
+  | 'CORRUPT'
+  | 'UNSUPPORTED'
+  | 'EMPTY'
+  | 'TOO_LARGE'
+  | 'NO_FILE'
+  | 'AI_ERROR'
+  | 'RATE_LIMIT'
+  | 'NOT_CONFIGURED'
+  | 'TOO_SHORT';
+
 export interface AtsState {
   result?: AtsResult;
   error?: string;
+  code?: AtsErrorCode;
 }
 
 export const initialState: AtsState = {};

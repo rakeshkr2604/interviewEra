@@ -5,7 +5,44 @@ import { headers } from 'next/headers';
 import OpenAI from 'openai';
 import { completeFreeToolChatChain, getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
+import {
+  extractText,
+  PDFCorruptError,
+  PDFEncryptedError,
+  PDFScannedNoTextError,
+  PDFUnsupportedError,
+} from '@/lib/pdf/parser';
 import type { AtsResult, AtsState } from './ats-types';
+
+const PDF_USER_MESSAGES: Record<'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED', string> = {
+  ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
+  SCANNED_NO_TEXT:
+    'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
+  CORRUPT: 'This file appears corrupt. Try re-saving and uploading again.',
+  UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
+};
+
+function pdfErrorToState(err: unknown): AtsState {
+  if (err instanceof PDFEncryptedError)
+    return { error: PDF_USER_MESSAGES.ENCRYPTED, code: 'ENCRYPTED' };
+  if (err instanceof PDFScannedNoTextError)
+    return { error: PDF_USER_MESSAGES.SCANNED_NO_TEXT, code: 'SCANNED_NO_TEXT' };
+  if (err instanceof PDFCorruptError)
+    return { error: PDF_USER_MESSAGES.CORRUPT, code: 'CORRUPT' };
+  if (err instanceof PDFUnsupportedError)
+    return { error: PDF_USER_MESSAGES.UNSUPPORTED, code: 'UNSUPPORTED' };
+  return { error: PDF_USER_MESSAGES.CORRUPT, code: 'CORRUPT' };
+}
+
+async function extractFileText(file: File): Promise<string> {
+  const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+  if (ext === '.txt') return await file.text();
+  if (ext === '.pdf') {
+    const arrayBuffer = await file.arrayBuffer();
+    return await extractText(arrayBuffer);
+  }
+  throw new PDFUnsupportedError();
+}
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const RESUME_PROMPT_CHARS = 8000;
@@ -174,6 +211,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     return {
       error:
         'Resume checker is not configured. Set OPENROUTER_API_KEY (recommended) or OPENAI_API_KEY in the environment.',
+      code: 'NOT_CONFIGURED',
     };
   }
 
@@ -183,44 +221,33 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
 
   const file = formData.get('file');
   const rawJd = formData.get('jobDescription');
-  const jobDescription =
-    typeof rawJd === 'string' ? rawJd.slice(0, JOB_DESC_MAX_CHARS) : '';
+  const jdFile = formData.get('jobDescriptionFile');
+  const pastedJd =
+    typeof rawJd === 'string' ? rawJd.trim().slice(0, JOB_DESC_MAX_CHARS) : '';
 
   if (!file || !(file instanceof File)) {
-    return { error: 'Please upload a resume file.' };
+    return { error: 'Please upload a resume file.', code: 'NO_FILE' };
   }
 
   if (file.size <= 0) {
-    return { error: 'The uploaded file is empty.' };
+    return { error: 'The uploaded file is empty.', code: 'EMPTY' };
   }
 
   if (file.size > MAX_FILE_BYTES) {
-    return { error: 'File exceeds 5 MB limit.' };
+    return { error: 'File exceeds 5 MB limit.', code: 'TOO_LARGE' };
   }
 
   const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
   if (ext !== '.pdf' && ext !== '.txt') {
-    return { error: 'Only PDF and TXT files are supported.' };
+    return { error: PDF_USER_MESSAGES.UNSUPPORTED, code: 'UNSUPPORTED' };
   }
 
   let resumeText = '';
   try {
-    if (ext === '.pdf') {
-      const arrayBuffer = await file.arrayBuffer();
-      const { PDFParse } = await import('pdf-parse');
-      const parser = new PDFParse({ data: arrayBuffer });
-      try {
-        const textResult = await parser.getText();
-        resumeText = textResult.text ?? '';
-      } finally {
-        await parser.destroy();
-      }
-    } else {
-      resumeText = await file.text();
-    }
+    resumeText = await extractFileText(file);
   } catch (pdfErr) {
-    console.error('[ats-checker] extract error', pdfErr);
-    return { error: 'Could not read this file. Try a text-based PDF (not a scan) or a .txt export.' };
+    console.error('[ats-checker] resume extract error', pdfErr);
+    return pdfErrorToState(pdfErr);
   }
 
   const trimmed = resumeText.trim();
@@ -228,7 +255,32 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     return {
       error:
         'Not enough readable text (need at least 50 characters). Scanned PDFs often have no text — try "Save as PDF" from Word or paste plain text.',
+      code: 'TOO_SHORT',
     };
+  }
+
+  // Job description: PDF/TXT upload wins over paste when both are present
+  // (last input wins — uploading a file is the more deliberate action).
+  let jobDescription = pastedJd;
+  if (jdFile && jdFile instanceof File && jdFile.size > 0) {
+    if (jdFile.size > MAX_FILE_BYTES) {
+      return { error: 'Job description file exceeds 5 MB limit.', code: 'TOO_LARGE' };
+    }
+    const jdExt = `.${jdFile.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    if (jdExt !== '.pdf' && jdExt !== '.txt') {
+      return {
+        error: 'Job description: ' + PDF_USER_MESSAGES.UNSUPPORTED,
+        code: 'UNSUPPORTED',
+      };
+    }
+    try {
+      const jdText = (await extractFileText(jdFile)).trim();
+      if (jdText.length > 0) jobDescription = jdText.slice(0, JOB_DESC_MAX_CHARS);
+    } catch (err) {
+      console.error('[ats-checker] JD extract error', err);
+      const jdState = pdfErrorToState(err);
+      return { error: 'Job description: ' + (jdState.error ?? ''), code: jdState.code };
+    }
   }
 
   const { route } = getToolChatClient();
@@ -240,7 +292,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
 
   const limited = checkAndConsumeFreeToolLimit('ats-checker', ip);
   if (!limited.ok) {
-    return { error: limited.message };
+    return { error: limited.message, code: 'RATE_LIMIT' };
   }
 
   try {
@@ -249,6 +301,6 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     return { result };
   } catch (err) {
     console.error('[ats-checker] analyze failed', err);
-    return { error: userFacingError(err) };
+    return { error: userFacingError(err), code: 'AI_ERROR' };
   }
 }
