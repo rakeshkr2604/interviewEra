@@ -37,6 +37,13 @@ next-env.d.ts
 supabase/.temp/
 supabase/.branches/
 
+# local dev server logs (never commit)
+/dev.err.log
+/dev.out.log
+
+# accidental hoisted package extract / tooling artifact (not a monorepo `packages/` workspace)
+/packages/node-domexception/
+
 # claude code — local machine-specific settings only
 .claude/settings.local.json
 .env.local
