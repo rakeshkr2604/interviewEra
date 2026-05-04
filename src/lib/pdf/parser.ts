@@ -12,7 +12,7 @@
  * user-facing codes; never surface the raw exception.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -51,6 +51,13 @@ export class PDFUnsupportedError extends Error {
   }
 }
 
+export class PDFParserUnavailableError extends Error {
+  constructor(message = 'PDF parser assets are unavailable on server') {
+    super(message);
+    this.name = 'PDFParserUnavailableError';
+  }
+}
+
 const MIN_USEFUL_CHARS = 20;
 
 interface PdfJsTextItem {
@@ -67,21 +74,28 @@ interface PdfJsTextItem {
  * different real path than the traced `standard_fonts/` tree in some
  * bundled / symlinked deployments, so font fetches 404 → FormatError → CORRUPT.
  */
-function resolvePdfJsPackageRoot(): string {
+function resolvePdfJsPackageRootFromRequire(): string | null {
   try {
     const req = createRequire(import.meta.url);
     return dirname(req.resolve('pdfjs-dist/package.json'));
   } catch {
+    return null;
+  }
+}
+
+function resolvePdfJsPackageRootFromEntry(): string | null {
+  try {
     const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
     const entryUrl = import.meta.resolve(pkgSpec);
     const entryPath = fileURLToPath(entryUrl);
     const buildDir = dirname(entryPath);
     return dirname(dirname(buildDir));
+  } catch {
+    return null;
   }
 }
 
-function resolvePdfJsAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } {
-  const pkgRoot = resolvePdfJsPackageRoot();
+function toAssetPaths(pkgRoot: string): { standardFontDataUrl: string; cMapUrl: string } {
   return {
     standardFontDataUrl: join(pkgRoot, 'standard_fonts') + '/',
     cMapUrl: join(pkgRoot, 'cmaps') + '/',
@@ -120,16 +134,27 @@ function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: stri
 function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | null {
   if (cachedAssetPaths !== undefined) return cachedAssetPaths;
   try {
-    const paths = resolvePdfJsAssetPaths();
-    const sf = paths.standardFontDataUrl.replace(/\/$/, '');
-    const cm = paths.cMapUrl.replace(/\/$/, '');
-    if (!existsSync(sf) || !existsSync(cm)) {
-      logPdfJsResolveDiag(paths, 'asset directories missing after resolve');
-      cachedAssetPaths = null;
-      return null;
+    const roots = [
+      resolvePdfJsPackageRootFromRequire(),
+      resolvePdfJsPackageRootFromEntry(),
+      join(process.cwd(), 'node_modules', 'pdfjs-dist'),
+    ].filter((r): r is string => Boolean(r));
+
+    for (const root of roots) {
+      const paths = toAssetPaths(root);
+      const sf = paths.standardFontDataUrl.replace(/\/$/, '');
+      const cm = paths.cMapUrl.replace(/\/$/, '');
+      if (existsSync(sf) && existsSync(cm)) {
+        cachedAssetPaths = paths;
+        return paths;
+      }
     }
-    cachedAssetPaths = paths;
-    return paths;
+
+    if (roots.length > 0) {
+      logPdfJsResolveDiag(toAssetPaths(roots[0]), 'asset directories missing after all resolution attempts');
+    }
+    cachedAssetPaths = null;
+    return null;
   } catch (err) {
     console.error(
       '[pdf-parse] could not resolve pdfjs-dist asset paths',
@@ -140,48 +165,16 @@ function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | nul
   }
 }
 
-/**
- * Installed pdfjs-dist version (for CDN URLs that mirror the traced package).
- */
-function getPdfjsDistPackageVersion(): string {
-  try {
-    const req = createRequire(import.meta.url);
-    const pkgJsonPath = req.resolve('pdfjs-dist/package.json');
-    const raw = readFileSync(pkgJsonPath, 'utf8');
-    const pkg = JSON.parse(raw) as { version?: string };
-    if (typeof pkg.version === 'string' && /^[0-9]+\.[0-9]+\.[0-9]/.test(pkg.version)) {
-      return pkg.version;
-    }
-  } catch {
-    /* fallback — keep in sync with package.json */
-  }
-  return '5.4.296';
-}
-
-/**
- * When serverless output omits `standard_fonts/` + `cmaps/` beside the resolved
- * package root, pdfjs throws FormatError → false CORRUPT. Use unpkg for the
- * same relative paths at the installed version (Node fetch; not browser CSP).
- */
-function buildUnpkgPdfJsAssetUrls(): { standardFontDataUrl: string; cMapUrl: string } {
-  const v = getPdfjsDistPackageVersion();
-  const base = `https://unpkg.com/pdfjs-dist@${v}`;
-  return {
-    standardFontDataUrl: `${base}/standard_fonts/`,
-    cMapUrl: `${base}/cmaps/`,
-  };
-}
-
 function getPdfJsAssetUrlsForServer(): {
-  urls: { standardFontDataUrl: string; cMapUrl: string };
-  source: 'local' | 'cdn';
+  standardFontDataUrl: string;
+  cMapUrl: string;
 } {
   const local = getAssetPaths();
-  if (local) return { urls: local, source: 'local' };
+  if (local) return local;
   if (process.env.VERCEL === '1') {
-    console.warn('[pdf-parse][vercel] local pdfjs standard_fonts/cmaps missing; using unpkg fallback');
+    console.error('[pdf-parse][vercel] local pdfjs standard_fonts/cmaps missing');
   }
-  return { urls: buildUnpkgPdfJsAssetUrls(), source: 'cdn' };
+  throw new PDFParserUnavailableError();
 }
 
 /**
@@ -246,7 +239,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
 
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const { urls: assets, source: assetSource } = getPdfJsAssetUrlsForServer();
+  const assets = getPdfJsAssetUrlsForServer();
 
   let doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> | null = null;
   try {
@@ -278,6 +271,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
     if (err instanceof PDFEncryptedError) throw err;
     if (err instanceof PDFCorruptError) throw err;
     if (err instanceof PDFUnsupportedError) throw err;
+    if (err instanceof PDFParserUnavailableError) throw err;
     // Surface enough detail in Vercel logs to actually debug — no file bytes.
     const e = err as { name?: string; message?: string; stack?: string };
     console.error(
@@ -288,11 +282,11 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       'stack=', e?.stack,
     );
     if (process.env.VERCEL === '1') {
-      console.error('[pdf-parse][vercel] asset_source=', assetSource);
       try {
-        logPdfJsResolveDiag(resolvePdfJsAssetPaths(), 'parse_error_context');
+        const candidate = toAssetPaths(join(process.cwd(), 'node_modules', 'pdfjs-dist'));
+        logPdfJsResolveDiag(candidate, 'parse_error_context');
       } catch {
-        console.error('[pdf-parse][vercel] resolvePdfJsAssetPaths threw during diag');
+        console.error('[pdf-parse][vercel] parse_error_context diagnostic failed');
       }
     }
     classifyAndThrow(err);

@@ -7,6 +7,7 @@ import {
   normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
+  PDFParserUnavailableError,
   PDFScannedNoTextError,
   PDFUnsupportedError,
   type PDFErrorCode,
@@ -29,12 +30,37 @@ const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
 };
 
-function classifyPdfError(err: unknown): { code: PDFErrorCode; message: string } {
+type ResumeUploadPdfErrorCode = PDFErrorCode | 'PARSER_UNAVAILABLE';
+
+function classifyPdfError(err: unknown): { code: ResumeUploadPdfErrorCode; message: string } {
+  if (err instanceof PDFParserUnavailableError) {
+    return {
+      code: 'PARSER_UNAVAILABLE',
+      message: 'Resume parser is temporarily unavailable. Please retry in a minute.',
+    };
+  }
   if (err instanceof PDFEncryptedError) return { code: 'ENCRYPTED', message: PDF_ERROR_MESSAGES.ENCRYPTED };
   if (err instanceof PDFScannedNoTextError) return { code: 'SCANNED_NO_TEXT', message: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT };
   if (err instanceof PDFCorruptError) return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
   if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
   return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+}
+
+function hasPdfHeader(bytes: Uint8Array): boolean {
+  if (bytes.byteLength < 5) return false;
+  const scanLimit = Math.min(bytes.byteLength - 5, 1024);
+  for (let i = 0; i <= scanLimit; i++) {
+    if (
+      bytes[i] === 0x25 && // %
+      bytes[i + 1] === 0x50 && // P
+      bytes[i + 2] === 0x44 && // D
+      bytes[i + 3] === 0x46 && // F
+      bytes[i + 4] === 0x2d // -
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -96,10 +122,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // ── Step 3: Read bytes ONCE (storage upload + parser share the buffer) ───
-    // Reading via formData detaches the underlying ArrayBuffer on some
-    // runtimes — pull bytes here, then construct a fresh Blob for storage.
+    // ── Step 3: Read bytes once and parse from an immutable copy ──────────────
     const arrayBuffer = await file.arrayBuffer();
+    const parseBytes = new Uint8Array(arrayBuffer).slice();
+
+    let rawText = '';
+    if (ext === '.pdf') {
+      try {
+        rawText = await extractText(parseBytes);
+      } catch (err) {
+        const { code, message } = classifyPdfError(err);
+        console.error(
+          `[resume/upload][${reqId}] PDF parse failed code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
+          err instanceof Error ? err.message : err,
+        );
+        return NextResponse.json({ error: message, code }, { status: 422 });
+      }
+    } else {
+      rawText = new TextDecoder().decode(parseBytes);
+    }
+
+    if (!rawText.trim()) {
+      return NextResponse.json(
+        {
+          error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
+          code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
+        },
+        { status: 422 }
+      );
+    }
 
     // ── Step 4: Upload to Supabase Storage ────────────────────────────────────
     const serviceClient = createServiceClient();
@@ -125,10 +176,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       data: { publicUrl },
     } = serviceClient.storage.from('resumes').getPublicUrl(filePath);
 
-    // ── Step 5: Create resume record ──────────────────────────────────────────
+    // ── Step 5: Create resume record with extracted text ──────────────────────
     const { data: resume, error: insertError } = await supabase
       .from('resumes')
-      .insert({ user_id: user.id, file_url: publicUrl, status: 'uploading' })
+      .insert({ user_id: user.id, file_url: publicUrl, raw_text: rawText, status: 'parsing' })
       .select()
       .single();
 
@@ -140,49 +191,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // ── Step 6: Extract raw text ───────────────────────────────────────────────
-    let rawText = '';
-
-    if (ext === '.pdf') {
-      try {
-        rawText = await extractText(arrayBuffer);
-      } catch (err) {
-        const { code, message } = classifyPdfError(err);
-        console.error(
-          `[resume/upload][${reqId}] PDF parse failed code=${code} bytes=${arrayBuffer.byteLength} name=${normalizedName}`,
-          err instanceof Error ? err.message : err,
-        );
-        await supabase
-          .from('resumes')
-          .update({ status: 'failed' })
-          .eq('id', resume.id);
-        return NextResponse.json({ error: message, code }, { status: 422 });
-      }
-    } else {
-      rawText = new TextDecoder().decode(arrayBuffer);
-    }
-
-    if (!rawText.trim()) {
-      await supabase
-        .from('resumes')
-        .update({ status: 'failed' })
-        .eq('id', resume.id);
-      return NextResponse.json(
-        {
-          error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
-          code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
-        },
-        { status: 422 }
-      );
-    }
-
-    // ── Step 7: Store raw_text ─────────────────────────────────────────────────
-    await supabase
-      .from('resumes')
-      .update({ raw_text: rawText, status: 'parsing' })
-      .eq('id', resume.id);
-
-    // ── Step 8: Return resumeId immediately — AI parsing runs in /api/resume/parse
+    // ── Step 6: Return resumeId immediately — AI parsing runs in /api/resume/parse
     // This keeps the upload handler well under the serverless timeout limit.
     return NextResponse.json({
       resumeId: resume.id,

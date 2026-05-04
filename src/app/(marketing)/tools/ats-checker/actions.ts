@@ -10,6 +10,7 @@ import {
   normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
+  PDFParserUnavailableError,
   PDFScannedNoTextError,
   PDFUnsupportedError,
 } from '@/lib/pdf/parser';
@@ -23,7 +24,12 @@ const PDF_USER_MESSAGES: Record<'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'U
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
 };
 
+const PARSER_UNAVAILABLE_MESSAGE = 'Resume parser is temporarily unavailable. Please retry in a minute.';
+
 function pdfErrorToState(err: unknown): AtsState {
+  if (err instanceof PDFParserUnavailableError) {
+    return { error: PARSER_UNAVAILABLE_MESSAGE, code: 'PARSER_UNAVAILABLE' };
+  }
   if (err instanceof PDFEncryptedError)
     return { error: PDF_USER_MESSAGES.ENCRYPTED, code: 'ENCRYPTED' };
   if (err instanceof PDFScannedNoTextError)
