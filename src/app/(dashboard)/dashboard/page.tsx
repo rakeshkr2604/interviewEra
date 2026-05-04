@@ -14,13 +14,24 @@ import {
   Clock,
 } from 'lucide-react'
 
+/** Row from interviews + embedded reports (single round-trip vs separate reports query). */
+type InterviewWithReportsRow = {
+  id: string
+  role: string
+  difficulty: string
+  status: string
+  completed_at: string | null
+  started_at: string | null
+  reports: { overall_score: number | null; generated_at: string | null }[] | null
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // userData and interviews are independent — fetch in parallel
-  const [{ data: userData }, { data: interviews }] = await Promise.all([
+  // user row + recent interviews (with nested reports) — 2 parallel queries only
+  const [{ data: userData }, { data: interviewsRaw }] = await Promise.all([
     supabase
       .from('users')
       .select('name, plan_tier, credits_remaining, placement_date, created_at')
@@ -28,20 +39,35 @@ export default async function DashboardPage() {
       .single(),
     supabase
       .from('interviews')
-      .select('id, role, difficulty, status, completed_at, started_at')
+      .select(`
+        id,
+        role,
+        difficulty,
+        status,
+        completed_at,
+        started_at,
+        reports (
+          overall_score,
+          generated_at
+        )
+      `)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
       .limit(5),
   ])
 
-  // Fetch reports for avg score
-  const { data: reports } = await supabase
-    .from('reports')
-    .select('overall_score, interview_id, generated_at')
-    .in(
-      'interview_id',
-      (interviews || []).filter(i => i.status === 'completed').map(i => i.id)
-    )
+  const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const interviews = rows.map(({ reports: _r, ...rest }) => rest)
+
+  const reports = rows.flatMap((i) =>
+    i.status === 'completed'
+      ? (i.reports ?? []).map((r) => ({
+          interview_id: i.id,
+          overall_score: r.overall_score,
+          generated_at: r.generated_at,
+        }))
+      : [],
+  )
 
   const completedCount = (interviews || []).filter(i => i.status === 'completed').length
   const totalCount = interviews?.length || 0
@@ -291,7 +317,7 @@ export default async function DashboardPage() {
               role: i.role,
               difficulty: i.difficulty,
               status: i.status,
-              started_at: i.started_at,
+              started_at: i.started_at ?? '',
               score: scoreMap.get(i.id) ?? null,
             }))}
           />
