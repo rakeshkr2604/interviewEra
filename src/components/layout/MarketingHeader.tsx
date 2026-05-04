@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
-import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -29,13 +28,44 @@ export function MarketingHeader() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => setUser(data.user ?? null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
+
+    /** Defer @supabase/ssr off the marketing-header initial chunk. */
+    const work = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        if (cancelled) return;
+        const supabase = createClient();
+        void supabase.auth.getUser().then(({ data }) => {
+          if (!cancelled) setUser(data.user ?? null);
+        });
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!cancelled) setUser(session?.user ?? null);
+        });
+        unsubscribe = () => sub.subscription.unsubscribe();
+      } catch {
+        /* navigation still works without auth state */
+      }
+    };
+
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const w = window as IdleWindow;
+    const handle: number | ReturnType<typeof setTimeout> = w.requestIdleCallback
+      ? w.requestIdleCallback(() => void work(), { timeout: 1500 })
+      : setTimeout(() => void work(), 0);
+
     return () => {
-      sub.subscription.unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
+      if (typeof handle === 'number') {
+        w.cancelIdleCallback?.(handle);
+      } else {
+        clearTimeout(handle);
+      }
     };
   }, []);
 

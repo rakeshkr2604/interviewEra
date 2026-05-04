@@ -879,3 +879,27 @@ html[data-theme="dark"] .ie-landing-premium ::selection {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* ─── Hero micro-animations (composited; replace motion/react) ─── */
+@keyframes ie-live-pulse-kf {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.55); }
+}
+.ie-live-pulse {
+  animation: ie-live-pulse-kf 1.8s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+
+@keyframes ie-cursor-blink-kf {
+  0%, 33%, 66%, 100% { opacity: 1; }
+  34%, 65% { opacity: 0; }
+}
+.ie-cursor-blink {
+  animation: ie-cursor-blink-kf 1.1s linear infinite;
+  will-change: opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-live-pulse, .ie-cursor-blink { animation: none !important; }
+}
