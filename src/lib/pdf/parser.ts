@@ -230,6 +230,21 @@ function classifyAndThrow(err: unknown): never {
   throw new PDFCorruptError(`PDF could not be parsed (${message})`);
 }
 
+function isLikelyCorruptParseError(err: unknown): boolean {
+  const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
+  const name = (err as { name?: string } | null)?.name ?? '';
+  const message = err instanceof Error ? err.message : String(err);
+  return (
+    ctor === 'InvalidPDFException' ||
+    name === 'InvalidPDFException' ||
+    ctor === 'MissingPDFException' ||
+    name === 'MissingPDFException' ||
+    ctor === 'FormatError' ||
+    name === 'FormatError' ||
+    /invalid pdf|missing pdf|format error|stream must|corrupt/i.test(message)
+  );
+}
+
 /**
  * Extract text from PDF bytes via pdfjs-dist. Configured for Node
  * serverless (no system fonts, no font face registration, no eval).
@@ -242,8 +257,25 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
   const assets = getPdfJsAssetUrlsForServer();
 
   let doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> | null = null;
+
+  const readText = async (
+    opts: Record<string, unknown>,
+  ): Promise<{ text: string; doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> }> => {
+    const loadedDoc = await pdfjs.getDocument(opts).promise;
+    let text = '';
+    for (let i = 1; i <= loadedDoc.numPages; i++) {
+      const page = await loadedDoc.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = (content.items as PdfJsTextItem[])
+        .map((it) => (typeof it.str === 'string' ? it.str : ''))
+        .join(' ');
+      text += pageText + '\n';
+    }
+    return { text: text.trim(), doc: loadedDoc };
+  };
+
   try {
-    doc = await pdfjs.getDocument({
+    const primary = await readText({
       data: bytes,
       useSystemFonts: false,
       disableFontFace: true,
@@ -251,18 +283,9 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       verbosity: 0,
       ...assets,
       cMapPacked: true,
-    }).promise;
-
-    let text = '';
-    for (let i = 1; i <= doc.numPages; i++) {
-      const page = await doc.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = (content.items as PdfJsTextItem[])
-        .map((it) => (typeof it.str === 'string' ? it.str : ''))
-        .join(' ');
-      text += pageText + '\n';
-    }
-    text = text.trim();
+    });
+    doc = primary.doc;
+    const text = primary.text;
 
     if (text.length >= MIN_USEFUL_CHARS) return text;
     throw new PDFScannedNoTextError();
@@ -287,6 +310,23 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
         logPdfJsResolveDiag(candidate, 'parse_error_context');
       } catch {
         console.error('[pdf-parse][vercel] parse_error_context diagnostic failed');
+      }
+    }
+    // Some serverless bundles fail when explicit font/cmap URLs are supplied.
+    // Retry once without those asset URLs before classifying as CORRUPT.
+    if (isLikelyCorruptParseError(err)) {
+      try {
+        const retry = await readText({
+          data: bytes,
+          useSystemFonts: false,
+          disableFontFace: true,
+          isEvalSupported: false,
+          verbosity: 0,
+        });
+        doc = retry.doc;
+        if (retry.text.length >= MIN_USEFUL_CHARS) return retry.text;
+      } catch {
+        // Keep original error classification path.
       }
     }
     classifyAndThrow(err);
