@@ -17,6 +17,11 @@ interface UploadZoneProps {
   initialResume?: ParsedResume | null;
 }
 
+interface UploadErrorResponse {
+  error?: string;
+  code?: 'PARSER_UNAVAILABLE' | string;
+}
+
 const STATUS_LABEL: Record<string, string> = {
   uploading: 'Uploading file...',
   extracting: 'Extracting text...',
@@ -69,9 +74,16 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
         clearTimeout(t2);
 
         if (!res.ok) {
-          const data = (await res.json()) as { error?: string };
+          const data = (await res.json()) as UploadErrorResponse;
           setStatus('error');
-          setErrorMessage(data.error ?? 'Upload failed. Please try again.');
+          if (data.code === 'PARSER_UNAVAILABLE') {
+            setErrorMessage(
+              data.error ??
+                'Resume parser is temporarily unavailable. Your file is fine - retry in a minute.'
+            );
+          } else {
+            setErrorMessage(data.error ?? 'Upload failed. Please try again.');
+          }
           return;
         }
 

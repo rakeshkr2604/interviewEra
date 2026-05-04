@@ -16,6 +16,9 @@ export const metadata: Metadata = {
   },
 };
 
+export const runtime = 'nodejs';
+export const maxDuration = 30;
+
 const BULLETS = [
   { icon: Sparkles, text: 'Instant score + concrete fixes you can apply today' },
   { icon: Zap, text: 'Keyword and structure signals recruiters’ ATS tools look for' },

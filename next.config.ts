@@ -28,7 +28,7 @@ const nextConfig: NextConfig = {
   // server actions vs API routes on Vercel (picomatch must match the traced
   // route id exactly — easy to get wrong per deployment).
   outputFileTracingIncludes: {
-    '/*': [
+    '/**': [
       './node_modules/pdfjs-dist/standard_fonts/**',
       './node_modules/pdfjs-dist/cmaps/**',
     ],

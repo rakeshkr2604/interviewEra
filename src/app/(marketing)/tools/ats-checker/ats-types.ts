@@ -13,6 +13,7 @@ export interface AtsResult {
 }
 
 export type AtsErrorCode =
+  | 'PARSER_UNAVAILABLE'
   | 'ENCRYPTED'
   | 'SCANNED_NO_TEXT'
   | 'CORRUPT'
