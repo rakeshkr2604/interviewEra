@@ -46,13 +46,21 @@ export function Reveal({
   children,
   delay = 0,
   className,
+  /**
+   * When the wrapped content is above-the-fold (LCP-critical), set
+   * `instant` so we don't render at opacity:0 and bottleneck the LCP
+   * paint on Framer hydration. The element still benefits from the
+   * shared API surface so callers don't have to fork.
+   */
+  instant = false,
 }: {
   children: React.ReactNode;
   delay?: number;
   className?: string;
+  instant?: boolean;
 }) {
   const reduce = useReducedMotion();
-  if (reduce) return <div className={className}>{children}</div>;
+  if (instant || reduce) return <div className={className}>{children}</div>;
   return (
     <motion.div
       className={className}

@@ -248,7 +248,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
 
           {/* Left: Copy */}
           <div>
-            <Reveal>
+            <Reveal instant>
               <div
                 style={{
                   display: 'inline-flex',
@@ -269,7 +269,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </div>
             </Reveal>
 
-            <Reveal delay={0.05}>
+            <Reveal instant>
               <h1
                 style={{
                   fontFamily: "'Bricolage Grotesque', sans-serif",
@@ -337,13 +337,13 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </div>
             </Reveal>
 
-            <Reveal delay={0.13}>
+            <Reveal instant>
               <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '460px', marginBottom: '32px' }}>
                 Upload your resume. Get grilled on what you actually wrote. Every answer is scored on 5 dimensions — the exact criteria campus panels use to build their shortlists. No more guessing. No more hoping. Just a number that tells you the truth.
               </p>
             </Reveal>
 
-            <Reveal delay={0.16}>
+            <Reveal instant>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
                 <Link
                   href={cta}

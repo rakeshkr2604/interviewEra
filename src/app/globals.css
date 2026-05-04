@@ -498,15 +498,28 @@ html[data-theme="dark"] .ie-card-hover:hover {
   50% { opacity: 1; transform: scale(1.04); }
 }
 
-/* Soft pulse halo for the "Most common" badge */
+/* Soft pulse halo — composited via transform/opacity (no box-shadow animation,
+   per Lighthouse: shadow paints, transform/opacity stay on the GPU). */
 .ie-badge-pulse {
   position: absolute;
+  isolation: isolate;
+}
+.ie-badge-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--accent-primary) 55%, transparent);
+  opacity: 0.55;
+  z-index: -1;
+  pointer-events: none;
   animation: ie-badge-pulse 2.4s cubic-bezier(0.66, 0, 0, 1) infinite;
+  will-change: transform, opacity;
 }
 @keyframes ie-badge-pulse {
-  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-primary) 55%, transparent); }
-  70% { box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent-primary) 0%, transparent); }
-  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-primary) 0%, transparent); }
+  0% { transform: scale(1); opacity: 0.55; }
+  70% { transform: scale(1.45); opacity: 0; }
+  100% { transform: scale(1.45); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -737,25 +750,17 @@ html[data-theme="dark"] .ie-landing-premium ::selection {
 
 /* ─── Hero gradient text — background-clip:text must not participate in the
        universal background/color transition or the clip breaks in light mode ─── */
+/* Static gradient — animating background-position is non-composited and
+   hurts CLS / LCP; the visual is still strong without the shimmer. */
 .v3-hero-gradient-text {
   display: inline-block;
   background: linear-gradient(110deg, #6366f1 0%, #8b5cf6 35%, #d946ef 65%, #6366f1 100%);
-  background-size: 200% 100%;
+  background-size: 100% 100%;
   -webkit-background-clip: text !important;
   background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   color: transparent !important;
   transition: none !important;
-  animation: ie-gradient-shift 7s ease-in-out infinite;
-}
-
-@keyframes ie-gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .v3-hero-gradient-text { animation: none; }
 }
 
 /* ─── Progress bar fills — background must never participate in any transition.
