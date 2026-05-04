@@ -3,7 +3,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { posthog } from '@/lib/analytics/posthog';
 import type { ParsedResume } from '@/types/app.types';
 
 type UploadStatus = 'idle' | 'uploading' | 'extracting' | 'parsing' | 'success' | 'error';
@@ -81,10 +80,6 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
           setParsedSummary(data.parsedSummary);
         }
         setStatus('success');
-        posthog.capture('resume_uploaded', {
-          fileType: file.name.split('.').pop() ?? 'unknown',
-          fileSize: file.size,
-        });
         router.refresh();
       } catch {
         resolved = true;

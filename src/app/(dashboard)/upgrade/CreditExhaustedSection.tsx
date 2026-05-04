@@ -1,9 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TrendChart } from '@/components/report/TrendChart';
-import { posthog } from '@/lib/analytics/posthog';
 import type { RadarDataPoint } from '@/types/app.types';
 
 interface CreditExhaustedSectionProps {
@@ -14,13 +12,8 @@ interface CreditExhaustedSectionProps {
 /** Progress + social proof only — pricing grid is rendered separately via `PricingSection` for layout parity. */
 export function CreditExhaustedSection({
   trendData,
-  totalInterviewsCompleted,
+  totalInterviewsCompleted: _totalInterviewsCompleted,
 }: CreditExhaustedSectionProps) {
-  useEffect(() => {
-    posthog.capture('credit_exhausted', { totalInterviewsCompleted });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div className="space-y-6">
       {trendData.length >= 2 && (

@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
-import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
@@ -103,7 +102,7 @@ export default function RootLayout({
         <StructuredData />
         <ThemeProvider>
           <OfflineBanner />
-          <PostHogProvider>{children}</PostHogProvider>
+          {children}
         </ThemeProvider>
         <SpeedInsights />
         <Analytics />

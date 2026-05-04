@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { QuestionCard } from '@/components/interview/QuestionCard';
 import { VoiceAnswerInput } from '@/components/interview/VoiceAnswerInput';
 import { ProgressBar } from '@/components/interview/ProgressBar';
-import { posthog } from '@/lib/analytics/posthog';
 import type { AnswerMode, Question } from '@/types/app.types';
 
 type SessionState =
@@ -62,10 +61,6 @@ export function InterviewSession({
         return;
       }
 
-      posthog.capture('interview_completed', {
-        questionCount: totalQuestions,
-        interviewId,
-      });
       setSessionState('done');
       router.push(`/report/${data.reportId}`);
     } catch {
@@ -108,13 +103,6 @@ export function InterviewSession({
           evaluationId: data.evaluationId ?? null,
           score: data.score ?? null,
           feedback: data.feedback ?? '',
-        });
-
-        posthog.capture('answer_submitted', {
-          questionNumber: currentIndex + 1,
-          answerLength: answerText.length,
-          answerMode,
-          interviewId,
         });
 
         if (isLastQuestion) {

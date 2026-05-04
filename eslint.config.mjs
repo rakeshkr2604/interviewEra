@@ -1,6 +1,8 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import react from "eslint-plugin-react";
+import tseslint from "typescript-eslint";
 
 const eslintConfig = defineConfig([
   ...nextVitals,
@@ -14,8 +16,15 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // k6 load test scripts are plain JS — skip linting
     "load-tests/**",
+    // Node CJS one-off scripts (require() is intentional)
+    "scripts/**",
   ]),
   {
+    files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
+    plugins: {
+      react,
+      "@typescript-eslint": tseslint.plugin,
+    },
     // Bypass react version auto-detect (breaks on ESLint 10 + older eslint-plugin-react).
     settings: {
       react: { version: "19.2" },

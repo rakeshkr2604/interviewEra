@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
-import { posthog } from '@/lib/analytics/posthog';
 import { getFirstInterviewQuestionCount } from '@/lib/analytics/flags';
 import { cn } from '@/lib/utils';
 import type { DomainPack, PlanTier } from '@/types/app.types';
@@ -105,13 +104,6 @@ export function StartInterviewForm({
         return;
       }
 
-      posthog.capture('interview_started', {
-        role: body.role,
-        difficulty,
-        interviewMode,
-        domainPackId: interviewMode === 'domain_pack' ? selectedPackId : undefined,
-        creditsRemaining,
-      });
       router.push(`/interview/${data.interviewId!}`);
     } catch {
       setError('Network error. Please check your connection and try again.');

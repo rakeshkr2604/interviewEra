@@ -10,7 +10,7 @@ export const interviewStartSchema = z.object({
   role: z.string().min(1).max(100),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   interviewerId: z.enum(INTERVIEWER_IDS),
-  // Optional: client sends PostHog feature-flag value for A/B test on question count.
+  // Optional: client sends question count from feature defaults / env (clamped client-side and server-side).
   // Clamped server-side to [4, 10] before use.
   questionCount: z.number().int().min(4).max(10).optional(),
   // Optional: Pro feature — use a pre-built domain pack instead of AI-generated questions

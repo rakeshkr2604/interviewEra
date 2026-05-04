@@ -6,7 +6,7 @@ export function StructuredData() {
     '@type': 'Organization',
     name: siteConfig.name,
     url: siteConfig.url,
-    logo: `${siteConfig.url}/icons/icon-192.png`,
+    logo: `${siteConfig.url}/icon-192.png`,
   }
 
   const website = {

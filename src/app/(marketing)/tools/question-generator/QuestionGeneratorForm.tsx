@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { ChevronDown, Loader2, Sparkles } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { posthog } from '@/lib/analytics/posthog';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { generateQuestionsAction, type GeneratedQuestion } from './actions';
 import { QUESTIONS_RESULT_STORAGE_KEY, serializeQuestions } from './question-generator-result-storage';
@@ -105,11 +104,9 @@ export function QuestionGeneratorForm() {
       redirectDoneRef.current = false;
       queueMicrotask(() => {
         setInlineFallback(true);
-        posthog.capture('tool_used', { toolName: 'question-generator' });
       });
       return;
     }
-    posthog.capture('tool_used', { toolName: 'question-generator' });
     router.replace('/tools/question-generator/results');
   }, [state.questions, router]);
 

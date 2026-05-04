@@ -35,7 +35,7 @@ preparation SaaS for Indian students. This is a production project, not a tutori
 | Payments      | Razorpay                       | UPI + card + netbanking              |
 | File Storage  | Supabase Storage               | For resume PDFs + exports            |
 | Hosting       | Vercel                         | Edge functions enabled               |
-| Analytics     | PostHog                        | Self-hosted not required for MVP     |
+| Analytics     | Vercel Analytics (+ Speed Insights) | MVP: no third-party product analytics SDK |
 | Email         | Resend                         | Transactional only                   |
 | PDF Parsing   | pdf-parse (npm)                | Phase 1 only                         |
 
@@ -238,7 +238,7 @@ Return ONLY valid JSON:
 |------|---------|---------|------|--------|
 | `first_interview_questions` | 6 questions | 4 questions | Test if fewer Qs improve completion rate | ACTIVE — review at Phase 3 Week 12 |
 
-Note: `first_interview_questions = 4` is an approved deviation from the "first interview = 6 questions" rule in this file. The flag code enforces a hard floor of 4 and ceiling of 10 regardless of PostHog value.
+Note: `first_interview_questions = 4` is an approved deviation from the "first interview = 6 questions" rule in this file. Client code clamps count to \[4, 10\]; optional env override: `NEXT_PUBLIC_FIRST_INTERVIEW_QUESTIONS`.
 
 ---
 
@@ -261,10 +261,6 @@ NEXT_PUBLIC_RAZORPAY_KEY_ID=
 # Resend
 RESEND_API_KEY=
 
-# PostHog
-NEXT_PUBLIC_POSTHOG_KEY=
-NEXT_PUBLIC_POSTHOG_HOST=
-
 # Upstash Redis (rate limiting + question cache)
 UPSTASH_REDIS_REST_URL=
 UPSTASH_REDIS_REST_TOKEN=
@@ -274,6 +270,8 @@ MISTRAL_API_KEY=
 
 # App
 NEXT_PUBLIC_APP_URL=
+# Optional — first-interview question count (integer, clamped 4–10 client-side). Default 6 when unset.
+# NEXT_PUBLIC_FIRST_INTERVIEW_QUESTIONS=4
 NODE_ENV=
 ```
 

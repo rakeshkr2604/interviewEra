@@ -9,7 +9,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { posthog } from '@/lib/analytics/posthog';
 
 interface ShareCardProps {
   overallScore: number;
@@ -74,7 +73,6 @@ export function ShareCard({ overallScore, role }: ShareCardProps) {
               <Button
                 variant="secondary"
                 className="relative mt-6 w-full border border-white/25 bg-white/15 font-semibold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
-                onClick={() => posthog.capture('share_card_generated', { score: overallScore, role })}
               >
                 Share your result
               </Button>

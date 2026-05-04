@@ -6,7 +6,6 @@ import { ChevronDown, Loader2, Lock, Sparkles } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { posthog } from '@/lib/analytics/posthog';
 import { useTheme } from '@/lib/theme/ThemeProvider';
 import { buildStarAction } from './actions';
 import type { StarState } from './actions';
@@ -144,11 +143,9 @@ export function StarBuilderForm() {
       redirectDoneRef.current = false;
       queueMicrotask(() => {
         setInlineFallback(true);
-        posthog.capture('tool_used', { toolName: 'star-builder' });
       });
       return;
     }
-    posthog.capture('tool_used', { toolName: 'star-builder' });
     router.replace('/tools/star-builder/results');
   }, [state.result, state.notice, router]);
 

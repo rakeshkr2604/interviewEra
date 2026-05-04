@@ -4,7 +4,6 @@ import { useState, useEffect, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { posthog } from '@/lib/analytics/posthog';
 import { BILLING_AMOUNTS } from '@/lib/pricing/tiers';
 
 interface RazorpayOptions {
@@ -77,7 +76,6 @@ export function CheckoutButton({
   async function handleCheckout() {
     if (!scriptLoaded) return;
     setLoading(true);
-    posthog.capture('upgrade_cta_clicked', { plan, billingCycle });
 
     try {
       const res = await fetch('/api/payments/create-order', {
@@ -99,12 +97,6 @@ export function CheckoutButton({
         key: string;
       };
 
-      posthog.capture('payment_initiated', {
-        plan,
-        amount: data.amount,
-        billingCycle,
-      });
-
       const rzp = new window.Razorpay({
         key: data.key,
         subscription_id: data.subscriptionId,
@@ -113,7 +105,6 @@ export function CheckoutButton({
         prefill: { email: userEmail },
         theme: { color: '#4F46E5' },
         handler: () => {
-          posthog.capture('payment_completed', { plan, amount: data.amount, billingCycle });
           router.push(`/dashboard?upgraded=${plan}`);
         },
         modal: {
