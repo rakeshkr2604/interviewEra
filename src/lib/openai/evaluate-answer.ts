@@ -1,8 +1,8 @@
-import openai, { callWithRetry } from './client';
+import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
 import type { QuestionRubric, DimensionScores, DetailedAnalysis } from '@/types/app.types';
 
-export type EvaluationProvider = 'openai' | 'mistral';
+export type EvaluationProvider = 'openrouter' | 'openai' | 'mistral';
 
 export interface EvaluateAnswerInput {
   questionText: string;
@@ -138,32 +138,26 @@ function tryParseResponse(content: string): EvaluationResult | null {
   }
 }
 
-async function evaluateWithOpenAI(prompt: string): Promise<EvaluationResult> {
-  const response = await callWithRetry(() =>
-    openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.3,
-    })
-  );
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error('Empty response from OpenAI');
+async function evaluateWithPrimaryChain(prompt: string): Promise<EvaluationResult> {
+  const messages = [{ role: 'user' as const, content: prompt }];
 
-  let parsed = tryParseResponse(content);
+  const first = await completeInterviewChat({
+    messages,
+    temperature: 0.3,
+  });
+  let parsed = tryParseResponse(first.content);
   if (!parsed) {
-    const retry = await callWithRetry(() =>
-      openai.chat.completions.create({
-        model: 'gpt-4.1-mini',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.3,
-      })
-    );
-    const retryContent = retry.choices[0]?.message?.content ?? '';
-    parsed = tryParseResponse(retryContent);
-    if (!parsed) throw new Error('Failed to parse evaluation from OpenAI after retry');
+    const second = await completeInterviewChat({
+      messages,
+      temperature: 0.3,
+    });
+    parsed = tryParseResponse(second.content);
+    if (!parsed) {
+      throw new Error(`Failed to parse evaluation after retry (${second.provider})`);
+    }
+    return normalizeResult(parsed, second.provider);
   }
-
-  return normalizeResult(parsed, 'openai');
+  return normalizeResult(parsed, first.provider);
 }
 
 async function evaluateWithMistral(prompt: string): Promise<EvaluationResult> {
@@ -188,14 +182,14 @@ export async function evaluateAnswer({
   const prompt = buildPrompt(questionText, rubric, answerText);
 
   try {
-    return await evaluateWithOpenAI(prompt);
-  } catch (openaiError) {
-    console.warn('[AI] OpenAI evaluation failed, switching to Mistral:', openaiError);
+    return await evaluateWithPrimaryChain(prompt);
+  } catch (primaryError) {
+    console.warn('[AI] Primary interview AI failed, switching to Mistral:', primaryError);
 
     try {
       return await evaluateWithMistral(prompt);
     } catch (mistralError) {
-      console.error('[AI] Both OpenAI and Mistral evaluation failed:', mistralError);
+      console.error('[AI] Primary chain and Mistral evaluation failed:', mistralError);
       throw mistralError;
     }
   }

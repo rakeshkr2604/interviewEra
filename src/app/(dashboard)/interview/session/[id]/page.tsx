@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { AvatarPlayer } from '@/components/avatar/AvatarPlayer'
@@ -10,6 +10,7 @@ import { FillerWordBadge } from '@/components/interview/FillerWordBadge'
 import { useAvatarSync } from '@/hooks/useAvatarSync'
 import { useTimer } from '@/hooks/useTimer'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { useAutoGrowTextarea } from '@/hooks/useAutoGrowTextarea'
 import { analyzeFillerWords } from '@/hooks/useFillerDetection'
 import type { FillerAnalysis } from '@/hooks/useFillerDetection'
 import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
@@ -19,6 +20,8 @@ import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 
 const TIME_PER_QUESTION = 60
+/** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
+const TEXT_ANSWER_TIME_MULTIPLIER = 2
 const MAX_SKIPS = 2
 
 interface InterviewData {
@@ -56,6 +59,8 @@ export default function InterviewSessionPage() {
   const [spokenText, setSpokenText] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
+  /** Matches TimerCircle denominator for the active answering phase */
+  const [answerTimeBudget, setAnswerTimeBudget] = useState(TIME_PER_QUESTION)
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
 
@@ -82,6 +87,9 @@ export default function InterviewSessionPage() {
   } = useSpeechRecognition()
   const useManualInput = inputMode === 'text' || !isMicSupported || permissionState === 'denied' || Boolean(micError)
 
+  const useManualInputRef = useRef(useManualInput)
+  useManualInputRef.current = useManualInput
+
   useEffect(() => {
     if (!isMicSupported || permissionState === 'denied' || Boolean(micError)) {
       setInputMode('text')
@@ -91,6 +99,9 @@ export default function InterviewSessionPage() {
   const answerText = useManualInput
     ? manualAnswer.trim()
     : (transcript + ' ' + interimTranscript).trim()
+
+  const manualAnswerGrowEnabled = phase === 'candidate_answering' && useManualInput
+  const manualAnswerRef = useAutoGrowTextarea(manualAnswer, manualAnswerGrowEnabled)
 
   // ─── Load interview data ───────────────────────────────────
   useEffect(() => {
@@ -148,9 +159,12 @@ export default function InterviewSessionPage() {
     speakQuestion(intro, () => {
       // TTS complete → 500ms pause → start timer + mic
       setTimeout(() => {
+        const manual = useManualInputRef.current
+        const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
+        setAnswerTimeBudget(budget)
         setPhase('candidate_answering')
         setAnswerStartTime(Date.now())
-        resetTimer(TIME_PER_QUESTION)
+        resetTimer(budget)
         startTimer()
       }, 500)
     })
@@ -248,7 +262,11 @@ export default function InterviewSessionPage() {
     resetTranscript()
     setManualAnswer('')
     stopTimer()
-    resetTimer(TIME_PER_QUESTION)
+    const budget = useManualInputRef.current
+      ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER
+      : TIME_PER_QUESTION
+    resetTimer(budget)
+    setAnswerTimeBudget(budget)
     setPhase('avatar_speaking')
   }, [phase, stopListening, resetTranscript, stopTimer, resetTimer])
 
@@ -356,7 +374,7 @@ export default function InterviewSessionPage() {
         </div>
 
         {/* ── Main Layout: Left (Avatar) + Right (Answer) ── */}
-        <div className="grid gap-4 lg:grid-cols-[min(380px,100%)_1fr] xl:grid-cols-[420px_1fr]">
+        <div className="grid min-w-0 gap-4 lg:grid-cols-[min(380px,100%)_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
 
           {/* ── LEFT: Avatar Panel ── */}
           <div className="space-y-3">
@@ -432,7 +450,7 @@ export default function InterviewSessionPage() {
                 {phase === 'candidate_answering' ? (
                   <TimerCircle
                     timeLeft={timeLeft}
-                    totalTime={TIME_PER_QUESTION}
+                    totalTime={answerTimeBudget}
                     size={96}
                   />
                 ) : (
@@ -468,27 +486,29 @@ export default function InterviewSessionPage() {
             </div>
           </div>
 
-          {/* ── RIGHT: Answer Panel ── */}
-          <div className="space-y-3 flex flex-col">
+          {/* ── RIGHT: Answer Panel (min-w-0 so 1fr column + textarea fill width) ── */}
+          <div className="flex min-w-0 flex-col space-y-3">
 
             {/* Candidate transcript / answer area */}
-            <div className="dashboard-premium-card flex flex-1 flex-col space-y-3 p-5">
+            <div className="dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-3 p-5">
 
               {phase === 'candidate_answering' && !useManualInput && (
-                <CandidateTranscript
-                  transcript={transcript}
-                  interimTranscript={interimTranscript}
-                  isListening={isListening}
-                  isSupported={isMicSupported}
-                  error={micError}
-                  permissionState={permissionState}
-                  onToggle={() => { void handleToggleMic() }}
-                  onRetry={() => { void retryPermission() }}
-                />
+                <div className="w-full min-w-0">
+                  <CandidateTranscript
+                    transcript={transcript}
+                    interimTranscript={interimTranscript}
+                    isListening={isListening}
+                    isSupported={isMicSupported}
+                    error={micError}
+                    permissionState={permissionState}
+                    onToggle={() => { void handleToggleMic() }}
+                    onRetry={() => { void retryPermission() }}
+                  />
+                </div>
               )}
 
               {phase === 'candidate_answering' && useManualInput && (
-                <div className="space-y-2">
+                <div className="flex w-full min-w-0 flex-col space-y-2">
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                     {isMicSupported
                       ? 'Microphone unavailable right now. Please type your answer.'
@@ -504,10 +524,11 @@ export default function InterviewSessionPage() {
                     </button>
                   )}
                   <textarea
+                    ref={manualAnswerRef}
                     value={manualAnswer}
                     onChange={(event) => setManualAnswer(event.target.value)}
                     placeholder="Type your answer here..."
-                    className="min-h-[120px] w-full rounded-xl border border-(--card-border) bg-(--card-bg) p-3 text-sm text-(--text-primary) outline-none focus:border-(--accent-primary)"
+                    className="box-border block min-h-[120px] min-w-0 w-full max-w-full resize-none overflow-y-auto rounded-xl border border-(--card-border) bg-(--card-bg) p-3 text-sm leading-relaxed text-(--text-primary) outline-none focus:border-(--accent-primary)"
                   />
                 </div>
               )}
@@ -596,7 +617,7 @@ export default function InterviewSessionPage() {
             </div>
 
             {/* ── Control Bar ── */}
-            <div className="dashboard-premium-card p-4">
+            <div className="dashboard-premium-card w-full min-w-0 p-4">
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => {

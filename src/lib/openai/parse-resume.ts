@@ -1,4 +1,4 @@
-import openai, { callWithRetry } from './client';
+import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
 import type { ParsedResume } from '@/types/app.types';
 
@@ -48,15 +48,10 @@ function isValidParsedResume(data: unknown): data is ParsedResume {
 }
 
 async function callOpenAI(prompt: string): Promise<string> {
-  const response = await callWithRetry(() =>
-    openai.chat.completions.create({
-      model: 'gpt-4.1-mini',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0,
-    })
-  );
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error('Empty response from OpenAI');
+  const { content } = await completeInterviewChat({
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0,
+  });
   return content;
 }
 
@@ -64,12 +59,12 @@ async function getAIContent(prompt: string): Promise<string> {
   try {
     return await callOpenAI(prompt);
   } catch (openaiError) {
-    console.warn('[AI] OpenAI failed, switching to Mistral:', openaiError);
+    console.warn('[AI] Interview AI chain failed, switching to Mistral:', openaiError);
 
     try {
       return await callMistralChat(prompt, 0);
     } catch (mistralError) {
-      console.error('[AI] Both OpenAI and Mistral failed:', mistralError);
+      console.error('[AI] Interview AI chain and Mistral failed:', mistralError);
       throw mistralError;
     }
   }

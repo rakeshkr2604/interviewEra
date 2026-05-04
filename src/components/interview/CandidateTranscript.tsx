@@ -23,7 +23,7 @@ export function CandidateTranscript({
   onRetry,
 }: CandidateTranscriptProps) {
   return (
-    <div className="space-y-2">
+    <div className="w-full min-w-0 space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-(--text-secondary)">
           Your Answer
@@ -62,8 +62,10 @@ export function CandidateTranscript({
           </button>
         </div>
       )}
-      <div className="min-h-[120px] rounded-xl border border-(--card-border)
-                      bg-(--card-bg) p-4 text-sm text-(--text-primary)">
+      <div
+        className="min-h-[120px] max-h-[min(50vh,520px)] w-full max-w-full overflow-y-auto rounded-xl border border-(--card-border)
+                      bg-(--card-bg) p-4 text-sm leading-relaxed whitespace-pre-wrap break-words text-(--text-primary)"
+      >
         {transcript}
         {interimTranscript && (
           <span className="text-(--text-muted) italic"> {interimTranscript}</span>
