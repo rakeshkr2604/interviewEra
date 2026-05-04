@@ -2,11 +2,10 @@
  * Shared PDF text extraction service.
  *
  * Both the resume upload route and the ATS checker server action route
- * through this module. Uses `pdfjs-dist` directly (pure JS, no native
- * binaries) so behavior is identical on Windows local + Linux Vercel
- * Lambdas. We previously layered `pdf-parse` v2 on top, but its
- * `@napi-rs/canvas` dependency was the source of production-only
- * `CORRUPT` failures.
+ * through this module. Uses `pdfjs-dist/legacy` for text extraction. On
+ * Node (Vercel), pdfjs touches `DOMMatrix` / `Path2D` / `ImageData` at
+ * module load — we preload `@napi-rs/canvas` so those globals exist
+ * before importing pdfjs (see `pdfjs-node-setup.ts`).
  *
  * Throws one of the typed errors below — callers map those to
  * user-facing codes; never surface the raw exception.
@@ -16,6 +15,8 @@ import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+
+import { ensurePdfJsNodeGlobalsSync } from '@/lib/pdf/pdfjs-node-setup';
 
 export type PDFErrorCode = 'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED';
 
@@ -288,6 +289,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
   assertPdfMagic(input);
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
 
+  ensurePdfJsNodeGlobalsSync();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const assets = getPdfJsAssetUrlsForServer();
 

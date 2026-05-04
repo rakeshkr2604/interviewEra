@@ -22,7 +22,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 86400,
   },
   // Prevents Next.js from bundling packages that need Node.js internals at load time
-  serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer'],
+  serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer', '@napi-rs/canvas'],
   // Force NFT to trace pdfjs-dist font + cmap assets into every Node server
   // bundle that needs them. A single `/*` key avoids route-key mismatch for
   // server actions vs API routes on Vercel (picomatch must match the traced
@@ -31,6 +31,7 @@ const nextConfig: NextConfig = {
     '/**': [
       './node_modules/pdfjs-dist/standard_fonts/**',
       './node_modules/pdfjs-dist/cmaps/**',
+      './node_modules/@napi-rs/canvas/**',
     ],
   },
   // Performance
