@@ -204,6 +204,38 @@ export function assertPdfMagic(input: Uint8Array | ArrayBuffer): void {
   throw new PDFUnsupportedError('File is not a PDF (missing %PDF- header)');
 }
 
+/** Safe structured fields for Vercel / server logs (no PDF bytes). */
+function pdfJsExceptionFields(err: unknown): Record<string, string> {
+  const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
+  const name = err instanceof Error ? err.name : (err as { name?: string } | null)?.name ?? '';
+  const message = err instanceof Error ? err.message : String(err);
+  const stackHead =
+    err instanceof Error && err.stack
+      ? err.stack.split('\n').slice(0, 4).join(' ← ')
+      : '';
+  return {
+    err_ctor: ctor || '(unknown)',
+    err_name: name || '(unknown)',
+    err_message: message.slice(0, 600),
+    err_stack_head: stackHead.slice(0, 900),
+  };
+}
+
+function logPdfParseEvent(
+  event: string,
+  err: unknown,
+  extra: Record<string, string | number | boolean | undefined> = {},
+): void {
+  const payload = {
+    event,
+    ...extra,
+    ...pdfJsExceptionFields(err),
+    vercel: process.env.VERCEL === '1',
+    node: process.version,
+  };
+  console.error('[pdf-parse][diag]', JSON.stringify(payload));
+}
+
 function classifyAndThrow(err: unknown): never {
   const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
   const name = (err as { name?: string } | null)?.name ?? '';
@@ -214,6 +246,7 @@ function classifyAndThrow(err: unknown): never {
     name === 'PasswordException' ||
     /password|encrypted/i.test(message)
   ) {
+    logPdfParseEvent('classify_result', err, { maps_to: 'ENCRYPTED' });
     throw new PDFEncryptedError();
   }
   if (
@@ -225,8 +258,10 @@ function classifyAndThrow(err: unknown): never {
     name === 'FormatError' ||
     /invalid pdf|missing pdf|format error|stream must|corrupt/i.test(message)
   ) {
+    logPdfParseEvent('classify_result', err, { maps_to: 'CORRUPT' });
     throw new PDFCorruptError();
   }
+  logPdfParseEvent('classify_result', err, { maps_to: 'CORRUPT_generic' });
   throw new PDFCorruptError(`PDF could not be parsed (${message})`);
 }
 
@@ -296,6 +331,11 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
     if (err instanceof PDFUnsupportedError) throw err;
     if (err instanceof PDFParserUnavailableError) throw err;
     // Surface enough detail in Vercel logs to actually debug — no file bytes.
+    logPdfParseEvent('primary_catch', err, {
+      stage: 'after_primary_readText',
+      bytes: bytes.byteLength,
+      had_assets: true,
+    });
     const e = err as { name?: string; message?: string; stack?: string };
     console.error(
       '[pdf-parse] pdfjs-dist failed',
@@ -315,6 +355,10 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
     // Some serverless bundles fail when explicit font/cmap URLs are supplied.
     // Retry once without those asset URLs before classifying as CORRUPT.
     if (isLikelyCorruptParseError(err)) {
+      logPdfParseEvent('retry_start', err, {
+        stage: 'no_asset_urls_retry',
+        bytes: bytes.byteLength,
+      });
       try {
         const retry = await readText({
           data: bytes,
@@ -325,8 +369,21 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
         });
         doc = retry.doc;
         if (retry.text.length >= MIN_USEFUL_CHARS) return retry.text;
-      } catch {
-        // Keep original error classification path.
+        logPdfParseEvent(
+          'retry_insufficient_text',
+          new Error(`retry extracted ${retry.text.length} chars (< ${MIN_USEFUL_CHARS})`),
+          {
+            stage: 'retry_ok_but_short',
+            text_len: retry.text.length,
+            bytes: bytes.byteLength,
+          },
+        );
+      } catch (retryErr) {
+        logPdfParseEvent('retry_failed', retryErr, {
+          stage: 'no_asset_urls_retry',
+          bytes: bytes.byteLength,
+          original_was_corrupt_class: isLikelyCorruptParseError(err),
+        });
       }
     }
     classifyAndThrow(err);

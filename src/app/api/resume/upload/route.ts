@@ -65,6 +65,7 @@ function hasPdfHeader(bytes: Uint8Array): boolean {
 
 export async function POST(request: Request): Promise<NextResponse> {
   const reqId = randomUUID().slice(0, 8);
+  const vercelId = request.headers.get('x-vercel-id');
   try {
     // ── Step 1: Authenticate user ─────────────────────────────────────────────
     const supabase = await createClient();
@@ -133,10 +134,22 @@ export async function POST(request: Request): Promise<NextResponse> {
       } catch (err) {
         const { code, message } = classifyPdfError(err);
         console.error(
-          `[resume/upload][${reqId}] PDF parse failed code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
+          `[resume/upload][${reqId}] PDF parse failed vercel_id=${vercelId ?? 'n/a'} code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
           err instanceof Error ? err.message : err,
         );
-        return NextResponse.json({ error: message, code }, { status: 422 });
+        console.error(
+          `[resume/upload][${reqId}] grep Vercel logs for [pdf-parse][diag] and this requestId; x-vercel-id=${vercelId ?? 'n/a'}`,
+        );
+        return NextResponse.json(
+          { error: message, code, requestId: reqId },
+          {
+            status: 422,
+            headers: {
+              'X-Request-Id': reqId,
+              ...(vercelId ? { 'X-Vercel-Id': vercelId } : {}),
+            },
+          },
+        );
       }
     } else {
       rawText = new TextDecoder().decode(parseBytes);
@@ -147,8 +160,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         {
           error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
           code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
+          requestId: reqId,
         },
-        { status: 422 }
+        { status: 422, headers: { 'X-Request-Id': reqId } }
       );
     }
 
