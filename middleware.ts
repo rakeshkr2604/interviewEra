@@ -54,9 +54,40 @@ function addSecurityHeaders(res: NextResponse): NextResponse {
   return res;
 }
 
+function getCanonicalHostname(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.com';
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return 'interviewera.com';
+  }
+}
+
 export async function middleware(request: NextRequest) {
+  const host =
+    request.headers.get('host')?.split(':')[0]?.toLowerCase() ?? '';
+  const canonicalHost = getCanonicalHostname();
+  if (
+    canonicalHost &&
+    !canonicalHost.startsWith('www.') &&
+    host === `www.${canonicalHost}`
+  ) {
+    const url = request.nextUrl.clone();
+    url.hostname = canonicalHost;
+    url.protocol = 'https:';
+    return NextResponse.redirect(url, 308);
+  }
+
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
+
+  // Next.js build chunks — never run Supabase session refresh here (perf + edge cache).
+  if (
+    pathname.startsWith('/_next/static') ||
+    pathname.startsWith('/_next/data')
+  ) {
+    return addSecurityHeaders(NextResponse.next());
+  }
 
   // OAuth fallback — Supabase sometimes lands on the Site URL (`/`) with
   // ?code=... when the redirect URL isn't whitelisted in the Supabase
@@ -118,5 +149,12 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml).*)'],
+  matcher: [
+    /*
+     * Run on app HTML and on `/_next/static/*` so `www` requests for CSS/JS
+     * also 308 to apex (cached HTML on www otherwise loads broken relative chunks).
+     * Skip `/_next/image` (optimizer), static files in /public via explicit names below.
+     */
+    '/((?!_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml).*)',
+  ],
 };
