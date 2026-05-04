@@ -1,7 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
-import { posthog } from '@/lib/analytics/posthog';
 import type { PlanTier } from '@/types/app.types';
 
 interface ReportViewTrackerProps {
@@ -10,11 +8,8 @@ interface ReportViewTrackerProps {
   interviewId: string;
 }
 
-export function ReportViewTracker({ overallScore, userPlan, interviewId }: ReportViewTrackerProps) {
-  useEffect(() => {
-    posthog.capture('report_viewed', { overallScore, userPlan, interviewId });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+/** Placeholder for future Vercel / server analytics (PostHog removed for MVP). */
+export function ReportViewTracker(props: ReportViewTrackerProps) {
+  void props;
   return null;
 }

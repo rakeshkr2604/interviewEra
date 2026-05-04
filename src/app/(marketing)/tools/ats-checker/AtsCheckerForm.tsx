@@ -4,7 +4,6 @@ import { useRef, useActionState, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation';
 import { ArrowRight, FileText, Loader2, Upload } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
-import { posthog } from '@/lib/analytics/posthog';
 import { checkAtsAction } from './actions';
 import { ATS_RESULT_STORAGE_KEY, serializeAtsResult } from './ats-result-storage';
 import { AtsResultsView } from './AtsResultsView';
@@ -43,10 +42,8 @@ export function AtsCheckerForm() {
       redirectDoneRef.current = false;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setInlineFallback(true);
-      posthog.capture('tool_used', { toolName: 'ats-checker' });
       return;
     }
-    posthog.capture('tool_used', { toolName: 'ats-checker' });
     router.replace('/tools/ats-checker/results');
   }, [state.result, router]);
 

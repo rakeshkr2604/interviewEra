@@ -11,7 +11,7 @@ AI-powered mock interview practice SaaS for Indian students.
 - **AI:** GPT-4o-mini (OpenAI) + Mistral fallback
 - **Payments:** Razorpay (UPI + card + netbanking)
 - **Email:** Resend
-- **Analytics:** PostHog
+- **Analytics:** Vercel Analytics
 - **Caching:** Upstash Redis
 
 ## Interview Flow

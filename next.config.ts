@@ -67,12 +67,12 @@ const nextConfig: NextConfig = {
     // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://app.posthog.com https://eu.i.posthog.com`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com`,
       `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co`,
       "media-src 'self' blob:",
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://app.posthog.com https://eu.i.posthog.com https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com`,
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://va.vercel-scripts.com`,
       "frame-src 'self' https://checkout.razorpay.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
