@@ -10,6 +10,8 @@ export const metadata: Metadata = {
     'Practical interview preparation guides: DSA topic maps, HR answer frameworks, placement prep, STAR method, and software engineer interview questions.',
 };
 
+export const revalidate = 3600;
+
 const BLOG_POSTS = [
   {
     title: 'Top DSA Interview Questions & Topic Map (2026)',
