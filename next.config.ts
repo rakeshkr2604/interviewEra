@@ -23,18 +23,12 @@ const nextConfig: NextConfig = {
   },
   // Prevents Next.js from bundling packages that need Node.js internals at load time
   serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer'],
-  // Force NFT to trace pdfjs-dist's bundled font and cmap assets into
-  // the serverless functions that parse PDFs. Keys are URL-style route
-  // paths (matched by picomatch with `contains: true`). Without this
-  // Vercel ships pdfjs-dist's JS but not its standard_fonts/ and cmaps/
-  // directories — real-world resumes that reference Helvetica/Times
-  // then fail with "CORRUPT" on prod only.
+  // Force NFT to trace pdfjs-dist font + cmap assets into every Node server
+  // bundle that needs them. A single `/*` key avoids route-key mismatch for
+  // server actions vs API routes on Vercel (picomatch must match the traced
+  // route id exactly — easy to get wrong per deployment).
   outputFileTracingIncludes: {
-    '/api/resume/upload': [
-      './node_modules/pdfjs-dist/standard_fonts/**',
-      './node_modules/pdfjs-dist/cmaps/**',
-    ],
-    '/tools/ats-checker': [
+    '/*': [
       './node_modules/pdfjs-dist/standard_fonts/**',
       './node_modules/pdfjs-dist/cmaps/**',
     ],

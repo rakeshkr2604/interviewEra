@@ -12,6 +12,8 @@
  * user-facing codes; never surface the raw exception.
  */
 
+import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -58,44 +60,84 @@ interface PdfJsTextItem {
 /**
  * Resolve the on-disk path to pdfjs-dist's bundled font + cmap assets.
  *
- * We previously used `eval('require')` to dodge bundler static analysis,
- * but in Node ESM (which Next 14+ uses for App Router server modules)
- * `require` is undefined in scope and `eval('require')` throws
- * `ReferenceError` — silently dropping standardFontDataUrl/cMapUrl, then
- * pdfjs surfaces obscure errors on real-world PDFs that we re-classify
- * as CORRUPT.
- *
- * `import.meta.resolve` is the ESM-native resolver (stable in Node 20.6+,
- * Vercel's default runtime is Node 22). It returns a `file://` URL we can
- * convert to a filesystem path. Building the path string in pieces keeps
- * Turbopack from trying to apply its own `require()` rewriter.
+ * Prefer `createRequire(import.meta.url).resolve('pdfjs-dist/package.json')`:
+ * it follows normal Node resolution from the compiled server chunk, which
+ * stays aligned with `serverExternalPackages` + Vercel output tracing.
+ * `import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs')` can land on a
+ * different real path than the traced `standard_fonts/` tree in some
+ * bundled / symlinked deployments, so font fetches 404 → FormatError → CORRUPT.
  */
+function resolvePdfJsPackageRoot(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    return dirname(req.resolve('pdfjs-dist/package.json'));
+  } catch {
+    const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
+    const entryUrl = import.meta.resolve(pkgSpec);
+    const entryPath = fileURLToPath(entryUrl);
+    const buildDir = dirname(entryPath);
+    return dirname(dirname(buildDir));
+  }
+}
+
 function resolvePdfJsAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } {
-  const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
-  const entryUrl = import.meta.resolve(pkgSpec);
-  const entryPath = fileURLToPath(entryUrl);
-  const buildDir = dirname(entryPath); // .../pdfjs-dist/legacy/build
-  const pkgRoot = dirname(dirname(buildDir)); // .../pdfjs-dist
-  // Trailing slash matters — pdfjs concatenates the asset filename onto it.
+  const pkgRoot = resolvePdfJsPackageRoot();
   return {
     standardFontDataUrl: join(pkgRoot, 'standard_fonts') + '/',
     cMapUrl: join(pkgRoot, 'cmaps') + '/',
   };
 }
 
-let cachedAssetPaths: { standardFontDataUrl: string; cMapUrl: string } | null = null;
-function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | null {
-  if (cachedAssetPaths) return cachedAssetPaths;
+/** `undefined` = not computed yet; `null` = failure or missing dirs (cached). */
+let cachedAssetPaths: { standardFontDataUrl: string; cMapUrl: string } | null | undefined;
+
+function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: string }, reason: string): void {
+  if (process.env.VERCEL !== '1') return;
+  const sf = paths.standardFontDataUrl.replace(/\/$/, '');
+  const cm = paths.cMapUrl.replace(/\/$/, '');
+  const pkgRoot = dirname(sf);
+  let resolvedViaEntry = '';
   try {
-    cachedAssetPaths = resolvePdfJsAssetPaths();
+    const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
+    resolvedViaEntry = fileURLToPath(import.meta.resolve(pkgSpec));
+  } catch {
+    resolvedViaEntry = '(import.meta.resolve failed)';
+  }
+  console.error(
+    '[pdf-parse][vercel]',
+    reason,
+    'pkg_root=',
+    pkgRoot,
+    'standard_fonts_exists=',
+    existsSync(sf),
+    'cmaps_exists=',
+    existsSync(cm),
+    'legacy_pdf_entry=',
+    resolvedViaEntry,
+  );
+}
+
+function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | null {
+  if (cachedAssetPaths !== undefined) return cachedAssetPaths;
+  try {
+    const paths = resolvePdfJsAssetPaths();
+    const sf = paths.standardFontDataUrl.replace(/\/$/, '');
+    const cm = paths.cMapUrl.replace(/\/$/, '');
+    if (!existsSync(sf) || !existsSync(cm)) {
+      logPdfJsResolveDiag(paths, 'asset directories missing after resolve');
+      cachedAssetPaths = null;
+      return null;
+    }
+    cachedAssetPaths = paths;
+    return paths;
   } catch (err) {
     console.error(
       '[pdf-parse] could not resolve pdfjs-dist asset paths',
       err instanceof Error ? err.message : err,
     );
     cachedAssetPaths = null;
+    return null;
   }
-  return cachedAssetPaths;
 }
 
 /**
@@ -201,6 +243,14 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       'message=', e?.message,
       'stack=', e?.stack,
     );
+    if (process.env.VERCEL === '1') {
+      console.error('[pdf-parse][vercel] had_asset_urls=', assets != null);
+      try {
+        logPdfJsResolveDiag(resolvePdfJsAssetPaths(), 'parse_error_context');
+      } catch {
+        console.error('[pdf-parse][vercel] resolvePdfJsAssetPaths threw during diag');
+      }
+    }
     classifyAndThrow(err);
     throw err; // unreachable — classifyAndThrow is `never`, but TS can't infer through try/finally
   } finally {
