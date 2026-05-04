@@ -86,6 +86,13 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.next());
   }
 
+  // Static assets in /public (PWA icons, OG images, fonts, source maps).
+  // Without this, files like /icon-192.png fall through the auth gate and
+  // 307 to /login, breaking the manifest + favicons + share images.
+  if (/\.(?:png|jpe?g|svg|gif|webp|ico|avif|woff2?|ttf|otf|eot|map)$/i.test(pathname)) {
+    return addSecurityHeaders(NextResponse.next());
+  }
+
   // OAuth fallback — Supabase sometimes lands on the Site URL (`/`) with
   // ?code=... when the redirect URL isn't whitelisted in the Supabase
   // Dashboard. Forward any stray ?code= on non-callback routes to the
@@ -152,6 +159,6 @@ export const config = {
      * also 308 to apex (cached HTML on www otherwise loads broken relative chunks).
      * Skip `/_next/image` (optimizer), static files in /public via explicit names below.
      */
-    '/((?!_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml).*)',
+    '/((?!_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|icon-192.png|icon-512.png|apple-icon.png|opengraph-image.png|twitter-image.png).*)',
   ],
 };
