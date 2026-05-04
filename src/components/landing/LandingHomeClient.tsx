@@ -8,7 +8,6 @@ import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
 const LandingHomeBelowFold = dynamic(
   () => import('@/components/landing/LandingHomeBelowFold'),
   {
-    ssr: false,
     loading: () => (
       <div
         className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
@@ -321,8 +320,8 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </h1>
             </Reveal>
 
-            {/* Mechanism line */}
-            <Reveal delay={0.1}>
+            {/* Mechanism line — instant: delayed Reveal stays opacity:0 on SSR (bad for LCP/FCP). */}
+            <Reveal instant>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
                 {[
                   { n: '1', label: 'Upload resume' },
@@ -421,7 +420,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </div>
             </Reveal>
 
-            <Reveal delay={0.19}>
+            <Reveal instant>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '12.5px', color: T.text2 }}>
                 {[
                   { dot: T.ok,  label: 'No credit card needed' },
@@ -438,7 +437,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
           </div>
 
           {/* Right: Scoring card */}
-          <Reveal delay={0.08}>
+          <Reveal instant>
             <div className="ie-hero-glow">
               <ScoringCard />
             </div>
@@ -480,7 +479,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <section id="how" style={{ padding: '80px 0', background: T.bg2 }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
-        <Reveal>
+        <Reveal instant>
           <div style={{ textAlign: 'center' }}>
             <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
               The scoring system
@@ -580,7 +579,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
   return (
     <section style={{ padding: '88px 0', background: T.bg }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
-        <Reveal>
+        <Reveal instant>
           <div style={{ textAlign: 'center' }}>
             <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
               Your starting point
