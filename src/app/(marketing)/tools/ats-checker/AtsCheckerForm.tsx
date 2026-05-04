@@ -27,6 +27,8 @@ export function AtsCheckerForm() {
   const redirectDoneRef = useRef(false);
   const [state, formAction, isPending] = useActionState(checkAtsAction, initialState);
   const [fileLabel, setFileLabel] = useState<string | null>(null);
+  /** Browsers cannot focus a `display:none` + `required` file input for HTML5 validation (throws in console, blocks submit). */
+  const [clientError, setClientError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [inlineFallback, setInlineFallback] = useState(false);
   const [jdMode, setJdMode] = useState<JdMode>('paste');
@@ -51,6 +53,7 @@ export function AtsCheckerForm() {
   const syncLabelFromInput = useCallback(() => {
     const f = fileInputRef.current?.files?.[0];
     setFileLabel(f ? f.name : null);
+    if (f) setClientError(null);
   }, []);
 
   const onDrop = useCallback(
@@ -63,6 +66,7 @@ export function AtsCheckerForm() {
       if (!ok) return;
       setInputFile(fileInputRef.current, file);
       setFileLabel(file.name);
+      setClientError(null);
     },
     [],
   );
@@ -73,7 +77,17 @@ export function AtsCheckerForm() {
         headerEyebrow="Analyzer"
         headerTitle="Upload resume · optional job description · instant report"
       >
-        <form action={formAction} className="space-y-6 p-5 sm:p-7 lg:p-8">
+        <form
+          action={formAction}
+          className="space-y-6 p-5 sm:p-7 lg:p-8"
+          onSubmit={(e) => {
+            setClientError(null);
+            if (!fileInputRef.current?.files?.length) {
+              e.preventDefault();
+              setClientError('Please upload a resume (PDF or TXT · max 5 MB).');
+            }
+          }}
+        >
           <div className="space-y-2.5">
             <label className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
               Resume <span style={{ color: 'var(--text-muted)' }}>(PDF or TXT · max 5 MB)</span>
@@ -143,9 +157,9 @@ export function AtsCheckerForm() {
                 type="file"
                 name="file"
                 accept=".pdf,.txt"
-                required
                 className="hidden"
                 onChange={syncLabelFromInput}
+                aria-invalid={Boolean(clientError)}
               />
             </div>
           </div>
@@ -246,7 +260,7 @@ export function AtsCheckerForm() {
             )}
           </div>
 
-          {state.error && (
+          {(clientError ?? state.error) && (
             <p
               className="rounded-xl border px-4 py-3 text-sm font-medium sm:text-base"
               style={{
@@ -255,7 +269,7 @@ export function AtsCheckerForm() {
                 color: 'var(--accent-danger)',
               }}
             >
-              {state.error}
+              {clientError ?? state.error}
             </p>
           )}
 
