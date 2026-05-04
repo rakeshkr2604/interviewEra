@@ -8,25 +8,37 @@ import { Analytics } from "@vercel/analytics/react";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
+/**
+ * Marketing/heading font — keep above-the-fold weights only.
+ * Hero typography uses 600/700/800; 400/500 weren't in use.
+ */
 const bricolage = Bricolage_Grotesque({
   variable: "--font-bricolage",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700", "800"],
+  weight: ["600", "700", "800"],
+  preload: true,
 });
 
+/** Body font — restrict to weights we actually render. */
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600"],
+  preload: true,
 });
 
+/**
+ * Mono font — only used by `<code>` / `<pre>` / `.font-mono` (rare on landing).
+ * Skip preload + drop heavier weights to win LCP / network budget.
+ */
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600"],
+  weight: ["400"],
+  preload: false,
 });
 
 export const metadata: Metadata = {

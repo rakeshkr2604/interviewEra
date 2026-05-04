@@ -3,8 +3,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { createClient } from '@/lib/supabase/client';
-import { motion } from 'motion/react';
 import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
 
 const LandingHomeBelowFold = dynamic(
@@ -55,7 +53,8 @@ function PainBar() {
 /* ─── 2. HERO ─── */
 function LivePulse() {
   return (
-    <motion.span
+    <span
+      className="ie-live-pulse"
       style={{
         display: 'inline-block',
         width: '6px',
@@ -64,15 +63,14 @@ function LivePulse() {
         background: T.ok,
         flexShrink: 0,
       }}
-      animate={{ opacity: [1, 0.4, 1], scale: [1, 1.55, 1] }}
-      transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
     />
   );
 }
 
 function CursorBlink() {
   return (
-    <motion.span
+    <span
+      className="ie-cursor-blink"
       style={{
         display: 'inline-block',
         width: '2px',
@@ -81,8 +79,49 @@ function CursorBlink() {
         marginLeft: '2px',
         verticalAlign: 'middle',
       }}
-      animate={{ opacity: [1, 1, 0, 0, 1, 1] }}
-      transition={{ duration: 1.1, repeat: Infinity, ease: 'linear' }}
+    />
+  );
+}
+
+function BarFill({ color, pct }: { color: string; pct: number }) {
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  const [filled, setFilled] = React.useState(false);
+
+  React.useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    if (!('IntersectionObserver' in window)) {
+      setFilled(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            setFilled(true);
+            io.disconnect();
+            break;
+          }
+        }
+      },
+      { threshold: 0.3 },
+    );
+    io.observe(node);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className="v3-bar-fill-solid"
+      style={{
+        height: '100%',
+        borderRadius: '99px',
+        background: color,
+        width: filled ? `${pct}%` : '0%',
+        transition: 'width 900ms cubic-bezier(0.16,1,0.3,1) 300ms',
+        willChange: filled ? 'auto' : 'width',
+      }}
     />
   );
 }
@@ -185,14 +224,7 @@ function ScoringCard() {
             <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               <span style={{ fontSize: '12px', color: T.text2, width: '88px', flexShrink: 0 }}>{d.label}</span>
               <div style={{ flex: 1, height: '5px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-                <motion.div
-                  className="v3-bar-fill-solid"
-                  style={{ height: '100%', borderRadius: '99px', background: barColor }}
-                  initial={{ width: 0 }}
-                  whileInView={{ width: `${d.pct}%` }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.9, delay: 0.3, ease: 'easeOut' }}
-                />
+                <BarFill color={barColor} pct={d.pct} />
               </div>
               <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 600, color: barColor, width: '28px', textAlign: 'right', flexShrink: 0 }}>
                 {d.value}
@@ -248,7 +280,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
 
           {/* Left: Copy */}
           <div>
-            <Reveal>
+            <Reveal instant>
               <div
                 style={{
                   display: 'inline-flex',
@@ -269,7 +301,7 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </div>
             </Reveal>
 
-            <Reveal delay={0.05}>
+            <Reveal instant>
               <h1
                 style={{
                   fontFamily: "'Bricolage Grotesque', sans-serif",
@@ -337,13 +369,13 @@ function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displa
               </div>
             </Reveal>
 
-            <Reveal delay={0.13}>
+            <Reveal instant>
               <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '460px', marginBottom: '32px' }}>
                 Upload your resume. Get grilled on what you actually wrote. Every answer is scored on 5 dimensions — the exact criteria campus panels use to build their shortlists. No more guessing. No more hoping. Just a number that tells you the truth.
               </p>
             </Reveal>
 
-            <Reveal delay={0.16}>
+            <Reveal instant>
               <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
                 <Link
                   href={cta}
@@ -621,25 +653,57 @@ export default function LandingHomeClient() {
   const [displayCount, setDisplayCount] = useState('1,000+');
 
   useEffect(() => {
-    const supabase = createClient();
-    void supabase.auth.getUser().then(({ data }) => {
-      setIsLoggedIn(Boolean(data.user));
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setIsLoggedIn(Boolean(session?.user));
-    });
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
 
-    void fetch('/api/stats/student-count')
-      .then((res) => res.json())
-      .then((body: { displayCount?: string }) => {
-        if (typeof body.displayCount === 'string') setDisplayCount(body.displayCount);
-      })
-      .catch(() => {
+    /**
+     * Defer Supabase auth + stats off the LCP critical path.
+     * `requestIdleCallback` (or a microtask fallback) keeps the initial
+     * page chunk free of `@supabase/ssr` until the browser is idle.
+     */
+    const work = async () => {
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        if (cancelled) return;
+        const supabase = createClient();
+        void supabase.auth.getUser().then(({ data }) => {
+          if (!cancelled) setIsLoggedIn(Boolean(data.user));
+        });
+        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+          if (!cancelled) setIsLoggedIn(Boolean(session?.user));
+        });
+        unsubscribe = () => sub.subscription.unsubscribe();
+      } catch {
+        /* network / chunk error — landing still works */
+      }
+
+      try {
+        const res = await fetch('/api/stats/student-count');
+        const body = (await res.json()) as { displayCount?: string };
+        if (!cancelled && typeof body.displayCount === 'string') {
+          setDisplayCount(body.displayCount);
+        }
+      } catch {
         /* keep fallback */
-      });
+      }
+    };
+
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+    };
+    const w = window as IdleWindow;
+    const handle: number | ReturnType<typeof setTimeout> = w.requestIdleCallback
+      ? w.requestIdleCallback(() => void work(), { timeout: 1500 })
+      : setTimeout(() => void work(), 0);
 
     return () => {
-      sub.subscription.unsubscribe();
+      cancelled = true;
+      unsubscribe?.();
+      if (typeof handle === 'number' && 'cancelIdleCallback' in window) {
+        (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback?.(handle);
+      } else {
+        clearTimeout(handle as ReturnType<typeof setTimeout>);
+      }
     };
   }, []);
 
