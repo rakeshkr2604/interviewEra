@@ -7,6 +7,7 @@ import { completeFreeToolChatChain, getToolChatClient, isFreeToolAiConfigured } 
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
 import {
   extractText,
+  normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
   PDFScannedNoTextError,
@@ -35,7 +36,10 @@ function pdfErrorToState(err: unknown): AtsState {
 }
 
 async function extractFileText(file: File): Promise<string> {
-  const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+  // Strip duplicate trailing extensions (`resume.pdf.pdf` → `resume.pdf`)
+  // before extension-based MIME validation; some browsers add them.
+  const normalized = normalizeFileName(file.name);
+  const ext = `.${normalized.split('.').pop()?.toLowerCase() ?? ''}`;
   if (ext === '.txt') return await file.text();
   if (ext === '.pdf') {
     const arrayBuffer = await file.arrayBuffer();
@@ -237,7 +241,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     return { error: 'File exceeds 5 MB limit.', code: 'TOO_LARGE' };
   }
 
-  const ext = `.${file.name.split('.').pop()?.toLowerCase() ?? ''}`;
+  const ext = `.${normalizeFileName(file.name).split('.').pop()?.toLowerCase() ?? ''}`;
   if (ext !== '.pdf' && ext !== '.txt') {
     return { error: PDF_USER_MESSAGES.UNSUPPORTED, code: 'UNSUPPORTED' };
   }
@@ -266,7 +270,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     if (jdFile.size > MAX_FILE_BYTES) {
       return { error: 'Job description file exceeds 5 MB limit.', code: 'TOO_LARGE' };
     }
-    const jdExt = `.${jdFile.name.split('.').pop()?.toLowerCase() ?? ''}`;
+    const jdExt = `.${normalizeFileName(jdFile.name).split('.').pop()?.toLowerCase() ?? ''}`;
     if (jdExt !== '.pdf' && jdExt !== '.txt') {
       return {
         error: 'Job description: ' + PDF_USER_MESSAGES.UNSUPPORTED,
