@@ -27,7 +27,6 @@
     "motion": "^12.38.0",
     "next": "^16.2.4",
     "openai": "^6.33.0",
-    "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^5.4.296",
     "posthog-js": "^1.364.4",
     "razorpay": "^2.9.6",
@@ -44,7 +43,6 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
-    "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
