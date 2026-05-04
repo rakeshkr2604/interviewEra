@@ -54,26 +54,23 @@ function addSecurityHeaders(res: NextResponse): NextResponse {
   return res;
 }
 
-function getCanonicalHostname(): string {
-  const raw = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.com';
-  try {
-    return new URL(raw).hostname.toLowerCase();
-  } catch {
-    return 'interviewera.com';
-  }
+/** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
+const PRODUCTION_APEX = 'interviewera.com';
+
+function forwardedHost(request: NextRequest): string {
+  const raw =
+    request.headers.get('x-forwarded-host')?.split(',')[0]?.trim() ??
+    request.headers.get('host') ??
+    '';
+  const host = raw.split(':')[0];
+  return host ? host.toLowerCase() : '';
 }
 
 export async function middleware(request: NextRequest) {
-  const host =
-    request.headers.get('host')?.split(':')[0]?.toLowerCase() ?? '';
-  const canonicalHost = getCanonicalHostname();
-  if (
-    canonicalHost &&
-    !canonicalHost.startsWith('www.') &&
-    host === `www.${canonicalHost}`
-  ) {
+  const host = forwardedHost(request);
+  if (host === `www.${PRODUCTION_APEX}`) {
     const url = request.nextUrl.clone();
-    url.hostname = canonicalHost;
+    url.hostname = PRODUCTION_APEX;
     url.protocol = 'https:';
     return NextResponse.redirect(url, 308);
   }

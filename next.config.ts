@@ -42,9 +42,26 @@ const nextConfig: NextConfig = {
   // Performance
   compress: true,
   poweredByHeader: false,
+  /** Same as vercel.json — ensures www → apex even if platform redirects run later. */
+  async redirects() {
+    return [
+      {
+        source: '/:path*',
+        has: [{ type: 'host', value: 'www.interviewera.com' }],
+        destination: 'https://interviewera.com/:path*',
+        permanent: true,
+      },
+    ];
+  },
   // HTTP security headers applied to all routes
   async headers() {
     const isDev = process.env.NODE_ENV === 'development';
+
+    // Both apex + www: document may briefly load on www; Next may emit absolute
+    // chunk URLs for the other host — CSP 'self' only matches the document origin.
+    const siteApex = 'https://interviewera.com';
+    const siteWww = 'https://www.interviewera.com';
+    const siteTwin = `${siteApex} ${siteWww}`;
 
     // CSP notes:
     // - 'unsafe-inline' on script-src is required for Next.js hydration chunks and the
@@ -53,14 +70,15 @@ const nextConfig: NextConfig = {
     //   trace reconstruction. React never uses eval() in production.
     // - 'unsafe-inline' on style-src is required for Tailwind CSS-in-JS and Recharts inline styles.
     // - wss://*.supabase.co covers Supabase Realtime subscriptions.
+    // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://checkout.razorpay.com https://app.posthog.com https://eu.i.posthog.com`,
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.supabase.co",
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://app.posthog.com https://eu.i.posthog.com`,
+      `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
+      `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com`,
+      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co`,
       "media-src 'self' blob:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://app.posthog.com https://eu.i.posthog.com https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com",
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://app.posthog.com https://eu.i.posthog.com https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com`,
       "frame-src 'self' https://checkout.razorpay.com",
       "worker-src 'self' blob:",
       "object-src 'none'",

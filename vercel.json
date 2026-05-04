@@ -33,6 +33,10 @@
           "type": "header",
           "key": "x-forwarded-proto",
           "value": "http"
+        },
+        {
+          "type": "host",
+          "value": "interviewera.com"
         }
       ],
       "destination": "https://interviewera.com/:path*",
