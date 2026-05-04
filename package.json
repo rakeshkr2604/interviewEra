@@ -8,6 +8,7 @@
     "dev:fresh": "npm run clean && next dev --turbopack",
     "dev:webpack": "next dev --webpack",
     "build": "next build",
+    "analyze": "next build",
     "start": "next start",
     "lint": "eslint"
   },

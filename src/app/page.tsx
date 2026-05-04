@@ -1,27 +1,15 @@
 import MarketingLayout from '@/app/(marketing)/layout';
-import { createClient } from '@/lib/supabase/server';
-import { getServerUser } from '@/lib/supabase/session';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
 import { PAGE_SEO } from '@/lib/seo/metadata';
 
 export const metadata = PAGE_SEO.home;
+/** ISR for public homepage shell (stats + auth resolve on client). */
+export const revalidate = 3600;
 
-export default async function Page() {
-  const supabase = await createClient();
-  const user = await getServerUser(supabase);
-
-  const { count: studentCount } = await supabase
-    .from('users')
-    .select('id', { count: 'exact', head: true });
-
-  const displayCount =
-    studentCount && studentCount > 10
-      ? `${studentCount.toLocaleString('en-IN')}+`
-      : '1,000+';
-
+export default function Page() {
   return (
     <MarketingLayout>
-      <LandingHomeClient isLoggedIn={!!user} displayCount={displayCount} />
+      <LandingHomeClient />
     </MarketingLayout>
   );
 }

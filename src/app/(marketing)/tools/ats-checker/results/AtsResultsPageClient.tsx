@@ -15,24 +15,36 @@ import { cn } from '@/lib/utils';
 export function AtsResultsPageClient() {
   const router = useRouter();
 
-  const [result] = useState<AtsResult | null>(() => {
-    const raw = sessionStorage.getItem(ATS_RESULT_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = parseStoredAtsResult(raw);
-    if (!parsed) {
-      sessionStorage.removeItem(ATS_RESULT_STORAGE_KEY);
-      return null;
-    }
-    return parsed;
-  });
+  const [result, setResult] = useState<AtsResult | null>(null);
+  const [storageRead, setStorageRead] = useState(false);
 
   useEffect(() => {
+    queueMicrotask(() => {
+      const raw = sessionStorage.getItem(ATS_RESULT_STORAGE_KEY);
+      if (!raw) {
+        setResult(null);
+        setStorageRead(true);
+        return;
+      }
+      const parsed = parseStoredAtsResult(raw);
+      if (!parsed) {
+        sessionStorage.removeItem(ATS_RESULT_STORAGE_KEY);
+        setResult(null);
+      } else {
+        setResult(parsed);
+      }
+      setStorageRead(true);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!storageRead) return;
     if (!result) {
       router.replace('/tools/ats-checker');
     }
-  }, [result, router]);
+  }, [result, router, storageRead]);
 
-  if (!result) {
+  if (!storageRead || !result) {
     return (
       <main
         className="ie-landing-type flex min-h-[50vh] items-center justify-center py-20"
