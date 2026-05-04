@@ -16,6 +16,10 @@ const eslintConfig = defineConfig([
     "load-tests/**",
   ]),
   {
+    // Bypass react version auto-detect (breaks on ESLint 10 + older eslint-plugin-react).
+    settings: {
+      react: { version: "19.2" },
+    },
     rules: {
       // Relax to only forbid chars that actually break JSX parsing (> and }).
       // Apostrophes (') and quotes (") in prose text are cosmetically imperfect

@@ -30,6 +30,9 @@ updates:
           - "supabase"
     # Skip patch bumps for stable dependencies to keep PR volume low
     ignore:
+      # eslint-config-next / eslint-plugin-react are not ESLint-10-safe yet (Next.js #89764).
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "next"
         update-types: ["version-update:semver-patch"]
       - dependency-name: "react"
