@@ -12,8 +12,8 @@
  * user-facing codes; never surface the raw exception.
  */
 
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
 export type PDFErrorCode = 'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED';
 
@@ -57,16 +57,24 @@ interface PdfJsTextItem {
 
 /**
  * Resolve the on-disk path to pdfjs-dist's bundled font + cmap assets.
- * Without this, pdfjs computes a path relative to its own module file
- * which doesn't survive Vercel's NFT bundling for many real-world PDFs
- * that need standard font definitions or CJK cMaps.
+ *
+ * We previously used `eval('require')` to dodge bundler static analysis,
+ * but in Node ESM (which Next 14+ uses for App Router server modules)
+ * `require` is undefined in scope and `eval('require')` throws
+ * `ReferenceError` — silently dropping standardFontDataUrl/cMapUrl, then
+ * pdfjs surfaces obscure errors on real-world PDFs that we re-classify
+ * as CORRUPT.
+ *
+ * `import.meta.resolve` is the ESM-native resolver (stable in Node 20.6+,
+ * Vercel's default runtime is Node 22). It returns a `file://` URL we can
+ * convert to a filesystem path. Building the path string in pieces keeps
+ * Turbopack from trying to apply its own `require()` rewriter.
  */
 function resolvePdfJsAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } {
-  // require.resolve gives us the actual file path inside node_modules,
-  // which Next's output-file-tracing follows.
-  const req: NodeRequire = eval('require');
-  const entry = req.resolve('pdfjs-dist/legacy/build/pdf.mjs');
-  const buildDir = dirname(entry); // .../pdfjs-dist/legacy/build
+  const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
+  const entryUrl = import.meta.resolve(pkgSpec);
+  const entryPath = fileURLToPath(entryUrl);
+  const buildDir = dirname(entryPath); // .../pdfjs-dist/legacy/build
   const pkgRoot = dirname(dirname(buildDir)); // .../pdfjs-dist
   // Trailing slash matters — pdfjs concatenates the asset filename onto it.
   return {
@@ -90,9 +98,32 @@ function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | nul
   return cachedAssetPaths;
 }
 
-// Touch fileURLToPath so the import isn't tree-shaken; we may need it as
-// a fallback if eval-require ever stops working.
-void fileURLToPath;
+/**
+ * Cheap pre-flight: a real PDF starts with `%PDF-` (plus tolerant of a
+ * BOM / leading whitespace, which some browsers prepend on drag-and-drop).
+ * Throwing here gives a precise UNSUPPORTED message instead of letting
+ * pdfjs return a generic FormatError that we have to coerce to CORRUPT.
+ */
+export function assertPdfMagic(input: Uint8Array | ArrayBuffer): void {
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+  if (bytes.byteLength < 5) {
+    throw new PDFCorruptError('File is too short to be a PDF');
+  }
+  // Skip up to 1024 leading bytes to tolerate stray whitespace / BOMs.
+  const scanLimit = Math.min(bytes.byteLength - 5, 1024);
+  for (let i = 0; i <= scanLimit; i++) {
+    if (
+      bytes[i] === 0x25 && // %
+      bytes[i + 1] === 0x50 && // P
+      bytes[i + 2] === 0x44 && // D
+      bytes[i + 3] === 0x46 && // F
+      bytes[i + 4] === 0x2d // -
+    ) {
+      return;
+    }
+  }
+  throw new PDFUnsupportedError('File is not a PDF (missing %PDF- header)');
+}
 
 function classifyAndThrow(err: unknown): never {
   const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
@@ -125,6 +156,7 @@ function classifyAndThrow(err: unknown): never {
  * serverless (no system fonts, no font face registration, no eval).
  */
 export async function extractText(input: Uint8Array | ArrayBuffer): Promise<string> {
+  assertPdfMagic(input);
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
 
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -159,10 +191,12 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
     if (err instanceof PDFScannedNoTextError) throw err;
     if (err instanceof PDFEncryptedError) throw err;
     if (err instanceof PDFCorruptError) throw err;
-    // Surface enough detail in Vercel logs to actually debug.
+    if (err instanceof PDFUnsupportedError) throw err;
+    // Surface enough detail in Vercel logs to actually debug — no file bytes.
     const e = err as { name?: string; message?: string; stack?: string };
     console.error(
       '[pdf-parse] pdfjs-dist failed',
+      'bytes=', bytes.byteLength,
       'name=', e?.name,
       'message=', e?.message,
       'stack=', e?.stack,
@@ -178,4 +212,15 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       }
     }
   }
+}
+
+/**
+ * Strip duplicate trailing extensions (`resume.pdf.pdf` → `resume.pdf`)
+ * before extension-based MIME validation. Some browsers or saved-from-
+ * web flows append a second `.pdf` when the file already ends in `.pdf`.
+ */
+export function normalizeFileName(name: string): string {
+  return name
+    .replace(/(\.pdf)(?:\.pdf)+$/i, '$1')
+    .replace(/(\.txt)(?:\.txt)+$/i, '$1');
 }
