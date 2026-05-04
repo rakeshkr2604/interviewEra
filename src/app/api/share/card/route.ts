@@ -1,8 +1,6 @@
 import { ImageResponse } from 'next/og';
 import React from 'react';
 
-export const runtime = 'edge';
-
 export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url);
   const score = parseFloat(searchParams.get('score') ?? '0');
