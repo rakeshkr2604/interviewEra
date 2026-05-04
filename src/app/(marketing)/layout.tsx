@@ -1,7 +1,5 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import { getServerUser } from '@/lib/supabase/session';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
@@ -10,17 +8,13 @@ interface MarketingLayoutProps {
   children: ReactNode;
 }
 
-export default async function MarketingLayout({
-  children,
-}: MarketingLayoutProps) {
-  const user = await getServerUser(await createClient());
-
+export default function MarketingLayout({ children }: MarketingLayoutProps) {
   return (
     <div
       className="ie-landing-premium flex min-h-screen flex-col"
       style={{ background: 'var(--page-gradient)', color: 'var(--text-primary)' }}
     >
-      <MarketingHeader user={user} />
+      <MarketingHeader />
 
       <div className="flex-1">{children}</div>
 

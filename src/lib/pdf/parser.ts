@@ -64,7 +64,6 @@ interface PdfJsTextItem {
 function resolvePdfJsAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } {
   // require.resolve gives us the actual file path inside node_modules,
   // which Next's output-file-tracing follows.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const req: NodeRequire = eval('require');
   const entry = req.resolve('pdfjs-dist/legacy/build/pdf.mjs');
   const buildDir = dirname(entry); // .../pdfjs-dist/legacy/build

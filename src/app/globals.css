@@ -1,3 +1,7 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
 /* ─── Theme Tokens — default dark (SSR); ThemeProvider + inline script override ─── */
 :root {
   --bg-primary: #0a0f1e;
@@ -106,9 +110,25 @@ code, pre, .font-mono {
   transition: box-shadow 400ms ease;
 }
 
-@import "tailwindcss";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+/* Landing testimonial marquee — CSS animation (lighter than Framer loop) */
+@keyframes ie-testi-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.ie-testi-track-css {
+  animation: ie-testi-marquee 34s linear infinite;
+}
+
+.ie-testi-wrap:hover .ie-testi-track-css {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-testi-track-css {
+    animation: none;
+  }
+}
 
 @custom-variant dark (&:is(.dark *));
 
