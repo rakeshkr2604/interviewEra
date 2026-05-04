@@ -1,20 +1,33 @@
 import { z } from 'zod';
 import { INTERVIEWER_IDS } from '@/lib/config/interviewers';
+import type { InterviewGoal } from '@/types/onboarding.types';
 
 export const resumeUploadSchema = z.object({
   userId: z.string().uuid(),
 });
+
+export const INTERVIEW_GOAL_IDS = [
+  'fresher_placement',
+  'job_switch',
+  'promotion_prep',
+  'general_practice',
+] as const satisfies readonly InterviewGoal[];
 
 export const interviewStartSchema = z.object({
   resumeId: z.string().uuid(),
   role: z.string().min(1).max(100),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   interviewerId: z.enum(INTERVIEWER_IDS),
+  goal: z.enum(INTERVIEW_GOAL_IDS).optional().default('general_practice'),
+  interviewMode: z.enum(['technical', 'hr_behavioral']).optional().default('technical'),
+  experienceYears: z.number().int().min(0).max(60).optional().default(0),
   // Optional: client sends question count from feature defaults / env (clamped client-side and server-side).
   // Clamped server-side to [4, 10] before use.
   questionCount: z.number().int().min(4).max(10).optional(),
   // Optional: Pro feature — use a pre-built domain pack instead of AI-generated questions
   domainPackId: z.string().uuid().optional(),
+  // Optional: pasted employer JD — used only for question personalization (max 12k chars server-side).
+  jobDescription: z.string().max(12000).optional(),
 });
 
 export const interviewAnswerSchema = z.object({

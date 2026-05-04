@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
-import { getFirstInterviewQuestionCount } from '@/lib/analytics/flags';
+import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
 import { cn } from '@/lib/utils';
 import type { DomainPack, PlanTier } from '@/types/app.types';
 
@@ -76,7 +76,7 @@ export function StartInterviewForm({
 
       if (interviewMode === 'ai') {
         body.role = role.trim();
-        body.questionCount = getFirstInterviewQuestionCount();
+        body.questionCount = difficultyQuestionCount(difficulty);
       } else {
         const pack = domainPacks.find((p) => p.id === selectedPackId);
         body.role = pack?.name ?? 'Domain Interview';

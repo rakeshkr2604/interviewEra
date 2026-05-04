@@ -7,7 +7,7 @@ export type InterviewGoal =
 export interface OnboardingData {
   goal: InterviewGoal | null
   role: string
-  experience: string
+  experienceYears: number
   mode: 'Technical' | 'HR'
   interviewerId: 'priya' | 'arjun' | null
   resumeId: string | null

@@ -1,3 +1,5 @@
+import type { InterviewGoal } from '@/types/onboarding.types';
+
 // ─── Enum-like types ──────────────────────────────────────────────────────────
 
 export type PlanTier = 'free' | 'starter' | 'pro' | 'campus' | 'campus_admin';
@@ -17,6 +19,16 @@ export type InterviewDifficulty = 'easy' | 'medium' | 'hard';
 export type QuestionCategory = 'technical' | 'behavioral' | 'situational';
 
 export type DomainPackDomain = 'dsa' | 'system_design' | 'hr';
+
+/** Stored on interviews.session_context — mirrors validated interview start payload */
+export interface InterviewSessionContext {
+  goal: InterviewGoal;
+  interviewMode: 'technical' | 'hr_behavioral';
+  experienceYears: number;
+  interviewerId: 'priya' | 'arjun';
+  /** Optional employer JD text used only for question personalization */
+  jobDescription?: string;
+}
 
 export interface DomainPack {
   id: string;
@@ -91,6 +103,7 @@ export interface Interview {
   status: InterviewStatus;
   started_at: string | null;
   completed_at: string | null;
+  session_context: InterviewSessionContext;
 }
 
 export interface QuestionRubric {

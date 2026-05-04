@@ -2,15 +2,18 @@
 
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
+import { usePathname } from 'next/navigation'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { cn } from '@/lib/utils'
 
 export function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname() ?? ''
+  const isOnboarding = pathname.startsWith('/onboarding')
 
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--bg-secondary)' }}>
+    <div className={cn('flex', !isOnboarding && 'min-h-screen')} style={{ background: 'var(--bg-secondary)' }}>
       {mobileOpen ? (
         <button
           type="button"
@@ -36,7 +39,12 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         <Sidebar onNavigate={() => setMobileOpen(false)} />
       </div>
 
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-[17.5rem]">
+      <div
+        className={cn(
+          'flex min-w-0 flex-1 flex-col lg:pl-[17.5rem]',
+          isOnboarding ? 'h-dvh max-h-dvh min-h-0 overflow-hidden' : 'min-h-screen',
+        )}
+      >
         <header
           className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 lg:hidden"
           style={{
@@ -67,7 +75,10 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         </header>
 
         <main
-          className="ie-landing-premium ie-landing-type relative min-w-0 flex-1 overflow-x-hidden overflow-y-auto"
+          className={cn(
+            'ie-landing-premium ie-landing-type relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
+            isOnboarding ? 'overflow-hidden' : 'overflow-y-auto',
+          )}
           style={{ background: 'var(--page-gradient)', color: 'var(--text-primary)' }}
         >
           <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -89,26 +100,36 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
             />
           </div>
 
-          <div className={cn('relative min-w-0 px-4 py-8 sm:px-5 sm:py-10 md:py-12', LANDING_PAGE_CONTAINER)}>
+          <div
+            className={cn(
+              'relative flex min-h-0 min-w-0 flex-1 flex-col px-4 sm:px-5',
+              isOnboarding
+                ? 'overflow-hidden py-3 md:py-4'
+                : 'py-8 sm:py-10 md:py-12',
+              LANDING_PAGE_CONTAINER,
+            )}
+          >
             {children}
           </div>
 
-          <footer
-            className="relative border-t px-4 py-4 sm:px-6"
-            style={{
-              borderColor: 'var(--card-border)',
-              background: 'color-mix(in srgb, var(--card-bg) 35%, transparent)',
-            }}
-          >
-            <div className={cn(LANDING_PAGE_CONTAINER)}>
-              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  InterviewEra
-                </span>{' '}
-                dashboard
-              </p>
-            </div>
-          </footer>
+          {!isOnboarding ? (
+            <footer
+              className="relative border-t px-4 py-4 sm:px-6"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--card-bg) 35%, transparent)',
+              }}
+            >
+              <div className={cn(LANDING_PAGE_CONTAINER)}>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    InterviewEra
+                  </span>{' '}
+                  dashboard
+                </p>
+              </div>
+            </footer>
+          ) : null}
         </main>
       </div>
     </div>

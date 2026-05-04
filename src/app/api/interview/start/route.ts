@@ -7,11 +7,13 @@ import { interviewStartSchema } from '@/lib/validations/schemas';
 
 import {
   buildCacheKey,
+  computeJdFingerprint,
   getCachedQuestions,
   setCachedQuestions,
 } from '@/lib/redis/question-cache';
-import type { ParsedResume, QuestionCategory } from '@/types/app.types';
+import type { ParsedResume, QuestionCategory, InterviewSessionContext } from '@/types/app.types';
 import { getInterviewerById } from '@/lib/config/interviewers';
+import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -61,10 +63,44 @@ export async function POST(request: Request): Promise<NextResponse> {
       role,
       difficulty,
       interviewerId,
+      goal,
+      interviewMode,
+      experienceYears,
       questionCount: clientQuestionCount,
       domainPackId,
+      jobDescription: rawJobDescription,
     } = validation.data;
-    const questionCount = clientQuestionCount ?? 6;
+
+    const jobDescription =
+      rawJobDescription && rawJobDescription.trim().length > 0
+        ? rawJobDescription.trim().slice(0, 12000)
+        : undefined;
+
+    let rawCount: number;
+    if (domainPackId) {
+      rawCount = clientQuestionCount ?? 6;
+    } else {
+      rawCount = clientQuestionCount ?? difficultyQuestionCount(difficulty);
+    }
+    const questionCount = Math.min(10, Math.max(4, rawCount));
+
+    const sessionContext: InterviewSessionContext = {
+      goal,
+      interviewMode,
+      experienceYears,
+      interviewerId,
+    };
+    if (jobDescription) {
+      sessionContext.jobDescription = jobDescription;
+    }
+
+    const cacheSession = {
+      goal,
+      interviewMode,
+      experienceYears,
+      interviewerId,
+      jdFingerprint: computeJdFingerprint(jobDescription),
+    };
     const interviewer = getInterviewerById(interviewerId);
     if (!interviewer) {
       return NextResponse.json({ error: 'Invalid interviewer selection' }, { status: 400 });
@@ -125,6 +161,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         status: 'in_progress',
         started_at: new Date().toISOString(),
         question_count: questionCount,
+        session_context: sessionContext,
       })
       .select('id')
       .single();
@@ -174,7 +211,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     } else {
       // ── AI path: generate questions via GPT (with Redis cache) ───────────
       const parsedResume = resume.parsed_data as ParsedResume;
-      const cacheKey = buildCacheKey(role, difficulty, parsedResume);
+      const cacheKey = buildCacheKey(role, difficulty, parsedResume, cacheSession);
       const cached = await getCachedQuestions(cacheKey);
 
       if (cached) {
@@ -200,6 +237,11 @@ export async function POST(request: Request): Promise<NextResponse> {
             role,
             difficulty,
             questionCount,
+            goal,
+            interviewMode,
+            experienceYears,
+            interviewerId,
+            jobDescription,
           });
         } catch (err) {
           await refundCredit(user.id);

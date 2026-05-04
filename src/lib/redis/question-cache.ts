@@ -32,14 +32,45 @@ function hashResume(parsed: ParsedResume): string {
   return (h >>> 0).toString(16);
 }
 
+export interface QuestionCacheSessionContext {
+  goal: string;
+  interviewMode: string;
+  experienceYears: number;
+  interviewerId: string;
+  /** djb2 fingerprint of trimmed JD prefix; "0" when absent */
+  jdFingerprint: string;
+}
+
+/** Stable hash for Redis cache partitioning when JD text differs */
+export function computeJdFingerprint(jobDescription: string | undefined): string {
+  const s = (jobDescription ?? '').trim().slice(0, 2000);
+  if (!s) return '0';
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h) ^ s.charCodeAt(i);
+  }
+  return (h >>> 0).toString(16);
+}
+
+function hashSessionContext(session: QuestionCacheSessionContext): string {
+  const sig = `${session.goal}|${session.interviewMode}|${session.experienceYears}|${session.interviewerId}|${session.jdFingerprint}`;
+  let h = 5381;
+  for (let i = 0; i < sig.length; i++) {
+    h = ((h << 5) + h) ^ sig.charCodeAt(i);
+  }
+  return (h >>> 0).toString(16);
+}
+
 export function buildCacheKey(
   role: string,
   difficulty: string,
-  parsedResume: ParsedResume
+  parsedResume: ParsedResume,
+  session: QuestionCacheSessionContext
 ): string {
   const slug = role.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 40);
   const resumeHash = hashResume(parsedResume);
-  return `qcache:${slug}:${difficulty}:${resumeHash}`;
+  const ctxHash = hashSessionContext(session);
+  return `qcache:${slug}:${difficulty}:${resumeHash}:${ctxHash}`;
 }
 
 export async function getCachedQuestions(

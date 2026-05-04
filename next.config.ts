@@ -41,6 +41,16 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: '/onboarding/avatar',
+        destination: '/onboarding',
+        permanent: true,
+      },
+      {
+        source: '/onboarding/briefing',
+        destination: '/onboarding',
+        permanent: true,
+      },
+      {
         source: '/:path*',
         has: [{ type: 'host', value: 'www.interviewera.com' }],
         destination: 'https://interviewera.com/:path*',

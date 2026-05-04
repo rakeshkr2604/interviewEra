@@ -12,6 +12,8 @@ import {
   PDFUnsupportedError,
   type PDFErrorCode,
 } from '@/lib/pdf/parser';
+import { assertLooksLikeResume } from '@/lib/documents/document-classification';
+import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 
 // pdfjs-dist is a Node-only library (Buffer + node:module). Pin the
 // runtime explicitly — never ship this on Edge, where the module would
@@ -95,6 +97,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── Step 2: Validate file ──────────────────────────────────────────────────
     const formData = await request.formData();
+    const multiErr = getMultipleFilesError(formData, 'file');
+    if (multiErr) {
+      return NextResponse.json({ error: multiErr }, { status: 400 });
+    }
     const file = formData.get('file');
 
     if (!file || !(file instanceof File)) {
@@ -163,6 +169,14 @@ export async function POST(request: Request): Promise<NextResponse> {
           requestId: reqId,
         },
         { status: 422, headers: { 'X-Request-Id': reqId } }
+      );
+    }
+
+    const resumeDocCheck = assertLooksLikeResume(rawText);
+    if (!resumeDocCheck.ok) {
+      return NextResponse.json(
+        { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
+        { status: 422, headers: { 'X-Request-Id': reqId } },
       );
     }
 

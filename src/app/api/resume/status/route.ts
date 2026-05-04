@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import type { ParsedResume } from '@/types/app.types';
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -23,7 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     const serviceClient = createServiceClient();
     const { data: resume, error: resumeError } = await serviceClient
       .from('resumes')
-      .select('id, status')
+      .select('id, status, parsed_data')
       .eq('id', resumeId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -37,11 +38,22 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
+    const payload: {
+      resumeId: string;
+      status: string;
+      ready: boolean;
+      parsed_data?: ParsedResume;
+    } = {
       resumeId: resume.id,
       status: resume.status,
       ready: resume.status === 'parsed',
-    });
+    };
+
+    if (resume.status === 'parsed' && resume.parsed_data) {
+      payload.parsed_data = resume.parsed_data as ParsedResume;
+    }
+
+    return NextResponse.json(payload);
   } catch (err) {
     console.error('[resume/status] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
