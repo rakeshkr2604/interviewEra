@@ -12,7 +12,7 @@
  * user-facing codes; never surface the raw exception.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -141,6 +141,50 @@ function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | nul
 }
 
 /**
+ * Installed pdfjs-dist version (for CDN URLs that mirror the traced package).
+ */
+function getPdfjsDistPackageVersion(): string {
+  try {
+    const req = createRequire(import.meta.url);
+    const pkgJsonPath = req.resolve('pdfjs-dist/package.json');
+    const raw = readFileSync(pkgJsonPath, 'utf8');
+    const pkg = JSON.parse(raw) as { version?: string };
+    if (typeof pkg.version === 'string' && /^[0-9]+\.[0-9]+\.[0-9]/.test(pkg.version)) {
+      return pkg.version;
+    }
+  } catch {
+    /* fallback — keep in sync with package.json */
+  }
+  return '5.4.296';
+}
+
+/**
+ * When serverless output omits `standard_fonts/` + `cmaps/` beside the resolved
+ * package root, pdfjs throws FormatError → false CORRUPT. Use unpkg for the
+ * same relative paths at the installed version (Node fetch; not browser CSP).
+ */
+function buildUnpkgPdfJsAssetUrls(): { standardFontDataUrl: string; cMapUrl: string } {
+  const v = getPdfjsDistPackageVersion();
+  const base = `https://unpkg.com/pdfjs-dist@${v}`;
+  return {
+    standardFontDataUrl: `${base}/standard_fonts/`,
+    cMapUrl: `${base}/cmaps/`,
+  };
+}
+
+function getPdfJsAssetUrlsForServer(): {
+  urls: { standardFontDataUrl: string; cMapUrl: string };
+  source: 'local' | 'cdn';
+} {
+  const local = getAssetPaths();
+  if (local) return { urls: local, source: 'local' };
+  if (process.env.VERCEL === '1') {
+    console.warn('[pdf-parse][vercel] local pdfjs standard_fonts/cmaps missing; using unpkg fallback');
+  }
+  return { urls: buildUnpkgPdfJsAssetUrls(), source: 'cdn' };
+}
+
+/**
  * Cheap pre-flight: a real PDF starts with `%PDF-` (plus tolerant of a
  * BOM / leading whitespace, which some browsers prepend on drag-and-drop).
  * Throwing here gives a precise UNSUPPORTED message instead of letting
@@ -202,7 +246,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
 
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const assets = getAssetPaths();
+  const { urls: assets, source: assetSource } = getPdfJsAssetUrlsForServer();
 
   let doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> | null = null;
   try {
@@ -212,7 +256,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       disableFontFace: true,
       isEvalSupported: false,
       verbosity: 0,
-      ...(assets ?? {}),
+      ...assets,
       cMapPacked: true,
     }).promise;
 
@@ -244,7 +288,7 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       'stack=', e?.stack,
     );
     if (process.env.VERCEL === '1') {
-      console.error('[pdf-parse][vercel] had_asset_urls=', assets != null);
+      console.error('[pdf-parse][vercel] asset_source=', assetSource);
       try {
         logPdfJsResolveDiag(resolvePdfJsAssetPaths(), 'parse_error_context');
       } catch {
