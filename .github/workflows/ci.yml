@@ -1,10 +1,12 @@
 name: CI
 
+# Solo workflow: validate on every push to any branch — no PR required.
+# Dependabot still gets CI when it pushes to dependabot/* branches.
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    branches:
+      - '**'
+  workflow_dispatch:
 
 # Cancel any in-progress run on the same branch when a new commit is pushed
 concurrency:
