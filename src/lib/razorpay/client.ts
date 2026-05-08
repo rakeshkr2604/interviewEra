@@ -58,6 +58,61 @@ export async function createSubscriptionOrder(
   };
 }
 
+/** Minimum order amount for Razorpay standard checkout (1 INR). */
+export const MIN_STANDARD_ORDER_PAISE = 100;
+
+export async function createStandardOrder(params: {
+  amount: number;
+  currency?: string;
+  receipt?: string;
+  userId: string;
+}): Promise<{ order_id: string; amount: number; currency: string }> {
+  const { amount, currency = 'INR', receipt, userId } = params;
+  if (amount < MIN_STANDARD_ORDER_PAISE) {
+    throw new Error(`Amount must be at least ${MIN_STANDARD_ORDER_PAISE} paise`);
+  }
+  const receiptId = (
+    receipt ?? `ie_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
+  ).slice(0, 40);
+
+  const order = await razorpay.orders.create({
+    amount,
+    currency,
+    receipt: receiptId,
+    notes: { user_id: userId },
+  });
+
+  return {
+    order_id: order.id,
+    amount: typeof order.amount === 'number' ? order.amount : Number(order.amount),
+    currency: order.currency,
+  };
+}
+
+export function verifyStandardPaymentSignature(
+  orderId: string,
+  paymentId: string,
+  clientSignature: string,
+): boolean {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) {
+    console.error('[razorpay] RAZORPAY_KEY_SECRET is not set');
+    return false;
+  }
+  try {
+    const expected = crypto
+      .createHmac('sha256', secret)
+      .update(`${orderId}|${paymentId}`)
+      .digest('hex');
+    const a = Buffer.from(expected, 'hex');
+    const b = Buffer.from(clientSignature, 'hex');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) {

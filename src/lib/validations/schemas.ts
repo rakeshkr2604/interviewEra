@@ -51,6 +51,19 @@ export const paymentCreateOrderSchema = z.object({
   billingCycle: z.enum(['monthly', 'annual']).default('monthly'),
 });
 
+/** Standard Razorpay order (one-time payment). Amount is in paise (min 100). */
+export const standardOrderCreateSchema = z.object({
+  amount: z.number().int().min(100),
+  currency: z.string().min(3).max(3).default('INR'),
+  receipt: z.string().min(1).max(40).optional(),
+});
+
+export const standardPaymentVerifySchema = z.object({
+  razorpay_order_id: z.string().min(1),
+  razorpay_payment_id: z.string().min(1),
+  razorpay_signature: z.string().min(1),
+});
+
 // referredUserId is obtained from the authenticated session server-side, not from the request body
 export const referralApplySchema = z.object({
   referralCode: z.string().min(1),

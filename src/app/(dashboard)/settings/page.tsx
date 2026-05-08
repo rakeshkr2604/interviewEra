@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { VoicePreferenceSelect } from '@/components/settings/VoicePreferenceSelect'
+import { StandardRazorpayCheckoutButton } from '@/components/payments/StandardRazorpayCheckoutButton'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -71,6 +72,21 @@ export default async function SettingsPage() {
             Used for AI interviewer TTS when available.
           </p>
           <VoicePreferenceSelect />
+        </div>
+
+        {/* Standard Razorpay checkout (integration test) */}
+        <div className="dashboard-premium-card px-6 py-5 sm:px-7">
+          <p
+            className="mb-0.5 font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Standard Razorpay checkout
+          </p>
+          <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+            One-time order flow (not subscription). Uses ₹100 test amount; verifies payment on the
+            server. For local testing with Razorpay test keys only.
+          </p>
+          <StandardRazorpayCheckoutButton userEmail={user.email ?? ''} />
         </div>
 
         {/* Account info */}

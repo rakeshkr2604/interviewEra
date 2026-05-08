@@ -17,9 +17,30 @@ interface RazorpayOptions {
   modal: { ondismiss: () => void };
 }
 
+/** Standard (order_id) checkout — shared Window typing for CheckoutButton + StandardRazorpayCheckoutButton */
+interface RazorpayOrderCheckoutOptions {
+  key: string;
+  amount: number;
+  currency: string;
+  order_id: string;
+  name: string;
+  description: string;
+  prefill: { email: string };
+  theme: { color: string };
+  handler: (response: {
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+  }) => void;
+  modal: { ondismiss: () => void };
+}
+
 declare global {
   interface Window {
-    Razorpay: new (options: RazorpayOptions) => { open: () => void };
+    Razorpay: new (options: RazorpayOptions | RazorpayOrderCheckoutOptions) => {
+      open: () => void;
+      on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void;
+    };
   }
 }
 
