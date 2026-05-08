@@ -11,6 +11,9 @@ const PUBLIC_ROUTES = new Set([
   '/about',
   '/campus',
   '/join',
+  '/privacy',
+  '/terms',
+  '/refund',
   '/auth/callback',
 ]);
 const AUTH_ROUTES = new Set(['/login', '/signup']);
