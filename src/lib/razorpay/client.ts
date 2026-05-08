@@ -50,11 +50,17 @@ export async function createSubscriptionOrder(
     notes: { user_id: userId, plan, billing_cycle: billingCycle },
   });
 
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  if (!keyId) {
+    throw new Error('RAZORPAY_KEY_ID is not configured');
+  }
+
   return {
     subscriptionId: subscription.id,
     amount: PLAN_AMOUNTS[planKey],
     currency: 'INR',
-    key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+    // Must match the key used server-side; avoid NEXT_PUBLIC_* drift on Vercel (causes checkout 401).
+    key: keyId,
   };
 }
 

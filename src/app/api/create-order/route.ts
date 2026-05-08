@@ -47,16 +47,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const { amount, currency, receipt } = validation.data;
 
-  const publicKey = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-  if (!publicKey) {
-    console.error('[create-order] NEXT_PUBLIC_RAZORPAY_KEY_ID is not set');
-    return NextResponse.json(
-      { error: 'Payment configuration error. Please try again later.' },
-      { status: 500 },
-    );
-  }
-
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+  const keyId = process.env.RAZORPAY_KEY_ID;
+  if (!keyId || !process.env.RAZORPAY_KEY_SECRET) {
     console.error('[create-order] Razorpay server credentials are not set');
     return NextResponse.json(
       { error: 'Payment configuration error. Please try again later.' },
@@ -73,7 +65,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     return NextResponse.json({
       ...order,
-      key: publicKey,
+      key: keyId,
     });
   } catch (err) {
     console.error('[create-order] Razorpay error:', err);

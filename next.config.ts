@@ -76,15 +76,19 @@ const nextConfig: NextConfig = {
     // - 'unsafe-inline' on style-src is required for Tailwind CSS-in-JS and Recharts inline styles.
     // - wss://*.supabase.co covers Supabase Realtime subscriptions.
     // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
-    // - Razorpay Web Checkout: nested iframes may load api.razorpay.com (frame-src + child-src).
+    // - Razorpay Web Checkout: nested iframes (api); static host serves chunks/fonts for hosted checkout.
+    const razorpayScript =
+      'https://checkout.razorpay.com https://cdn.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
+    const razorpayConnect =
+      'https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://cdn.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://va.vercel-scripts.com`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} ${razorpayScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
-      `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com`,
+      `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com https://checkout-static-next.razorpay.com`,
       `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co`,
       "media-src 'self' blob:",
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://va.vercel-scripts.com`,
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} https://va.vercel-scripts.com`,
       "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "child-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "worker-src 'self' blob:",
