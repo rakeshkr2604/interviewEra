@@ -76,14 +76,16 @@ const nextConfig: NextConfig = {
     // - 'unsafe-inline' on style-src is required for Tailwind CSS-in-JS and Recharts inline styles.
     // - wss://*.supabase.co covers Supabase Realtime subscriptions.
     // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
+    // - Razorpay Web Checkout: checkout + CDN scripts, iframe; API + lumberjack (telemetry)
+    //   for fetch/WebSocket as required by the hosted checkout SDK.
     const csp = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://va.vercel-scripts.com`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} https://checkout.razorpay.com https://cdn.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com`,
       `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co`,
       "media-src 'self' blob:",
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://va.vercel-scripts.com`,
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://va.vercel-scripts.com`,
       "frame-src 'self' https://checkout.razorpay.com",
       "worker-src 'self' blob:",
       "object-src 'none'",
