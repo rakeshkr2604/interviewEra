@@ -1,6 +1,7 @@
-import type { MetadataRoute } from 'next'
+import type { MetadataRoute } from 'next';
+import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com'
+const BASE_URL = getCanonicalSiteOrigin();
 
 export default function robots(): MetadataRoute.Robots {
   return {

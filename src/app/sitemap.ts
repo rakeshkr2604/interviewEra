@@ -1,7 +1,8 @@
 import type { MetadataRoute } from 'next';
+import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
+  const baseUrl = getCanonicalSiteOrigin();
   const now = new Date();
 
   return [
