@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
+import { getCanonicalSiteOrigin } from './site-url'
 
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://interviewera.com'
+const BASE_URL = getCanonicalSiteOrigin()
 const BRAND = 'InterviewEra'
 
 export const siteConfig = {
