@@ -14,6 +14,14 @@ export const revalidate = 3600;
 
 const BLOG_POSTS = [
   {
+    title: 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026',
+    description:
+      'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
+    href: '/blog/ai-mock-interviews-smartest-prep-2026',
+    category: 'AI mock interviews',
+    readTime: '6 min read',
+  },
+  {
     title: 'Top DSA Interview Questions & Topic Map (2026)',
     description:
       'Topic frequency chart, classic patterns by area, and an illustrative prep timeline — prioritize what actually gets asked.',
