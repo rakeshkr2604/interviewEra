@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { getAuthRedirectOrigin } from '@/lib/auth/redirect-origin';
 import { createClient } from '@/lib/supabase/client';
 import { Eye, EyeOff } from 'lucide-react';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -82,7 +83,7 @@ export function LoginForm() {
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${getAuthRedirectOrigin()}/auth/callback`,
         },
       });
 

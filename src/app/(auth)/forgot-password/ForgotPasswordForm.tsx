@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { getAuthRedirectOrigin } from '@/lib/auth/redirect-origin';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
@@ -25,7 +26,7 @@ export function ForgotPasswordForm() {
 
     try {
       const supabase = createClient();
-      const origin = window.location.origin;
+      const origin = getAuthRedirectOrigin();
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: `${origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`,
       });
