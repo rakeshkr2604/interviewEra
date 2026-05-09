@@ -1,5 +1,8 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import { PLAN_ACTIVATION_CREDITS } from '@/lib/razorpay/plan-credits';
+
+export { PLAN_ACTIVATION_CREDITS };
 
 export const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
@@ -20,15 +23,6 @@ const RAZORPAY_PLAN_IDS: Record<string, string> = {
   pro: process.env.RAZORPAY_PRO_PLAN_ID!,
   starter_annual: process.env.RAZORPAY_STARTER_ANNUAL_PLAN_ID!,
   pro_annual: process.env.RAZORPAY_PRO_ANNUAL_PLAN_ID!,
-};
-
-// Credits granted at subscription.activated webhook
-// Annual = 12 months × monthly credits (full year upfront)
-export const PLAN_ACTIVATION_CREDITS: Record<string, number> = {
-  starter: 12,
-  pro: 30,
-  starter_annual: 144,  // 12 × 12
-  pro_annual: 360,      // 30 × 12
 };
 
 export async function createSubscriptionOrder(

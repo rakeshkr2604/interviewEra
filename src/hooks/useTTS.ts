@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { resolveVoiceForInterviewer } from '@/lib/interviewer/voice'
+import { readAiVoiceEnabled, readTtsRate } from '@/lib/settings/client-preferences'
 
 interface UseTTSReturn {
   speak: (
@@ -50,8 +51,13 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
     setError(null)
     stop()
 
+    if (!readAiVoiceEnabled()) {
+      queueMicrotask(() => onComplete?.())
+      return
+    }
+
     const utterance = new SpeechSynthesisUtterance(text)
-    utterance.rate = 0.9
+    utterance.rate = readTtsRate()
     const interviewer = getInterviewerById(interviewerId)
     utterance.pitch = interviewer?.gender === 'female' ? 1.1 : 0.9
     utterance.volume = 1

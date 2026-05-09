@@ -1,6 +1,7 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
 import type { QuestionRubric, DimensionScores, DetailedAnalysis } from '@/types/app.types';
+import type { AnswerStyle } from '@/lib/settings/client-preferences';
 
 export type EvaluationProvider = 'openrouter' | 'openai' | 'mistral';
 
@@ -8,6 +9,8 @@ export interface EvaluateAnswerInput {
   questionText: string;
   rubric: QuestionRubric;
   answerText: string;
+  /** Settings preference — calibrates structure/length expectations in scoring. */
+  answerStyle?: AnswerStyle;
 }
 
 export interface EvaluationResult {
@@ -74,12 +77,32 @@ function isValidEvaluation(data: unknown): data is EvaluationResult {
   return true;
 }
 
-function buildPrompt(questionText: string, rubric: QuestionRubric, answerText: string): string {
+function answerStyleInstruction(style: AnswerStyle | undefined): string {
+  if (!style) return '';
+  const lines: Record<AnswerStyle, string> = {
+    concise:
+      'The candidate prefers concise answers: reward clear, direct responses; do not penalize brevity if the question is fully addressed.',
+    balanced:
+      'The candidate prefers balanced answers: expect brief structure (context → points → takeaway) without excessive length.',
+    detailed:
+      'The candidate prefers detailed answers: reward substantive depth and examples; only penalize if rambling or off-topic.',
+  };
+  return `\nCandidate answer-length preference (from their settings): ${style}. ${lines[style]}\n`;
+}
+
+function buildPrompt(
+  questionText: string,
+  rubric: QuestionRubric,
+  answerText: string,
+  answerStyle?: AnswerStyle,
+): string {
   return (
     `You are an expert interview evaluator. Score the following answer strictly and fairly.\n\n` +
     `Question: ${questionText}\n` +
     `Rubric: ${JSON.stringify(rubric)}\n` +
-    `Candidate's Answer: ${answerText}\n\n` +
+    `Candidate's Answer: ${answerText}\n` +
+    answerStyleInstruction(answerStyle) +
+    `\n` +
     `Score each dimension from 1–10 (1=very poor, 10=excellent).\n` +
     `Be strict. A score of 7+ means genuinely good. Do not inflate scores.\n\n` +
     `Return ONLY valid JSON, no markdown, no explanation:\n` +
@@ -178,8 +201,9 @@ export async function evaluateAnswer({
   questionText,
   rubric,
   answerText,
+  answerStyle,
 }: EvaluateAnswerInput): Promise<EvaluationResult> {
-  const prompt = buildPrompt(questionText, rubric, answerText);
+  const prompt = buildPrompt(questionText, rubric, answerText, answerStyle);
 
   try {
     return await evaluateWithPrimaryChain(prompt);

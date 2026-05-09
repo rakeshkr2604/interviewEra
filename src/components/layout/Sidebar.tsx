@@ -132,36 +132,44 @@ export function Sidebar({
     >
       {/* Logo */}
       <div
-        className="flex items-center gap-2.5 border-b px-4 py-4"
+        className="flex items-center gap-3 border-b px-4 py-5"
         style={{ borderColor: 'var(--card-border)' }}
       >
         <img
           src={BRAND_MARK}
-          width={38}
-          height={38}
-          className="size-[38px] shrink-0 rounded-2xl"
+          width={44}
+          height={44}
+          className="size-11 shrink-0 rounded-2xl"
           style={{
-            boxShadow: '0 6px 22px color-mix(in srgb, var(--accent-primary) 24%, transparent)',
+            boxShadow: '0 6px 22px color-mix(in srgb, var(--accent-primary) 22%, transparent)',
           }}
           alt=""
         />
         <div>
-          <p className="text-sm leading-none" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+          <p className="text-[15px] leading-tight" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
             <BrandWordmarkSplit interviewClassName="font-semibold" eraClassName="font-bold" />
           </p>
-          <p className="text-[10px] mt-0.5 font-medium tracking-wide" style={{ color: 'var(--text-muted)' }}>
+          <p
+            className="mt-1 text-[11px] font-medium tracking-wide"
+            style={{ color: 'color-mix(in srgb, var(--text-muted) 78%, var(--text-secondary))' }}
+          >
             Practice studio
           </p>
         </div>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-5 px-2.5 py-4">
-        {sections.map((section) => (
-          <div key={section.label}>
+      <nav className="flex-1 space-y-0 px-2.5 py-3">
+        {sections.map((section, sectionIndex) => (
+          <div
+            key={section.label}
+            className={cn(
+              sectionIndex > 0 && 'mt-2 border-t border-[var(--card-border)]/55 pt-3',
+            )}
+          >
             <p
-              className="px-2 mb-2 text-[10px] font-bold uppercase tracking-[0.14em]"
-              style={{ color: 'var(--text-muted)' }}
+              className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: 'color-mix(in srgb, var(--text-muted) 48%, transparent)' }}
             >
               {section.label}
             </p>
@@ -177,14 +185,14 @@ export function Sidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200"
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold leading-snug transition-all duration-200"
                       style={{
                         background: isActive
-                          ? 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 72%, #6d28d9))'
+                          ? 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))'
                           : 'transparent',
                         color: isActive ? '#ffffff' : 'var(--text-secondary)',
                         boxShadow: isActive
-                          ? '0 10px 28px color-mix(in srgb, var(--accent-primary) 28%, transparent)'
+                          ? '0 6px 20px color-mix(in srgb, var(--accent-primary) 17%, transparent)'
                           : 'none',
                       }}
                       onClick={() => onNavigate?.()}
@@ -202,7 +210,7 @@ export function Sidebar({
                         }
                       }}
                     >
-                      <Icon size={17} strokeWidth={2} />
+                      <Icon size={18} strokeWidth={2.25} />
                       {item.label}
                     </Link>
                   </li>

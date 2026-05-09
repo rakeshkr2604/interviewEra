@@ -2,7 +2,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { DARK_TOKENS, LIGHT_TOKENS } from './tokens'
 
-type Theme = 'dark' | 'light' | 'system'
+export type Theme = 'dark' | 'light' | 'system'
 
 interface ThemeContextType {
   theme: Theme

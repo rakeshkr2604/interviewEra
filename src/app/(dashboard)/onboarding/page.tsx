@@ -15,6 +15,7 @@ import {
   difficultyQuestionCount,
   difficultyQuestionRangeLabel,
 } from '@/lib/interview/difficulty-question-count'
+import { readDefaultDifficulty } from '@/lib/settings/client-preferences'
 import { SINGLE_FILE_UPLOAD_MESSAGE } from '@/lib/http/form-data-single-file'
 import { FaUserTie, FaBriefcase, FaFileUpload } from 'react-icons/fa'
 
@@ -73,7 +74,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [parsedResume, setParsedResume] = useState<ParsedResume | null>(null)
-  const [difficulty, setDifficulty] = useState<InterviewDifficulty>('medium')
+  const [difficulty, setDifficulty] = useState<InterviewDifficulty>(() => readDefaultDifficulty())
   const [allChecked, setAllChecked] = useState(false)
   const [startLoading, setStartLoading] = useState(false)
   const [startError, setStartError] = useState('')

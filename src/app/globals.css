@@ -33,6 +33,11 @@ html {
   html { scroll-behavior: auto; }
 }
 
+/* Settings in-page anchors — offset sticky dashboard header + mobile TOC */
+[id^="settings-"] {
+  scroll-margin-top: max(6.75rem, calc(88px + 3rem));
+}
+
 /* ─── Font Assignment (variables injected by next/font in layout.tsx) ─── */
 body {
   font-family: var(--font-dm-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

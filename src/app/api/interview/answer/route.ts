@@ -47,7 +47,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 400 }
       );
     }
-    const { interviewId, questionId, answerText, answerMode } = validation.data;
+    const { interviewId, questionId, answerText, answerMode, answerStyle } = validation.data;
 
     const serviceClient = createServiceClient();
 
@@ -99,6 +99,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         questionText: question.question_text as string,
         rubric: question.rubric as QuestionRubric,
         answerText,
+        answerStyle,
       });
 
       const { data: evaluation } = await serviceClient

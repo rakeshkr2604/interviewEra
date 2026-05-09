@@ -35,6 +35,8 @@ export const interviewAnswerSchema = z.object({
   questionId: z.string().uuid(),
   answerText: z.string().min(1).max(5000),
   answerMode: z.enum(['text', 'voice']).optional(),
+  /** Matches Settings → Interview → answer style (localStorage). Optional for older clients. */
+  answerStyle: z.enum(['concise', 'balanced', 'detailed']).optional(),
 });
 
 export const interviewCompleteSchema = z.object({

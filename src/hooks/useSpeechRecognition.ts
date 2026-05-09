@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
 
 // Minimal Web Speech API typings (not present in all TS DOM lib versions)
 interface SpeechRecognitionResult {
@@ -84,7 +85,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     setPermissionState('requesting');
     hasRequestedMicRef.current = true;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints());
       stream.getTracks().forEach((track) => track.stop());
       setPermissionState('granted');
       return true;

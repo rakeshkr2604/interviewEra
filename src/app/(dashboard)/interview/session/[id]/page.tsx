@@ -18,6 +18,7 @@ import { api } from '@/services/api'
 import { Mic, MicOff, SkipForward, RotateCcw, Send } from 'lucide-react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
+import { readAnswerStyle } from '@/lib/settings/client-preferences'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -188,6 +189,8 @@ export default function InterviewSessionPage() {
         questionId: currentQuestion?.id,
         answerText: finalTranscript,
         interviewId,
+        answerMode: useManualInput ? 'text' : 'voice',
+        answerStyle: readAnswerStyle(),
       })
 
       const record: AnswerRecord = {

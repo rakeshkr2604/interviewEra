@@ -8,6 +8,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
+import {
+  readDefaultDifficulty,
+  readPreferredInterviewerId,
+} from '@/lib/settings/client-preferences';
 import { cn } from '@/lib/utils';
 import type { DomainPack, PlanTier } from '@/types/app.types';
 
@@ -49,7 +53,7 @@ export function StartInterviewForm({
   domainPacks,
 }: StartInterviewFormProps) {
   const [role, setRole] = useState('');
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
+  const [difficulty, setDifficulty] = useState<Difficulty>(() => readDefaultDifficulty());
   const [interviewMode, setInterviewMode] = useState<InterviewMode>('ai');
   const [selectedPackId, setSelectedPackId] = useState<string>(domainPacks[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
@@ -71,7 +75,7 @@ export function StartInterviewForm({
       const body: Record<string, unknown> = {
         resumeId,
         difficulty,
-        interviewerId: 'priya',
+        interviewerId: readPreferredInterviewerId(),
       };
 
       if (interviewMode === 'ai') {

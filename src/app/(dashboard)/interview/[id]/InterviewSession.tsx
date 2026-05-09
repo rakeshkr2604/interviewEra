@@ -6,6 +6,7 @@ import { QuestionCard } from '@/components/interview/QuestionCard';
 import { VoiceAnswerInput } from '@/components/interview/VoiceAnswerInput';
 import { ProgressBar } from '@/components/interview/ProgressBar';
 import type { AnswerMode, Question } from '@/types/app.types';
+import { readAnswerStyle } from '@/lib/settings/client-preferences';
 
 type SessionState =
   | 'answering'
@@ -83,6 +84,7 @@ export function InterviewSession({
             questionId: currentQuestion.id,
             answerText,
             answerMode,
+            answerStyle: readAnswerStyle(),
           }),
         });
 
