@@ -90,11 +90,11 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           >
             {/* Fixed rem sizes — avoid vw so orbs do not resize when scrollbar / viewport stabilizes (CLS). */}
             <div
-              className="absolute -left-[10%] top-[-12%] size-[18rem] sm:size-[20rem] rounded-full blur-[90px] opacity-90"
+              className="absolute -left-[10%] top-[-12%] size-[18rem] rounded-full blur-[90px] opacity-90"
               style={{ background: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)' }}
             />
             <div
-              className="absolute -right-[8%] top-[22%] size-56 sm:size-60 rounded-full blur-[80px] opacity-80"
+              className="absolute -right-[8%] top-[22%] size-56 rounded-full blur-[80px] opacity-80"
               style={{ background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}
             />
             <div
