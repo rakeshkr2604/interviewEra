@@ -47,11 +47,6 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
-        source: '/favicon.ico',
-        destination: '/favicon/favicon-32x32.png',
-        permanent: false,
-      },
-      {
         source: '/manifest.json',
         destination: '/site.webmanifest',
         permanent: false,
