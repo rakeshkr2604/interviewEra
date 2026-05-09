@@ -3,8 +3,7 @@ import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/react";
+import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -131,8 +130,7 @@ export default function RootLayout({
           <OfflineBanner />
           {children}
         </ThemeProvider>
-        <SpeedInsights />
-        <Analytics />
+        <DeferredVercelMetrics />
       </body>
     </html>
   );

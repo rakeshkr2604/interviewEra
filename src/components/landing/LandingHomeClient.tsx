@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
+import { T, Reveal } from '@/components/landing/landing-home-shared';
 
 const LandingHomeBelowFold = dynamic(
   () => import('@/components/landing/LandingHomeBelowFold'),
@@ -18,437 +18,7 @@ const LandingHomeBelowFold = dynamic(
   }
 );
 
-/* ─── 1. PAIN BAR ─── */
-function PainBar() {
-  return (
-    <div
-      style={{
-        background: T.painBg,
-        borderBottom: `1px solid ${T.painBrd}`,
-        padding: '10px 0',
-        textAlign: 'center',
-      }}
-    >
-      <p
-        style={{
-          fontSize: '13px',
-          fontWeight: 500,
-          color: T.painText,
-          maxWidth: '640px',
-          margin: '0 auto',
-          padding: '0 24px',
-        }}
-      >
-        Most candidates don&apos;t fail because of what they know — they fail because they{' '}
-        <strong style={{ color: T.err, fontWeight: 700 }}>
-          can&apos;t structure answers under pressure
-        </strong>
-        . You can&apos;t fix what you can&apos;t measure.
-      </p>
-    </div>
-  );
-}
-
-/* ─── 2. HERO ─── */
-function LivePulse() {
-  return (
-    <span
-      className="ie-live-pulse"
-      style={{
-        display: 'inline-block',
-        width: '6px',
-        height: '6px',
-        borderRadius: '50%',
-        background: T.ok,
-        flexShrink: 0,
-      }}
-    />
-  );
-}
-
-function CursorBlink() {
-  return (
-    <span
-      className="ie-cursor-blink"
-      style={{
-        display: 'inline-block',
-        width: '2px',
-        height: '13px',
-        background: T.acc,
-        marginLeft: '2px',
-        verticalAlign: 'middle',
-      }}
-    />
-  );
-}
-
-function BarFill({ color, pct }: { color: string; pct: number }) {
-  const ref = React.useRef<HTMLDivElement | null>(null);
-  const [filled, setFilled] = React.useState(false);
-
-  React.useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    if (!('IntersectionObserver' in window)) {
-      setFilled(true);
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        for (const e of entries) {
-          if (e.isIntersecting) {
-            setFilled(true);
-            io.disconnect();
-            break;
-          }
-        }
-      },
-      { threshold: 0.3 },
-    );
-    io.observe(node);
-    return () => io.disconnect();
-  }, []);
-
-  return (
-    <div
-      ref={ref}
-      className="v3-bar-fill-solid"
-      style={{
-        height: '100%',
-        borderRadius: '99px',
-        background: color,
-        width: filled ? `${pct}%` : '0%',
-        transition: 'width 900ms cubic-bezier(0.16,1,0.3,1) 300ms',
-        willChange: filled ? 'auto' : 'width',
-      }}
-    />
-  );
-}
-
-function ScoringCard() {
-  const dims = [
-    { label: 'Communication', value: 7.8, pct: 78 },
-    { label: 'Technical depth', value: 7.2, pct: 72 },
-    { label: 'STAR structure', value: 8.4, pct: 84 },
-    { label: 'Confidence', value: 6.8, pct: 68 },
-  ];
-
-  return (
-    <div
-      style={{
-        background: T.card,
-        border: `1px solid ${T.bord2}`,
-        borderRadius: '20px',
-        overflow: 'hidden',
-        boxShadow: T.scoreShadow,
-      }}
-    >
-      {/* Top bar */}
-      <div
-        style={{
-          background: T.bg2,
-          borderBottom: `1px solid ${T.bord}`,
-          padding: '12px 18px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <div style={{ display: 'flex', gap: '5px' }}>
-          {[0, 1, 2].map((i) => (
-            <span
-              key={i}
-              style={{
-                width: '10px',
-                height: '10px',
-                borderRadius: '50%',
-                background: T.bord2,
-                display: 'block',
-              }}
-            />
-          ))}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 600, color: T.ok }}>
-          <LivePulse /> Scoring live
-        </div>
-      </div>
-
-      {/* Body */}
-      <div style={{ padding: '18px 20px' }}>
-        <div style={{ fontSize: '11px', fontWeight: 700, color: T.text3, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '8px' }}>
-          Question 2 of 5 · Technical
-        </div>
-        <div
-          style={{
-            background: T.bg2,
-            border: `1px solid ${T.bord}`,
-            borderRadius: '10px',
-            padding: '13px 15px',
-            fontSize: '14px',
-            fontWeight: 600,
-            color: T.text,
-            lineHeight: 1.5,
-            marginBottom: '16px',
-            fontFamily: "'Bricolage Grotesque', sans-serif",
-          }}
-        >
-          &ldquo;Walk me through the payment API failure you handled in your final-year project.&rdquo;
-        </div>
-        <div style={{ fontSize: '10.5px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.text3, marginBottom: '6px' }}>
-          Your answer
-        </div>
-        <div
-          style={{
-            background: T.ansBg,
-            border: `1px solid ${T.bord2}`,
-            borderRadius: '10px',
-            padding: '12px 14px',
-            fontSize: '13.5px',
-            color: T.text2,
-            lineHeight: 1.65,
-            marginBottom: '16px',
-            minHeight: '56px',
-          }}
-        >
-          In Q4 2023, our payment service was dropping ~8% of transactions silently. I owned the backend debug — traced a race condition in the retry worker using logs, added idempotent keys and exponential backoff...<CursorBlink />
-        </div>
-        <div style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.text3, marginBottom: '10px' }}>
-          AI scoring in progress
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
-          {dims.map((d) => {
-            const isHigh = d.value >= 7.0;
-            const barColor = isHigh ? T.ok : T.warn;
-            return (
-            <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <span style={{ fontSize: '12px', color: T.text2, width: '88px', flexShrink: 0 }}>{d.label}</span>
-              <div style={{ flex: 1, height: '5px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-                <BarFill color={barColor} pct={d.pct} />
-              </div>
-              <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 600, color: barColor, width: '28px', textAlign: 'right', flexShrink: 0 }}>
-                {d.value}
-              </span>
-            </div>
-          )})}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div
-        style={{
-          borderTop: `1px solid ${T.bord}`,
-          padding: '12px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-        }}
-      >
-        <span style={{ fontSize: '12px', color: T.text3 }}>Session average</span>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
-          <span style={{ fontSize: '22px', color: T.acc }}>
-            <CountUp to={7.6} decimals={1} duration={1.4} delay={0.5} />
-          </span>
-          <span style={{ fontSize: '13px', color: T.text3, marginLeft: '4px' }}>/ 10</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HeroSection({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displayCount: string }) {
-  const cta = isLoggedIn ? '/dashboard' : '/signup';
-
-  return (
-    <section style={{ position: 'relative', overflow: 'hidden', padding: '80px 0 96px' }}>
-      {/* Dot texture */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          inset: 0,
-          pointerEvents: 'none',
-          backgroundImage: `radial-gradient(${T.bord2} 1px, transparent 1px)`,
-          backgroundSize: '32px 32px',
-          maskImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, black 20%, transparent 80%)',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, black 20%, transparent 80%)',
-        }}
-      />
-
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative' }}>
-        <div className="hero-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'clamp(300px,52%,600px) 1fr', gap: '64px', alignItems: 'start' }}>
-
-          {/* Left: Copy */}
-          <div>
-            <Reveal instant>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  background: T.accdim,
-                  border: `1px solid ${T.accbrd}`,
-                  borderRadius: '99px',
-                  padding: '5px 14px',
-                  fontSize: '12px',
-                  fontWeight: 600,
-                  color: T.acc2,
-                  marginBottom: '24px',
-                }}
-              >
-                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: T.ok, flexShrink: 0, display: 'block' }} />
-                {displayCount} students · Built for Indian campus hiring
-              </div>
-            </Reveal>
-
-            <Reveal instant>
-              <h1
-                style={{
-                  fontFamily: "'Bricolage Grotesque', sans-serif",
-                  fontSize: 'clamp(36px, 4.4vw, 58px)',
-                  fontWeight: 800,
-                  lineHeight: 1.04,
-                  letterSpacing: '-0.03em',
-                  marginBottom: '20px',
-                  color: T.text,
-                }}
-              >
-                Know your score<br />
-                before the company<br />
-                <em className="v3-hero-gradient-text" style={{ fontStyle: 'normal' }}>
-                  decides for you
-                </em>
-              </h1>
-            </Reveal>
-
-            {/* Mechanism line — instant: delayed Reveal stays opacity:0 on SSR (bad for LCP/FCP). */}
-            <Reveal instant>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                {[
-                  { n: '1', label: 'Upload resume' },
-                  { n: '2', label: 'Answer AI questions' },
-                  { n: '3', label: 'Get scored' },
-                ].map((step, i) => (
-                  <React.Fragment key={step.n}>
-                    {i > 0 && <span style={{ color: T.text3, fontSize: '14px' }}>→</span>}
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: T.bg3,
-                        border: `1px solid ${T.bord2}`,
-                        borderRadius: '8px',
-                        padding: '5px 12px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        color: T.text2,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '5px',
-                          background: T.acc,
-                          color: '#fff',
-                          fontSize: '10px',
-                          fontWeight: 800,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {step.n}
-                      </span>
-                      {step.label}
-                    </div>
-                  </React.Fragment>
-                ))}
-              </div>
-            </Reveal>
-
-            <Reveal instant>
-              <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '460px', marginBottom: '32px' }}>
-                Upload your resume. Get grilled on what you actually wrote. Every answer is scored on 5 dimensions — the exact criteria campus panels use to build their shortlists. No more guessing. No more hoping. Just a number that tells you the truth.
-              </p>
-            </Reveal>
-
-            <Reveal instant>
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
-                <Link
-                  href={cta}
-                  className="v3-btn-primary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '15px 32px',
-                    borderRadius: '12px',
-                    background: T.acc,
-                    color: '#fff',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Start a scored interview — free →
-                </Link>
-                <Link
-                  href="#how"
-                  className="v3-btn-secondary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '15px 32px',
-                    borderRadius: '12px',
-                    background: 'transparent',
-                    color: T.text,
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                    border: `1.5px solid ${T.bord2}`,
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  See how scoring works
-                </Link>
-              </div>
-            </Reveal>
-
-            <Reveal instant>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '12.5px', color: T.text2 }}>
-                {[
-                  { dot: T.ok,  label: 'No credit card needed' },
-                  { dot: T.acc, label: 'Under 60 seconds to start' },
-                  { dot: T.ok,  label: 'Free to begin' },
-                ].map((item) => (
-                  <span key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: item.dot, display: 'block' }} />
-                    {item.label}
-                  </span>
-                ))}
-              </div>
-            </Reveal>
-          </div>
-
-          {/* Right: Scoring card */}
-          <Reveal instant>
-            <div className="ie-hero-glow">
-              <ScoringCard />
-            </div>
-          </Reveal>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-/* ─── 3. FLOW SECTION ─── */
+/* ─── 1. FLOW SECTION ─── */
 function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
 
@@ -544,7 +114,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
-/* ─── 4. ENTRY SECTION ─── */
+/* ─── 3. ENTRY SECTION ─── */
 function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cards = [
     {
@@ -646,20 +216,13 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
   );
 }
 
-/* ─── ROOT EXPORT ─── */
-export default function LandingHomeClient() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [displayCount, setDisplayCount] = useState('1,000+');
+export default function LandingHomeClient({ initialLoggedIn }: { initialLoggedIn: boolean }) {
+  const [isLoggedIn, setIsLoggedIn] = useState(initialLoggedIn);
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
     let cancelled = false;
 
-    /**
-     * Defer Supabase auth + stats off the LCP critical path.
-     * `requestIdleCallback` (or a microtask fallback) keeps the initial
-     * page chunk free of `@supabase/ssr` until the browser is idle.
-     */
     const work = async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client');
@@ -674,16 +237,6 @@ export default function LandingHomeClient() {
         unsubscribe = () => sub.subscription.unsubscribe();
       } catch {
         /* network / chunk error — landing still works */
-      }
-
-      try {
-        const res = await fetch('/api/stats/student-count');
-        const body = (await res.json()) as { displayCount?: string };
-        if (!cancelled && typeof body.displayCount === 'string') {
-          setDisplayCount(body.displayCount);
-        }
-      } catch {
-        /* keep fallback */
       }
     };
 
@@ -707,12 +260,10 @@ export default function LandingHomeClient() {
   }, []);
 
   return (
-    <main id="main-content">
-      <PainBar />
-      <HeroSection isLoggedIn={isLoggedIn} displayCount={displayCount} />
+    <>
       <FlowSection isLoggedIn={isLoggedIn} />
       <EntrySection isLoggedIn={isLoggedIn} />
       <LandingHomeBelowFold isLoggedIn={isLoggedIn} />
-    </main>
+    </>
   );
 }

@@ -2,37 +2,7 @@
 
 import React from 'react';
 
-/** Design tokens — CSS custom properties / theme-only literals. */
-export const T = {
-  bg: 'var(--bg-primary)',
-  bg2: 'var(--bg-secondary)',
-  bg3: 'var(--bg-tertiary)',
-  card: 'var(--card-bg)',
-  bord: 'var(--v3-bord)',
-  bord2: 'var(--card-border)',
-  text: 'var(--text-primary)',
-  text2: 'var(--text-secondary)',
-  text3: 'var(--text-muted)',
-  acc: 'var(--accent-primary)',
-  acc2: 'var(--accent-hover)',
-  accdim: 'var(--v3-accdim)',
-  accbrd: 'var(--v3-accbrd)',
-  ok: 'var(--accent-success)',
-  okdim: 'var(--v3-okdim)',
-  okbrd: 'var(--v3-ok-brd)',
-  warn: 'var(--accent-warning)',
-  err: 'var(--accent-danger)',
-  pur: 'var(--v3-pur)',
-  ansBg: 'var(--v3-ans-bg)',
-  scoreShadow: 'var(--v3-score-shadow)',
-  ctaBg: 'var(--v3-cta-bg)',
-  ctaBrd: 'var(--v3-cta-brd)',
-  stepHover: 'var(--v3-step-hover)',
-  badHi: 'var(--v3-bad-hi)',
-  painBg: 'var(--v3-pain-bg)',
-  painBrd: 'var(--v3-pain-brd)',
-  painText: 'var(--v3-pain-text)',
-} as const;
+export { T } from '@/components/landing/landing-home-tokens';
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
