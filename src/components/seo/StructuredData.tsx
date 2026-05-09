@@ -1,55 +1,75 @@
-import { BRAND_ICON_192_PATH, siteConfig } from '@/lib/seo/metadata'
+import {
+  BRAND_ICON_192_PATH,
+  schemaIds,
+  siteConfig,
+  siteOrganizationStructured,
+} from '@/lib/seo/metadata'
 
-const ORGANIZATION_ID = `${siteConfig.url}#organization` as const
+const logoUrl = `${siteConfig.url}${BRAND_ICON_192_PATH}`
 
 export function StructuredData() {
-  const organization = {
+  const graph = {
     '@context': 'https://schema.org',
-    '@type': 'Organization',
-    '@id': ORGANIZATION_ID,
-    name: siteConfig.name,
-    url: siteConfig.url,
-    logo: `${siteConfig.url}${BRAND_ICON_192_PATH}`,
-  }
-
-  const website = {
-    '@context': 'https://schema.org',
-    '@type': 'WebSite',
-    name: siteConfig.name,
-    url: siteConfig.url,
-    description: siteConfig.defaultDescription,
-    inLanguage: 'en-IN',
-    publisher: { '@id': ORGANIZATION_ID },
-  }
-
-  const product = {
-    '@context': 'https://schema.org',
-    '@type': 'SoftwareApplication',
-    name: siteConfig.name,
-    applicationCategory: 'EducationalApplication',
-    operatingSystem: 'Web',
-    description: siteConfig.defaultDescription,
-    offers: {
-      '@type': 'Offer',
-      price: '0',
-      priceCurrency: 'INR',
-    },
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': schemaIds.organization,
+        name: siteConfig.name,
+        url: siteConfig.url,
+        logo: {
+          '@type': 'ImageObject',
+          '@id': schemaIds.logo,
+          url: logoUrl,
+          contentUrl: logoUrl,
+          width: 192,
+          height: 192,
+        },
+        brand: {
+          '@type': 'Brand',
+          name: siteConfig.name,
+          logo: { '@id': schemaIds.logo },
+        },
+        sameAs: [...siteOrganizationStructured.sameAs],
+        founder: { '@id': schemaIds.founder },
+        employee: [{ '@id': schemaIds.founder }],
+      },
+      {
+        '@type': 'Person',
+        '@id': schemaIds.founder,
+        name: siteOrganizationStructured.founder.name,
+        jobTitle: siteOrganizationStructured.founder.jobTitle,
+        sameAs: [...siteOrganizationStructured.founder.sameAs],
+        worksFor: { '@id': schemaIds.organization },
+      },
+      {
+        '@type': 'WebSite',
+        '@id': `${siteConfig.url}#website`,
+        name: siteConfig.name,
+        url: siteConfig.url,
+        description: siteConfig.defaultDescription,
+        inLanguage: 'en-IN',
+        publisher: { '@id': schemaIds.organization },
+      },
+      {
+        '@type': 'SoftwareApplication',
+        name: siteConfig.name,
+        applicationCategory: 'EducationalApplication',
+        operatingSystem: 'Web',
+        description: siteConfig.defaultDescription,
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'INR',
+        },
+        provider: { '@id': schemaIds.organization },
+      },
+    ],
   }
 
   return (
-    <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(organization) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(website) }}
-      />
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(product) }}
-      />
-    </>
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: JSON.stringify(graph) }}
+    />
   )
 }

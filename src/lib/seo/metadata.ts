@@ -18,6 +18,28 @@ export const siteConfig = {
   locale: 'en_IN',
 } as const
 
+/** Stable `@id` fragments for JSON-LD `@graph` (aligned with `siteConfig.url`). */
+export const schemaIds = {
+  organization: `${siteConfig.url}#organization`,
+  founder: `${siteConfig.url}#founder`,
+  logo: `${siteConfig.url}#logo`,
+} as const
+
+/**
+ * Organization `sameAs` + founder — keep in sync with marketing footer / about page.
+ */
+export const siteOrganizationStructured = {
+  sameAs: [
+    'https://www.linkedin.com/company/interviewera',
+    'https://twitter.com/interviewera',
+  ],
+  founder: {
+    name: 'Rakesh Kumar',
+    jobTitle: 'Founder & CEO',
+    sameAs: ['https://www.linkedin.com/in/rakeshkumar2604/'],
+  },
+} as const
+
 export function brandPageTitle(pageTitle: string): string {
   return `${BRAND} | ${pageTitle}`
 }

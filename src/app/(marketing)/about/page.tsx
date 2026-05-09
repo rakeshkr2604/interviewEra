@@ -3,13 +3,15 @@ import Link from 'next/link';
 import { CalendarCheck, ExternalLink, FileSearch, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock, FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
-import { generateMetadata } from '@/lib/seo/metadata';
+import { generateMetadata, schemaIds, siteConfig, siteOrganizationStructured } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
+
+const ABOUT_PAGE_DESCRIPTION =
+  'InterviewEra is an AI-powered mock interview platform for Indian campus and early-career hiring: resume-aware sessions, rubric-scored feedback, and structured practice you can repeat.';
 
 export const metadata: Metadata = generateMetadata({
   title: 'About',
-  description:
-    'InterviewEra is an AI-powered mock interview platform built for serious placement preparation. Resume-aware sessions, rubric-scored feedback, and structured progress tracking.',
+  description: ABOUT_PAGE_DESCRIPTION,
   path: '/about',
 });
 
@@ -66,6 +68,18 @@ function GitHubIcon({ className }: { className?: string }) {
 }
 
 export default function AboutPage() {
+  const aboutPageLd = {
+    '@context': 'https://schema.org',
+    '@type': 'AboutPage',
+    name: `About ${siteConfig.name}`,
+    description: ABOUT_PAGE_DESCRIPTION,
+    url: `${siteConfig.url}/about`,
+    inLanguage: 'en-IN',
+    isPartOf: { '@id': `${siteConfig.url}#website` },
+    mainEntity: { '@id': schemaIds.organization },
+    about: { '@id': schemaIds.organization },
+  } as const;
+
   return (
     <BlogMarketingShell>
 
@@ -92,10 +106,10 @@ export default function AboutPage() {
               Practice interviews with AI —{' '}
               <span style={{ color: 'var(--accent-primary)' }}>not guesswork.</span>
             </h1>
-            <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              Every session is grounded in your resume, scored against a clear rubric,
-              and designed to get sharper each time — not a one-off practice chat.
-            </p>
+          <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
+            Every session is grounded in your resume, scored against a clear rubric,
+            and built to compound between attempts — for Indian campus and early-career hiring, not generic chat practice.
+          </p>
           </div>
 
           {/* Bullets */}
@@ -121,7 +135,7 @@ export default function AboutPage() {
             className="text-xs font-medium tracking-wide"
             style={{ color: 'var(--text-muted)' }}
           >
-            Designed for repeatable placement preparation · Resume-aware · Rubric-scored
+            Built for placement season · Resume-aware · Rubric-scored · Honest feedback you can act on
           </p>
 
           {/* Secondary nav */}
@@ -146,17 +160,16 @@ export default function AboutPage() {
           >
             <div className="space-y-5 p-5 sm:p-7 lg:p-8">
               <p className="text-sm leading-[1.85] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-                Most interview prep is unstructured. Students practice with ChatGPT, get
-                generic feedback, and walk into panels without knowing where they actually
-                stand. InterviewEra fixes that — upload your resume, run realistic scored
-                sessions, and leave each one knowing{' '}
+                Most prep stays unstructured: long ChatGPT threads, vague encouragement, no score breakdown.
+                Panels still have to place you in a band — and generic practice does not tell you which band you are in.
+                InterviewEra fixes that: upload your resume, run scored mocks that reference your real projects,
+                and exit each session knowing{' '}
                 <strong style={{ color: 'var(--text-primary)' }}>exactly what to fix next.</strong>
               </p>
               <p className="text-sm leading-[1.85] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-                Whether you are targeting campus placements, your first full-time role, or
-                a mid-career switch, the goal is the same:{' '}
-                <strong style={{ color: 'var(--text-primary)' }}>signal over noise</strong>{' '}
-                in how you prepare — not more practice, smarter practice.
+                Campus hiring in India moves fast; the lever is not more drills, it is{' '}
+                <strong style={{ color: 'var(--text-primary)' }}>repeatable, measurable practice</strong>{' '}
+                — the same structured signal panels use when they score you, without the guesswork in between.
               </p>
               <div
                 className="flex items-center gap-3 rounded-xl border p-4"
@@ -175,10 +188,10 @@ export default function AboutPage() {
                   RK
                 </span>
                 <p className="text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  "Structured, repeatable practice is what separates prepared candidates
-                  from hopeful ones."
+                  &ldquo;Structured, repeatable practice is what separates prepared candidates
+                  from hopeful ones.&rdquo;
                   <span className="ml-2 font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    — Rakesh Kumar, Founder
+                    — {siteOrganizationStructured.founder.name}, {siteOrganizationStructured.founder.jobTitle}
                   </span>
                 </p>
               </div>
@@ -258,22 +271,26 @@ export default function AboutPage() {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
-                Rakesh Kumar
+                {siteOrganizationStructured.founder.name}
               </p>
               <span
-                className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider"
+                className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-balance"
                 style={{
                   background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
                   color: 'var(--accent-primary)',
                 }}
               >
-                Founder
+                {siteOrganizationStructured.founder.jobTitle}
               </span>
             </div>
             <p className="mt-2 max-w-xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-              InterviewEra was built to make interview preparation more structured,
-              repeatable, and practical — so students can walk into real placement panels
-              prepared, not anxious.
+              InterviewEra exists because placement panels reward structured answers under pressure — not longer AI chats with
+              no rubric. We focus on resume-grounded questions, dimension-level scoring, and a practice loop you can repeat until
+              the weak spots are obvious.
+            </p>
+            <p className="mt-3 max-w-xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+              If you are preparing for Indian campus or your first full-time role, the goal is the same: walk in knowing how you
+              will be read, not hoping the panel fills in the gaps.
             </p>
 
             {/* Links */}
@@ -292,12 +309,12 @@ export default function AboutPage() {
               </a>
               <span aria-hidden="true" style={{ color: 'var(--card-border)' }}>·</span>
               <a
-                href="https://www.linkedin.com/in/rakeshkumar2604/"
+                href={siteOrganizationStructured.founder.sameAs[0]}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-medium transition-opacity hover:opacity-75 sm:text-sm"
                 style={{ color: 'var(--text-muted)' }}
-                aria-label="Rakesh Kumar on LinkedIn"
+                aria-label={`${siteOrganizationStructured.founder.name} on LinkedIn`}
               >
                 <LinkedInIcon className="size-3.5" />
                 linkedin.com/in/rakeshkumar2604
@@ -318,6 +335,11 @@ export default function AboutPage() {
         />
       </div>
 
+      {/* Page-level JSON-LD — references org + website nodes from root layout graph */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutPageLd) }}
+      />
     </BlogMarketingShell>
   );
 }

@@ -116,6 +116,9 @@ export default function RootLayout({
       data-theme="dark"
       className={`${bricolage.variable} ${dmSans.variable} ${jetbrains.variable} dark h-full antialiased`}
     >
+      <head>
+        <StructuredData />
+      </head>
       <body className="min-h-full flex flex-col">
         <script
           dangerouslySetInnerHTML={{
@@ -133,7 +136,6 @@ export default function RootLayout({
             `,
           }}
         />
-        <StructuredData />
         <ThemeProvider>
           <OfflineBanner />
           {children}
