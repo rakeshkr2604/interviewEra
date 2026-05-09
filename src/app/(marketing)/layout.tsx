@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-import './marketing-styles.css';
 import { MarketingHeader } from '@/components/layout/MarketingHeader';
 import { MarketingFooter } from '@/components/layout/MarketingFooter';
 
