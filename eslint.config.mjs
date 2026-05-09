@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "load-tests/**",
     // Node CJS one-off scripts (require() is intentional)
     "scripts/**",
+    // Local brand toolkit / canvas (not part of the Next app)
+    "InterviewEra.com Brand Icons/**",
   ]),
   {
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
