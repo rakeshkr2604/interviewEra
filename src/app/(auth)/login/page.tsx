@@ -1,20 +1,27 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Shield, Sparkles, Zap } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { ArrowLeft, Shield, Zap } from 'lucide-react';
+import { AuthBrandChipIcon, AUTH_BRAND_MARK_PATH } from '@/components/auth/AuthBrandChipIcon';
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { LoginForm } from './LoginForm';
 
 export const metadata: Metadata = {
-  title: 'Login | InterviewEra',
+  title: 'Login',
   description: 'Sign in to InterviewEra — AI mock interviews tailored to your resume.',
 };
 
-const BULLETS = [
-  { icon: Shield, text: 'Secure sign-in with email or Google' },
-  { icon: Zap, text: 'Resume-aware practice picks up where you left off' },
-  { icon: Sparkles, text: 'Free to start — upgrade when you want deeper analytics' },
-] as const;
+type Bullet =
+  | { kind: 'lucide'; icon: LucideIcon; text: string }
+  | { kind: 'brand'; text: string };
+
+const BULLETS: Bullet[] = [
+  { kind: 'lucide', icon: Shield, text: 'Secure sign-in with email or Google' },
+  { kind: 'lucide', icon: Zap, text: 'Resume-aware practice picks up where you left off' },
+  { kind: 'brand', text: 'Free to start — upgrade when you want deeper analytics' },
+];
 
 export default function LoginPage() {
   return (
@@ -45,8 +52,8 @@ export default function LoginPage() {
                   color: 'var(--text-primary)',
                 }}
               >
-                <Sparkles className="size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                InterviewEra
+                <AuthBrandChipIcon />
+                <BrandWordmarkSplit interviewClassName="font-medium" eraClassName="font-semibold" />
               </div>
 
               <div className="space-y-4">
@@ -60,18 +67,34 @@ export default function LoginPage() {
               </div>
 
               <ul className="mx-auto max-w-md space-y-3.5 text-left sm:max-w-lg lg:mx-0 lg:max-w-none">
-                {BULLETS.map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex gap-3 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+                {BULLETS.map((item) => (
+                  <li key={item.text} className="flex gap-3 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
                     <span
-                      className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl"
-                      style={{
-                        background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-                        color: 'var(--accent-primary)',
-                      }}
+                      className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden"
+                      style={
+                        item.kind === 'lucide'
+                          ? {
+                              background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                              color: 'var(--accent-primary)',
+                            }
+                          : undefined
+                      }
                     >
-                      <Icon className="size-4" aria-hidden />
+                      {item.kind === 'lucide' ? (() => {
+                        const Icon = item.icon;
+                        return <Icon className="size-4" aria-hidden />;
+                      })() : (
+                        <img
+                          src={AUTH_BRAND_MARK_PATH}
+                          width={36}
+                          height={36}
+                          className="size-9 rounded-lg"
+                          alt=""
+                          aria-hidden
+                        />
+                      )}
                     </span>
-                    <span className="leading-relaxed">{text}</span>
+                    <span className="leading-relaxed">{item.text}</span>
                   </li>
                 ))}
               </ul>

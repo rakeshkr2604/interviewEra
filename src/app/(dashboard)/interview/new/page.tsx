@@ -1,7 +1,13 @@
+import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { StartInterviewForm } from './StartInterviewForm';
 import type { DomainPack, ParsedResume, PlanTier } from '@/types/app.types';
+
+export const metadata: Metadata = {
+  title: 'Start interview',
+  robots: { index: false, follow: false },
+};
 
 export default async function NewInterviewPage() {
   const supabase = await createClient();

@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, KeyRound, Mail, ShieldCheck, Sparkles } from 'lucide-react';
+import { ArrowLeft, KeyRound, Mail, ShieldCheck } from 'lucide-react';
+import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
 
 export const metadata: Metadata = {
-  title: 'Forgot password | InterviewEra',
+  title: 'Forgot password',
   description: 'Reset your InterviewEra account password via email.',
 };
 
@@ -45,8 +47,8 @@ export default function ForgotPasswordPage() {
                   color: 'var(--text-primary)',
                 }}
               >
-                <Sparkles className="size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                InterviewEra
+                <AuthBrandChipIcon />
+                <BrandWordmarkSplit interviewClassName="font-medium" eraClassName="font-semibold" />
               </div>
 
               <div className="space-y-4">
@@ -54,8 +56,13 @@ export default function ForgotPasswordPage() {
                   Forgot password?
                 </h1>
                 <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-                  Enter the email you use for InterviewEra. We&apos;ll send a link to set a new password — no support ticket
-                  needed.
+                  Enter the email you use for{' '}
+                  <BrandWordmarkSplit
+                    className="inline text-[inherit]"
+                    interviewClassName="font-medium"
+                    eraClassName="font-semibold"
+                  />
+                  . We&apos;ll send a link to set a new password — no support ticket needed.
                 </p>
               </div>
 

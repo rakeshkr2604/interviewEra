@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getAuthRedirectOrigin } from '@/lib/auth/redirect-origin';
 import { createClient } from '@/lib/supabase/client';
 import { Eye, EyeOff } from 'lucide-react';
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
@@ -103,7 +104,11 @@ export function LoginForm() {
     <FreeToolFormCard
       headerEyebrow="Account"
       headerTitle="Welcome back"
-      headerSubtitle="Sign in to your InterviewEra account"
+      headerSubtitle={
+        <>
+          Sign in to your <BrandWordmarkSplit className="text-[inherit]" /> account
+        </>
+      }
       headerBadge={<ThemeToggle />}
     >
       <div className="space-y-5 p-5 sm:p-6">

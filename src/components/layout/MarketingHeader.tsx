@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Menu } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
+import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Button } from '@/components/ui/button';
 import {
@@ -83,13 +84,7 @@ export function MarketingHeader() {
           'flex items-center gap-6 px-4 py-3 sm:gap-8 sm:px-5',
         )}
       >
-        <Link
-          href="/"
-          className="shrink-0 text-base font-bold tracking-tight sm:text-lg"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          InterviewEra
-        </Link>
+        <BrandHomeLink variant="navbar" className="shrink-0" />
 
         <div
           className="hidden items-center gap-5 md:flex"
@@ -107,18 +102,22 @@ export function MarketingHeader() {
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
           <ThemeToggle />
           {user ? (
             <Link
               href="/dashboard"
               className="hidden rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 md:inline-flex"
-              style={{ background: 'var(--accent-primary)' }}
+              style={{
+                background: 'var(--accent-primary)',
+                boxShadow:
+                  'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+              }}
             >
               Dashboard
             </Link>
           ) : (
-            <div className="hidden items-center gap-3 md:flex">
+            <div className="hidden items-center gap-2.5 md:flex">
               <Link
                 href="/login"
                 className="text-sm font-medium transition-opacity hover:opacity-80"
@@ -129,7 +128,11 @@ export function MarketingHeader() {
               <Link
                 href="/signup"
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{ background: 'var(--accent-primary)' }}
+                style={{
+                  background: 'var(--accent-primary)',
+                  boxShadow:
+                    'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                }}
               >
                 Sign up free
               </Link>
@@ -155,7 +158,8 @@ export function MarketingHeader() {
                 className="w-[min(100%,20rem)] gap-0 border-l border-border p-0 sm:max-w-sm"
               >
                 <SheetHeader className="border-b border-border px-4 py-4 text-left">
-                  <SheetTitle className="text-foreground">Menu</SheetTitle>
+                  <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+                  <BrandHomeLink variant="navbar" compact wordmarkClassName="text-base" />
                 </SheetHeader>
                 <nav className="flex flex-col p-2">
                   {NAV_LINKS.map(({ href, label }) => (
@@ -177,7 +181,11 @@ export function MarketingHeader() {
                       href="/dashboard"
                       onClick={() => setMobileOpen(false)}
                       className="mx-2 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
-                      style={{ background: 'var(--accent-primary)' }}
+                      style={{
+                        background: 'var(--accent-primary)',
+                        boxShadow:
+                          'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                      }}
                     >
                       Dashboard
                     </Link>
@@ -194,7 +202,11 @@ export function MarketingHeader() {
                         href="/signup"
                         onClick={() => setMobileOpen(false)}
                         className="mx-2 mt-1 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
-                        style={{ background: 'var(--accent-primary)' }}
+                        style={{
+                          background: 'var(--accent-primary)',
+                          boxShadow:
+                            'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                        }}
                       >
                         Sign up free
                       </Link>

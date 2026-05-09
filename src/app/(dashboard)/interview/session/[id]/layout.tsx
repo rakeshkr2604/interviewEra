@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Live Interview | InterviewEra',
+  title: 'Live Interview',
   robots: { index: false, follow: false },
 }
 

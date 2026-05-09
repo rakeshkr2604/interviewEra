@@ -1,5 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Analytics',
+  robots: { index: false, follow: false },
+}
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 
 export default async function AnalyticsPage() {

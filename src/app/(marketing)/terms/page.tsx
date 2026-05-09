@@ -5,7 +5,7 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Terms & Conditions — InterviewEra',
+  title: 'Terms & Conditions',
   description:
     'Read the terms and conditions governing your use of InterviewEra.com — an AI-powered mock interview platform.',
 };

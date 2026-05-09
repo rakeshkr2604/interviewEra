@@ -1,7 +1,13 @@
 import type { CSSProperties } from 'react';
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
+
+export const metadata: Metadata = {
+  title: 'Score report',
+  robots: { index: false, follow: false },
+};
 import { Badge } from '@/components/ui/badge';
 import { ScoreCard } from '@/components/report/ScoreCard';
 import { ReportPanel } from '@/components/report/ReportPanel';

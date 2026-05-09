@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { QuestionGeneratorResultsPageClient } from './QuestionGeneratorResultsPageClient';
 
 export const metadata: Metadata = {
-  title: 'Your interview questions | InterviewEra',
+  title: 'Your interview questions',
   description: 'Role-tailored interview questions you just generated.',
   robots: { index: false, follow: true },
 };

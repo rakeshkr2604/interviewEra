@@ -5,7 +5,7 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'InterviewEra Blog | Interview Preparation Guides',
+  title: 'Blog',
   description:
     'Practical interview preparation guides: DSA topic maps, HR answer frameworks, placement prep, STAR method, and software engineer interview questions.',
 };

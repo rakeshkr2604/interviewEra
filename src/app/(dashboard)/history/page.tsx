@@ -1,5 +1,11 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'History',
+  robots: { index: false, follow: false },
+}
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { HistoryListClient } from './HistoryListClient'
 

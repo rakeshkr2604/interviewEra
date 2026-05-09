@@ -3,14 +3,18 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
+import { brandArticleOgTitle } from '@/lib/seo/metadata';
+
+const STAR_META_TITLE = 'What Is the STAR Method? With Examples for Indian Students';
+
 export const metadata: Metadata = {
-  title: 'What Is the STAR Method? With Examples for Indian Students | InterviewEra',
+  title: STAR_META_TITLE,
   description:
     'Learn the STAR method for behavioral interviews. Includes 5 full STAR examples for common questions like "Tell me about a time you failed" and "Describe a conflict."',
   keywords:
     'STAR method examples, STAR interview answers, behavioral interview STAR method, situation task action result examples, STAR method India placement',
   openGraph: {
-    title: 'What Is the STAR Method? With Full Examples',
+    title: brandArticleOgTitle(STAR_META_TITLE),
     description:
       'Learn the STAR method for behavioral interviews with 5 full worked examples for common questions.',
     type: 'article',

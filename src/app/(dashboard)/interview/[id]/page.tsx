@@ -1,7 +1,13 @@
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { InterviewSession } from './InterviewSession';
 import type { Question } from '@/types/app.types';
+
+export const metadata: Metadata = {
+  title: 'Interview',
+  robots: { index: false, follow: false },
+};
 
 interface InterviewPageProps {
   params: Promise<{ id: string }>;

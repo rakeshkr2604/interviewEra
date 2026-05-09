@@ -6,9 +6,9 @@ export function DashboardPageHeader({
   subtitle,
   action,
 }: {
-  eyebrow: string;
+  eyebrow: ReactNode;
   title: string;
-  subtitle?: string;
+  subtitle?: ReactNode;
   action?: ReactNode;
 }) {
   return (

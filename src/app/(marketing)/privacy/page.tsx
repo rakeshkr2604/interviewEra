@@ -5,7 +5,7 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Privacy Policy — InterviewEra',
+  title: 'Privacy Policy',
   description:
     'Learn how InterviewEra collects, uses, and protects your personal data. We are committed to keeping your information safe.',
 };

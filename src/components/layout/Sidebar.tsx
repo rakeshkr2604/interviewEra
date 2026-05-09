@@ -11,12 +11,13 @@ import {
   Settings,
   CreditCard,
   Shield,
-  LogOut,
-  Sparkles,
 } from 'lucide-react'
-import { ThemeToggle } from './ThemeToggle'
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { createClient } from '@/lib/supabase/client'
 import type { PlanTier } from '@/types/app.types'
+import { ThemeToggle } from './ThemeToggle'
+
+const BRAND_MARK = '/brand/logos/icon-only.svg'
 
 const NAV_SECTIONS = [
   {
@@ -131,24 +132,22 @@ export function Sidebar({
     >
       {/* Logo */}
       <div
-        className="flex items-center gap-3 px-5 py-5 border-b"
+        className="flex items-center gap-2.5 border-b px-4 py-4"
         style={{ borderColor: 'var(--card-border)' }}
       >
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-2xl shadow-lg"
+        <img
+          src={BRAND_MARK}
+          width={38}
+          height={38}
+          className="size-[38px] shrink-0 rounded-2xl"
           style={{
-            background: 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #6d28d9))',
-            boxShadow: '0 12px 32px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
+            boxShadow: '0 6px 22px color-mix(in srgb, var(--accent-primary) 24%, transparent)',
           }}
-        >
-          <Sparkles size={18} className="text-white" />
-        </div>
+          alt=""
+        />
         <div>
-          <p
-            className="text-sm font-bold leading-none"
-            style={{ color: 'var(--text-primary)', fontFamily: 'Bricolage Grotesque, sans-serif' }}
-          >
-            InterviewEra
+          <p className="text-sm leading-none" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+            <BrandWordmarkSplit interviewClassName="font-semibold" eraClassName="font-bold" />
           </p>
           <p className="text-[10px] mt-0.5 font-medium tracking-wide" style={{ color: 'var(--text-muted)' }}>
             Practice studio
@@ -157,7 +156,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-5">
+      <nav className="flex-1 space-y-5 px-2.5 py-4">
         {sections.map((section) => (
           <div key={section.label}>
             <p
@@ -227,6 +226,7 @@ export function Sidebar({
         </div>
 
         <button
+          type="button"
           onClick={handleLogout}
           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2
                      text-sm font-medium transition-all duration-150"
@@ -240,7 +240,14 @@ export function Sidebar({
             e.currentTarget.style.color = 'var(--text-secondary)'
           }}
         >
-          <LogOut size={16} />
+          <img
+            src={BRAND_MARK}
+            width={28}
+            height={28}
+            className="size-7 shrink-0 rounded-lg"
+            alt=""
+            aria-hidden
+          />
           Log out
         </button>
       </div>

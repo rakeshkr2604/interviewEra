@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { siteConfig } from '@/lib/seo/metadata';
+import { BRAND_ICON_192_PATH, brandArticleOgTitle, siteConfig } from '@/lib/seo/metadata';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { AiMockBlogReadingProgress } from '@/components/blog/AiMockBlogReadingProgress';
 
@@ -38,8 +38,10 @@ const RELATED_POSTS = [
 const CTA_FOCUS =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C47FF] rounded-lg';
 
+const AI_MOCK_META_TITLE = 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026';
+
 export const metadata: Metadata = {
-  title: 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026 | InterviewEra',
+  title: AI_MOCK_META_TITLE,
   description:
     'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
   keywords: [
@@ -52,7 +54,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   alternates: { canonical: `${siteConfig.url}${CANONICAL_PATH}` },
   openGraph: {
-    title: 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026 | InterviewEra',
+    title: brandArticleOgTitle(AI_MOCK_META_TITLE),
     description:
       'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
     url: `${siteConfig.url}${CANONICAL_PATH}`,
@@ -72,7 +74,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026 | InterviewEra',
+    title: brandArticleOgTitle(AI_MOCK_META_TITLE),
     description:
       'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
     images: [`${siteConfig.url}/blog/ai-mock-interviews-smartest-prep-2026/roadblock-visual.png`],
@@ -148,7 +150,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
       url: siteConfig.url,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteConfig.url}/icon-192.png`,
+        url: `${siteConfig.url}${BRAND_ICON_192_PATH}`,
       },
     },
     mainEntityOfPage: {

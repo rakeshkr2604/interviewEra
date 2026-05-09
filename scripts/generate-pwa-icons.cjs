@@ -1,8 +1,6 @@
 /**
- * One-off asset generator: writes public/icon-192.png and public/icon-512.png
- * for manifest.json (brand matches apple-icon.tsx).
- *
- * Run: node scripts/generate-pwa-icons.cjs
+ * Legacy helper — PWA icons now live under `public/favicon/` from brand assets.
+ * Do not run for production deploys unless you intentionally replace those files.
  */
 const sharp = require('sharp');
 const path = require('path');

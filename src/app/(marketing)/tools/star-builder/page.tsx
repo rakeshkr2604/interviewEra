@@ -5,7 +5,7 @@ import { StarBuilderForm } from './StarBuilderForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
 export const metadata: Metadata = {
-  title: 'Free STAR Method Answer Builder | InterviewEra',
+  title: 'STAR answer builder',
   description:
     'Structure your behavioral interview answers using the STAR method. Get a polished, ready-to-use answer with quality scores and improvement tips. Free tool, no sign-up required.',
   keywords: [

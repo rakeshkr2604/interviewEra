@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { ArrowLeft, Lock, Sparkles } from 'lucide-react';
+import { ArrowLeft, Lock } from 'lucide-react';
+import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { ResetPasswordForm } from './ResetPasswordForm';
 
 export const metadata: Metadata = {
-  title: 'Set new password | InterviewEra',
+  title: 'Set new password',
   description: 'Choose a new password for your InterviewEra account.',
 };
 
@@ -39,8 +41,8 @@ export default function ResetPasswordPage() {
                   color: 'var(--text-primary)',
                 }}
               >
-                <Sparkles className="size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                InterviewEra
+                <AuthBrandChipIcon />
+                <BrandWordmarkSplit interviewClassName="font-medium" eraClassName="font-semibold" />
               </div>
 
               <div className="space-y-4">

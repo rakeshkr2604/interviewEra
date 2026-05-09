@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { AtsResultsPageClient } from './AtsResultsPageClient';
 
 export const metadata: Metadata = {
-  title: 'ATS check results | InterviewEra',
+  title: 'ATS check results',
   description: 'Your ATS compatibility score and actionable resume feedback.',
   robots: { index: false, follow: true },
 };

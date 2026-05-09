@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { cn } from '@/lib/utils'
@@ -25,7 +26,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
 
       <div
         className={cn(
-          'fixed left-0 top-0 z-40 flex h-screen w-[min(17.5rem,92vw)] max-w-[280px] flex-col border-r transition-transform duration-200 ease-out lg:w-[17.5rem] lg:max-w-none',
+          'fixed left-0 top-0 z-40 flex h-screen w-[min(15.25rem,88vw)] max-w-[246px] flex-col border-r transition-transform duration-200 ease-out lg:w-[15.25rem] lg:max-w-none',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         )}
         style={{
@@ -41,7 +42,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
 
       <div
         className={cn(
-          'flex min-w-0 flex-1 flex-col lg:pl-[17.5rem]',
+          'flex min-w-0 flex-1 flex-col lg:pl-[15.25rem]',
           isOnboarding ? 'h-dvh max-h-dvh min-h-0 overflow-hidden' : 'min-h-screen',
         )}
       >
@@ -66,11 +67,8 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <span
-            className="font-semibold"
-            style={{ color: 'var(--text-primary)', fontFamily: 'Bricolage Grotesque, sans-serif' }}
-          >
-            InterviewEra
+          <span style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+            <BrandWordmarkSplit />
           </span>
         </header>
 
@@ -122,10 +120,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
             >
               <div className={cn(LANDING_PAGE_CONTAINER)}>
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    InterviewEra
-                  </span>{' '}
-                  dashboard
+                  <BrandWordmarkSplit className="inline text-[inherit]" /> dashboard
                 </p>
               </div>
             </footer>

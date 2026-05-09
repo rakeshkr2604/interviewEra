@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 export function AdminTopBar() {
@@ -10,8 +11,11 @@ export function AdminTopBar() {
       style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
     >
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-        <span className="shrink-0 font-semibold" style={{ color: 'var(--text-primary)' }}>
-          InterviewEra Campus
+        <span className="inline-flex shrink-0 items-baseline gap-1.5">
+          <BrandWordmarkSplit />
+          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Campus
+          </span>
         </span>
         <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <Link

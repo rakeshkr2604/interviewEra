@@ -1,4 +1,4 @@
-import { siteConfig } from '@/lib/seo/metadata'
+import { BRAND_ICON_192_PATH, siteConfig } from '@/lib/seo/metadata'
 
 export function StructuredData() {
   const organization = {
@@ -6,7 +6,7 @@ export function StructuredData() {
     '@type': 'Organization',
     name: siteConfig.name,
     url: siteConfig.url,
-    logo: `${siteConfig.url}/icon-192.png`,
+    logo: `${siteConfig.url}${BRAND_ICON_192_PATH}`,
   }
 
   const website = {

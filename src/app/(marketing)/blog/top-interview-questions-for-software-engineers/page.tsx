@@ -3,14 +3,18 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
+import { brandArticleOgTitle } from '@/lib/seo/metadata';
+
+const SWE_META_TITLE = 'Top Interview Questions for Software Engineers (2026)';
+
 export const metadata: Metadata = {
-  title: 'Top Interview Questions for Software Engineers (2026) | InterviewEra',
+  title: SWE_META_TITLE,
   description:
     'The most commonly asked software engineer interview questions — DSA, system design, and behavioral — with tips on what interviewers are really looking for.',
   keywords:
     'software engineer interview questions, SWE interview questions, coding interview questions, technical interview questions India, SDE interview preparation',
   openGraph: {
-    title: 'Top Interview Questions for Software Engineers (2026)',
+    title: brandArticleOgTitle(SWE_META_TITLE),
     description:
       'The most commonly asked SWE interview questions with tips on what interviewers are really looking for.',
     type: 'article',

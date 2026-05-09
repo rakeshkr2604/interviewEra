@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Lock, Mail, MessageCircle, Zap } from 'lucide-react';
+import { Clock, Lock, Mail } from 'lucide-react';
+import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
@@ -68,25 +69,7 @@ export function MarketingFooter() {
 
           {/* Brand */}
           <div className="md:col-span-4 lg:col-span-5">
-            <Link
-              href="/"
-              className="group inline-flex items-center gap-2"
-              aria-label="InterviewEra home"
-            >
-              <span
-                className="flex h-8 w-8 items-center justify-center rounded-lg"
-                style={{ background: 'var(--accent-primary)' }}
-                aria-hidden="true"
-              >
-                <Zap className="h-4 w-4 text-white" strokeWidth={2.5} />
-              </span>
-              <span
-                className="text-lg font-bold tracking-tight transition-opacity duration-200 group-hover:opacity-80"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                InterviewEra<span style={{ color: 'var(--accent-primary)' }}>.com</span>
-              </span>
-            </Link>
+            <BrandHomeLink variant="footer" />
             <p
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
@@ -98,13 +81,12 @@ export function MarketingFooter() {
             {/* CTA */}
             <Link
               href="/signup"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:-translate-y-px"
+              className="mt-5 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:-translate-y-px"
               style={{
                 background: 'var(--accent-primary)',
                 boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
               }}
             >
-              <Zap className="h-3.5 w-3.5" strokeWidth={2.5} aria-hidden="true" />
               Start Mock Interview
             </Link>
 
@@ -202,7 +184,7 @@ export function MarketingFooter() {
                   className="flex items-center gap-1.5 text-xs"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  <MessageCircle className="h-3 w-3 shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                  <Clock className="h-3 w-3 shrink-0" strokeWidth={1.75} aria-hidden="true" />
                   Typically responds within 24 hours
                 </li>
               </ul>
@@ -239,7 +221,17 @@ export function MarketingFooter() {
           )}
           style={{ color: 'var(--text-muted)' }}
         >
-          <p>© 2026 InterviewEra.com. All rights reserved.</p>
+          <p className="flex items-center gap-2">
+            <img
+              src={BRAND_MARK_PATH}
+              width={20}
+              height={20}
+              className="h-5 w-5 shrink-0 opacity-90"
+              alt=""
+              aria-hidden
+            />
+            <span>© 2026 InterviewEra.com. All rights reserved.</span>
+          </p>
           <p className="opacity-60">Ranchi, Jharkhand, India</p>
         </div>
       </div>

@@ -1,8 +1,14 @@
+import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { ReplayClient } from './ReplayClient';
 import type { AnswerMode, DimensionScores, PlanTier, QuestionCategory } from '@/types/app.types';
 import type { ReplayItem } from './ReplayClient';
+
+export const metadata: Metadata = {
+  title: 'Interview replay',
+  robots: { index: false, follow: false },
+};
 
 interface ReplayPageProps {
   params: Promise<{ id: string }>;

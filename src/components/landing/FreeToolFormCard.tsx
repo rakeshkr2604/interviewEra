@@ -9,7 +9,7 @@ interface FreeToolFormCardProps {
   /** Primary line in the header strip */
   headerTitle: string;
   /** Supporting line under title */
-  headerSubtitle?: string;
+  headerSubtitle?: ReactNode;
   /** Optional right-side chip in header (e.g. "10 questions") */
   headerBadge?: ReactNode;
   className?: string;

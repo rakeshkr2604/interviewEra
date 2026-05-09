@@ -4,14 +4,18 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 import { HrAnswerFlowDiagram, HrAnswerQualityRadar } from '@/components/blog/visualizations/BlogDynamicCharts';
 
+import { brandArticleOgTitle } from '@/lib/seo/metadata';
+
+const HR_META_TITLE = 'HR Interview Answer Tips & Tricks (With Framework Visuals)';
+
 export const metadata: Metadata = {
-  title: 'HR Interview Answer Tips & Tricks (With Framework Visuals) | InterviewEra',
+  title: HR_META_TITLE,
   description:
     'Answer HR and managerial round questions with structure: radar model for answer quality, step-by-step delivery flow, and traps to avoid.',
   keywords:
     'HR interview tips, HR round preparation India, tell me about yourself, behavioral interview HR, campus placement HR',
   openGraph: {
-    title: 'HR Interview Answer Tips & Tricks',
+    title: brandArticleOgTitle(HR_META_TITLE),
     description: 'Visual frameworks for stronger HR answers — clarity, structure, and authenticity.',
     type: 'article',
   },

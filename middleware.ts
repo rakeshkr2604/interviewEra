@@ -75,10 +75,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Static assets in /public (PWA icons, OG images, fonts, source maps).
-  // Without this, files like /icon-192.png fall through the auth gate and
-  // 307 to /login, breaking the manifest + favicons + share images.
-  if (/\.(?:png|jpe?g|svg|gif|webp|ico|avif|woff2?|ttf|otf|eot|map)$/i.test(pathname)) {
+  // Static assets in /public (PWA icons, OG images, fonts, source maps, web app manifest).
+  // Without this, these files can fall through the auth gate and 307 to /login.
+  if (
+    /\.(?:png|jpe?g|svg|gif|webp|ico|avif|woff2?|ttf|otf|eot|map|webmanifest)$/i.test(pathname)
+  ) {
     return NextResponse.next();
   }
 
@@ -142,6 +143,6 @@ export const config = {
      * also 308 to apex (cached HTML on www otherwise loads broken relative chunks).
      * Skip `/_next/image` (optimizer), static files in /public via explicit names below.
      */
-    '/((?!_next/image|favicon.ico|manifest.json|robots.txt|sitemap.xml|icon-192.png|icon-512.png|apple-icon.png|opengraph-image.png|twitter-image.png).*)',
+    '/((?!_next/image|favicon.ico|site.webmanifest|robots.txt|sitemap.xml|opengraph-image.png|twitter-image.png).*)',
   ],
 };

@@ -1,10 +1,17 @@
 import { Suspense } from 'react'
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { CreditBadge } from '@/components/layout/CreditBadge'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
 import { DashboardMainSkeleton } from './DashboardMainSkeleton'
+
+export const metadata: Metadata = {
+  title: 'Dashboard',
+  robots: { index: false, follow: false },
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -33,7 +40,11 @@ export default async function DashboardPage() {
   return (
     <>
       <DashboardPageHeader
-        eyebrow="InterviewEra analytics"
+        eyebrow={
+          <>
+            <BrandWordmarkSplit className="text-[inherit]" /> analytics
+          </>
+        }
         title="Dashboard"
         subtitle="Track your interview performance and keep your prep on track."
         action={<CreditBadge creditsRemaining={creditsRemaining} />}

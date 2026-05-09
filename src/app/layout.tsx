@@ -41,27 +41,39 @@ const jetbrains = JetBrains_Mono({
   preload: false,
 });
 
+const defaultOgTitle = `${siteConfig.name} | ${siteConfig.socialDefaultHeadline}`;
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: siteConfig.defaultTitle,
-    template: `%s | ${siteConfig.name}`,
+    default: siteConfig.name,
+    template: `${siteConfig.name} | %s`,
   },
   description: siteConfig.defaultDescription,
-  manifest: "/manifest.json",
+  manifest: "/site.webmanifest",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/favicon/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon/favicon-48x48.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: [{ url: "/favicon/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    other: [{ rel: "mask-icon", url: "/favicon/safari-pinned-tab.svg", color: "#6366F1" }],
+  },
   alternates: { canonical: siteConfig.url },
   openGraph: {
     type: "website",
     locale: siteConfig.locale,
     url: siteConfig.url,
     siteName: siteConfig.name,
-    title: siteConfig.defaultTitle,
+    title: defaultOgTitle,
     description: siteConfig.defaultDescription,
-    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: siteConfig.defaultTitle }],
+    images: [{ url: siteConfig.ogImage, width: 1200, height: 630, alt: defaultOgTitle }],
   },
   twitter: {
     card: "summary_large_image",
-    title: siteConfig.defaultTitle,
+    title: defaultOgTitle,
     description: siteConfig.defaultDescription,
     images: [siteConfig.ogImage],
   },

@@ -1,15 +1,18 @@
 import type { Metadata } from 'next';
 import { FileSearch, Shield, Sparkles, Zap } from 'lucide-react';
+import { brandPageTitle } from '@/lib/seo/metadata';
 import { AtsCheckerForm } from './AtsCheckerForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
+const ATS_OG_TITLE = 'Free ATS Resume Checker';
+
 export const metadata: Metadata = {
-  title: 'Free ATS Resume Checker | InterviewEra',
+  title: ATS_OG_TITLE,
   description:
     'Find out if your resume passes Applicant Tracking Systems. Instant ATS compatibility score with actionable fixes — no sign-up required.',
   keywords: 'ATS resume checker, applicant tracking system, resume scanner, ATS score, resume check',
   openGraph: {
-    title: 'Free ATS Resume Checker',
+    title: brandPageTitle(ATS_OG_TITLE),
     description:
       'Find out if your resume passes Applicant Tracking Systems. Instant results.',
     type: 'website',

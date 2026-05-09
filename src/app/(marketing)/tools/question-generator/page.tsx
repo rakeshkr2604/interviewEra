@@ -1,17 +1,20 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Sparkles, Zap, ShieldCheck, ListChecks } from 'lucide-react';
+import { brandPageTitle } from '@/lib/seo/metadata';
 import { QuestionGeneratorForm } from './QuestionGeneratorForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
+const QGEN_OG_TITLE = 'Free Interview Question Generator';
+
 export const metadata: Metadata = {
-  title: 'Free Interview Question Generator | InterviewEra',
+  title: QGEN_OG_TITLE,
   description:
     'Get 10 role-specific interview questions in 10 seconds — no sign-up required. Tailored by role, experience level, and domain.',
   keywords:
     'interview question generator, free interview questions, placement interview questions, technical interview questions, HR interview questions, mock interview preparation',
   openGraph: {
-    title: 'Free Interview Question Generator',
+    title: brandPageTitle(QGEN_OG_TITLE),
     description: 'Generate tailored interview questions instantly. No sign-up.',
     type: 'website',
   },

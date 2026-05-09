@@ -4,7 +4,7 @@
  */
 
 export const CAMPUS_META = {
-  title: 'InterviewEra for Campus | Improve Placement Outcomes at Scale',
+  title: 'Campus placements',
   description:
     'Structured mock interviews for entire batches, verified readiness before Day 1, no extra T&P workload — from ₹799/student/year.',
 } as const;

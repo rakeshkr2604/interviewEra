@@ -1,9 +1,16 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
+import { StandardRazorpayCheckoutButton } from '@/components/payments/StandardRazorpayCheckoutButton'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 import { VoicePreferenceSelect } from '@/components/settings/VoicePreferenceSelect'
-import { StandardRazorpayCheckoutButton } from '@/components/payments/StandardRazorpayCheckoutButton'
+import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = {
+  title: 'Settings',
+  robots: { index: false, follow: false },
+}
 
 export default async function SettingsPage() {
   const supabase = await createClient()
@@ -15,7 +22,11 @@ export default async function SettingsPage() {
       <DashboardPageHeader
         eyebrow="Account"
         title="Settings"
-        subtitle="Preferences and account controls — same look as the rest of InterviewEra."
+        subtitle={
+          <>
+            Preferences and account controls — same look as the rest of <BrandWordmarkSplit className="inline text-[inherit]" />.
+          </>
+        }
       />
 
       <div className="mx-auto max-w-2xl space-y-4">

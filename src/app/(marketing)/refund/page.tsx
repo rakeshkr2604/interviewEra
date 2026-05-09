@@ -5,7 +5,7 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { cn } from '@/lib/utils';
 
 export const metadata: Metadata = {
-  title: 'Refund Policy — InterviewEra',
+  title: 'Refund Policy',
   description:
     'Understand InterviewEra\'s refund and cancellation policy for subscriptions and credits.',
 };
