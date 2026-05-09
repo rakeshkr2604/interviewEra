@@ -3,10 +3,9 @@ import LandingHero from '@/components/landing/LandingHero';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
 import { resolveInternalSiteOrigin } from '@/lib/server/internal-origin';
 import { PAGE_SEO } from '@/lib/seo/metadata';
-import { createClient } from '@/lib/supabase/server';
 
 export const metadata = PAGE_SEO.home;
-/** ISR for cached student-count fetch; hero copy is server-rendered for LCP. */
+/** Static/ISR homepage — no `cookies()` so document can cache + bfcache eligibility improves. */
 export const revalidate = 3600;
 
 async function getDisplayCount(): Promise<string> {
@@ -24,18 +23,13 @@ async function getDisplayCount(): Promise<string> {
 }
 
 export default async function Page() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const isLoggedIn = Boolean(user);
   const displayCount = await getDisplayCount();
 
   return (
     <MarketingLayout>
       <main id="main-content">
-        <LandingHero isLoggedIn={isLoggedIn} displayCount={displayCount} />
-        <LandingHomeClient initialLoggedIn={isLoggedIn} />
+        <LandingHero displayCount={displayCount} />
+        <LandingHomeClient />
       </main>
     </MarketingLayout>
   );

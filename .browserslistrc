@@ -1,6 +1,8 @@
-# Modern targets — trims SWC legacy polyfills (Lighthouse "Legacy JavaScript").
-last 2 Chrome versions
-last 2 Firefox versions
-last 2 Safari major versions
-last 2 Edge versions
-iOS >= 15
+# Tight baseline — trims polyfills Lighthouse flags (at / flat / Object.hasOwn, etc.).
+# Adjust if you must support older mobile WebViews at scale.
+
+Chrome >= 93
+Firefox >= 92
+Safari >= 15.4
+Edge >= 93
+last 2 iOS major versions

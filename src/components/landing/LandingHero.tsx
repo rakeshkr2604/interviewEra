@@ -1,9 +1,8 @@
-import Link from 'next/link';
 import { T } from '@/components/landing/landing-home-tokens';
+import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
 import LandingHeroScorecardSlot from '@/components/landing/LandingHeroScorecardSlot';
 
-export default function LandingHero({ isLoggedIn, displayCount }: { isLoggedIn: boolean; displayCount: string }) {
-  const cta = isLoggedIn ? '/dashboard' : '/signup';
+export default function LandingHero({ displayCount }: { displayCount: string }) {
 
   return (
     <>
@@ -156,49 +155,7 @@ export default function LandingHero({ isLoggedIn, displayCount }: { isLoggedIn: 
                 number that tells you the truth.
               </p>
 
-              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
-                <Link
-                  href={cta}
-                  className="v3-btn-primary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '15px 32px',
-                    borderRadius: '12px',
-                    background: T.acc,
-                    color: '#fff',
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  Start a scored interview — free →
-                </Link>
-                <Link
-                  href="#how"
-                  className="v3-btn-secondary"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '15px 32px',
-                    borderRadius: '12px',
-                    background: 'transparent',
-                    color: T.text,
-                    fontSize: '15px',
-                    fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif",
-                    border: `1.5px solid ${T.bord2}`,
-                    textDecoration: 'none',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  See how scoring works
-                </Link>
-              </div>
+              <LandingHeroCtaIsland />
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '12.5px', color: T.text2 }}>
                 {[

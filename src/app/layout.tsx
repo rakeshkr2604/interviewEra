@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
+import { DeferredWebManifest } from "@/components/shared/DeferredWebManifest";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -49,7 +50,6 @@ export const metadata: Metadata = {
     template: `${siteConfig.name} | %s`,
   },
   description: siteConfig.defaultDescription,
-  manifest: "/site.webmanifest",
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
@@ -130,6 +130,7 @@ export default function RootLayout({
           <OfflineBanner />
           {children}
         </ThemeProvider>
+        <DeferredWebManifest />
         <DeferredVercelMetrics />
       </body>
     </html>
