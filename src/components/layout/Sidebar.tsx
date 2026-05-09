@@ -159,17 +159,19 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 space-y-0 px-2.5 py-3">
+      <nav className="flex-1 space-y-3.5 px-2.5 py-4">
         {sections.map((section, sectionIndex) => (
           <div
             key={section.label}
-            className={cn(
-              sectionIndex > 0 && 'mt-2 border-t border-[var(--card-border)]/55 pt-3',
-            )}
+            className={
+              sectionIndex > 0
+                ? 'mt-2 border-t border-[var(--card-border)]/55 pt-3'
+                : undefined
+            }
           >
             <p
               className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em]"
-              style={{ color: 'color-mix(in srgb, var(--text-muted) 48%, transparent)' }}
+              style={{ color: 'color-mix(in srgb, var(--text-muted) 52%, transparent)' }}
             >
               {section.label}
             </p>
@@ -185,7 +187,7 @@ export function Sidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-[13px] font-bold leading-snug transition-all duration-200"
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-all duration-200"
                       style={{
                         background: isActive
                           ? 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))'

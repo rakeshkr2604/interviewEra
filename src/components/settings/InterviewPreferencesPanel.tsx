@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   type LucideIcon,
   ChevronDown,
-  Languages,
+  Languages as LanguagesIcon,
   Gauge,
   TextQuote,
 } from 'lucide-react'
@@ -87,7 +87,9 @@ function FieldHeader({
 }
 
 export function InterviewPreferencesPanel() {
-  const [lang, setLang] = useState<InterviewLanguageCode>(() => readInterviewLanguage())
+  const [interviewLanguage, setInterviewLanguage] = useState<InterviewLanguageCode>(() =>
+    readInterviewLanguage(),
+  )
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(() => readDefaultDifficulty())
   const [answerStyle, setAnswerStyle] = useState<AnswerStyle>(() => readAnswerStyle())
 
@@ -104,14 +106,14 @@ export function InterviewPreferencesPanel() {
         >
           <div className="grid gap-5 sm:grid-cols-2 sm:gap-x-6 sm:gap-y-4">
             <div className="space-y-3">
-              <FieldHeader icon={Languages} htmlFor="interview-lang" label="Interview language" />
+              <FieldHeader icon={LanguagesIcon} htmlFor="interview-lang" label="Interview language" />
               <div className="relative">
                 <select
                   id="interview-lang"
-                  value={lang}
+                  value={interviewLanguage}
                   onChange={(e) => {
                     const v = e.target.value as InterviewLanguageCode
-                    setLang(v)
+                    setInterviewLanguage(v)
                     localStorage.setItem(STORAGE_KEYS.interviewLanguage, v)
                   }}
                   className={selectClassName}
