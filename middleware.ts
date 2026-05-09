@@ -43,20 +43,6 @@ function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
   return true;
 }
 
-// ─── Security Headers ─────────────────────────────────────────────────────────
-const SECURITY_HEADERS: [string, string][] = [
-  ['X-Frame-Options', 'DENY'],
-  ['X-Content-Type-Options', 'nosniff'],
-  ['Referrer-Policy', 'strict-origin-when-cross-origin'],
-  ['Permissions-Policy', 'camera=(), microphone=(self), geolocation=()'],
-  ['X-DNS-Prefetch-Control', 'on'],
-];
-
-function addSecurityHeaders(res: NextResponse): NextResponse {
-  SECURITY_HEADERS.forEach(([key, value]) => res.headers.set(key, value));
-  return res;
-}
-
 /** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
 const PRODUCTION_APEX = 'interviewera.com';
 
@@ -86,14 +72,14 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/_next/static') ||
     pathname.startsWith('/_next/data')
   ) {
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   }
 
   // Static assets in /public (PWA icons, OG images, fonts, source maps).
   // Without this, files like /icon-192.png fall through the auth gate and
   // 307 to /login, breaking the manifest + favicons + share images.
   if (/\.(?:png|jpe?g|svg|gif|webp|ico|avif|woff2?|ttf|otf|eot|map)$/i.test(pathname)) {
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   }
 
   // OAuth fallback — Supabase sometimes lands on the Site URL (`/`) with
@@ -106,7 +92,7 @@ export async function middleware(request: NextRequest) {
     callbackUrl.searchParams.set('code', code);
     const next = request.nextUrl.searchParams.get('next');
     if (next) callbackUrl.searchParams.set('next', next);
-    return addSecurityHeaders(NextResponse.redirect(callbackUrl));
+    return NextResponse.redirect(callbackUrl);
   }
 
   const isPublic =
@@ -123,36 +109,30 @@ export async function middleware(request: NextRequest) {
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     if (!checkRateLimit(`${ip}:${pathname}`, limit, windowMs)) {
-      return addSecurityHeaders(
-        new NextResponse('Too Many Requests', {
-          status: 429,
-          headers: { 'Retry-After': '60' },
-        })
-      );
+      return new NextResponse('Too Many Requests', {
+        status: 429,
+        headers: { 'Retry-After': '60' },
+      });
     }
   }
 
   if (!needsAuthResolution) {
-    return addSecurityHeaders(NextResponse.next());
+    return NextResponse.next();
   }
 
   const { response, user } = await updateSession(request);
 
   // Unauthenticated user on a protected route → send to login (API returns JSON 401 from handlers)
   if (!user && !isPublic && !isApi) {
-    return addSecurityHeaders(
-      NextResponse.redirect(new URL('/login', request.url))
-    );
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   // Authenticated user on a pure auth route → send to dashboard
   if (user && AUTH_ROUTES.has(pathname)) {
-    return addSecurityHeaders(
-      NextResponse.redirect(new URL('/dashboard', request.url))
-    );
+    return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
-  return addSecurityHeaders(response);
+  return response;
 }
 
 export const config = {

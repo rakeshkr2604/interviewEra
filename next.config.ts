@@ -5,6 +5,9 @@ const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
 
+/** Vercel sets `preview` only for Preview deployments — never on Production (`production`). */
+const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
+
 const nextConfig: NextConfig = {
   webpack: (config) => config,
   turbopack: {},
@@ -58,7 +61,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  // HTTP security headers applied to all routes
+  // HTTP security headers: single source of truth (middleware does not duplicate these).
   async headers() {
     const isDev = process.env.NODE_ENV === 'development';
 
@@ -77,11 +80,22 @@ const nextConfig: NextConfig = {
     // - wss://*.supabase.co covers Supabase Realtime subscriptions.
     // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
     // - Razorpay Web Checkout: nested iframes (api); static host serves chunks/fonts for hosted checkout.
+    // - framing: Production uses `frame-ancestors 'none'` + X-Frame-Options: DENY.
+    //   Preview (VERCEL_ENV=preview): frame-ancestors https://vercel.com https://vercel.live only — no `'self'`, no wildcards.
     const razorpayScript =
       'https://checkout.razorpay.com https://cdn.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
     const razorpayConnect =
       'https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
-    const csp = [
+
+    /** Embed only from Vercel dashboard origins (no `self`; avoids same-origin nesting edge cases). */
+    const FRAME_ANCESTORS_PREVIEW =
+      'frame-ancestors https://vercel.com https://vercel.live';
+
+    const frameAncestorsDirective = IS_VERCEL_PREVIEW
+      ? FRAME_ANCESTORS_PREVIEW
+      : "frame-ancestors 'none'";
+
+    const cspDirectives = [
       "default-src 'self'",
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} ${razorpayScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
@@ -95,47 +109,22 @@ const nextConfig: NextConfig = {
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self' https://checkout.razorpay.com",
-    ].join('; ');
+      frameAncestorsDirective,
+    ].join("; ");
 
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: csp,
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-          {
-            key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(self), geolocation=()',
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
-          },
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains',
-          },
-          {
-            key: 'Cross-Origin-Opener-Policy',
-            value: 'same-origin',
-          },
-        ],
-      },
+    const securityHeaders = [
+      { key: "Content-Security-Policy", value: cspDirectives },
+      ...(IS_VERCEL_PREVIEW ? [] : ([{ key: "X-Frame-Options", value: "DENY" }] satisfies { key: string; value: string }[])),
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
+      { key: "X-DNS-Prefetch-Control", value: "on" },
+      // Matches prior vercel.json HSTS intent; single STS source-of-truth here (headers block removed there).
+      { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
     ];
+
+    return [{ source: "/(.*)", headers: securityHeaders }];
   },
 };
 
