@@ -31,9 +31,13 @@ export function ResetPasswordForm() {
     let cancelled = false;
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase.auth.getSession();
+      const { data, error } = await supabase.auth.getSession();
+      if (error) {
+        const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
+        await signOutIfStaleAuth(supabase, error);
+      }
       if (!cancelled) {
-        setSessionReady(!!data.session);
+        setSessionReady(Boolean(data.session) && !error);
       }
     })();
     return () => {

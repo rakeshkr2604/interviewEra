@@ -38,8 +38,14 @@ export default function LandingHomeClient() {
         const { createClient } = await import('@/lib/supabase/client');
         if (cancelled) return;
         const supabase = createClient();
-        void supabase.auth.getUser().then(({ data }) => {
-          if (!cancelled) setIsLoggedIn(Boolean(data.user));
+        void supabase.auth.getUser().then(async ({ data, error }) => {
+          if (error) {
+            const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
+            await signOutIfStaleAuth(supabase, error);
+            if (!cancelled) setIsLoggedIn(false);
+          } else if (!cancelled) {
+            setIsLoggedIn(Boolean(data.user));
+          }
         });
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
           if (!cancelled) setIsLoggedIn(Boolean(session?.user));

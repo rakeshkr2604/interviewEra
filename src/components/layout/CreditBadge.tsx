@@ -21,7 +21,7 @@ export function CreditBadge({ creditsRemaining }: CreditBadgeProps) {
         role="status"
         className="inline-flex cursor-pointer select-none items-center
                    rounded-full px-3 py-1 text-xs font-semibold text-white
-                   transition-all duration-200"
+                   transition-none"
         style={{ background: bg }}
         onClick={() => setShowTooltip((v) => !v)}
         onMouseEnter={() => setShowTooltip(true)}

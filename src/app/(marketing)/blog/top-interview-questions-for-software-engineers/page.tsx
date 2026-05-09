@@ -3,23 +3,20 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
-import { brandArticleOgTitle } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
 
 const SWE_META_TITLE = 'Top Interview Questions for Software Engineers (2026)';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: SWE_META_TITLE,
   description:
     'The most commonly asked software engineer interview questions — DSA, system design, and behavioral — with tips on what interviewers are really looking for.',
+  path: '/blog/top-interview-questions-for-software-engineers',
+  socialTitle: brandArticleOgTitle(SWE_META_TITLE),
   keywords:
     'software engineer interview questions, SWE interview questions, coding interview questions, technical interview questions India, SDE interview preparation',
-  openGraph: {
-    title: brandArticleOgTitle(SWE_META_TITLE),
-    description:
-      'The most commonly asked SWE interview questions with tips on what interviewers are really looking for.',
-    type: 'article',
-  },
-};
+  openGraphType: 'article',
+});
 
 interface QSection {
   id: string;

@@ -1,7 +1,12 @@
 import type { MetadataRoute } from 'next';
+import { isFullSiteCrawlBlocked } from '@/lib/seo/crawl-policy';
 import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 export default function sitemap(): MetadataRoute.Sitemap {
+  if (isFullSiteCrawlBlocked()) {
+    return [];
+  }
+
   const baseUrl = getCanonicalSiteOrigin();
   const now = new Date();
 
@@ -36,6 +41,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.65,
+    },
+    {
+      url: `${baseUrl}/privacy`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.35,
+    },
+    {
+      url: `${baseUrl}/terms`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.35,
+    },
+    {
+      url: `${baseUrl}/refund`,
+      lastModified: now,
+      changeFrequency: 'yearly',
+      priority: 0.3,
     },
 
     // ── Free Tools ────────────────────────────────────────────────────────────
@@ -100,20 +123,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: now,
       changeFrequency: 'monthly',
       priority: 0.8,
-    },
-
-    // ── Auth ──────────────────────────────────────────────────────────────────
-    {
-      url: `${baseUrl}/signup`,
-      lastModified: now,
-      changeFrequency: 'yearly',
-      priority: 0.6,
-    },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: now,
-      changeFrequency: 'yearly',
-      priority: 0.4,
     },
   ];
 }

@@ -1,13 +1,14 @@
-import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { StartInterviewForm } from './StartInterviewForm';
+import { privatePageMetadata } from '@/lib/seo/metadata';
 import type { DomainPack, ParsedResume, PlanTier } from '@/types/app.types';
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Start interview',
-  robots: { index: false, follow: false },
-};
+  description: 'Configure and start a new AI mock interview.',
+  path: '/interview/new',
+});
 
 export default async function NewInterviewPage() {
   const supabase = await createClient();

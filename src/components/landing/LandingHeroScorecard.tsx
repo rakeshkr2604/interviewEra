@@ -1,7 +1,6 @@
-'use client';
-
-import React, { useEffect, useRef, useState } from 'react';
-import { T, CountUp } from '@/components/landing/landing-home-shared';
+import { T } from '@/components/landing/landing-home-tokens';
+import { HeroScorecardCountUp } from '@/components/landing/HeroScorecardCountUp';
+import { ScoringBarsIsland } from '@/components/landing/ScoringBarsIsland';
 
 function LivePulse() {
   return (
@@ -35,98 +34,7 @@ function CursorBlink() {
   );
 }
 
-const DIMS = [
-  { label: 'Communication', value: 7.8, pct: 78 },
-  { label: 'Technical depth', value: 7.2, pct: 72 },
-  { label: 'STAR structure', value: 8.4, pct: 84 },
-  { label: 'Confidence', value: 6.8, pct: 68 },
-] as const;
-
-function ScoringBars() {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [filled, setFilled] = useState(false);
-
-  useEffect(() => {
-    const node = containerRef.current;
-    let io: IntersectionObserver | undefined;
-
-    queueMicrotask(() => {
-      if (!node) return;
-
-      const reduced =
-        typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (reduced) {
-        setFilled(true);
-        return;
-      }
-
-      if (!('IntersectionObserver' in window)) {
-        setFilled(true);
-        return;
-      }
-
-      io = new IntersectionObserver(
-        (entries) => {
-          for (const e of entries) {
-            if (e.isIntersecting) {
-              setFilled(true);
-              io?.disconnect();
-              break;
-            }
-          }
-        },
-        { threshold: 0.25, rootMargin: '0px 0px -5% 0px' },
-      );
-      io.observe(node);
-    });
-
-    return () => {
-      io?.disconnect();
-    };
-  }, []);
-
-  return (
-    <div ref={containerRef} style={{ display: 'flex', flexDirection: 'column', gap: '7px', marginBottom: '14px' }}>
-      {DIMS.map((d) => {
-        const isHigh = d.value >= 7.0;
-        const barColor = isHigh ? T.ok : T.warn;
-        return (
-          <div key={d.label} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '12px', color: T.text2, width: '88px', flexShrink: 0 }}>{d.label}</span>
-            <div style={{ flex: 1, height: '5px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-              <div
-                className="v3-bar-fill-solid"
-                style={{
-                  height: '100%',
-                  borderRadius: '99px',
-                  background: barColor,
-                  width: filled ? `${d.pct}%` : '0%',
-                  transition: 'width 900ms cubic-bezier(0.16, 1, 0.3, 1) 300ms',
-                  willChange: filled ? 'auto' : 'width',
-                }}
-              />
-            </div>
-            <span
-              style={{
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '12px',
-                fontWeight: 600,
-                color: barColor,
-                width: '28px',
-                textAlign: 'right',
-                flexShrink: 0,
-              }}
-            >
-              {d.value}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-/** Above-the-fold mock scoring UI — deferred with `dynamic(..., { ssr: false })` from Server Hero. */
+/** Above-the-fold mock scoring UI — server-rendered shell; bars/count animate via client islands. */
 export default function LandingHeroScorecard() {
   return (
     <div
@@ -162,7 +70,9 @@ export default function LandingHeroScorecard() {
             />
           ))}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 600, color: T.ok }}>
+        <div
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 600, color: T.ok }}
+        >
           <LivePulse /> Scoring live
         </div>
       </div>
@@ -191,7 +101,7 @@ export default function LandingHeroScorecard() {
             color: T.text,
             lineHeight: 1.5,
             marginBottom: '16px',
-            fontFamily: "'Bricolage Grotesque', sans-serif",
+            fontFamily: 'var(--font-bricolage), ui-sans-serif, system-ui, sans-serif',
           }}
         >
           &ldquo;Walk me through the payment API failure you handled in your final-year project.&rdquo;
@@ -237,7 +147,7 @@ export default function LandingHeroScorecard() {
         >
           AI scoring in progress
         </div>
-        <ScoringBars />
+        <ScoringBarsIsland />
       </div>
 
       <div
@@ -250,9 +160,9 @@ export default function LandingHeroScorecard() {
         }}
       >
         <span style={{ fontSize: '12px', color: T.text3 }}>Session average</span>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+        <div style={{ fontFamily: 'var(--font-jetbrains), ui-monospace, monospace', fontWeight: 700 }}>
           <span style={{ fontSize: '22px', color: T.acc }}>
-            <CountUp to={7.6} decimals={1} duration={1.4} delay={0.5} />
+            <HeroScorecardCountUp to={7.6} decimals={1} duration={1.4} delay={0.5} />
           </span>
           <span style={{ fontSize: '13px', color: T.text3, marginLeft: '4px' }}>/ 10</span>
         </div>

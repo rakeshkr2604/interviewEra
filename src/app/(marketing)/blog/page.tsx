@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight, BookOpen, Clock } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'Blog',
   description:
     'Practical interview preparation guides: DSA topic maps, HR answer frameworks, placement prep, STAR method, and software engineer interview questions.',
-};
+  path: '/blog',
+});
 
 export const revalidate = 3600;
 

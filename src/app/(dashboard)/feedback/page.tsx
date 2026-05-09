@@ -1,12 +1,13 @@
-import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { privatePageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Feedback',
-  robots: { index: false, follow: false },
-}
+  description: 'Share feedback about your InterviewEra experience.',
+  path: '/feedback',
+})
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 
 export default async function FeedbackPage() {

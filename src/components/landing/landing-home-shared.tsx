@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export { T } from '@/components/landing/landing-home-tokens';
 
@@ -157,5 +158,11 @@ export function CountUp({
     };
   }, [to, duration, delay]);
 
-  return <span ref={ref}>{formatted}</span>;
+  const widthClass = comma ? 'min-w-[5ch]' : decimals > 0 ? 'min-w-[3.2ch]' : 'min-w-[2.5ch]';
+
+  return (
+    <span ref={ref} className={cn('tabular-nums inline-block text-right', widthClass)}>
+      {formatted}
+    </span>
+  );
 }

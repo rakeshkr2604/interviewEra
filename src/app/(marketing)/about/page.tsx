@@ -3,13 +3,15 @@ import Link from 'next/link';
 import { CalendarCheck, ExternalLink, FileSearch, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock, FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'About',
   description:
     'InterviewEra is an AI-powered mock interview platform built for serious placement preparation. Resume-aware sessions, rubric-scored feedback, and structured progress tracking.',
-};
+  path: '/about',
+});
 
 const PILLARS = [
   {

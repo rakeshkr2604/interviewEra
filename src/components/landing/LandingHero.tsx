@@ -1,8 +1,9 @@
+import type { ReactNode } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
 import LandingHeroScorecardSlot from '@/components/landing/LandingHeroScorecardSlot';
 
-export default function LandingHero({ displayCount }: { displayCount: string }) {
+export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
   return (
     <>
@@ -73,7 +74,7 @@ export default function LandingHero({ displayCount }: { displayCount: string }) 
                     display: 'block',
                   }}
                 />
-                {displayCount} students · Built for Indian campus hiring
+                {countPill}
               </div>
 
               <h1

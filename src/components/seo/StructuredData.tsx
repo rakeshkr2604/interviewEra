@@ -1,9 +1,12 @@
 import { BRAND_ICON_192_PATH, siteConfig } from '@/lib/seo/metadata'
 
+const ORGANIZATION_ID = `${siteConfig.url}#organization` as const
+
 export function StructuredData() {
   const organization = {
     '@context': 'https://schema.org',
     '@type': 'Organization',
+    '@id': ORGANIZATION_ID,
     name: siteConfig.name,
     url: siteConfig.url,
     logo: `${siteConfig.url}${BRAND_ICON_192_PATH}`,
@@ -16,6 +19,7 @@ export function StructuredData() {
     url: siteConfig.url,
     description: siteConfig.defaultDescription,
     inLanguage: 'en-IN',
+    publisher: { '@id': ORGANIZATION_ID },
   }
 
   const product = {

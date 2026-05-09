@@ -1,11 +1,12 @@
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { privatePageMetadata } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Analytics',
-  robots: { index: false, follow: false },
-}
+  description: 'Performance analytics and trends for your mock interviews.',
+  path: '/analytics',
+})
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 
 export default async function AnalyticsPage() {

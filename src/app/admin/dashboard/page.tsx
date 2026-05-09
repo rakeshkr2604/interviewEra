@@ -1,9 +1,15 @@
-import { createServiceClient, createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
+import { createServiceClient, createClient } from '@/lib/supabase/server';
+import { privatePageMetadata } from '@/lib/seo/metadata';
 import type { CampusStudentRow } from '@/types/app.types';
 
-// ── Data fetching ─────────────────────────────────────────────────────────────
+export const metadata = privatePageMetadata({
+  title: 'Admin',
+  description: 'Campus admin dashboard for InterviewEra.',
+  path: '/admin/dashboard',
+});
+
 
 async function getAdminData(adminUserId: string) {
   const serviceClient = createServiceClient();

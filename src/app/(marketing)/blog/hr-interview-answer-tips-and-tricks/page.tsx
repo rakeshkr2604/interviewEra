@@ -4,22 +4,20 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 import { HrAnswerFlowDiagram, HrAnswerQualityRadar } from '@/components/blog/visualizations/BlogDynamicCharts';
 
-import { brandArticleOgTitle } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
 
 const HR_META_TITLE = 'HR Interview Answer Tips & Tricks (With Framework Visuals)';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: HR_META_TITLE,
   description:
     'Answer HR and managerial round questions with structure: radar model for answer quality, step-by-step delivery flow, and traps to avoid.',
+  path: '/blog/hr-interview-answer-tips-and-tricks',
+  socialTitle: brandArticleOgTitle(HR_META_TITLE),
   keywords:
     'HR interview tips, HR round preparation India, tell me about yourself, behavioral interview HR, campus placement HR',
-  openGraph: {
-    title: brandArticleOgTitle(HR_META_TITLE),
-    description: 'Visual frameworks for stronger HR answers — clarity, structure, and authenticity.',
-    type: 'article',
-  },
-};
+  openGraphType: 'article',
+});
 
 const SECTION_IDS = [
   ['#why-hr', 'Why HR filters strong candidates'],

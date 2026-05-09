@@ -18,27 +18,29 @@ const bricolage = Bricolage_Grotesque({
   display: "swap",
   weight: ["600", "700", "800"],
   preload: true,
+  adjustFontFallback: true,
 });
 
-/** Body font — restrict to weights we actually render. */
+/** Body font — 700 for `font-bold` on non-heading copy; avoid loading 800/900 here (use heading font for display nums). */
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600"],
+  weight: ["400", "500", "600", "700"],
   preload: true,
+  adjustFontFallback: true,
 });
 
 /**
- * Mono font — only used by `<code>` / `<pre>` / `.font-mono` (rare on landing).
- * Skip preload + drop heavier weights to win LCP / network budget.
+ * Mono — marketing hero + scorecard use tabular metrics; preload so first paint matches final font metrics.
  */
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
   display: "swap",
-  weight: ["400"],
-  preload: false,
+  weight: ["400", "600", "700"],
+  preload: true,
+  adjustFontFallback: true,
 });
 
 const defaultOgTitle = `${siteConfig.name} | ${siteConfig.socialDefaultHeadline}`;
@@ -60,7 +62,6 @@ export const metadata: Metadata = {
     apple: [{ url: "/favicon/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
     other: [{ rel: "mask-icon", url: "/favicon/safari-pinned-tab.svg", color: "#6366F1" }],
   },
-  alternates: { canonical: siteConfig.url },
   openGraph: {
     type: "website",
     locale: siteConfig.locale,

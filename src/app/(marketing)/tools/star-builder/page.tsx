@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BookOpen, ClipboardCheck, Shield, Sparkles } from 'lucide-react';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { StarBuilderForm } from './StarBuilderForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'STAR answer builder',
   description:
     'Structure your behavioral interview answers using the STAR method. Get a polished, ready-to-use answer with quality scores and improvement tips. Free tool, no sign-up required.',
+  path: '/tools/star-builder',
   keywords: [
     'STAR method examples',
     'behavioral interview answers',
@@ -16,7 +18,7 @@ export const metadata: Metadata = {
     'STAR method template',
     'interview answer builder',
   ],
-};
+});
 
 const BULLETS = [
   {

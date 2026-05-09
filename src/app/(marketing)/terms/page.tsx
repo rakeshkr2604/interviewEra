@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'Terms & Conditions',
   description:
     'Read the terms and conditions governing your use of InterviewEra.com — an AI-powered mock interview platform.',
-};
+  path: '/terms',
+});
 
 const SECTIONS = [
   {

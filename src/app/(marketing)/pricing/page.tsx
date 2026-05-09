@@ -1,11 +1,13 @@
 import type { Metadata } from 'next';
 import { PricingPageClient } from './PricingPageClient';
+import { generateMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'Pricing',
   description:
     'Simple, transparent pricing for InterviewEra. Start free with 5 credits, upgrade to Starter or Pro for unlimited scored mock interviews.',
-};
+  path: '/pricing',
+});
 
 export const revalidate = 3600;
 

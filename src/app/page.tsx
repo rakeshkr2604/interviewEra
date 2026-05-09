@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import MarketingLayout from '@/app/(marketing)/layout';
 import LandingHero from '@/components/landing/LandingHero';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
@@ -22,13 +23,26 @@ async function getDisplayCount(): Promise<string> {
   }
 }
 
-export default async function Page() {
+async function HeroStudentCountLine() {
   const displayCount = await getDisplayCount();
+  return (
+    <>
+      {displayCount} students · Built for Indian campus hiring
+    </>
+  );
+}
 
+export default function Page() {
   return (
     <MarketingLayout>
       <main id="main-content">
-        <LandingHero displayCount={displayCount} />
+        <LandingHero
+          countPill={
+            <Suspense fallback={<>1,000+ students · Built for Indian campus hiring</>}>
+              <HeroStudentCountLine />
+            </Suspense>
+          }
+        />
         <LandingHomeClient />
       </main>
     </MarketingLayout>

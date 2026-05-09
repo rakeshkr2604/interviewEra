@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowLeft, Shield, Zap } from 'lucide-react';
@@ -8,10 +7,13 @@ import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { LoginForm } from './LoginForm';
 
-export const metadata: Metadata = {
+import { privatePageMetadata } from '@/lib/seo/metadata';
+
+export const metadata = privatePageMetadata({
   title: 'Login',
   description: 'Sign in to InterviewEra — AI mock interviews tailored to your resume.',
-};
+  path: '/login',
+});
 
 type Bullet =
   | { kind: 'lucide'; icon: LucideIcon; text: string }

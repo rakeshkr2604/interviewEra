@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, CalendarPlus, Rocket, Target } from 'lucide-react';
 import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
@@ -6,11 +5,13 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { SignupForm } from './SignupForm';
+import { privatePageMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Sign up',
   description: 'Create your InterviewEra account — AI mock interviews personalized to your resume.',
-};
+  path: '/signup',
+});
 
 const BULLETS = [
   { icon: Rocket, text: 'Resume-aware questions — not one-size-fits-all banks' },

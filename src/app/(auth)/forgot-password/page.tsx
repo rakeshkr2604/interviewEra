@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, KeyRound, Mail, ShieldCheck } from 'lucide-react';
 import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
@@ -6,11 +5,13 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { ForgotPasswordForm } from './ForgotPasswordForm';
+import { privatePageMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Forgot password',
   description: 'Reset your InterviewEra account password via email.',
-};
+  path: '/forgot-password',
+});
 
 const BULLETS = [
   { icon: Mail, text: 'One link in your inbox — expires for your security' },

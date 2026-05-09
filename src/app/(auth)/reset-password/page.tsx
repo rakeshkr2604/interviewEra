@@ -1,4 +1,3 @@
-import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowLeft, Lock } from 'lucide-react';
 import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
@@ -6,11 +5,13 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { ResetPasswordForm } from './ResetPasswordForm';
+import { privatePageMetadata } from '@/lib/seo/metadata';
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Set new password',
   description: 'Choose a new password for your InterviewEra account.',
-};
+  path: '/reset-password',
+});
 
 export default function ResetPasswordPage() {
   return (

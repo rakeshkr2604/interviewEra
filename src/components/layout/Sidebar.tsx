@@ -75,9 +75,15 @@ export function Sidebar({
       const supabase = createClient()
       const {
         data: { user },
+        error,
       } = await supabase.auth.getUser()
 
-      if (!user || !mounted) {
+      if (error) {
+        const { signOutIfStaleAuth } = await import('@/lib/supabase/session')
+        await signOutIfStaleAuth(supabase, error)
+      }
+
+      if (!user || !mounted || error) {
         setCanAccessAdmin(false)
         return
       }
@@ -239,7 +245,7 @@ export function Sidebar({
           type="button"
           onClick={handleLogout}
           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2
-                     text-sm font-medium transition-[background-color,color] duration-150"
+                     text-sm font-medium transition-none"
           style={{ color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--accent-danger)15'

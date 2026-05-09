@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { AdminTopBar } from '@/components/admin/AdminTopBar';
+import { privatePageMetadata } from '@/lib/seo/metadata';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
-export const metadata: Metadata = {
-  title: 'Admin',
-  robots: { index: false, follow: false },
-};
+export const metadata: Metadata = privatePageMetadata({
+  title: 'Campus admin',
+  description: 'InterviewEra campus administrator console.',
+  path: '/admin',
+});
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();

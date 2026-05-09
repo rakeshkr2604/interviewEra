@@ -2,16 +2,22 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { ReplayClient } from './ReplayClient';
+import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
 import type { AnswerMode, DimensionScores, PlanTier, QuestionCategory } from '@/types/app.types';
 import type { ReplayItem } from './ReplayClient';
 
-export const metadata: Metadata = {
-  title: 'Interview replay',
-  robots: { index: false, follow: false },
-};
-
 interface ReplayPageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata({ params }: ReplayPageProps): Promise<Metadata> {
+  const { id } = await params;
+  return buildPageMetadata({
+    title: 'Interview replay',
+    description: 'Replay video and transcript from your mock interview.',
+    path: `/report/${id}/replay`,
+    noIndex: true,
+  });
 }
 
 export default async function ReplayPage({ params }: ReplayPageProps) {

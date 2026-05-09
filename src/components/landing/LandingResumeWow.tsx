@@ -165,7 +165,10 @@ export function LandingResumeWow() {
               Scored answers
             </p>
           </div>
-          <p className="mt-3 text-3xl font-black tabular-nums" style={{ color: 'var(--text-primary)' }}>
+          <p
+            className="mt-3 text-3xl font-extrabold tabular-nums"
+            style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-bricolage), sans-serif' }}
+          >
             7.4
             <span className="text-lg font-bold" style={{ color: 'var(--text-muted)' }}>
               /10

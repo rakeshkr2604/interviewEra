@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Shield } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'Privacy Policy',
   description:
     'Learn how InterviewEra collects, uses, and protects your personal data. We are committed to keeping your information safe.',
-};
+  path: '/privacy',
+});
 
 const SECTIONS = [
   {

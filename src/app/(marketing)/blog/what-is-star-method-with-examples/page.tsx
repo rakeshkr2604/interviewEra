@@ -3,23 +3,20 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
-import { brandArticleOgTitle } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
 
 const STAR_META_TITLE = 'What Is the STAR Method? With Examples for Indian Students';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: STAR_META_TITLE,
   description:
     'Learn the STAR method for behavioral interviews. Includes 5 full STAR examples for common questions like "Tell me about a time you failed" and "Describe a conflict."',
+  path: '/blog/what-is-star-method-with-examples',
+  socialTitle: brandArticleOgTitle(STAR_META_TITLE),
   keywords:
     'STAR method examples, STAR interview answers, behavioral interview STAR method, situation task action result examples, STAR method India placement',
-  openGraph: {
-    title: brandArticleOgTitle(STAR_META_TITLE),
-    description:
-      'Learn the STAR method for behavioral interviews with 5 full worked examples for common questions.',
-    type: 'article',
-  },
-};
+  openGraphType: 'article',
+});
 
 interface StarExample {
   question: string;
@@ -241,7 +238,10 @@ export default function WhatIsStarMethodWithExamples() {
                     style={{ borderColor: strip.border, background: strip.fill }}
                   >
                     <p className="mb-1 text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-primary)' }}>
-                      <span className="text-base font-extrabold tabular-nums" style={{ color: strip.accent }}>
+                      <span
+                        className="text-base font-extrabold tabular-nums"
+                        style={{ color: strip.accent, fontFamily: 'var(--font-bricolage), sans-serif' }}
+                      >
                         {label}
                       </span>
                       {title.slice(1)}

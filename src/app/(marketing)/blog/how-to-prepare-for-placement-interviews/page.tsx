@@ -3,23 +3,20 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
-import { brandArticleOgTitle } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
 
 const PLACEMENT_META_TITLE = 'How to Prepare for Placement Interviews';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: PLACEMENT_META_TITLE,
   description:
     'A complete guide to cracking placement interviews — from resume prep to final-round system design. Covers DSA, HR rounds, and mock interviews.',
+  path: '/blog/how-to-prepare-for-placement-interviews',
+  socialTitle: brandArticleOgTitle(PLACEMENT_META_TITLE),
   keywords:
     'placement interview preparation, how to crack placement interviews, campus placement tips, placement preparation guide, interview preparation India',
-  openGraph: {
-    title: brandArticleOgTitle(PLACEMENT_META_TITLE),
-    description:
-      'A complete guide to cracking campus placement interviews — DSA, HR rounds, and mock interviews.',
-    type: 'article',
-  },
-};
+  openGraphType: 'article',
+});
 
 export default function HowToPrepareForPlacementInterviews() {
   return (

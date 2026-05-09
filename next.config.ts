@@ -9,6 +9,9 @@ const withBundleAnalyzer = bundleAnalyzer({
 const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'recharts'],
+  },
   webpack: (config) => config,
   turbopack: {},
   images: {

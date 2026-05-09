@@ -1,13 +1,23 @@
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
 import { InterviewSession } from './InterviewSession';
 import type { Question } from '@/types/app.types';
 
-export const metadata: Metadata = {
-  title: 'Interview',
-  robots: { index: false, follow: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  return buildPageMetadata({
+    title: 'Interview',
+    description: 'Practice session in your InterviewEra mock interview.',
+    path: `/interview/${id}`,
+    noIndex: true,
+  });
+}
 
 interface InterviewPageProps {
   params: Promise<{ id: string }>;

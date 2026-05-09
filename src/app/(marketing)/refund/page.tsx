@@ -2,13 +2,15 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ReceiptText } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
+import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: 'Refund Policy',
   description:
-    'Understand InterviewEra\'s refund and cancellation policy for subscriptions and credits.',
-};
+    "Understand InterviewEra's refund and cancellation policy for subscriptions and credits.",
+  path: '/refund',
+});
 
 const POLICY_HIGHLIGHTS = [
   { label: 'Credit refunds', value: 'Technical issues only' },

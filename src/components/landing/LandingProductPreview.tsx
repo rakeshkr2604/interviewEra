@@ -167,7 +167,10 @@ export function LandingProductPreview() {
             <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
               Scores
             </p>
-            <p className="mt-3 text-4xl font-black tabular-nums" style={{ color: 'var(--text-primary)' }}>
+            <p
+              className="mt-3 text-4xl font-extrabold tabular-nums"
+              style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-bricolage), sans-serif' }}
+            >
               7.8
             </p>
             <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>

@@ -3,11 +3,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
-
-export const metadata: Metadata = {
-  title: 'Score report',
-  robots: { index: false, follow: false },
-};
+import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
 import { Badge } from '@/components/ui/badge';
 import { ScoreCard } from '@/components/report/ScoreCard';
 import { ReportPanel } from '@/components/report/ReportPanel';
@@ -36,6 +32,15 @@ interface ReportPageProps {
   params: Promise<{ id: string }>;
 }
 
+export async function generateMetadata({ params }: ReportPageProps): Promise<Metadata> {
+  const { id } = await params;
+  return buildPageMetadata({
+    title: 'Score report',
+    description: 'Detailed feedback and scores for your completed mock interview.',
+    path: `/report/${id}`,
+    noIndex: true,
+  });
+}
 
 const CATEGORY_BADGE_STYLE: Record<QuestionCategory, CSSProperties> = {
   technical: {

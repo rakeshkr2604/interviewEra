@@ -18,7 +18,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
       {mobileOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-[35] bg-black/50 backdrop-blur-[1px] lg:hidden"
+          className="fixed inset-0 z-[35] bg-black/50 lg:hidden"
           aria-label="Close navigation"
           onClick={() => setMobileOpen(false)}
         />
@@ -31,9 +31,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         )}
         style={{
           borderColor: 'var(--card-border)',
-          background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-          backdropFilter: 'blur(14px)',
-          WebkitBackdropFilter: 'blur(14px)',
+          background: 'color-mix(in srgb, var(--card-bg) 96%, transparent)',
           boxShadow: '4px 0 48px color-mix(in srgb, var(--accent-primary) 6%, transparent)',
         }}
       >
@@ -46,12 +44,50 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           isOnboarding ? 'h-dvh max-h-dvh min-h-0 overflow-hidden' : 'min-h-screen',
         )}
       >
+        {/* Fixed below content — avoids layout coupling to main scrollbar / inset shifts (CLS). */}
+        <div
+          className="pointer-events-none fixed inset-0 z-0 overflow-hidden lg:left-[15.25rem]"
+          aria-hidden
+        >
+          <div
+            className="pointer-events-none absolute opacity-90"
+            style={{
+              left: '-6rem',
+              top: '-5rem',
+              width: '26rem',
+              height: '26rem',
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle at center, color-mix(in srgb, var(--accent-primary) 38%, transparent) 0%, transparent 72%)',
+            }}
+          />
+          <div
+            className="pointer-events-none absolute opacity-80"
+            style={{
+              right: '-4rem',
+              top: '4rem',
+              width: '22rem',
+              height: '22rem',
+              borderRadius: '50%',
+              background:
+                'radial-gradient(circle at center, color-mix(in srgb, #7c3aed 32%, transparent) 0%, transparent 70%)',
+            }}
+          />
+          <div
+            className="pointer-events-none absolute inset-0 opacity-[0.14] [mask-image:radial-gradient(ellipse_75%_55%_at_50%_-5%,black,transparent)]"
+            style={{
+              backgroundImage: `linear-gradient(to right, color-mix(in srgb, var(--text-secondary) 6%, transparent) 1px, transparent 1px),
+                  linear-gradient(to bottom, color-mix(in srgb, var(--text-secondary) 6%, transparent) 1px, transparent 1px)`,
+              backgroundSize: '44px 44px',
+            }}
+          />
+        </div>
+
         <header
           className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 lg:hidden"
           style={{
             borderColor: 'var(--card-border)',
-            background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
-            backdropFilter: 'blur(12px)',
+            background: 'color-mix(in srgb, var(--card-bg) 96%, transparent)',
           }}
         >
           <button
@@ -74,7 +110,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
 
         <main
           className={cn(
-            'ie-landing-premium ie-landing-type relative flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
+            'ie-landing-premium ie-landing-type relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
             isOnboarding ? 'overflow-hidden' : 'overflow-y-auto',
           )}
           style={{
@@ -83,42 +119,6 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
             ...(isOnboarding ? {} : { scrollbarGutter: 'stable' }),
           }}
         >
-          <div
-            className="pointer-events-none absolute inset-0 overflow-hidden"
-            style={{ contain: 'layout paint' }}
-            aria-hidden
-          >
-            {/* Rem-only position + size — % of main width changes with scrollbar/layout and caused CLS (~0.27). */}
-            <div
-              className="absolute rounded-full blur-[90px] opacity-90"
-              style={{
-                left: '-4rem',
-                top: '-3.5rem',
-                width: '18rem',
-                height: '18rem',
-                background: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)',
-              }}
-            />
-            <div
-              className="absolute rounded-full blur-[80px] opacity-80"
-              style={{
-                right: '-3rem',
-                top: '6rem',
-                width: '14rem',
-                height: '14rem',
-                background: 'color-mix(in srgb, #7c3aed 18%, transparent)',
-              }}
-            />
-            <div
-              className="absolute inset-0 opacity-[0.14] [mask-image:radial-gradient(ellipse_75%_55%_at_50%_-5%,black,transparent)]"
-              style={{
-                backgroundImage: `linear-gradient(to right, color-mix(in srgb, var(--text-secondary) 6%, transparent) 1px, transparent 1px),
-                  linear-gradient(to bottom, color-mix(in srgb, var(--text-secondary) 6%, transparent) 1px, transparent 1px)`,
-                backgroundSize: '44px 44px',
-              }}
-            />
-          </div>
-
           <div
             className={cn(
               'relative flex min-h-0 min-w-0 flex-1 flex-col px-4 sm:px-5',

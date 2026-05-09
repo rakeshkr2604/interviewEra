@@ -38,8 +38,14 @@ export function MarketingHeader() {
         const { createClient } = await import('@/lib/supabase/client');
         if (cancelled) return;
         const supabase = createClient();
-        void supabase.auth.getUser().then(({ data }) => {
-          if (!cancelled) setUser(data.user ?? null);
+        void supabase.auth.getUser().then(async ({ data, error }) => {
+          if (error) {
+            const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
+            await signOutIfStaleAuth(supabase, error);
+            if (!cancelled) setUser(null);
+          } else if (!cancelled) {
+            setUser(data.user ?? null);
+          }
         });
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
           if (!cancelled) setUser(session?.user ?? null);
@@ -104,29 +110,10 @@ export function MarketingHeader() {
 
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
           <ThemeToggle />
-          {user ? (
-            <Link
-              href="/dashboard"
-              className="hidden rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90 md:inline-flex"
-              style={{
-                background: 'var(--accent-primary)',
-                boxShadow:
-                  'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-              }}
-            >
-              Dashboard
-            </Link>
-          ) : (
-            <div className="hidden items-center gap-2.5 md:flex">
+          <div className="hidden min-h-9 items-center justify-end gap-2.5 md:flex md:min-w-[220px]">
+            {user ? (
               <Link
-                href="/login"
-                className="text-sm font-medium transition-opacity hover:opacity-80"
-                style={{ color: 'var(--text-secondary)' }}
-              >
-                Login
-              </Link>
-              <Link
-                href="/signup"
+                href="/dashboard"
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                 style={{
                   background: 'var(--accent-primary)',
@@ -134,10 +121,31 @@ export function MarketingHeader() {
                     'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
                 }}
               >
-                Sign up free
+                Dashboard
               </Link>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2.5">
+                <Link
+                  href="/login"
+                  className="text-sm font-medium transition-opacity hover:opacity-80"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                  style={{
+                    background: 'var(--accent-primary)',
+                    boxShadow:
+                      'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                  }}
+                >
+                  Sign up free
+                </Link>
+              </div>
+            )}
+          </div>
           <div className="flex md:hidden">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger

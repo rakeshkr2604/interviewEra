@@ -5,22 +5,20 @@ import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
 import { DsaPrepTimelineChart, DsaTopicFrequencyChart } from '@/components/blog/visualizations/BlogDynamicCharts';
 
-import { brandArticleOgTitle } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
 
 const DSA_META_TITLE = 'Top DSA Interview Questions & Topic Map (2026)';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: DSA_META_TITLE,
   description:
     'Which DSA topics show up most in OAs and technical rounds — with charts, must-solve problem patterns, and a realistic prep timeline.',
+  path: '/blog/top-dsa-interview-questions',
+  socialTitle: brandArticleOgTitle(DSA_META_TITLE),
   keywords:
     'DSA interview questions, coding interview topics, placement DSA preparation, LeetCode patterns, OA preparation India',
-  openGraph: {
-    title: brandArticleOgTitle(DSA_META_TITLE),
-    description: 'Topic frequency visualization, classic problems, and prep timeline for coding interviews.',
-    type: 'article',
-  },
-};
+  openGraphType: 'article',
+});
 
 const SECTION_IDS = [
   ['#topic-landscape', 'Topic landscape (chart)'],

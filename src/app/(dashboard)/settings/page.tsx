@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { SettingsPageClient } from '@/components/settings/SettingsPageClient'
 import { createClient } from '@/lib/supabase/server'
@@ -6,13 +5,15 @@ import { creditsMonthStartIsoIst } from '@/lib/settings/ist-month'
 import {
   parseNotificationPreferencesJson,
 } from '@/lib/settings/notification-preferences'
+import { privatePageMetadata } from '@/lib/seo/metadata'
 import type { PlanTier } from '@/types/app.types'
 import type { BillingSubscription, BillingTx } from '@/components/settings/BillingUsageCard'
 
-export const metadata: Metadata = {
+export const metadata = privatePageMetadata({
   title: 'Settings',
-  robots: { index: false, follow: false },
-}
+  description: 'Manage your InterviewEra account, plan, billing, and preferences.',
+  path: '/settings',
+})
 
 export default async function SettingsPage() {
   const supabase = await createClient()

@@ -27,8 +27,13 @@ export default function LandingHeroCtaIsland() {
         const supabase = createClient();
         const {
           data: { user },
+          error,
         } = await supabase.auth.getUser();
-        if (!cancelled) setPrimaryHref(user ? '/dashboard' : '/signup');
+        if (error) {
+          const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
+          await signOutIfStaleAuth(supabase, error);
+        }
+        if (!cancelled) setPrimaryHref(user && !error ? '/dashboard' : '/signup');
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
           if (!cancelled) setPrimaryHref(session?.user ? '/dashboard' : '/signup');
         });

@@ -34,10 +34,17 @@ interface PageSeoParams {
   path: string
   ogImage?: string
   noIndex?: boolean
+  /**
+   * When `noIndex` is true, allow `follow: true` so crawlers can still pass link equity
+   * (e.g. thin tool result pages).
+   */
+  noIndexFollow?: boolean
+  keywords?: string | string[]
   /** When set, bypasses root `metadata.title.template` (e.g. homepage tab `InterviewEra` only). */
   documentTitleAbsolute?: string
   /** Override both Open Graph and Twitter `title`; defaults from `brandPageTitle(title)`. */
   socialTitle?: string
+  openGraphType?: 'website' | 'article'
 }
 
 export function generateMetadata({
@@ -46,12 +53,25 @@ export function generateMetadata({
   path,
   ogImage,
   noIndex = false,
+  noIndexFollow = false,
   documentTitleAbsolute,
   socialTitle,
+  keywords,
+  openGraphType = 'website',
 }: PageSeoParams): Metadata {
   const promoTitle = socialTitle ?? brandPageTitle(title)
   const url = `${BASE_URL}${path}`
   const image = ogImage || `${BASE_URL}/og/default.png`
+
+  const robotsBlock: Metadata['robots'] = noIndex
+    ? noIndexFollow
+      ? { index: false, follow: true, googleBot: { index: false, follow: true } }
+      : { index: false, follow: false }
+    : {
+        index: true,
+        follow: true,
+        googleBot: { index: true, follow: true, 'max-image-preview': 'large' },
+      }
 
   return {
     title:
@@ -59,10 +79,9 @@ export function generateMetadata({
         ? { absolute: documentTitleAbsolute }
         : title,
     description,
+    ...(keywords !== undefined ? { keywords } : {}),
     alternates: { canonical: url },
-    robots: noIndex
-      ? { index: false, follow: false }
-      : { index: true, follow: true, googleBot: { index: true } },
+    robots: robotsBlock,
     openGraph: {
       title: promoTitle,
       description,
@@ -70,7 +89,7 @@ export function generateMetadata({
       siteName: BRAND,
       images: [{ url: image, width: 1200, height: 630, alt: promoTitle }],
       locale: 'en_IN',
-      type: 'website',
+      type: openGraphType,
     },
     twitter: {
       card: 'summary_large_image',
@@ -79,6 +98,11 @@ export function generateMetadata({
       images: [image],
     },
   }
+}
+
+/** Self-canonical + `noindex` for authenticated app routes (aligned with `robots.txt` disallow). */
+export function privatePageMetadata(input: Omit<PageSeoParams, 'noIndex'>): Metadata {
+  return generateMetadata({ ...input, noIndex: true })
 }
 
 export const PAGE_SEO = {

@@ -1,4 +1,3 @@
-import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
@@ -7,11 +6,9 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
 import { DashboardWelcomeCard } from './DashboardWelcomeCard'
 import type { InterviewWithReportsRow } from './dashboard-types'
+import { PAGE_SEO } from '@/lib/seo/metadata'
 
-export const metadata: Metadata = {
-  title: 'Dashboard',
-  robots: { index: false, follow: false },
-}
+export const metadata = PAGE_SEO.dashboard
 
 export default async function DashboardPage() {
   const supabase = await createClient()
