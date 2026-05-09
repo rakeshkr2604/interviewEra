@@ -18,6 +18,7 @@ export type AtsErrorCode =
   | 'SCANNED_NO_TEXT'
   | 'CORRUPT'
   | 'UNSUPPORTED'
+  | 'PARSER_RUNTIME'
   | 'EMPTY'
   | 'TOO_LARGE'
   | 'NO_FILE'

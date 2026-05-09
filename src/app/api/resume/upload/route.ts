@@ -7,6 +7,7 @@ import {
   normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
+  PDFParserRuntimeError,
   PDFParserUnavailableError,
   PDFScannedNoTextError,
   PDFUnsupportedError,
@@ -28,24 +29,40 @@ const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
   SCANNED_NO_TEXT:
     'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
-  CORRUPT: 'This file appears corrupt. Try re-saving and uploading again.',
+  CORRUPT:
+    'This PDF could not be read as valid. If it opens on your laptop, export it again (“Save as PDF”) and re-upload.',
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
 };
 
-type ResumeUploadPdfErrorCode = PDFErrorCode | 'PARSER_UNAVAILABLE';
+type ResumeUploadPdfErrorCode =
+  PDFErrorCode
+  | 'PARSER_UNAVAILABLE'
+  | 'PARSER_RUNTIME';
+
+const PDF_PARSER_INFRA_MESSAGES: Pick<
+  Record<ResumeUploadPdfErrorCode, string>,
+  'PARSER_UNAVAILABLE' | 'PARSER_RUNTIME'
+> = {
+  PARSER_UNAVAILABLE: 'Resume parser is temporarily unavailable. Please retry in a minute.',
+  PARSER_RUNTIME:
+    'Could not finish reading this PDF on our servers yet. Retry once — if it persists, re-export as PDF from Word/Canva or upload a .txt resume.',
+};
 
 function classifyPdfError(err: unknown): { code: ResumeUploadPdfErrorCode; message: string } {
   if (err instanceof PDFParserUnavailableError) {
     return {
       code: 'PARSER_UNAVAILABLE',
-      message: 'Resume parser is temporarily unavailable. Please retry in a minute.',
+      message: PDF_PARSER_INFRA_MESSAGES.PARSER_UNAVAILABLE,
     };
+  }
+  if (err instanceof PDFParserRuntimeError) {
+    return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
   }
   if (err instanceof PDFEncryptedError) return { code: 'ENCRYPTED', message: PDF_ERROR_MESSAGES.ENCRYPTED };
   if (err instanceof PDFScannedNoTextError) return { code: 'SCANNED_NO_TEXT', message: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT };
   if (err instanceof PDFCorruptError) return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
   if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
-  return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+  return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
 }
 
 function hasPdfHeader(bytes: Uint8Array): boolean {
@@ -136,7 +153,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     let rawText = '';
     if (ext === '.pdf') {
       try {
-        rawText = await extractText(parseBytes);
+        rawText = await extractText(parseBytes, {
+          mimeType: file.type,
+          fileNameHint: normalizedName,
+          vercelId: vercelId ?? '',
+          source: 'resume-upload',
+        });
       } catch (err) {
         const { code, message } = classifyPdfError(err);
         console.error(
@@ -144,7 +166,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           err instanceof Error ? err.message : err,
         );
         console.error(
-          `[resume/upload][${reqId}] grep Vercel logs for [pdf-parse][diag] and this requestId; x-vercel-id=${vercelId ?? 'n/a'}`,
+          `[resume/upload][${reqId}] grep logs: [pdf-parse][diag] [pdf-parse][attempt] x-vercel-id=${vercelId ?? 'n/a'}`,
         );
         return NextResponse.json(
           { error: message, code, requestId: reqId },

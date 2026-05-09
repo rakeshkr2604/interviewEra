@@ -8,6 +8,14 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** Vercel sets `preview` only for Preview deployments — never on Production (`production`). */
 const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
 
+function pdfTraceGlobs(): string[] {
+  return [
+    "./node_modules/pdfjs-dist/standard_fonts/**",
+    "./node_modules/pdfjs-dist/cmaps/**",
+    "./node_modules/@napi-rs/canvas/**",
+    "./node_modules/pdf-parse/**",
+  ];
+}
 const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
@@ -28,17 +36,15 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 86400,
   },
   // Prevents Next.js from bundling packages that need Node.js internals at load time
-  serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer', '@napi-rs/canvas'],
+  serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer', '@napi-rs/canvas', 'pdf-parse'],
   // Force NFT to trace pdfjs-dist font + cmap assets into every Node server
-  // bundle that needs them. A single `/*` key avoids route-key mismatch for
-  // server actions vs API routes on Vercel (picomatch must match the traced
-  // route id exactly — easy to get wrong per deployment).
+  // bundle that needs them. `'/**'` plus explicit route IDs reduces risk of Next
+  // picomatch drift per deployment (ATS server action vs API routes).
   outputFileTracingIncludes: {
-    '/**': [
-      './node_modules/pdfjs-dist/standard_fonts/**',
-      './node_modules/pdfjs-dist/cmaps/**',
-      './node_modules/@napi-rs/canvas/**',
-    ],
+    '/**': pdfTraceGlobs(),
+    '/tools/ats-checker': pdfTraceGlobs(),
+    '/api/resume/upload': pdfTraceGlobs(),
+    '/api/job-description/extract': pdfTraceGlobs(),
   },
   // Performance
   compress: true,

@@ -297,11 +297,24 @@ Before writing any code in a new session, confirm:
 npm run dev          # Start dev server with Turbopack (fast HMR)
 npm run dev:fresh    # Clean .next cache then start dev server
 npm run dev:webpack  # Start with Webpack (use if Turbopack causes issues)
-npm run build        # Production build
+npm run build        # Production build (Webpack — matches Vercel default `npm run build`)
 npm run lint         # Run ESLint
+npm run verify:pdf   # Regression: extractText on tests/fixtures/pdf (CI)
 ```
 
-There is no test suite — TypeScript type-checking is the primary correctness tool.
+TypeScript type-checking is the primary correctness tool. **PDF parsing** is additionally covered by `verify:pdf`.
+
+## PDF parsing (production operations)
+
+- Implementation: `src/lib/pdf/parser.ts` (pdfjs-dist + `pdf-parse` fallback); requires **Node >=20.18.1** (aligned with `engines` in package.json and `pdfjs-dist` upstream).
+- **Vercel logs:** filter **`[pdf-parse][diag]`**, **`[pdf-parse][attempt]`**, **`[pdf-parse][vercel]`**. Correlate **`x-vercel-id`** from the browser request with the deployment **Git SHA** and **Node version** shown in logs.
+- If parser breaks after dependency or lockfile changes: **Redeploy with “Clear build cache”** once, then redeploy normally.
+- **Dependabot branches in “Active branches”**: Vercel builds **Preview** deployments for each Git branch; Dependabot branches stay visible until merged/closed. They do **not** update Production unless the production branch tracked by the project advances. Optionally set **Ignored Build Step** for `dependabot/**` to skip Preview noise.
+
+### PDF fixtures
+
+- Checked-in fixtures: `tests/fixtures/pdf/*.pdf` — regenerate locally with  
+  `npx tsx scripts/generate-pdf-fixtures.tsx` if text content needs to change (do **not** hand-edit binaries).
 
 ---
 

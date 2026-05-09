@@ -10,18 +10,24 @@ import {
   normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
+  PDFParserRuntimeError,
   PDFParserUnavailableError,
   PDFScannedNoTextError,
   PDFUnsupportedError,
 } from '@/lib/pdf/parser';
 import type { AtsResult, AtsState } from './ats-types';
 
-const PDF_USER_MESSAGES: Record<'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED', string> = {
+const PDF_USER_MESSAGES: Record<
+  'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED' | 'PARSER_RUNTIME',
+  string
+> = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
   SCANNED_NO_TEXT:
     'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
-  CORRUPT: 'This file appears corrupt. Try re-saving and uploading again.',
+  CORRUPT: 'This PDF could not be read as valid. If you exported from Word or Canva, try “Save as PDF” again.',
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
+  PARSER_RUNTIME:
+    'Our server could not finish reading this PDF right now — not necessarily a bad file. Please retry once; if it keeps failing, try exporting the PDF again or use a .txt file.',
 };
 
 const PARSER_UNAVAILABLE_MESSAGE = 'Resume parser is temporarily unavailable. Please retry in a minute.';
@@ -29,6 +35,9 @@ const PARSER_UNAVAILABLE_MESSAGE = 'Resume parser is temporarily unavailable. Pl
 function pdfErrorToState(err: unknown): AtsState {
   if (err instanceof PDFParserUnavailableError) {
     return { error: PARSER_UNAVAILABLE_MESSAGE, code: 'PARSER_UNAVAILABLE' };
+  }
+  if (err instanceof PDFParserRuntimeError) {
+    return { error: PDF_USER_MESSAGES.PARSER_RUNTIME, code: 'PARSER_RUNTIME' };
   }
   if (err instanceof PDFEncryptedError)
     return { error: PDF_USER_MESSAGES.ENCRYPTED, code: 'ENCRYPTED' };
@@ -38,7 +47,7 @@ function pdfErrorToState(err: unknown): AtsState {
     return { error: PDF_USER_MESSAGES.CORRUPT, code: 'CORRUPT' };
   if (err instanceof PDFUnsupportedError)
     return { error: PDF_USER_MESSAGES.UNSUPPORTED, code: 'UNSUPPORTED' };
-  return { error: PDF_USER_MESSAGES.CORRUPT, code: 'CORRUPT' };
+  return { error: PDF_USER_MESSAGES.PARSER_RUNTIME, code: 'PARSER_RUNTIME' };
 }
 
 async function extractFileText(file: File): Promise<string> {
@@ -48,8 +57,14 @@ async function extractFileText(file: File): Promise<string> {
   const ext = `.${normalized.split('.').pop()?.toLowerCase() ?? ''}`;
   if (ext === '.txt') return await file.text();
   if (ext === '.pdf') {
+    const headerList = await headers();
     const arrayBuffer = await file.arrayBuffer();
-    return await extractText(arrayBuffer);
+    return await extractText(arrayBuffer, {
+      mimeType: file.type,
+      fileNameHint: normalized,
+      vercelId: headerList.get('x-vercel-id') ?? '',
+      source: 'ats-checker',
+    });
   }
   throw new PDFUnsupportedError();
 }
@@ -284,7 +299,18 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
       };
     }
     try {
-      const jdText = (await extractFileText(jdFile)).trim();
+      const jdHeaderList = await headers();
+      const jdNormalized = normalizeFileName(jdFile.name);
+      const extracted =
+        jdExt === '.txt'
+          ? await jdFile.text()
+          : await extractText(await jdFile.arrayBuffer(), {
+              mimeType: jdFile.type,
+              fileNameHint: jdNormalized,
+              vercelId: jdHeaderList.get('x-vercel-id') ?? '',
+              source: 'ats-checker-jd',
+            });
+      const jdText = extracted.trim();
       if (jdText.length > 0) jobDescription = jdText.slice(0, JOB_DESC_MAX_CHARS);
     } catch (err) {
       console.error('[ats-checker] JD extract error', err);

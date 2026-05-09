@@ -46,3 +46,12 @@ export function ensurePdfJsNodeGlobalsSync(): void {
     );
   }
 }
+
+/** True once canvas globals pdfjs-dist legacy expects exist on globalThis (Vercel Node). */
+export function hasPdfJsNodeGlobalsReady(): boolean {
+  return (
+    typeof globalThis.DOMMatrix !== 'undefined' &&
+    typeof globalThis.Path2D !== 'undefined' &&
+    typeof globalThis.ImageData !== 'undefined'
+  );
+}

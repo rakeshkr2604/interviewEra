@@ -7,6 +7,7 @@ import {
   normalizeFileName,
   PDFCorruptError,
   PDFEncryptedError,
+  PDFParserRuntimeError,
   PDFParserUnavailableError,
   PDFScannedNoTextError,
   PDFUnsupportedError,
@@ -25,28 +26,39 @@ const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and try again.',
   SCANNED_NO_TEXT:
     'This PDF appears to be scanned. Paste the JD as text or upload a text-based PDF.',
-  CORRUPT: 'This file appears corrupt. Try re-saving and uploading again.',
+  CORRUPT:
+    'This PDF could not be read. Try exporting the JD as PDF again, or paste plain text.',
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
 };
 
-type PdfErr = PDFErrorCode | 'PARSER_UNAVAILABLE';
+type PdfErr = PDFErrorCode | 'PARSER_UNAVAILABLE' | 'PARSER_RUNTIME';
+
+const PDF_PARSER_INFRA_MESSAGES: Record<'PARSER_UNAVAILABLE' | 'PARSER_RUNTIME', string> = {
+  PARSER_UNAVAILABLE: 'PDF parser is temporarily unavailable. Please retry in a minute.',
+  PARSER_RUNTIME:
+    'Could not finish reading this PDF on our servers. Retry once, or paste the JD as plain text.',
+};
 
 function classifyPdfError(err: unknown): { code: PdfErr; message: string } {
   if (err instanceof PDFParserUnavailableError) {
     return {
       code: 'PARSER_UNAVAILABLE',
-      message: 'PDF parser is temporarily unavailable. Please retry in a minute.',
+      message: PDF_PARSER_INFRA_MESSAGES.PARSER_UNAVAILABLE,
     };
+  }
+  if (err instanceof PDFParserRuntimeError) {
+    return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
   }
   if (err instanceof PDFEncryptedError) return { code: 'ENCRYPTED', message: PDF_ERROR_MESSAGES.ENCRYPTED };
   if (err instanceof PDFScannedNoTextError) return { code: 'SCANNED_NO_TEXT', message: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT };
   if (err instanceof PDFCorruptError) return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
   if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
-  return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+  return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
   const reqId = randomUUID().slice(0, 8);
+  const vercelReqIdHeader = request.headers.get('x-vercel-id');
   try {
     const supabase = await createClient();
     const {
@@ -96,7 +108,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     let rawText = '';
     if (ext === '.pdf') {
       try {
-        rawText = await extractText(parseBytes);
+        rawText = await extractText(parseBytes, {
+          mimeType: file.type,
+          fileNameHint: normalizedName,
+          vercelId: vercelReqIdHeader ?? '',
+          source: 'job-description-extract',
+        });
       } catch (err) {
         const { message } = classifyPdfError(err);
         console.error(`[job-description/extract][${reqId}] PDF parse failed`, err);

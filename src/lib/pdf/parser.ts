@@ -1,14 +1,10 @@
 /**
- * Shared PDF text extraction service.
+ * Shared PDF text extraction service (pdfjs-dist legacy + fallback pdf-parse).
  *
- * Both the resume upload route and the ATS checker server action route
- * through this module. Uses `pdfjs-dist/legacy` for text extraction. On
- * Node (Vercel), pdfjs touches `DOMMatrix` / `Path2D` / `ImageData` at
- * module load — we preload `@napi-rs/canvas` so those globals exist
- * before importing pdfjs (see `pdfjs-node-setup.ts`).
- *
- * Throws one of the typed errors below — callers map those to
- * user-facing codes; never surface the raw exception.
+ * Uses `pdfjs-dist/legacy` first; `@napi-rs/canvas` fills DOM globals on Node
+ * before pdfjs imports (pdfjs-node-setup.ts). Production serverless bundles can
+ * still miss cmap/font trees or canvas binaries — fallback uses `pdf-parse`
+ * with a distinct engine chain.
  */
 
 import { existsSync } from 'node:fs';
@@ -16,48 +12,40 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { ensurePdfJsNodeGlobalsSync } from '@/lib/pdf/pdfjs-node-setup';
+import type { PDFParseUserCode } from '@/lib/pdf/parser-errors';
+import {
+  PDFCorruptError,
+  PDFEncryptedError,
+  PDFParserRuntimeError,
+  PDFParserUnavailableError,
+  PDFScannedNoTextError,
+  PDFUnsupportedError,
+} from '@/lib/pdf/parser-errors';
+import { ensurePdfJsNodeGlobalsSync, hasPdfJsNodeGlobalsReady } from '@/lib/pdf/pdfjs-node-setup';
 
-export type PDFErrorCode = 'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED';
+export type { PDFParseUserCode };
 
-export class PDFEncryptedError extends Error {
-  readonly code: PDFErrorCode = 'ENCRYPTED';
-  constructor(message = 'PDF is password-protected') {
-    super(message);
-    this.name = 'PDFEncryptedError';
-  }
-}
+/** @deprecated Prefer PDFParseUserCode — narrow codes for typed message maps on some routes. */
+export type PDFErrorCode = Extract<
+  PDFParseUserCode,
+  'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED'
+>;
 
-export class PDFScannedNoTextError extends Error {
-  readonly code: PDFErrorCode = 'SCANNED_NO_TEXT';
-  constructor(message = 'PDF contains no extractable text') {
-    super(message);
-    this.name = 'PDFScannedNoTextError';
-  }
-}
+export type PdfExtractDiagContext = {
+  mimeType?: string;
+  fileNameHint?: string;
+  vercelId?: string;
+  source?: string;
+};
 
-export class PDFCorruptError extends Error {
-  readonly code: PDFErrorCode = 'CORRUPT';
-  constructor(message = 'PDF appears corrupt') {
-    super(message);
-    this.name = 'PDFCorruptError';
-  }
-}
-
-export class PDFUnsupportedError extends Error {
-  readonly code: PDFErrorCode = 'UNSUPPORTED';
-  constructor(message = 'Unsupported file type') {
-    super(message);
-    this.name = 'PDFUnsupportedError';
-  }
-}
-
-export class PDFParserUnavailableError extends Error {
-  constructor(message = 'PDF parser assets are unavailable on server') {
-    super(message);
-    this.name = 'PDFParserUnavailableError';
-  }
-}
+export {
+  PDFCorruptError,
+  PDFEncryptedError,
+  PDFParserRuntimeError,
+  PDFParserUnavailableError,
+  PDFScannedNoTextError,
+  PDFUnsupportedError,
+};
 
 const MIN_USEFUL_CHARS = 20;
 
@@ -66,15 +54,14 @@ interface PdfJsTextItem {
 }
 
 /**
- * Resolve the on-disk path to pdfjs-dist's bundled font + cmap assets.
- *
- * Prefer `createRequire(import.meta.url).resolve('pdfjs-dist/package.json')`:
- * it follows normal Node resolution from the compiled server chunk, which
- * stays aligned with `serverExternalPackages` + Vercel output tracing.
- * `import.meta.resolve('pdfjs-dist/legacy/build/pdf.mjs')` can land on a
- * different real path than the traced `standard_fonts/` tree in some
- * bundled / symlinked deployments, so font fetches 404 → FormatError → CORRUPT.
+ * Operational: correlate Vercel Runtime Logs → filter `[pdf-parse][diag]` and
+ * `[pdf-parse][attempt]` alongside `deploymentId`/`vercel_sha`/`vercel_region`
+ * from the deployment record and Request `x-vercel-id`.
  */
+export function pdfParseOperationalHint(): string {
+  return '[pdf-parse][operational] In Vercel → Logs: filter `[pdf-parse][diag]` or `[pdf-parse][attempt]`; match Request ID from network tab `x-vercel-id`; compare Deployment Git SHA.';
+}
+
 function resolvePdfJsPackageRootFromRequire(): string | null {
   try {
     const req = createRequire(import.meta.url);
@@ -103,7 +90,6 @@ function toAssetPaths(pkgRoot: string): { standardFontDataUrl: string; cMapUrl: 
   };
 }
 
-/** `undefined` = not computed yet; `null` = failure or missing dirs (cached). */
 let cachedAssetPaths: { standardFontDataUrl: string; cMapUrl: string } | null | undefined;
 
 function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: string }, reason: string): void {
@@ -129,6 +115,8 @@ function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: stri
     existsSync(cm),
     'legacy_pdf_entry=',
     resolvedViaEntry,
+    'nodejs_canvas_ready=',
+    hasPdfJsNodeGlobalsReady(),
   );
 }
 
@@ -178,26 +166,19 @@ function getPdfJsAssetUrlsForServer(): {
   throw new PDFParserUnavailableError();
 }
 
-/**
- * Cheap pre-flight: a real PDF starts with `%PDF-` (plus tolerant of a
- * BOM / leading whitespace, which some browsers prepend on drag-and-drop).
- * Throwing here gives a precise UNSUPPORTED message instead of letting
- * pdfjs return a generic FormatError that we have to coerce to CORRUPT.
- */
 export function assertPdfMagic(input: Uint8Array | ArrayBuffer): void {
   const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
   if (bytes.byteLength < 5) {
     throw new PDFCorruptError('File is too short to be a PDF');
   }
-  // Skip up to 1024 leading bytes to tolerate stray whitespace / BOMs.
   const scanLimit = Math.min(bytes.byteLength - 5, 1024);
   for (let i = 0; i <= scanLimit; i++) {
     if (
-      bytes[i] === 0x25 && // %
-      bytes[i + 1] === 0x50 && // P
-      bytes[i + 2] === 0x44 && // D
-      bytes[i + 3] === 0x46 && // F
-      bytes[i + 4] === 0x2d // -
+      bytes[i] === 0x25 &&
+      bytes[i + 1] === 0x50 &&
+      bytes[i + 2] === 0x44 &&
+      bytes[i + 3] === 0x46 &&
+      bytes[i + 4] === 0x2d
     ) {
       return;
     }
@@ -205,15 +186,12 @@ export function assertPdfMagic(input: Uint8Array | ArrayBuffer): void {
   throw new PDFUnsupportedError('File is not a PDF (missing %PDF- header)');
 }
 
-/** Safe structured fields for Vercel / server logs (no PDF bytes). */
 function pdfJsExceptionFields(err: unknown): Record<string, string> {
   const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
   const name = err instanceof Error ? err.name : (err as { name?: string } | null)?.name ?? '';
   const message = err instanceof Error ? err.message : String(err);
   const stackHead =
-    err instanceof Error && err.stack
-      ? err.stack.split('\n').slice(0, 4).join(' ← ')
-      : '';
+    err instanceof Error && err.stack ? err.stack.split('\n').slice(0, 4).join(' ← ') : '';
   return {
     err_ctor: ctor || '(unknown)',
     err_name: name || '(unknown)',
@@ -222,22 +200,53 @@ function pdfJsExceptionFields(err: unknown): Record<string, string> {
   };
 }
 
-function logPdfParseEvent(
+function logPdfParseDiag(
   event: string,
-  err: unknown,
+  errOrEmpty: unknown,
   extra: Record<string, string | number | boolean | undefined> = {},
 ): void {
   const payload = {
     event,
     ...extra,
-    ...pdfJsExceptionFields(err),
+    ...(errOrEmpty === undefined || errOrEmpty === null ? {} : pdfJsExceptionFields(errOrEmpty)),
     vercel: process.env.VERCEL === '1',
+    vercel_env: process.env.VERCEL_ENV ?? '',
     node: process.version,
   };
   console.error('[pdf-parse][diag]', JSON.stringify(payload));
 }
 
-function classifyAndThrow(err: unknown): never {
+function logPdfExtractAttempt(extra: Record<string, string | number | boolean | undefined>): void {
+  console.error('[pdf-parse][attempt]', JSON.stringify(extra));
+}
+
+function isInfrastructureThrownError(err: unknown): boolean {
+  const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
+  const name = (err as { name?: string } | null)?.name ?? '';
+  const message = err instanceof Error ? err.message : String(err);
+
+  const isDomMatrix =
+    (name === 'ReferenceError' || ctor === 'ReferenceError') &&
+    /DOMMatrix|Path2D|ImageData/i.test(message);
+
+  const isModuleProblem =
+    (name === 'Error' && /^Cannot find module/m.test(message)) ||
+    ctor === 'ERR_MODULE_NOT_FOUND' ||
+    (typeof (err as { code?: string } | null)?.code === 'string' &&
+      ['MODULE_NOT_FOUND', 'ERR_DLOPEN_FAILED'].includes(
+        String((err as { code?: string }).code),
+      ));
+
+  const isDlopen =
+    typeof message === 'string' &&
+    /dlopen|The specified procedure could not be found|wrong ELF class|invalid ELF header/i.test(
+      message,
+    );
+
+  return isDomMatrix || isModuleProblem || isDlopen;
+}
+
+function classifyAndThrowPdfJs(err: unknown): never {
   const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
   const name = (err as { name?: string } | null)?.name ?? '';
   const message = err instanceof Error ? err.message : String(err);
@@ -247,9 +256,15 @@ function classifyAndThrow(err: unknown): never {
     name === 'PasswordException' ||
     /password|encrypted/i.test(message)
   ) {
-    logPdfParseEvent('classify_result', err, { maps_to: 'ENCRYPTED' });
+    logPdfParseDiag('classify_pdfjs', err, { maps_to: 'ENCRYPTED' });
     throw new PDFEncryptedError();
   }
+
+  if (isInfrastructureThrownError(err)) {
+    logPdfParseDiag('classify_pdfjs', err, { maps_to: 'PARSER_RUNTIME' });
+    throw new PDFParserRuntimeError();
+  }
+
   if (
     ctor === 'InvalidPDFException' ||
     name === 'InvalidPDFException' ||
@@ -259,14 +274,15 @@ function classifyAndThrow(err: unknown): never {
     name === 'FormatError' ||
     /invalid pdf|missing pdf|format error|stream must|corrupt/i.test(message)
   ) {
-    logPdfParseEvent('classify_result', err, { maps_to: 'CORRUPT' });
+    logPdfParseDiag('classify_pdfjs', err, { maps_to: 'CORRUPT_candidate' });
     throw new PDFCorruptError();
   }
-  logPdfParseEvent('classify_result', err, { maps_to: 'CORRUPT_generic' });
-  throw new PDFCorruptError(`PDF could not be parsed (${message})`);
+
+  logPdfParseDiag('classify_pdfjs', err, { maps_to: 'PARSER_RUNTIME_or_unknown' });
+  throw new PDFParserRuntimeError(typeof message === 'string' ? message : 'PDF could not be read');
 }
 
-function isLikelyCorruptParseError(err: unknown): boolean {
+function isLikelyCorruptPdfJsError(err: unknown): boolean {
   const ctor = (err as { constructor?: { name?: string } } | null)?.constructor?.name ?? '';
   const name = (err as { name?: string } | null)?.name ?? '';
   const message = err instanceof Error ? err.message : String(err);
@@ -281,38 +297,60 @@ function isLikelyCorruptParseError(err: unknown): boolean {
   );
 }
 
-/**
- * Extract text from PDF bytes via pdfjs-dist. Configured for Node
- * serverless (no system fonts, no font face registration, no eval).
- */
-export async function extractText(input: Uint8Array | ArrayBuffer): Promise<string> {
-  assertPdfMagic(input);
-  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+async function extractWithPdfParse(bytes: Uint8Array): Promise<string> {
+  const imported = (await import('pdf-parse')) as {
+    default?: (buffer: Buffer) => Promise<{ text?: string }>;
+  };
+  const pdfParse = imported.default;
+  if (typeof pdfParse !== 'function') {
+    throw new PDFParserRuntimeError('pdf-parse default export unavailable');
+  }
+  const buf = Buffer.from(bytes);
+  const result = await pdfParse(buf);
+  const text =
+    typeof result === 'object' && result !== null && typeof result.text === 'string' ? result.text : '';
+  return text.trim();
+}
 
-  ensurePdfJsNodeGlobalsSync();
+type PdfJsDocument = {
+  numPages: number;
+  destroy: () => Promise<void>;
+  getPage: (i: number) => Promise<{ getTextContent: () => Promise<{ items: unknown[] }> }>;
+};
+
+async function runPdfJsTextExtract(
+  bytes: Uint8Array,
+  opts: Record<string, unknown>,
+): Promise<{ text: string; doc: PdfJsDocument }> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const loadedDoc = (await pdfjs.getDocument(opts).promise) as PdfJsDocument;
+  let text = '';
+  for (let i = 1; i <= loadedDoc.numPages; i++) {
+    const page = await loadedDoc.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = (content.items as PdfJsTextItem[])
+      .map((it) => (typeof it.str === 'string' ? it.str : ''))
+      .join(' ');
+    text += pageText + '\n';
+  }
+  return { text: text.trim(), doc: loadedDoc };
+}
+
+async function drainPdfJsDocument(doc: PdfJsDocument | null): Promise<void> {
+  if (!doc) return;
+  try {
+    await doc.destroy();
+  } catch {
+    /* ignore destroy errors */
+  }
+}
+
+/** Primary path: Mozilla PDF.js. Only call when `@napi-rs/canvas` globals are ready. */
+async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
   const assets = getPdfJsAssetUrlsForServer();
 
-  let doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> | null = null;
-
-  const readText = async (
-    opts: Record<string, unknown>,
-  ): Promise<{ text: string; doc: Awaited<ReturnType<typeof pdfjs.getDocument>['promise']> }> => {
-    const loadedDoc = await pdfjs.getDocument(opts).promise;
-    let text = '';
-    for (let i = 1; i <= loadedDoc.numPages; i++) {
-      const page = await loadedDoc.getPage(i);
-      const content = await page.getTextContent();
-      const pageText = (content.items as PdfJsTextItem[])
-        .map((it) => (typeof it.str === 'string' ? it.str : ''))
-        .join(' ');
-      text += pageText + '\n';
-    }
-    return { text: text.trim(), doc: loadedDoc };
-  };
-
   try {
-    const primary = await readText({
+    const primary = await runPdfJsTextExtract(bytes, {
       data: bytes,
       useSystemFonts: false,
       disableFontFace: true,
@@ -321,10 +359,13 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
       ...assets,
       cMapPacked: true,
     });
-    doc = primary.doc;
-    const text = primary.text;
 
-    if (text.length >= MIN_USEFUL_CHARS) return text;
+    if (primary.text.length >= MIN_USEFUL_CHARS) {
+      await drainPdfJsDocument(primary.doc);
+      return primary.text;
+    }
+
+    await drainPdfJsDocument(primary.doc);
     throw new PDFScannedNoTextError();
   } catch (err) {
     if (err instanceof PDFScannedNoTextError) throw err;
@@ -332,80 +373,137 @@ export async function extractText(input: Uint8Array | ArrayBuffer): Promise<stri
     if (err instanceof PDFCorruptError) throw err;
     if (err instanceof PDFUnsupportedError) throw err;
     if (err instanceof PDFParserUnavailableError) throw err;
-    // Surface enough detail in Vercel logs to actually debug — no file bytes.
-    logPdfParseEvent('primary_catch', err, {
-      stage: 'after_primary_readText',
+
+    logPdfParseDiag('pdfjs_primary_catch', err, {
+      stage: 'pdfjs_primary',
       bytes: bytes.byteLength,
       had_assets: true,
     });
-    const e = err as { name?: string; message?: string; stack?: string };
-    console.error(
-      '[pdf-parse] pdfjs-dist failed',
-      'bytes=', bytes.byteLength,
-      'name=', e?.name,
-      'message=', e?.message,
-      'stack=', e?.stack,
-    );
+    console.error('[pdf-parse] pdfjs primary failed:', err);
+
     if (process.env.VERCEL === '1') {
       try {
-        const candidate = toAssetPaths(join(process.cwd(), 'node_modules', 'pdfjs-dist'));
-        logPdfJsResolveDiag(candidate, 'parse_error_context');
+        logPdfJsResolveDiag(
+          toAssetPaths(join(process.cwd(), 'node_modules', 'pdfjs-dist')),
+          'parse_error_context',
+        );
       } catch {
         console.error('[pdf-parse][vercel] parse_error_context diagnostic failed');
       }
     }
-    // Some serverless bundles fail when explicit font/cmap URLs are supplied.
-    // Retry once without those asset URLs before classifying as CORRUPT.
-    if (isLikelyCorruptParseError(err)) {
-      logPdfParseEvent('retry_start', err, {
-        stage: 'no_asset_urls_retry',
-        bytes: bytes.byteLength,
+
+    if (!isLikelyCorruptPdfJsError(err)) {
+      classifyAndThrowPdfJs(err);
+    }
+
+    logPdfParseDiag('pdfjs_retry_without_assets_start', err, { bytes: bytes.byteLength });
+    try {
+      const retry = await runPdfJsTextExtract(bytes, {
+        data: bytes,
+        useSystemFonts: false,
+        disableFontFace: true,
+        isEvalSupported: false,
+        verbosity: 0,
       });
-      try {
-        const retry = await readText({
-          data: bytes,
-          useSystemFonts: false,
-          disableFontFace: true,
-          isEvalSupported: false,
-          verbosity: 0,
-        });
-        doc = retry.doc;
-        if (retry.text.length >= MIN_USEFUL_CHARS) return retry.text;
-        logPdfParseEvent(
-          'retry_insufficient_text',
-          new Error(`retry extracted ${retry.text.length} chars (< ${MIN_USEFUL_CHARS})`),
-          {
-            stage: 'retry_ok_but_short',
-            text_len: retry.text.length,
-            bytes: bytes.byteLength,
-          },
-        );
-      } catch (retryErr) {
-        logPdfParseEvent('retry_failed', retryErr, {
-          stage: 'no_asset_urls_retry',
-          bytes: bytes.byteLength,
-          original_was_corrupt_class: isLikelyCorruptParseError(err),
-        });
+
+      if (retry.text.length >= MIN_USEFUL_CHARS) {
+        await drainPdfJsDocument(retry.doc);
+        return retry.text;
       }
+
+      logPdfParseDiag(
+        'pdfjs_retry_no_assets_short_text',
+        new Error(`retry got ${retry.text.length} chars`),
+        { bytes: bytes.byteLength, text_len: retry.text.length },
+      );
+      await drainPdfJsDocument(retry.doc);
+    } catch (retryErr) {
+      logPdfParseDiag('pdfjs_retry_without_assets_failed', retryErr, { bytes: bytes.byteLength });
     }
-    classifyAndThrow(err);
-    throw err; // unreachable — classifyAndThrow is `never`, but TS can't infer through try/finally
-  } finally {
-    if (doc) {
-      try {
-        await doc.destroy();
-      } catch {
-        /* ignore destroy errors */
-      }
-    }
+
+    classifyAndThrowPdfJs(err);
   }
 }
 
 /**
- * Strip duplicate trailing extensions (`resume.pdf.pdf` → `resume.pdf`)
- * before extension-based MIME validation. Some browsers or saved-from-
- * web flows append a second `.pdf` when the file already ends in `.pdf`.
+ * Extract text from PDF bytes. Optional `diag` fields are logged (no file bytes).
  */
+export async function extractText(
+  input: Uint8Array | ArrayBuffer,
+  diag?: PdfExtractDiagContext,
+): Promise<string> {
+  assertPdfMagic(input);
+  const bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
+
+  logPdfExtractAttempt({
+    phase: 'start',
+    byteLength: bytes.byteLength,
+    mime: diag?.mimeType ?? '',
+    file_hint: (diag?.fileNameHint ?? '').slice(0, 120),
+    vercel_id: diag?.vercelId ?? '',
+    source: diag?.source ?? '',
+    vercel_sha: process.env.VERCEL_GIT_COMMIT_SHA ?? '',
+    region: process.env.VERCEL_REGION ?? '',
+  });
+
+  ensurePdfJsNodeGlobalsSync();
+  const canvasReady = hasPdfJsNodeGlobalsReady();
+
+  // When canvas native module failed on this Lambda, skip pdfjs import entirely;
+  // pdf-parse does not need PDF.js DOMMatrix at load time.
+  if (!canvasReady) {
+    logPdfParseDiag('canvas_globals_missing', new Error('DOMMatrix/Path2D/ImageData not set'), {
+      phase: 'pdf_parse_fallback_only',
+      byteLength: bytes.byteLength,
+    });
+    try {
+      const t = await extractWithPdfParse(bytes);
+      if (t.length >= MIN_USEFUL_CHARS) return t;
+      throw new PDFScannedNoTextError();
+    } catch (err) {
+      if (err instanceof PDFScannedNoTextError) throw err;
+      logPdfParseDiag('pdf_parse_after_no_canvas_failed', err, { byteLength: bytes.byteLength });
+      throw new PDFParserRuntimeError();
+    }
+  }
+
+  let pdfJsErr: unknown;
+  try {
+    return await extractWithPdfJsPrimary(bytes);
+  } catch (e) {
+    pdfJsErr = e;
+    if (e instanceof PDFEncryptedError || e instanceof PDFUnsupportedError) throw e;
+    // Including PARSER_UNAVAILABLE + canvas/runtime — secondary engine may succeed.
+  }
+
+  logPdfParseDiag('pdf_parse_fallback_start', pdfJsErr, {
+    byteLength: bytes.byteLength,
+    reason: 'after_pdfjs_or_corrupt_class',
+  });
+
+  try {
+    const fallback = await extractWithPdfParse(bytes);
+    if (fallback.length >= MIN_USEFUL_CHARS) {
+      logPdfParseDiag('pdf_parse_fallback_ok', null, {
+        byteLength: bytes.byteLength,
+        text_len: fallback.length,
+      });
+      return fallback;
+    }
+    if (pdfJsErr instanceof PDFScannedNoTextError) throw pdfJsErr;
+    throw new PDFScannedNoTextError();
+  } catch (fbErr) {
+    if (fbErr instanceof PDFScannedNoTextError) throw fbErr;
+    logPdfParseDiag('pdf_parse_fallback_failed', fbErr, { byteLength: bytes.byteLength });
+
+    if (pdfJsErr instanceof PDFCorruptError) throw pdfJsErr;
+    if (pdfJsErr instanceof PDFParserRuntimeError) throw pdfJsErr;
+    if (pdfJsErr instanceof PDFParserUnavailableError) throw pdfJsErr;
+    if (pdfJsErr instanceof PDFScannedNoTextError) throw pdfJsErr;
+    classifyAndThrowPdfJs(pdfJsErr instanceof Error ? pdfJsErr : fbErr);
+  }
+}
+
 export function normalizeFileName(name: string): string {
   return name
     .replace(/(\.pdf)(?:\.pdf)+$/i, '$1')
