@@ -88,14 +88,26 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
             style={{ contain: 'layout paint' }}
             aria-hidden
           >
-            {/* Fixed rem sizes — avoid vw so orbs do not resize when scrollbar / viewport stabilizes (CLS). */}
+            {/* Rem-only position + size — % of main width changes with scrollbar/layout and caused CLS (~0.27). */}
             <div
-              className="absolute -left-[10%] top-[-12%] size-[18rem] rounded-full blur-[90px] opacity-90"
-              style={{ background: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)' }}
+              className="absolute rounded-full blur-[90px] opacity-90"
+              style={{
+                left: '-4rem',
+                top: '-3.5rem',
+                width: '18rem',
+                height: '18rem',
+                background: 'color-mix(in srgb, var(--accent-primary) 22%, transparent)',
+              }}
             />
             <div
-              className="absolute -right-[8%] top-[22%] size-56 rounded-full blur-[80px] opacity-80"
-              style={{ background: 'color-mix(in srgb, #7c3aed 18%, transparent)' }}
+              className="absolute rounded-full blur-[80px] opacity-80"
+              style={{
+                right: '-3rem',
+                top: '6rem',
+                width: '14rem',
+                height: '14rem',
+                background: 'color-mix(in srgb, #7c3aed 18%, transparent)',
+              }}
             />
             <div
               className="absolute inset-0 opacity-[0.14] [mask-image:radial-gradient(ellipse_75%_55%_at_50%_-5%,black,transparent)]"
