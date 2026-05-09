@@ -1,68 +1,38 @@
+import dynamic from 'next/dynamic'
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
-import { PlacementCountdown } from '@/components/layout/PlacementCountdown'
 import { ActionCards } from '@/components/dashboard/ActionCards'
 import { RecentInterviews } from '@/components/dashboard/RecentInterviews'
-import { ScoreTrendChart } from '@/components/dashboard/ScoreTrendChart'
 import {
   ClipboardList,
   TrendingUp,
   CheckCircle2,
   Clock,
 } from 'lucide-react'
+import type { InterviewWithReportsRow, UserRow } from './dashboard-types'
 
-/** Row from interviews + embedded reports. */
-type InterviewWithReportsRow = {
-  id: string
-  role: string
-  difficulty: string
-  status: string
-  completed_at: string | null
-  started_at: string | null
-  reports: { overall_score: number | null; generated_at: string | null }[] | null
-}
+const ScoreTrendChart = dynamic(
+  () =>
+    import('@/components/dashboard/ScoreTrendChart').then((m) => ({
+      default: m.ScoreTrendChart,
+    })),
+  {
+    loading: () => (
+      <div
+        className="h-full min-h-[128px] w-full animate-pulse rounded-lg"
+        style={{ background: 'var(--bg-tertiary)' }}
+        aria-hidden
+      />
+    ),
+  },
+)
 
-type UserRow = {
-  name: string | null
-  plan_tier: string | null
-  credits_remaining: number | null
-  placement_date: string | null
-  created_at: string | null
-}
-
-export async function DashboardMain({
-  userId,
+export function DashboardMain({
+  rows,
   userData,
-  displayName,
-  memberSince,
-  creditsRemaining,
 }: {
-  userId: string
+  rows: InterviewWithReportsRow[]
   userData: UserRow | null
-  displayName: string
-  memberSince: string
-  creditsRemaining: number
 }) {
-  const supabase = await createClient()
-  const { data: interviewsRaw } = await supabase
-    .from('interviews')
-    .select(`
-        id,
-        role,
-        difficulty,
-        status,
-        completed_at,
-        started_at,
-        reports (
-          overall_score,
-          generated_at
-        )
-      `)
-    .eq('user_id', userId)
-    .order('started_at', { ascending: false })
-    .limit(5)
-
-  const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
   const interviews = rows.map(({ reports: _r, ...rest }) => rest)
 
   const reports = rows.flatMap((i) =>
@@ -95,42 +65,10 @@ export async function DashboardMain({
 
   const scoreMap = new Map(reports?.map((r) => [r.interview_id, r.overall_score]) || [])
 
+  const creditsRemaining = userData?.credits_remaining ?? 0
+
   return (
     <>
-      <div className="dashboard-premium-card mb-6 flex flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-7">
-        <div>
-          <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Hi, {displayName}
-          </p>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            Member since {memberSince} &nbsp;·&nbsp;
-            Interviews completed: {completedCount} &nbsp;·&nbsp;
-            Credits: {creditsRemaining} &nbsp;·&nbsp;
-            1 interview = 1 credit
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {userData?.placement_date ? (
-            <PlacementCountdown
-              placementDate={userData.placement_date}
-              interviewsCompleted={completedCount}
-            />
-          ) : null}
-          <Link
-            href="/feedback"
-            className="rounded-[14px] border-2 px-4 py-2.5 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5"
-            style={{
-              borderColor: 'var(--card-border)',
-              background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-              color: 'var(--text-primary)',
-              boxShadow: 'var(--card-shadow)',
-            }}
-          >
-            Give feedback
-          </Link>
-        </div>
-      </div>
-
       <div className="dashboard-premium-card mb-6 px-6 py-5 sm:px-7">
         <div className="mb-1 flex items-center justify-between">
           <div>
@@ -252,7 +190,7 @@ export async function DashboardMain({
             </div>
             <Link
               href="/history"
-              className="rounded-[12px] border-2 px-3 py-1.5 text-xs font-semibold transition-all duration-200"
+              className="rounded-[12px] border-2 px-3 py-1.5 text-xs font-semibold transition-[transform,opacity] duration-200"
               style={{
                 borderColor: 'var(--card-border)',
                 background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
@@ -342,7 +280,7 @@ export async function DashboardMain({
             </p>
             <div className="h-1.5 w-full rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
               <div
-                className="h-full rounded-full transition-all duration-500"
+                className="h-full rounded-full transition-[width] duration-500"
                 style={{
                   width: `${Math.min((completedCount / 20) * 100, 100)}%`,
                   background: 'var(--accent-primary)',

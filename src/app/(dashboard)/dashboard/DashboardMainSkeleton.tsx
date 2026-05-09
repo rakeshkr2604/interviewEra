@@ -1,4 +1,4 @@
-/** Placeholder streamed while interviews + reports load (faster TTFB / earlier first paint). */
+/** Full-page skeleton if dashboard is ever wrapped in Suspense again — matches welcome + trend card layout. */
 export function DashboardMainSkeleton() {
   return (
     <div aria-busy aria-label="Loading dashboard">
@@ -8,8 +8,9 @@ export function DashboardMainSkeleton() {
             className="h-5 w-48 max-w-full rounded-md animate-pulse"
             style={{ background: 'var(--bg-tertiary)' }}
           />
+          {/* ~2 lines of text-sm (welcome stats) to limit CLS if this swaps with real content */}
           <div
-            className="h-4 w-full max-w-xl rounded-md animate-pulse"
+            className="min-h-[2.75rem] w-full max-w-2xl rounded-md animate-pulse"
             style={{ background: 'var(--bg-tertiary)' }}
           />
         </div>

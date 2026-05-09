@@ -1,4 +1,3 @@
-import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
@@ -6,7 +5,8 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { CreditBadge } from '@/components/layout/CreditBadge'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
-import { DashboardMainSkeleton } from './DashboardMainSkeleton'
+import { DashboardWelcomeCard } from './DashboardWelcomeCard'
+import type { InterviewWithReportsRow } from './dashboard-types'
 
 export const metadata: Metadata = {
   title: 'Dashboard',
@@ -20,11 +20,39 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('name, plan_tier, credits_remaining, placement_date, created_at')
-    .eq('id', user.id)
-    .single()
+  const interviewsSelect = `
+        id,
+        role,
+        difficulty,
+        status,
+        completed_at,
+        started_at,
+        reports (
+          overall_score,
+          generated_at
+        )
+      `
+
+  const [{ data: userData, error: userError }, { data: interviewsRaw }] = await Promise.all([
+    supabase
+      .from('users')
+      .select('name, plan_tier, credits_remaining, placement_date, created_at')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('interviews')
+      .select(interviewsSelect)
+      .eq('user_id', user.id)
+      .order('started_at', { ascending: false })
+      .limit(5),
+  ])
+
+  if (userError) {
+    console.error('dashboard user fetch', userError.message)
+  }
+
+  const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const completedCount = rows.filter((i) => i.status === 'completed').length
 
   const memberSince = userData?.created_at
     ? new Date(userData.created_at).toLocaleDateString('en-IN', {
@@ -50,15 +78,15 @@ export default async function DashboardPage() {
         action={<CreditBadge creditsRemaining={creditsRemaining} />}
       />
 
-      <Suspense fallback={<DashboardMainSkeleton />}>
-        <DashboardMain
-          userId={user.id}
-          userData={userData}
-          displayName={displayName}
-          memberSince={memberSince}
-          creditsRemaining={creditsRemaining}
-        />
-      </Suspense>
+      <DashboardWelcomeCard
+        userData={userData}
+        displayName={displayName}
+        memberSince={memberSince}
+        creditsRemaining={creditsRemaining}
+        completedCount={completedCount}
+      />
+
+      <DashboardMain rows={rows} userData={userData} />
     </>
   )
 }

@@ -187,7 +187,7 @@ export function Sidebar({
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-all duration-200"
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-none"
                       style={{
                         background: isActive
                           ? 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))'
@@ -239,7 +239,7 @@ export function Sidebar({
           type="button"
           onClick={handleLogout}
           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2
-                     text-sm font-medium transition-all duration-150"
+                     text-sm font-medium transition-[background-color,color] duration-150"
           style={{ color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = 'var(--accent-danger)15'
