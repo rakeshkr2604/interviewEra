@@ -307,7 +307,7 @@ TypeScript type-checking is the primary correctness tool. **PDF parsing** is add
 
 ## PDF parsing (production operations)
 
-- Implementation: `src/lib/pdf/parser.ts` (pdfjs-dist + `pdf-parse` fallback); requires **Node >=20.18.1** (aligned with `engines` in package.json and `pdfjs-dist` upstream).
+- Implementation: `src/lib/pdf/parser.ts` (pdfjs-dist + `pdf-parse` fallback); deploy on **Node 20.x** (see `engines` in `package.json`; pdfjs-dist upstream targets current Node 20+).
 - **Vercel logs:** filter **`[pdf-parse][diag]`**, **`[pdf-parse][attempt]`**, **`[pdf-parse][vercel]`**. Correlate **`x-vercel-id`** from the browser request with the deployment **Git SHA** and **Node version** shown in logs.
 - If parser breaks after dependency or lockfile changes: **Redeploy with “Clear build cache”** once, then redeploy normally.
 - **Dependabot branches in “Active branches”**: Vercel builds **Preview** deployments for each Git branch; Dependabot branches stay visible until merged/closed. They do **not** update Production unless the production branch tracked by the project advances. Optionally set **Ignored Build Step** for `dependabot/**` to skip Preview noise.

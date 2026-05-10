@@ -1,10 +1,10 @@
 {
   "name": "interviewera",
   "version": "0.1.0",
-  "description": "Requires Node >=20.18.1 for pdfjs-dist; resume/JD PDF pipeline uses pdfjs-dist@5.4.296 and pdf-parse@1.1.1 (see dependencies).",
+  "description": "Node 20.x (Vercel). pdfjs-dist@5.4.296 + pdf-parse@1.1.1; see dependencies.",
   "private": true,
   "engines": {
-    "node": ">=20.18.1"
+    "node": "20.x"
   },
   "scripts": {
     "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
