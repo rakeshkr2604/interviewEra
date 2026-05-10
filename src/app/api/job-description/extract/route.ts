@@ -20,6 +20,7 @@ import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits';
 import { safeText } from '@/lib/utils/sanitize';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_FILE_SIZE = MULTIPART_UPLOAD_MAX_BYTES;
@@ -62,6 +63,12 @@ function classifyPdfError(err: unknown): { code: PdfErr; message: string } {
 export async function POST(request: Request): Promise<NextResponse> {
   const reqId = randomUUID().slice(0, 8);
   const vercelReqIdHeader = request.headers.get('x-vercel-id');
+  const cl = request.headers.get('content-length');
+  console.log('[JD_EXTRACT_STAGE] request_start', {
+    reqId,
+    vercel_id: vercelReqIdHeader ?? 'n/a',
+    content_length: cl ?? 'missing',
+  });
   try {
     const supabase = await createClient();
     const {

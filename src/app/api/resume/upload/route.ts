@@ -17,15 +17,32 @@ import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
 import { normalizeExtractedDocumentText } from '@/lib/utils/sanitize';
+import {
+  isUploadDiagnosticsEnabled,
+  shouldBypassResumeParsePipeline,
+  shouldSkipResumeDbInsert,
+} from '@/lib/debug/upload-diagnostics';
 
-// pdfjs-dist is a Node-only library (Buffer + node:module). Pin the
-// runtime explicitly — never ship this on Edge, where the module would
-// fail to evaluate and we'd surface a generic 500 instead of CORRUPT.
+// pdfjs-dist is Node-only; never Edge.
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 const MAX_FILE_SIZE = MULTIPART_UPLOAD_MAX_BYTES;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
+
+/** Placeholder body when IE_UPLOAD_BYPASS_PARSE=1 — must pass assertLooksLikeResume heuristics. */
+const BYPASS_RESUME_PLACEHOLDER = `
+Resume — Debug Bypass Parse
+Work experience
+Software Engineer at ACME Corp 2021–2024
+Technical skills: JavaScript, TypeScript, React, Node.js
+Education: B.Tech Computer Science, CGPA 8.5
+Projects: Mock interview platform
+Internship at Example Labs
+Certification: AWS Cloud Practitioner
+Languages known: English, Hindi
+`.trim();
 
 const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
@@ -37,7 +54,7 @@ const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
 };
 
 type ResumeUploadPdfErrorCode =
-  PDFErrorCode
+  | PDFErrorCode
   | 'PARSER_UNAVAILABLE'
   | 'PARSER_RUNTIME';
 
@@ -72,11 +89,11 @@ function hasPdfHeader(bytes: Uint8Array): boolean {
   const scanLimit = Math.min(bytes.byteLength - 5, 1024);
   for (let i = 0; i <= scanLimit; i++) {
     if (
-      bytes[i] === 0x25 && // %
-      bytes[i + 1] === 0x50 && // P
-      bytes[i + 2] === 0x44 && // D
-      bytes[i + 3] === 0x46 && // F
-      bytes[i + 4] === 0x2d // -
+      bytes[i] === 0x25 &&
+      bytes[i + 1] === 0x50 &&
+      bytes[i + 2] === 0x44 &&
+      bytes[i + 3] === 0x46 &&
+      bytes[i + 4] === 0x2d
     ) {
       return true;
     }
@@ -84,16 +101,54 @@ function hasPdfHeader(bytes: Uint8Array): boolean {
   return false;
 }
 
+function diagPayload(stage: string, err: unknown, reqId: string): Record<string, unknown> {
+  if (!isUploadDiagnosticsEnabled()) {
+    return { error: 'Something went wrong on our side. Please try again.', code: 'INTERNAL', requestId: reqId };
+  }
+  const e = err instanceof Error ? err : new Error(String(err));
+  return {
+    ok: false,
+    stage,
+    error: e.message,
+    stack: e.stack,
+    requestId: reqId,
+    diagnostics: true,
+  };
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   const reqId = randomUUID().slice(0, 8);
   const vercelId = request.headers.get('x-vercel-id');
+
+  console.log('[UPLOAD_STAGE] request_start', { reqId, vercel_id: vercelId ?? 'n/a' });
+
+  const cl = request.headers.get('content-length');
+  if (cl) {
+    const n = Number(cl);
+    console.log('[UPLOAD_STAGE] content_length', { reqId, contentLength: cl, parsed: Number.isFinite(n) ? n : 'nan' });
+    if (Number.isFinite(n) && n > MAX_FILE_SIZE + 512 * 1024) {
+      console.warn('[UPLOAD_STAGE] content_length_reject', { reqId, n, maxReasonable: MAX_FILE_SIZE + 512 * 1024 });
+      return NextResponse.json(
+        {
+          error: 'Request body too large for this endpoint.',
+          code: 'BODY_TOO_LARGE',
+          requestId: reqId,
+        },
+        { status: 413, headers: { 'X-Request-Id': reqId } },
+      );
+    }
+  } else {
+    console.log('[UPLOAD_STAGE] content_length', { reqId, contentLength: 'missing' });
+  }
+
   try {
-    // ── Step 1: Authenticate user ─────────────────────────────────────────────
+    console.log('[UPLOAD_STAGE] auth_start', { reqId });
     const supabase = await createClient();
     const {
       data: { user },
       error: authError,
     } = await supabase.auth.getUser();
+    console.log('[UPLOAD_STAGE] auth_done', { reqId, ok: !!user, authErr: authError?.message ?? null });
 
     if (authError || !user) {
       console.warn(`[resume/upload][${reqId}] auth failed`, authError?.message);
@@ -112,8 +167,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // ── Rate limiting (5 uploads / 5 min per user) ────────────────────────────
+    console.log('[UPLOAD_STAGE] rate_limit_start', { reqId });
     const rateLimit = await checkRateLimit(`upload:${user.id}`, 300, 5);
+    console.log('[UPLOAD_STAGE] rate_limit_done', { reqId, allowed: rateLimit.allowed });
     if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: 'Too many uploads. Please wait a few minutes before trying again.' },
@@ -123,12 +179,29 @@ export async function POST(request: Request): Promise<NextResponse> {
             'Retry-After': String(rateLimit.resetInSeconds),
             'X-RateLimit-Remaining': '0',
           },
-        }
+        },
       );
     }
 
-    // ── Step 2: Validate file ──────────────────────────────────────────────────
-    const formData = await request.formData();
+    console.log('[UPLOAD_STAGE] formData_start', { reqId });
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (fdErr) {
+      console.error('[UPLOAD_STAGE] formData_error', { reqId, err: fdErr });
+      const body = isUploadDiagnosticsEnabled()
+        ? {
+            ok: false,
+            stage: 'formData',
+            error: fdErr instanceof Error ? fdErr.message : String(fdErr),
+            stack: fdErr instanceof Error ? fdErr.stack : undefined,
+            requestId: reqId,
+          }
+        : { error: 'Could not read upload body.', code: 'FORM_DATA_FAILED', requestId: reqId };
+      return NextResponse.json(body, { status: 500, headers: { 'X-Request-Id': reqId } });
+    }
+    console.log('[UPLOAD_STAGE] formData_done', { reqId });
+
     const multiErr = getMultipleFilesError(formData, 'file');
     if (multiErr) {
       return NextResponse.json({ error: multiErr }, { status: 400 });
@@ -138,6 +211,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!file || !(file instanceof File)) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
+
+    console.log('[UPLOAD_STAGE] file_meta', {
+      reqId,
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
 
     if (file.size <= 0) {
       return NextResponse.json({ error: 'The uploaded file is empty.' }, { status: 400 });
@@ -154,85 +234,123 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Some browsers (especially Save-As / Send-To-PDF flows) emit a
-    // double `.pdf.pdf` extension. Strip it before extension validation.
     const normalizedName = normalizeFileName(file.name);
     const ext = `.${normalizedName.split('.').pop()?.toLowerCase() ?? ''}`;
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return NextResponse.json(
         { error: 'Only PDF and TXT files are supported. Please upload a PDF for best results.' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // ── Step 3: Read bytes once and parse from an immutable copy ──────────────
+    console.log('[UPLOAD_STAGE] buffer_start', { reqId });
     const arrayBuffer = await file.arrayBuffer();
     const parseBytes = new Uint8Array(arrayBuffer).slice();
+    console.log('[UPLOAD_STAGE] buffer_done', { reqId, bytes: parseBytes.byteLength });
 
-    let rawText = '';
-    if (ext === '.pdf') {
-      try {
-        rawText = await extractText(parseBytes, {
-          mimeType: file.type,
-          fileNameHint: normalizedName,
-          vercelId: vercelId ?? '',
-          source: 'resume-upload',
-        });
-      } catch (err) {
-        const { code, message } = classifyPdfError(err);
-        console.error(
-          `[resume/upload][${reqId}] PDF parse failed vercel_id=${vercelId ?? 'n/a'} code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
-          err instanceof Error ? err.message : err,
-        );
-        console.error(
-          `[resume/upload][${reqId}] grep logs: [pdf-parse][diag] [pdf-parse][attempt] x-vercel-id=${vercelId ?? 'n/a'}`,
-        );
-        return NextResponse.json(
-          { error: message, code, requestId: reqId },
-          {
-            status: 422,
-            headers: {
-              'X-Request-Id': reqId,
-              ...(vercelId ? { 'X-Vercel-Id': vercelId } : {}),
+    let sanitizedRaw: string;
+
+    if (shouldBypassResumeParsePipeline()) {
+      console.warn('[UPLOAD_STAGE] BYPASS_PARSE active — skipping extraction/classifier', { reqId });
+      sanitizedRaw = normalizeExtractedDocumentText(BYPASS_RESUME_PLACEHOLDER, 400_000);
+    } else {
+      let rawText = '';
+      if (ext === '.pdf') {
+        console.log('[UPLOAD_STAGE] pdf_extract_start', { reqId });
+        try {
+          rawText = await extractText(parseBytes, {
+            mimeType: file.type,
+            fileNameHint: normalizedName,
+            vercelId: vercelId ?? '',
+            source: 'resume-upload',
+          });
+        } catch (err) {
+          const { code, message } = classifyPdfError(err);
+          console.error('[UPLOAD_STAGE] pdf_extract_error', {
+            reqId,
+            code,
+            pdf_header: hasPdfHeader(parseBytes),
+            err: err instanceof Error ? err.message : err,
+          });
+          console.error(
+            `[resume/upload][${reqId}] PDF parse failed vercel_id=${vercelId ?? 'n/a'} code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
+          );
+          return NextResponse.json(
+            { error: message, code, requestId: reqId },
+            {
+              status: 422,
+              headers: {
+                'X-Request-Id': reqId,
+                ...(vercelId ? { 'X-Vercel-Id': vercelId } : {}),
+              },
             },
+          );
+        }
+        console.log('[UPLOAD_STAGE] pdf_extract_done', { reqId, chars: rawText.length });
+      } else {
+        console.log('[UPLOAD_STAGE] txt_decode_start', { reqId });
+        rawText = new TextDecoder().decode(parseBytes);
+        console.log('[UPLOAD_STAGE] txt_decode_done', { reqId, chars: rawText.length });
+      }
+
+      sanitizedRaw = normalizeExtractedDocumentText(rawText, 400_000);
+      if (!sanitizedRaw.trim()) {
+        return NextResponse.json(
+          {
+            error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
+            code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
+            requestId: reqId,
           },
+          { status: 422, headers: { 'X-Request-Id': reqId } },
         );
       }
-    } else {
-      rawText = new TextDecoder().decode(parseBytes);
+
+      const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
+      if (!resumeDocCheck.ok) {
+        return NextResponse.json(
+          { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
+          { status: 422, headers: { 'X-Request-Id': reqId } },
+        );
+      }
     }
 
-    const sanitizedRaw = normalizeExtractedDocumentText(rawText, 400_000);
-    if (!sanitizedRaw.trim()) {
+    console.log('[UPLOAD_STAGE] createServiceClient_start', { reqId });
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (svcErr) {
+      console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, svcErr });
       return NextResponse.json(
-        {
-          error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
-          code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
-          requestId: reqId,
-        },
-        { status: 422, headers: { 'X-Request-Id': reqId } }
+        isUploadDiagnosticsEnabled()
+          ? {
+              ok: false,
+              stage: 'createServiceClient',
+              error: svcErr instanceof Error ? svcErr.message : String(svcErr),
+              stack: svcErr instanceof Error ? svcErr.stack : undefined,
+              requestId: reqId,
+            }
+          : {
+              error: 'Resume upload is temporarily unavailable.',
+              code: 'SERVER_CONFIG',
+              requestId: reqId,
+            },
+        { status: 503, headers: { 'X-Request-Id': reqId } },
       );
     }
+    console.log('[UPLOAD_STAGE] createServiceClient_done', { reqId });
 
-    const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
-    if (!resumeDocCheck.ok) {
-      return NextResponse.json(
-        { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
-        { status: 422, headers: { 'X-Request-Id': reqId } },
-      );
-    }
-
-    // ── Step 4: Upload to Supabase Storage ────────────────────────────────────
-    const serviceClient = createServiceClient();
     const timestamp = Date.now();
     const filePath = `resumes/${user.id}/${timestamp}${ext}`;
     const extForMime = ext === '.txt' ? '.txt' : '.pdf';
     const contentType = normalizedUploadContentType(file.type, extForMime);
     const uploadBytes = Buffer.from(arrayBuffer);
 
-    console.info(
-      `[resume/upload][${reqId}] stage=storage_start vercel_id=${vercelId ?? 'n/a'} user=${user.id.slice(0, 8)} bytes=${uploadBytes.length} ext=${ext} content_type=${contentType}`,
-    );
+    console.log('[UPLOAD_STAGE] storage_upload_start', {
+      reqId,
+      path: filePath,
+      bytes: uploadBytes.length,
+      contentType,
+    });
 
     const { error: storageError } = await serviceClient.storage
       .from('resumes')
@@ -241,64 +359,89 @@ export async function POST(request: Request): Promise<NextResponse> {
         upsert: false,
       });
 
+    console.log('[UPLOAD_STAGE] storage_upload_result', {
+      reqId,
+      ok: !storageError,
+      message: storageError?.message ?? null,
+      storageError: storageError ? JSON.stringify(storageError) : null,
+    });
+
     if (storageError) {
-      console.error(
-        `[resume/upload][${reqId}] stage=storage_error vercel_id=${vercelId ?? 'n/a'} message=${storageError.message}`,
-        'details:',
-        JSON.stringify(storageError),
-      );
-      return NextResponse.json(
-        {
-          error:
-            'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
-          code: 'STORAGE_FAILED',
-          requestId: reqId,
-        },
-        { status: 500, headers: { 'X-Request-Id': reqId } },
-      );
+      const base = {
+        error:
+          'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
+        code: 'STORAGE_FAILED',
+        requestId: reqId,
+        ...(isUploadDiagnosticsEnabled()
+          ? {
+              stage: 'storage_upload',
+              storageMessage: storageError.message,
+              storageDetails: storageError as unknown as Record<string, unknown>,
+            }
+          : {}),
+      };
+      return NextResponse.json(base, { status: 500, headers: { 'X-Request-Id': reqId } });
     }
 
     const {
       data: { publicUrl },
     } = serviceClient.storage.from('resumes').getPublicUrl(filePath);
 
-    // ── Step 5: Create resume record with extracted text ──────────────────────
-    console.info(`[resume/upload][${reqId}] stage=db_insert resume_path=${filePath}`);
+    if (shouldSkipResumeDbInsert()) {
+      console.warn('[UPLOAD_STAGE] IE_UPLOAD_SKIP_DB active — skipping DB insert', { reqId, filePath, publicUrl });
+      return NextResponse.json(
+        {
+          debugSkipDb: true,
+          message: 'Storage upload OK; DB insert skipped (IE_UPLOAD_SKIP_DB=1).',
+          storagePath: filePath,
+          publicUrl,
+          requestId: reqId,
+        },
+        { status: 200, headers: { 'X-Request-Id': reqId } },
+      );
+    }
 
+    console.log('[UPLOAD_STAGE] db_insert_start', { reqId });
     const { data: resume, error: insertError } = await supabase
       .from('resumes')
       .insert({ user_id: user.id, file_url: publicUrl, raw_text: sanitizedRaw, status: 'parsing' })
       .select()
       .single();
 
+    console.log('[UPLOAD_STAGE] db_insert_result', {
+      reqId,
+      ok: !insertError && !!resume,
+      insertMessage: insertError?.message ?? null,
+      insertCode: insertError?.code ?? null,
+      resumeId: resume?.id ?? null,
+    });
+
     if (insertError || !resume) {
-      console.error(`[resume/upload][${reqId}] DB insert error:`, insertError?.message);
-      return NextResponse.json(
-        {
-          error: 'Could not save your resume record. Please try again or contact support.',
-          code: 'DB_INSERT_FAILED',
-          requestId: reqId,
-        },
-        { status: 500, headers: { 'X-Request-Id': reqId } },
-      );
+      const base: Record<string, unknown> = {
+        error: 'Could not save your resume record. Please try again or contact support.',
+        code: 'DB_INSERT_FAILED',
+        requestId: reqId,
+      };
+      if (isUploadDiagnosticsEnabled()) {
+        base.stage = 'db_insert';
+        base.insertError = insertError;
+      }
+      return NextResponse.json(base, { status: 500, headers: { 'X-Request-Id': reqId } });
     }
 
-    // ── Step 6: Return resumeId immediately — AI parsing runs in /api/resume/parse
-    // This keeps the upload handler well under the serverless timeout limit.
-    console.info(`[resume/upload][${reqId}] stage=ok resume_id=${resume.id}`);
+    console.log('[UPLOAD_STAGE] ok', { reqId, resume_id: resume.id });
     return NextResponse.json({
       resumeId: resume.id,
       status: 'parsing',
       parsed: false,
     });
   } catch (err) {
-    console.error(
-      `[resume/upload][${reqId}] stage=unhandled vercel_id=${vercelId ?? 'n/a'}`,
-      err instanceof Error ? err.stack ?? err.message : err,
-    );
-    return NextResponse.json(
-      { error: 'Something went wrong on our side. Please try again.', code: 'INTERNAL', requestId: reqId },
-      { status: 500, headers: { 'X-Request-Id': reqId } },
-    );
+    console.error('[UPLOAD_STAGE] unhandled', {
+      reqId,
+      vercel_id: vercelId ?? 'n/a',
+      stack: err instanceof Error ? err.stack : undefined,
+    });
+    const body = diagPayload('unhandled', err, reqId);
+    return NextResponse.json(body, { status: 500, headers: { 'X-Request-Id': reqId } });
   }
 }

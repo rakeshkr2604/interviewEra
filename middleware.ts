@@ -89,7 +89,8 @@ export async function middleware(request: NextRequest) {
     (pathname === '/api/resume/upload' ||
       pathname === '/api/resume/parse' ||
       pathname === '/api/job-description/extract' ||
-      pathname === '/api/job-description/parse');
+      pathname === '/api/job-description/parse' ||
+      pathname.startsWith('/api/debug/'));
 
   // Next.js build chunks — never run Supabase session refresh here (perf + edge cache).
   if (
