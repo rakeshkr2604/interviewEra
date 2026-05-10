@@ -24,8 +24,14 @@ export const UPCOMING_INTERVIEW_LANGUAGE = {
 
 export function readInterviewLanguage(): InterviewLanguageCode {
   if (typeof window === 'undefined') return 'en'
-  const v = localStorage.getItem(STORAGE_KEYS.interviewLanguage)
-  return v === 'en' ? 'en' : 'en'
+  try {
+    const v = localStorage.getItem(STORAGE_KEYS.interviewLanguage)
+    if (v === 'en') return 'en'
+    return 'en'
+  } catch {
+    // localStorage can throw in restricted browser modes; keep deterministic fallback.
+    return 'en'
+  }
 }
 
 export type AnswerStyle = 'concise' | 'balanced' | 'detailed'
