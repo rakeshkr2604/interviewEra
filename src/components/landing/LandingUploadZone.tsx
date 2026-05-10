@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { FileUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
 
 interface LandingUploadZoneProps {
   isLoggedIn: boolean;
@@ -67,7 +68,7 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
       });
 
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
+        const data = await parseResponseJsonSafe<{ error?: string }>(res);
         setError(data.error ?? 'Upload failed. Please try again.');
         return;
       }

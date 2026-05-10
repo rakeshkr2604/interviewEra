@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { assertLooksLikeJobDescription } from '@/lib/documents/document-classification';
+import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean';
 import { safeText } from '@/lib/utils/sanitize';
 
 const bodySchema = z.object({
@@ -37,12 +38,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 });
     }
 
-    const check = assertLooksLikeJobDescription(parsed.data.text);
+    const raw = parsed.data.text;
+    const refined = refineJobDescriptionForUi(raw);
+    const toValidate = refined.length >= 40 ? refined : raw;
+    const check = assertLooksLikeJobDescription(toValidate);
     if (!check.ok) {
       return NextResponse.json({ error: check.message }, { status: 422 });
     }
 
-    return NextResponse.json({ ok: true });
+    const normalized = refined.length >= 40 ? refined : raw;
+    return NextResponse.json({ ok: true, text: safeText(normalized, 12_000) });
   } catch (err) {
     console.error('[job-description/validate] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

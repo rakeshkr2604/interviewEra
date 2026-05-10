@@ -83,6 +83,11 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
 
+  /** Refresh session on POST resume actions only (polling /api/resume/status would thrash Supabase). */
+  const resumeApiNeedsSession =
+    isApi &&
+    (pathname === '/api/resume/upload' || pathname === '/api/resume/parse');
+
   // Next.js build chunks — never run Supabase session refresh here (perf + edge cache).
   if (
     pathname.startsWith('/_next/static') ||
@@ -117,7 +122,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/tools/') ||
     pathname.startsWith('/blog');
   const needsAuthResolution =
-    AUTH_ROUTES.has(pathname) || (!isPublic && !isApi);
+    AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
 
   // Rate limiting — checked before auth/DB calls for efficiency
   const rateConfig = RATE_LIMITS.find(([prefix]) => pathname.startsWith(prefix));
@@ -126,6 +131,12 @@ export async function middleware(request: NextRequest) {
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     if (!checkRateLimit(`${ip}:${pathname}`, limit, windowMs)) {
+      if (isApi) {
+        return NextResponse.json(
+          { error: 'Too many requests. Please wait a minute and try again.' },
+          { status: 429, headers: { 'Retry-After': '60' } },
+        );
+      }
       return new NextResponse('Too Many Requests', {
         status: 429,
         headers: { 'Retry-After': '60' },

@@ -82,6 +82,22 @@ export interface ParsedResume {
   target_roles: string[];
 }
 
+/** Structured JD used for interview personalization (mirrors resume-style parsing). */
+export interface ParsedJobDescription {
+  role_title: string;
+  company_employer: string;
+  location: string;
+  employment_type: string;
+  about_role: string;
+  responsibilities: string[];
+  requirements: string[];
+  must_have: string[];
+  nice_to_have: string[];
+  skills_keywords: string[];
+  education_eligibility: string[];
+  compensation_notes: string;
+}
+
 export interface Resume {
   id: string;
   user_id: string;

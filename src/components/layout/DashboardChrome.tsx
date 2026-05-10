@@ -111,20 +111,20 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             'ie-landing-premium ie-landing-type relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
-            isOnboarding ? 'overflow-hidden' : 'overflow-y-auto',
+            isOnboarding ? 'max-lg:overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
           )}
           style={{
             background: 'var(--page-gradient)',
             color: 'var(--text-primary)',
-            ...(isOnboarding ? {} : { scrollbarGutter: 'stable' }),
+            scrollbarGutter: isOnboarding ? 'auto' : 'stable',
           }}
         >
           <div
             className={cn(
-              'relative flex min-h-0 min-w-0 flex-1 flex-col px-4 sm:px-5',
+              'relative flex min-h-0 min-w-0 flex-col px-4 sm:px-5',
               isOnboarding
-                ? 'overflow-hidden py-3 md:py-4'
-                : 'py-8 sm:py-10 md:py-12',
+                ? 'flex-1 py-2 md:py-3 lg:py-1.5 lg:pt-2'
+                : 'flex-1 py-8 sm:py-10 md:py-12',
               LANDING_PAGE_CONTAINER,
             )}
           >

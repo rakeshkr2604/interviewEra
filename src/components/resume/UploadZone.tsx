@@ -3,6 +3,7 @@
 import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
+import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
 import type { ParsedResume } from '@/types/app.types';
 
 type UploadStatus = 'idle' | 'uploading' | 'extracting' | 'parsing' | 'success' | 'error';
@@ -74,7 +75,7 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
         clearTimeout(t2);
 
         if (!res.ok) {
-          const data = (await res.json()) as UploadErrorResponse;
+          const data = await parseResponseJsonSafe<UploadErrorResponse>(res);
           setStatus('error');
           if (data.code === 'PARSER_UNAVAILABLE') {
             setErrorMessage(
@@ -87,7 +88,10 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
           return;
         }
 
-        const data = (await res.json()) as { parsedSummary: ParsedSummary | null; parsed: boolean };
+        const data = await parseResponseJsonSafe<{
+          parsedSummary: ParsedSummary | null;
+          parsed: boolean;
+        }>(res);
         if (data.parsedSummary) {
           setParsedSummary(data.parsedSummary);
         }

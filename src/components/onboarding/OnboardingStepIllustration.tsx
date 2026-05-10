@@ -3,6 +3,7 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /** Step art in public/onboarding/ */
 const STEP_SRC: Record<number, string> = {
@@ -20,10 +21,10 @@ const STEP_ALT: Record<number, string> = {
 /** Encouraging copy beside the art — high signal, high energy */
 const STEP_COPY: Record<number, { title: string; bullets: string[] }> = {
   1: {
-    title: 'Start strong — pick the lane you are training for',
+    title: 'Goal first — then role and style on the next beat',
     bullets: [
-      'We calibrate tone and difficulty to fresher, job switch, promotion, or general reps.',
-      'No wrong choice: run another round anytime. This one should match today’s goal.',
+      'We calibrate the session to what you are practicing for today.',
+      'Voice and language stay in sync with Settings unless you change them here.',
     ],
   },
   2: {
@@ -34,19 +35,21 @@ const STEP_COPY: Record<number, { title: string; bullets: string[] }> = {
     ],
   },
   3: {
-    title: 'Your resume is the blueprint — we build questions from it',
+    title: 'One upload — questions that feel like a real screen',
     bullets: [
-      'Skills and projects become prompts that feel like a real screen, not generic trivia.',
-      'PDF or TXT is fine; clear sections help us pull the right signal fast.',
+      'Skills and projects become prompts tied to your CV.',
+      'JD is optional; skip it for a fast repeat run.',
     ],
   },
 }
 
 type Props = {
   step: number
+  /** Shorter art + no copy card — saves height beside the form on desktop */
+  compact?: boolean
 }
 
-export function OnboardingStepIllustration({ step }: Props) {
+export function OnboardingStepIllustration({ step, compact = false }: Props) {
   const [broken, setBroken] = useState(false)
   const src = STEP_SRC[step] ?? STEP_SRC[1]
   const alt = STEP_ALT[step] ?? STEP_ALT[1]
@@ -71,43 +74,55 @@ export function OnboardingStepIllustration({ step }: Props) {
   }
 
   return (
-    <div className="flex w-full max-w-md flex-col items-center gap-3 sm:max-w-lg sm:gap-4 lg:max-w-none">
+    <div
+      className={cn(
+        'flex w-full max-w-md flex-col items-center gap-3 sm:max-w-lg sm:gap-4 lg:max-w-none',
+        compact && 'gap-2 lg:gap-2',
+      )}
+    >
       <div className="relative flex w-full justify-center">
         <Image
           src={src}
           alt={alt}
           width={640}
           height={480}
-          sizes="(max-width: 1024px) min(100vw - 2rem, 28rem), min(40vw, 36rem)"
-          className="h-auto w-full max-w-[min(100%,20rem)] object-contain select-none sm:max-w-[min(100%,22rem)] lg:max-w-[min(100%,24rem)]"
+          sizes={compact ? '(max-width: 1024px) min(100vw - 2rem, 28rem), 14rem' : '(max-width: 1024px) min(100vw - 2rem, 28rem), min(40vw, 36rem)'}
+          className={cn(
+            'h-auto w-full object-contain select-none',
+            compact
+              ? 'max-w-[min(100%,17rem)] sm:max-w-[min(100%,19rem)] lg:max-w-[13rem]'
+              : 'max-w-[min(100%,20rem)] sm:max-w-[min(100%,22rem)] lg:max-w-[min(100%,24rem)]',
+          )}
           style={{ width: '100%', height: 'auto' }}
           priority={step === 1}
           onError={() => setBroken(true)}
         />
       </div>
 
-      <section
-        className="w-full rounded-2xl border border-(--card-border) border-l-[3px] border-l-(--accent-primary)/50 bg-(--bg-secondary)/90 px-4 py-3.5 shadow-sm sm:px-5 sm:py-4"
-        aria-labelledby={headingId}
-      >
-        <h2
-          id={headingId}
-          className="text-base font-semibold leading-snug text-(--text-primary)"
+      {compact ? null : (
+        <section
+          className="w-full rounded-2xl border border-(--card-border) border-l-[3px] border-l-(--accent-primary)/50 bg-(--bg-secondary)/90 px-4 py-3.5 shadow-sm sm:px-5 sm:py-4"
+          aria-labelledby={headingId}
         >
-          {copy.title}
-        </h2>
-        <ul className="mt-2.5 space-y-2 text-sm leading-relaxed text-(--text-secondary)">
-          {copy.bullets.map(line => (
-            <li key={line} className="flex gap-2.5">
-              <span
-                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent-primary)"
-                aria-hidden
-              />
-              <span>{line}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <h2
+            id={headingId}
+            className="text-base font-semibold leading-snug text-(--text-primary)"
+          >
+            {copy.title}
+          </h2>
+          <ul className="mt-2.5 space-y-2 text-sm leading-relaxed text-(--text-secondary)">
+            {copy.bullets.map(line => (
+              <li key={line} className="flex gap-2.5">
+                <span
+                  className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent-primary)"
+                  aria-hidden
+                />
+                <span>{line}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   )
 }
