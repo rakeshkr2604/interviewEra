@@ -234,14 +234,14 @@ export default function OnboardingPage() {
       const formData = new FormData()
       formData.append('file', resumeFile)
 
-      const { ok, status, data: result } = await fetchMultipartJson<ApiErr & { resumeId?: string }>(
+      const { ok, status, data: result, requestId: reqIdMeta } = await fetchMultipartJson<ApiErr & { resumeId?: string }>(
         '/api/resume/upload',
         formData,
       )
 
       if (!ok) {
         setResumeState('failed')
-        const rid = result.requestId
+        const rid = reqIdMeta ?? result.requestId
         if (status === 413) {
           setError(withRequestRef('Upload was rejected as too large. Use a file under 4 MB or paste text.', rid))
           return
@@ -350,13 +350,13 @@ export default function OnboardingPage() {
     try {
       const fd = new FormData()
       fd.append('file', jdFile)
-      const { ok, status, data: payload } = await fetchMultipartJson<ApiErr & { text?: string }>(
+      const { ok, status, data: payload, requestId: reqIdMeta } = await fetchMultipartJson<ApiErr & { text?: string }>(
         '/api/job-description/extract',
         fd,
       )
 
       if (!ok) {
-        const rid = payload.requestId
+        const rid = reqIdMeta ?? payload.requestId
         if (status === 413) {
           setJdExtractError(withRequestRef('This file is too large to upload (max 4 MB). Paste the text instead.', rid))
           return

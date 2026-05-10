@@ -136,9 +136,14 @@ export async function middleware(request: NextRequest) {
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
     if (!checkRateLimit(`${ip}:${pathname}`, limit, windowMs)) {
       if (isApi) {
+        const reqId = crypto.randomUUID().slice(0, 8);
         return NextResponse.json(
-          { error: 'Too many requests. Please wait a minute and try again.' },
-          { status: 429, headers: { 'Retry-After': '60' } },
+          {
+            error: 'Too many requests. Please wait a minute and try again.',
+            code: 'RATE_LIMITED',
+            requestId: reqId,
+          },
+          { status: 429, headers: { 'Retry-After': '60', 'X-Request-Id': reqId } },
         );
       }
       return new NextResponse('Too Many Requests', {

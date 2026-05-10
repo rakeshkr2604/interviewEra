@@ -68,6 +68,53 @@ const PDF_PARSER_INFRA_MESSAGES: Pick<
     'Could not finish reading this PDF on our servers yet. Retry once — if it persists, re-export as PDF from Word/Canva or upload a .txt resume.',
 };
 
+function withReqId(reqId: string, headers?: Record<string, string>): Record<string, string> {
+  return { 'X-Request-Id': reqId, ...headers };
+}
+
+function jsonWithReq<T extends Record<string, unknown>>(
+  body: T,
+  status: number,
+  reqId: string,
+  extraHeaders?: Record<string, string>,
+): NextResponse {
+  return NextResponse.json(
+    { ...body, requestId: reqId },
+    { status, headers: withReqId(reqId, extraHeaders) },
+  );
+}
+
+/** Pick single upload from `file` or `resume` (multipart); both non-empty → error. */
+function getSingleUploadedFile(formData: FormData): { file: File } | { error: string; code: string } {
+  const multiA = getMultipleFilesError(formData, 'file');
+  const multiB = getMultipleFilesError(formData, 'resume');
+  if (multiA) return { error: multiA, code: 'MULTIPLE_FILES' };
+  if (multiB) return { error: multiB, code: 'MULTIPLE_FILES' };
+
+  const a = formData.get('file');
+  const b = formData.get('resume');
+  const fileA = a instanceof File && a.size > 0 ? a : null;
+  const fileB = b instanceof File && b.size > 0 ? b : null;
+
+  if (fileA && fileB) {
+    return {
+      error: 'Use a single upload field (`file` or `resume`), not both.',
+      code: 'MULTIPLE_FILE_FIELDS',
+    };
+  }
+
+  const file =
+    fileA ??
+    fileB ??
+    (a instanceof File ? a : null) ??
+    (b instanceof File ? b : null);
+
+  if (!file || !(file instanceof File)) {
+    return { error: 'No file provided', code: 'NO_FILE' };
+  }
+  return { file };
+}
+
 function classifyPdfError(err: unknown): { code: ResumeUploadPdfErrorCode; message: string } {
   if (err instanceof PDFParserUnavailableError) {
     return {
@@ -129,13 +176,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.log('[UPLOAD_STAGE] content_length', { reqId, contentLength: cl, parsed: Number.isFinite(n) ? n : 'nan' });
     if (Number.isFinite(n) && n > MAX_FILE_SIZE + 512 * 1024) {
       console.warn('[UPLOAD_STAGE] content_length_reject', { reqId, n, maxReasonable: MAX_FILE_SIZE + 512 * 1024 });
-      return NextResponse.json(
+      return jsonWithReq(
         {
           error: 'Request body too large for this endpoint.',
           code: 'BODY_TOO_LARGE',
-          requestId: reqId,
         },
-        { status: 413, headers: { 'X-Request-Id': reqId } },
+        413,
+        reqId,
       );
     }
   } else {
@@ -153,18 +200,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (authError || !user) {
       console.warn(`[resume/upload][${reqId}] auth failed`, authError?.message);
-      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED', requestId: reqId }, { status: 401 });
+      return jsonWithReq({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401, reqId);
     }
 
     if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
       console.error(`[resume/upload][${reqId}] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY`);
-      return NextResponse.json(
+      return jsonWithReq(
         {
           error: 'Resume upload is temporarily unavailable. Please try again later.',
           code: 'SERVER_CONFIG',
-          requestId: reqId,
         },
-        { status: 503, headers: { 'X-Request-Id': reqId } },
+        503,
+        reqId,
       );
     }
 
@@ -172,14 +219,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     const rateLimit = await checkRateLimit(`upload:${user.id}`, 300, 5);
     console.log('[UPLOAD_STAGE] rate_limit_done', { reqId, allowed: rateLimit.allowed });
     if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many uploads. Please wait a few minutes before trying again.' },
+      return jsonWithReq(
         {
-          status: 429,
-          headers: {
-            'Retry-After': String(rateLimit.resetInSeconds),
-            'X-RateLimit-Remaining': '0',
-          },
+          error: 'Too many uploads. Please wait a few minutes before trying again.',
+          code: 'UPLOAD_RATE_LIMIT',
+        },
+        429,
+        reqId,
+        {
+          'Retry-After': String(rateLimit.resetInSeconds),
+          'X-RateLimit-Remaining': '0',
         },
       );
     }
@@ -190,21 +239,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       serviceClient = createServiceClient();
     } catch (svcErr) {
       console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, svcErr });
-      return NextResponse.json(
+      return jsonWithReq(
         isUploadDiagnosticsEnabled()
           ? {
               ok: false,
               stage: 'createServiceClient',
               error: svcErr instanceof Error ? svcErr.message : String(svcErr),
               stack: svcErr instanceof Error ? svcErr.stack : undefined,
-              requestId: reqId,
             }
           : {
               error: 'Resume upload is temporarily unavailable.',
               code: 'SERVER_CONFIG',
-              requestId: reqId,
             },
-        { status: 503, headers: { 'X-Request-Id': reqId } },
+        503,
+        reqId,
       );
     }
     console.log('[UPLOAD_STAGE] createServiceClient_done', { reqId });
@@ -218,17 +266,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         code: ensured.code,
         message: ensured.message,
       });
-      return NextResponse.json(
+      return jsonWithReq(
         {
           error:
             'Your account profile is still syncing. Sign out, sign in again, then retry — or contact support if this persists.',
           code: 'USER_PROFILE_MISSING',
-          requestId: reqId,
           ...(isUploadDiagnosticsEnabled()
             ? { stage: 'ensure_public_user', details: ensured.message }
             : {}),
         },
-        { status: 503, headers: { 'X-Request-Id': reqId } },
+        503,
+        reqId,
       );
     }
 
@@ -244,22 +292,24 @@ export async function POST(request: Request): Promise<NextResponse> {
             stage: 'formData',
             error: fdErr instanceof Error ? fdErr.message : String(fdErr),
             stack: fdErr instanceof Error ? fdErr.stack : undefined,
-            requestId: reqId,
           }
-        : { error: 'Could not read upload body.', code: 'FORM_DATA_FAILED', requestId: reqId };
-      return NextResponse.json(body, { status: 500, headers: { 'X-Request-Id': reqId } });
+        : { error: 'Could not read upload body.', code: 'FORM_DATA_FAILED' };
+      return jsonWithReq(body as Record<string, unknown>, 500, reqId);
     }
     console.log('[UPLOAD_STAGE] formData_done', { reqId });
 
-    const multiErr = getMultipleFilesError(formData, 'file');
-    if (multiErr) {
-      return NextResponse.json({ error: multiErr }, { status: 400 });
+    const picked = getSingleUploadedFile(formData);
+    if ('error' in picked) {
+      return jsonWithReq(
+        {
+          error: picked.error,
+          code: picked.code,
+        },
+        400,
+        reqId,
+      );
     }
-    const file = formData.get('file');
-
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
+    const { file } = picked;
 
     console.log('[UPLOAD_STAGE] file_meta', {
       reqId,
@@ -269,26 +319,30 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (file.size <= 0) {
-      return NextResponse.json({ error: 'The uploaded file is empty.' }, { status: 400 });
+      return jsonWithReq({ error: 'The uploaded file is empty.', code: 'EMPTY_FILE' }, 400, reqId);
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json(
+      return jsonWithReq(
         {
           error: `File exceeds ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))} MB limit. Export a smaller PDF or use .txt.`,
           code: 'FILE_TOO_LARGE',
-          requestId: reqId,
         },
-        { status: 400, headers: { 'X-Request-Id': reqId } },
+        400,
+        reqId,
       );
     }
 
     const normalizedName = normalizeFileName(file.name);
     const ext = `.${normalizedName.split('.').pop()?.toLowerCase() ?? ''}`;
     if (!ALLOWED_EXTENSIONS.has(ext)) {
-      return NextResponse.json(
-        { error: 'Only PDF and TXT files are supported. Please upload a PDF for best results.' },
-        { status: 400 },
+      return jsonWithReq(
+        {
+          error: 'Only PDF and TXT files are supported. Please upload a PDF for best results.',
+          code: 'UNSUPPORTED_EXT',
+        },
+        400,
+        reqId,
       );
     }
 
@@ -324,16 +378,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           console.error(
             `[resume/upload][${reqId}] PDF parse failed vercel_id=${vercelId ?? 'n/a'} code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
           );
-          return NextResponse.json(
-            { error: message, code, requestId: reqId },
-            {
-              status: 422,
-              headers: {
-                'X-Request-Id': reqId,
-                ...(vercelId ? { 'X-Vercel-Id': vercelId } : {}),
-              },
-            },
-          );
+          return jsonWithReq({ error: message, code }, 422, reqId, vercelId ? { 'X-Vercel-Id': vercelId } : undefined);
         }
         console.log('[UPLOAD_STAGE] pdf_extract_done', { reqId, chars: rawText.length });
       } else {
@@ -344,21 +389,22 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       sanitizedRaw = normalizeExtractedDocumentText(rawText, 400_000);
       if (!sanitizedRaw.trim()) {
-        return NextResponse.json(
+        return jsonWithReq(
           {
             error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
             code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
-            requestId: reqId,
           },
-          { status: 422, headers: { 'X-Request-Id': reqId } },
+          422,
+          reqId,
         );
       }
 
       const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
       if (!resumeDocCheck.ok) {
-        return NextResponse.json(
-          { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
-          { status: 422, headers: { 'X-Request-Id': reqId } },
+        return jsonWithReq(
+          { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE' },
+          422,
+          reqId,
         );
       }
     }
@@ -391,20 +437,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (storageError) {
-      const base = {
-        error:
-          'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
-        code: 'STORAGE_FAILED',
-        requestId: reqId,
-        ...(isUploadDiagnosticsEnabled()
-          ? {
-              stage: 'storage_upload',
-              storageMessage: storageError.message,
-              storageDetails: storageError as unknown as Record<string, unknown>,
-            }
-          : {}),
-      };
-      return NextResponse.json(base, { status: 500, headers: { 'X-Request-Id': reqId } });
+      return jsonWithReq(
+        {
+          error:
+            'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
+          code: 'STORAGE_FAILED',
+          ...(isUploadDiagnosticsEnabled()
+            ? {
+                stage: 'storage_upload',
+                storageMessage: storageError.message,
+                storageDetails: storageError as unknown as Record<string, unknown>,
+              }
+            : {}),
+        },
+        500,
+        reqId,
+      );
     }
 
     const {
@@ -413,20 +461,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (shouldSkipResumeDbInsert()) {
       console.warn('[UPLOAD_STAGE] IE_UPLOAD_SKIP_DB active — skipping DB insert', { reqId, filePath, publicUrl });
-      return NextResponse.json(
+      return jsonWithReq(
         {
           debugSkipDb: true,
           message: 'Storage upload OK; DB insert skipped (IE_UPLOAD_SKIP_DB=1).',
           storagePath: filePath,
           publicUrl,
-          requestId: reqId,
         },
-        { status: 200, headers: { 'X-Request-Id': reqId } },
+        200,
+        reqId,
       );
     }
 
     console.log('[UPLOAD_STAGE] db_insert_start', { reqId });
-    const { data: resume, error: insertError } = await supabase
+    const { data: resume, error: insertError } = await serviceClient
       .from('resumes')
       .insert({ user_id: user.id, file_url: publicUrl, raw_text: sanitizedRaw, status: 'parsing' })
       .select()
@@ -455,15 +503,19 @@ export async function POST(request: Request): Promise<NextResponse> {
         base.stage = 'db_insert';
         base.insertError = insertError;
       }
-      return NextResponse.json(base, { status: 500, headers: { 'X-Request-Id': reqId } });
+      return jsonWithReq(base as Record<string, unknown>, 500, reqId);
     }
 
     console.log('[UPLOAD_STAGE] ok', { reqId, resume_id: resume.id });
-    return NextResponse.json({
-      resumeId: resume.id,
-      status: 'parsing',
-      parsed: false,
-    });
+    return jsonWithReq(
+      {
+        resumeId: resume.id,
+        status: 'parsing',
+        parsed: false,
+      },
+      200,
+      reqId,
+    );
   } catch (err) {
     console.error('[UPLOAD_STAGE] unhandled', {
       reqId,
@@ -471,6 +523,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       stack: err instanceof Error ? err.stack : undefined,
     });
     const body = diagPayload('unhandled', err, reqId);
-    return NextResponse.json(body, { status: 500, headers: { 'X-Request-Id': reqId } });
+    return jsonWithReq(body, 500, reqId);
   }
 }

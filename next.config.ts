@@ -19,6 +19,10 @@ function pdfTraceGlobs(): string[] {
 const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
+    /** App Router + multipart uploads: default ~1 MB body — PDFs fail before the handler with HTML/plain errors. Keep ≤ Vercel ~4.5 MB. */
+    serverActions: {
+      bodySizeLimit: '4.5mb',
+    },
   },
   webpack: (config) => config,
   turbopack: {},
