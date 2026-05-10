@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeExtractedDocumentText, safeText, stripHtml } from '@/lib/utils/sanitize';
+import { normalizeExtractedDocumentText } from '@/lib/utils/normalize-extracted-document-text';
+import { safeText, stripHtml } from '@/lib/utils/sanitize';
 
 describe('sanitize', () => {
   it('stripHtml removes tags', () => {

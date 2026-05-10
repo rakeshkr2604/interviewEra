@@ -17,7 +17,7 @@ import {
 import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
-import { normalizeExtractedDocumentText } from '@/lib/utils/sanitize';
+import { normalizeExtractedDocumentText } from '@/lib/utils/normalize-extracted-document-text';
 import {
   isUploadDiagnosticsEnabled,
   shouldBypassResumeParsePipeline,
