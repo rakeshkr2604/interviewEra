@@ -17,6 +17,7 @@ import { useResolvedInterviewSetupPreferences } from '@/lib/interview/use-resolv
 import { getInterviewerById } from '@/lib/config/interviewers'
 import { SINGLE_FILE_UPLOAD_MESSAGE } from '@/lib/http/form-data-single-file'
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json'
+import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
 import { ParsedJobDescriptionSections } from '@/components/onboarding/ParsedJobDescriptionSections'
@@ -81,6 +82,7 @@ export default function OnboardingPage() {
   const [parsedJd, setParsedJd] = useState<ParsedJobDescription | null>(null)
   const [jdParseStatus, setJdParseStatus] = useState<JdParseStatus>('idle')
   const [jdParseError, setJdParseError] = useState('')
+  const [jdExtractError, setJdExtractError] = useState('')
   const [jdShowRawEditor, setJdShowRawEditor] = useState(false)
   const jdParseSeq = useRef(0)
 
@@ -128,7 +130,7 @@ export default function OnboardingPage() {
         credentials: 'include',
         body: JSON.stringify({ text: base.slice(0, 12_000) }),
       })
-      const data = (await res.json()) as { parsed?: ParsedJobDescription; error?: string }
+      const data = await parseResponseJsonSafe<{ parsed?: ParsedJobDescription; error?: string }>(res)
       if (seq !== jdParseSeq.current) return
       if (!res.ok) {
         setParsedJd(null)
@@ -210,33 +212,33 @@ export default function OnboardingPage() {
     setResumeState('uploading')
     setError('')
     setParsedResume(null)
-    setStatusMessage('Processing your resume... this may take a few seconds')
+    setStatusMessage('Sending your file securely…')
 
     try {
       const formData = new FormData()
       formData.append('file', resumeFile)
 
-      const res = await fetch('/api/resume/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include',
-      })
-
-      const result = await parseResponseJsonSafe<{
+      const { ok, status, data: result } = await fetchMultipartJson<{
         resumeId?: string
-        parsedSummary?: { skills?: string[] } | null
         error?: string
-        code?: 'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED'
-      }>(res)
+        code?: string
+      }>('/api/resume/upload', formData)
 
-      if (!res.ok) {
+      if (!ok) {
         setResumeState('failed')
         setError(
           result.error ??
-            (res.status >= 500
-              ? 'Server error while uploading. Please try again.'
-              : 'Resume upload failed. Please try again.'),
+            (status === 401
+              ? 'Your session expired. Refresh the page and sign in again.'
+              : status === 429
+                ? 'Too many uploads. Please wait a minute and try again.'
+                : status >= 500
+                  ? 'Our servers could not finish the upload. Please try again in a moment.'
+                  : 'Resume upload failed. Please try again.'),
         )
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[onboarding] resume upload failed', status, result)
+        }
         return
       }
 
@@ -252,14 +254,16 @@ export default function OnboardingPage() {
       void fetch('/api/resume/parse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ resumeId: result.resumeId }),
       })
 
       setResumeState('processing')
       setStatusMessage('Analyzing your resume — usually takes 10–20 seconds…')
-    } catch {
+    } catch (e) {
       setResumeState('failed')
-      setError('Resume upload failed. Please try again.')
+      setError('Could not reach the server. Check your connection and try again.')
+      if (process.env.NODE_ENV === 'development') console.warn('[onboarding] resume upload', e)
     }
   }
 
@@ -283,14 +287,28 @@ export default function OnboardingPage() {
   const handleJdExtract = async () => {
     if (!jdFile || jdExtractLoading) return
     setJdExtractLoading(true)
+    setJdExtractError('')
     setStartError('')
     try {
       const fd = new FormData()
       fd.append('file', jdFile)
-      const res = await fetch('/api/job-description/extract', { method: 'POST', body: fd })
-      const payload = (await res.json()) as { text?: string; error?: string }
-      if (!res.ok) {
-        setStartError(payload.error ?? 'Could not read job description file.')
+      const { ok, status, data: payload } = await fetchMultipartJson<{
+        text?: string
+        error?: string
+      }>('/api/job-description/extract', fd)
+
+      if (!ok) {
+        setJdExtractError(
+          payload.error ??
+            (status === 401
+              ? 'Your session expired. Refresh the page and sign in again.'
+              : status === 429
+                ? 'Too many requests. Please wait a minute.'
+                : 'Could not read this file. Try pasting the job text, or use a .txt export.'),
+        )
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[onboarding] JD extract failed', status, payload)
+        }
         return
       }
       if (payload.text) {
@@ -298,15 +316,16 @@ export default function OnboardingPage() {
         setJdShowRawEditor(false)
       }
       setJdFile(null)
-    } catch {
-      setStartError('Network error while reading the job description file.')
+    } catch (e) {
+      setJdExtractError('Could not read the job description file. Check your connection and try again.')
+      if (process.env.NODE_ENV === 'development') console.warn('[onboarding] JD extract', e)
     } finally {
       setJdExtractLoading(false)
     }
   }
 
   const handleStartInterview = async () => {
-    if (!allChecked || startLoading) return
+    if (startLoading) return
     setStartLoading(true)
     setStartError('')
 
@@ -323,9 +342,10 @@ export default function OnboardingPage() {
         const vr = await fetch('/api/job-description/validate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ text: jdTrim.slice(0, 12_000) }),
         })
-        const vd = (await vr.json().catch(() => ({}))) as { error?: string; text?: string }
+        const vd = await parseResponseJsonSafe<{ error?: string; text?: string }>(vr)
         if (!vr.ok) {
           setStartError(vd.error ?? 'Job description does not look like a valid JD. Fix it or clear the field.')
           setStartLoading(false)
@@ -347,6 +367,7 @@ export default function OnboardingPage() {
       const response = await fetch('/api/interview/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           resumeId: data.resumeId,
           role: data.role.trim(),
@@ -388,11 +409,7 @@ export default function OnboardingPage() {
   const showSuccess = resumeState === 'parsed'
 
   const canBegin =
-    showSuccess &&
-    allChecked &&
-    data.goal !== null &&
-    data.resumeId !== null &&
-    data.interviewerId !== null
+    showSuccess && data.goal !== null && data.resumeId !== null && data.interviewerId !== null
 
   const interviewerName = getInterviewerById(data.interviewerId)?.name ?? resolved.interviewerName
   const voiceIsSettingsDefault = data.interviewerId === resolved.interviewerId
@@ -629,6 +646,7 @@ export default function OnboardingPage() {
                         onChange={(e) => {
                           setJdText(e.target.value)
                           setStartError('')
+                          setJdExtractError('')
                         }}
                         onBlur={() => {
                           const t = jdText.trim()
@@ -735,6 +753,7 @@ export default function OnboardingPage() {
                                 setParsedJd(null)
                                 setJdParseStatus('idle')
                                 setJdParseError('')
+                                setJdExtractError('')
                                 setJdShowRawEditor(false)
                                 setStartError('')
                               }}
@@ -764,6 +783,7 @@ export default function OnboardingPage() {
                           }
                           setJdFile(files?.[0] ?? null)
                           setStartError('')
+                          setJdExtractError('')
                         }}
                       />
                       Upload file
@@ -784,74 +804,95 @@ export default function OnboardingPage() {
                       Reading text from your file — usually a few seconds.
                     </p>
                   ) : null}
+                  {jdExtractError ? (
+                    <p className="mt-1.5 text-[11px] text-(--accent-danger)" role="alert">
+                      {jdExtractError}
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <div className="flex min-h-0 flex-col gap-3 lg:gap-2">
-                <p className="text-center text-[11px] leading-snug text-(--text-muted) sm:text-left lg:text-left">
-                  This run:{' '}
-                  <span className="font-medium text-(--text-primary)">
-                    {difficultyQuestionCount(difficulty)} questions
-                  </span>
-                  , ~60s each, voice + captions — skips, feedback, then your report.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border border-(--card-border) bg-(--bg-secondary)/40 px-3 py-2 lg:py-1.5">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-(--text-muted)">Level</span>
-                  <div className="flex flex-1 flex-wrap gap-1.5">
-                    {(['easy', 'medium', 'hard'] as const).map((level) => (
-                      <button
-                        key={level}
-                        type="button"
-                        onClick={() => {
-                          setDifficulty(level)
-                          setDifficultyTouched(true)
-                          setStartError('')
-                        }}
-                        className={cn(
-                          'rounded-lg border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors',
-                          difficulty === level
-                            ? 'border-(--accent-primary) bg-(--accent-primary) text-white'
-                            : 'border-(--card-border) bg-(--card-bg) text-(--text-secondary) hover:border-(--accent-primary)/40',
-                        )}
-                      >
-                        {level}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-                    {difficultyTouched ? (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          refreshResolvedPreferences()
-                          setDifficulty(readDefaultDifficulty())
-                          setDifficultyTouched(false)
-                          setStartError('')
-                        }}
-                        className="text-[10px] font-medium text-(--text-muted) underline hover:text-(--text-primary)"
-                      >
-                        Match Settings
-                      </button>
-                    ) : null}
+                <div className="rounded-xl border border-(--card-border) bg-(--bg-secondary)/40 px-3 py-2.5 lg:py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-(--text-muted)">This session</p>
+                  <p className="mt-1 text-xs text-(--text-primary)">
+                    <span className="font-medium capitalize">{difficulty}</span>
+                    <span className="text-(--text-muted)">
+                      {' '}
+                      · {difficultyTouched ? 'overridden for this run' : 'from Settings'}
+                      {' · '}
+                    </span>
+                    <span className="font-medium">{interviewerName}</span>
+                  </p>
+                  <p className="mt-1 text-[11px] leading-snug text-(--text-muted)">
+                    {difficultyQuestionCount(difficulty)} questions, ~60s each, voice and captions — then your report.
+                  </p>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setStartError('')
+                        setStep(1)
+                      }}
+                      className="rounded-lg border border-(--card-border) bg-(--card-bg) px-2.5 py-1 text-[10px] font-semibold text-(--text-primary) hover:border-(--accent-primary)/40"
+                    >
+                      Edit goal &amp; voice
+                    </button>
                     <Link
                       href="/settings"
-                      className="inline-flex items-center gap-1 rounded-lg border border-(--card-border) bg-(--card-bg) px-2 py-1 text-[10px] font-semibold text-(--text-primary) hover:border-(--accent-primary)/40 hover:text-(--accent-primary)"
+                      className="inline-flex items-center gap-1 rounded-lg border border-(--card-border) bg-(--card-bg) px-2.5 py-1 text-[10px] font-semibold text-(--text-primary) hover:border-(--accent-primary)/40 hover:text-(--accent-primary)"
                     >
                       <Settings className="size-3 opacity-80" aria-hidden />
-                      Settings
+                      All preferences
                     </Link>
                   </div>
+                  <details className="mt-2.5 rounded-lg border border-(--card-border) bg-(--card-bg) px-2.5 py-2">
+                    <summary className="cursor-pointer select-none text-[10px] font-semibold text-(--text-secondary)">
+                      Difficulty for this run only
+                    </summary>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <div className="flex flex-1 flex-wrap gap-1.5">
+                        {(['easy', 'medium', 'hard'] as const).map((level) => (
+                          <button
+                            key={level}
+                            type="button"
+                            onClick={() => {
+                              setDifficulty(level)
+                              setDifficultyTouched(true)
+                              setStartError('')
+                            }}
+                            className={cn(
+                              'rounded-lg border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors',
+                              difficulty === level
+                                ? 'border-(--accent-primary) bg-(--accent-primary) text-white'
+                                : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary) hover:border-(--accent-primary)/40',
+                            )}
+                          >
+                            {level}
+                          </button>
+                        ))}
+                      </div>
+                      {difficultyTouched ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            refreshResolvedPreferences()
+                            setDifficulty(readDefaultDifficulty())
+                            setDifficultyTouched(false)
+                            setStartError('')
+                          }}
+                          className="text-[10px] font-medium text-(--text-muted) underline hover:text-(--text-primary)"
+                        >
+                          Match Settings
+                        </button>
+                      ) : null}
+                    </div>
+                  </details>
                 </div>
-
-                <p className="text-[11px] text-(--text-muted)">
-                  Voice: <span className="font-medium text-(--text-primary)">{interviewerName}</span>
-                  {voiceIsSettingsDefault ? ' (Settings)' : ' (custom)'} — change on step 1 if needed.
-                </p>
 
                 <div className="rounded-xl border border-(--card-border) bg-(--card-bg)/30 p-2.5 lg:p-2">
                   <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-(--text-secondary)">
-                    Ready in 3 taps
+                    Before you start (recommended)
                   </p>
                   <BriefingChecklist compact variant="quick" onAllChecked={setAllChecked} />
                 </div>
@@ -874,8 +915,8 @@ export default function OnboardingPage() {
 
           <div className="mt-0 shrink-0 space-y-2 border-t border-(--card-border)/80 bg-[color-mix(in_srgb,var(--card-bg)_88%,transparent)] px-4 py-3 text-center sm:px-6 sm:py-3 lg:rounded-b-[inherit]">
             {showSuccess && !allChecked ? (
-              <p className="text-center text-xs font-medium text-(--text-muted) sm:text-left">
-                Tap the three quick checks on the right to start.
+              <p className="text-center text-xs text-(--text-muted) sm:text-left">
+                Tip: the checklist helps avoid interruptions — optional before you begin.
               </p>
             ) : null}
             {startError && <p className="text-xs text-(--accent-danger)">{startError}</p>}

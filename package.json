@@ -1,6 +1,7 @@
 {
   "name": "interviewera",
   "version": "0.1.0",
+  "description": "Requires Node >=20.18.1 for pdfjs-dist; resume/JD PDF pipeline uses pdfjs-dist@5.4.296 and pdf-parse@1.1.1 (see dependencies).",
   "private": true,
   "engines": {
     "node": ">=20.18.1"

@@ -219,8 +219,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (storageError) {
       console.error(`[resume/upload][${reqId}] Storage error:`, storageError.message);
       return NextResponse.json(
-        { error: 'Failed to upload file. Please try again.' },
-        { status: 500 }
+        {
+          error:
+            'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
+          code: 'STORAGE_FAILED',
+          requestId: reqId,
+        },
+        { status: 500, headers: { 'X-Request-Id': reqId } },
       );
     }
 
@@ -238,8 +243,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (insertError || !resume) {
       console.error(`[resume/upload][${reqId}] DB insert error:`, insertError?.message);
       return NextResponse.json(
-        { error: 'Failed to create resume record.' },
-        { status: 500 }
+        {
+          error: 'Could not save your resume record. Please try again or contact support.',
+          code: 'DB_INSERT_FAILED',
+          requestId: reqId,
+        },
+        { status: 500, headers: { 'X-Request-Id': reqId } },
       );
     }
 
@@ -256,8 +265,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       err instanceof Error ? err.message : err,
     );
     return NextResponse.json(
-      { error: 'Internal server error.' },
-      { status: 500 }
+      { error: 'Something went wrong on our side. Please try again.', code: 'INTERNAL', requestId: reqId },
+      { status: 500, headers: { 'X-Request-Id': reqId } },
     );
   }
 }

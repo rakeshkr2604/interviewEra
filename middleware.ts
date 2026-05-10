@@ -83,10 +83,13 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
 
-  /** Refresh session on POST resume actions only (polling /api/resume/status would thrash Supabase). */
+  /** Refresh session on multipart / heavy POSTs that must see a fresh cookie (avoid 401 + HTML edge). */
   const resumeApiNeedsSession =
     isApi &&
-    (pathname === '/api/resume/upload' || pathname === '/api/resume/parse');
+    (pathname === '/api/resume/upload' ||
+      pathname === '/api/resume/parse' ||
+      pathname === '/api/job-description/extract' ||
+      pathname === '/api/job-description/parse');
 
   // Next.js build chunks — never run Supabase session refresh here (perf + edge cache).
   if (

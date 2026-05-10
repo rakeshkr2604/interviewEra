@@ -142,6 +142,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ text: clipped, requestId: reqId });
   } catch (err) {
     console.error(`[job-description/extract][${reqId}] Unexpected error:`, err);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Something went wrong on our side. Please try again.', requestId: reqId },
+      { status: 500, headers: { 'X-Request-Id': reqId } },
+    );
   }
 }
