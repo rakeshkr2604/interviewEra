@@ -68,7 +68,7 @@ export function InterviewSession({
       setCompletingError('Network error while generating report. Please try again.');
       setSessionState('answering');
     }
-  }, [interviewId, totalQuestions, router]);
+  }, [interviewId, router]);
 
   const handleSubmitAnswer = useCallback(
     async (answerText: string, answerMode: AnswerMode) => {
@@ -122,7 +122,7 @@ export function InterviewSession({
         setSessionState('answering');
       }
     },
-    [interviewId, currentIndex, currentQuestion, isLastQuestion, completeInterview]
+    [interviewId, currentQuestion, isLastQuestion, completeInterview]
   );
 
   if (!currentQuestion || currentIndex >= totalQuestions) {

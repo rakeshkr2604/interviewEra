@@ -211,7 +211,17 @@ export default function InterviewSessionPage() {
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
     }
-  }, [phase, answerText, currentQuestion, interviewId, answerStartTime, stopTimer, stopListening, stopSpeaking])
+  }, [
+    phase,
+    answerText,
+    currentQuestion,
+    interviewId,
+    answerStartTime,
+    useManualInput,
+    stopTimer,
+    stopListening,
+    stopSpeaking,
+  ])
 
   // ─── Timer runs out → auto submit ─────────────────────────
   useEffect(() => {

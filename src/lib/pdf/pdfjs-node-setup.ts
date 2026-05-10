@@ -1,6 +1,12 @@
 import { createRequire } from 'node:module';
+import { join } from 'node:path';
 
 let setupDone = false;
+
+/** Avoid `import.meta.url` here — Webpack emits Critical dependency warnings when bundling server actions that import the PDF stack. */
+function nodeRequireFromProject(): ReturnType<typeof createRequire> {
+  return createRequire(join(process.cwd(), 'package.json'));
+}
 
 /**
  * `pdfjs-dist/legacy/build/pdf.mjs` evaluates code that references `DOMMatrix`,
@@ -22,7 +28,7 @@ export function ensurePdfJsNodeGlobalsSync(): void {
   }
 
   try {
-    const req = createRequire(import.meta.url);
+    const req = nodeRequireFromProject();
     const canvas = req('@napi-rs/canvas') as {
       DOMMatrix: unknown;
       Path2D: unknown;
