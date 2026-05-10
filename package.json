@@ -8,8 +8,10 @@
   },
   "scripts": {
     "clean": "node -e \"try{require('fs').rmSync('.next',{recursive:true,force:true})}catch(e){}\"",
-    "dev": "next dev --turbopack",
-    "dev:fresh": "npm run clean && next dev --turbopack",
+    "dev": "next dev --webpack",
+    "dev:turbopack": "next dev --turbopack",
+    "dev:fresh": "npm run clean && next dev --webpack",
+    "dev:fresh:turbo": "npm run clean && next dev --turbopack",
     "dev:webpack": "next dev --webpack",
     "build": "next build --webpack",
     "build:turbo": "next build",

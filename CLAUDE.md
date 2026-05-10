@@ -294,9 +294,10 @@ Before writing any code in a new session, confirm:
 ## DEVELOPMENT COMMANDS
 
 ```bash
-npm run dev          # Start dev server with Turbopack (fast HMR)
-npm run dev:fresh    # Clean .next cache then start dev server
-npm run dev:webpack  # Start with Webpack (use if Turbopack causes issues)
+npm run dev          # Start dev server with Webpack (default — matches upload/API stability)
+npm run dev:turbopack # Turbopack HMR (Next 16: POST to /api/* can 404 — see next.js#88917)
+npm run dev:fresh    # Clean .next cache then start dev (Webpack)
+npm run dev:webpack  # Same as npm run dev
 npm run build        # Production build (Webpack — matches Vercel default `npm run build`)
 npm run lint         # Run ESLint
 npm run verify:pdf   # Regression: extractText on tests/fixtures/pdf (CI)
