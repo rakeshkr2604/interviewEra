@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { ensurePublicUserRow } from '@/lib/supabase/ensure-public-user';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import {
   extractText,
@@ -183,6 +184,54 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    console.log('[UPLOAD_STAGE] createServiceClient_start', { reqId });
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (svcErr) {
+      console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, svcErr });
+      return NextResponse.json(
+        isUploadDiagnosticsEnabled()
+          ? {
+              ok: false,
+              stage: 'createServiceClient',
+              error: svcErr instanceof Error ? svcErr.message : String(svcErr),
+              stack: svcErr instanceof Error ? svcErr.stack : undefined,
+              requestId: reqId,
+            }
+          : {
+              error: 'Resume upload is temporarily unavailable.',
+              code: 'SERVER_CONFIG',
+              requestId: reqId,
+            },
+        { status: 503, headers: { 'X-Request-Id': reqId } },
+      );
+    }
+    console.log('[UPLOAD_STAGE] createServiceClient_done', { reqId });
+
+    console.log('[UPLOAD_STAGE] ensure_public_user_start', { reqId });
+    const ensured = await ensurePublicUserRow(serviceClient, user);
+    console.log('[UPLOAD_STAGE] ensure_public_user_done', { reqId, ok: ensured.ok });
+    if (!ensured.ok) {
+      console.error('[UPLOAD_STAGE] ensure_public_user_failed', {
+        reqId,
+        code: ensured.code,
+        message: ensured.message,
+      });
+      return NextResponse.json(
+        {
+          error:
+            'Your account profile is still syncing. Sign out, sign in again, then retry — or contact support if this persists.',
+          code: 'USER_PROFILE_MISSING',
+          requestId: reqId,
+          ...(isUploadDiagnosticsEnabled()
+            ? { stage: 'ensure_public_user', details: ensured.message }
+            : {}),
+        },
+        { status: 503, headers: { 'X-Request-Id': reqId } },
+      );
+    }
+
     console.log('[UPLOAD_STAGE] formData_start', { reqId });
     let formData: FormData;
     try {
@@ -314,31 +363,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    console.log('[UPLOAD_STAGE] createServiceClient_start', { reqId });
-    let serviceClient: ReturnType<typeof createServiceClient>;
-    try {
-      serviceClient = createServiceClient();
-    } catch (svcErr) {
-      console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, svcErr });
-      return NextResponse.json(
-        isUploadDiagnosticsEnabled()
-          ? {
-              ok: false,
-              stage: 'createServiceClient',
-              error: svcErr instanceof Error ? svcErr.message : String(svcErr),
-              stack: svcErr instanceof Error ? svcErr.stack : undefined,
-              requestId: reqId,
-            }
-          : {
-              error: 'Resume upload is temporarily unavailable.',
-              code: 'SERVER_CONFIG',
-              requestId: reqId,
-            },
-        { status: 503, headers: { 'X-Request-Id': reqId } },
-      );
-    }
-    console.log('[UPLOAD_STAGE] createServiceClient_done', { reqId });
-
     const timestamp = Date.now();
     const filePath = `resumes/${user.id}/${timestamp}${ext}`;
     const extForMime = ext === '.txt' ? '.txt' : '.pdf';
@@ -417,9 +441,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (insertError || !resume) {
+      const isFk =
+        insertError?.code === '23503' ||
+        (typeof insertError?.message === 'string' && insertError.message.includes('foreign key'));
       const base: Record<string, unknown> = {
-        error: 'Could not save your resume record. Please try again or contact support.',
-        code: 'DB_INSERT_FAILED',
+        error: isFk
+          ? 'Account data is out of sync with our database. Sign out and sign in again, then retry upload.'
+          : 'Could not save your resume record. Please try again or contact support.',
+        code: isFk ? 'FK_VIOLATION' : 'DB_INSERT_FAILED',
         requestId: reqId,
       };
       if (isUploadDiagnosticsEnabled()) {

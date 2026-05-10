@@ -259,6 +259,26 @@ export default function OnboardingPage() {
           setError(withRequestRef('Upload service is misconfigured. Please try again later.', rid))
           return
         }
+        if (result.code === 'USER_PROFILE_MISSING') {
+          setError(
+            withRequestRef(
+              result.error ??
+                'Your account is still syncing. Sign out, sign in again, then retry the upload.',
+              rid,
+            ),
+          )
+          return
+        }
+        if (result.code === 'FK_VIOLATION') {
+          setError(
+            withRequestRef(
+              result.error ??
+                'Your session is out of sync with our database. Sign out and sign in again, then retry.',
+              rid,
+            ),
+          )
+          return
+        }
         if (result.code === 'FILE_TOO_LARGE') {
           setError(withRequestRef(result.error ?? 'File too large.', rid))
           return
