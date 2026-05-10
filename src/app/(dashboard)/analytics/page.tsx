@@ -8,6 +8,10 @@ export const metadata = privatePageMetadata({
   path: '/analytics',
 })
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
+import {
+  normalizeRadarRowToDimensionKey,
+  REPORT_DIMENSION_LABELS,
+} from '@/lib/utils/report-radar-dimensions'
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()
@@ -43,18 +47,19 @@ export default async function AnalyticsPage() {
   for (const report of orderedReports) {
     const radar = Array.isArray(report.radar_data) ? report.radar_data as RadarPoint[] : []
     for (const point of radar) {
-      const key = String(point.dimension || '').trim()
+      const dimKey = normalizeRadarRowToDimensionKey(String(point.dimension || ''))
+      if (dimKey == null) continue
       const score = Number(point.score)
-      if (!key || Number.isNaN(score)) continue
-      const bucket = dimensionMap.get(key) ?? []
+      if (Number.isNaN(score)) continue
+      const bucket = dimensionMap.get(dimKey) ?? []
       bucket.push(score)
-      dimensionMap.set(key, bucket)
+      dimensionMap.set(dimKey, bucket)
     }
   }
 
   const skills = Array.from(dimensionMap.entries())
     .map(([name, scores]) => ({
-      name,
+      name: REPORT_DIMENSION_LABELS[name as keyof typeof REPORT_DIMENSION_LABELS] ?? name,
       pct: Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10),
     }))
     .sort((a, b) => b.pct - a.pct)

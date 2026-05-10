@@ -153,6 +153,7 @@ export interface Evaluation {
   detailed_analysis: DetailedAnalysis;
 }
 
+/** Spider rows: `dimension` matches keys of DimensionScores (string). Trend series: labels like Interview 1. */
 export interface RadarDataPoint {
   dimension: string;
   score: number;

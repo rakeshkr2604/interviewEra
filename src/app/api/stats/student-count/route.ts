@@ -5,8 +5,10 @@ export const runtime = 'nodejs';
 /** Public landing stat — cache 1h at CDN. */
 export const revalidate = 3600;
 
+const BETA_LABEL = 'Now in private beta — join the waitlist';
+
 const FALLBACK = NextResponse.json(
-  { displayCount: '1,000+' },
+  { displayCount: BETA_LABEL },
   { status: 200, headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' } },
 );
 
@@ -25,7 +27,7 @@ export async function GET(): Promise<NextResponse> {
     const displayCount =
       studentCount != null && studentCount > 10
         ? `${studentCount.toLocaleString('en-IN')}+`
-        : '1,000+';
+        : BETA_LABEL;
 
     return NextResponse.json(
       { displayCount },

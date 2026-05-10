@@ -3,21 +3,8 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ReportPDF } from '@/components/report/ReportPDF';
-import type {
-  DetailedAnalysis,
-  DimensionScores,
-  PlanTier,
-  QuestionCategory,
-  RadarDataPoint,
-} from '@/types/app.types';
-
-const DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
-  communication_clarity: 'Communication Clarity',
-  technical_depth: 'Technical Depth',
-  answer_structure: 'Answer Structure',
-  confidence: 'Confidence',
-  relevance: 'Relevance',
-};
+import type { DetailedAnalysis, PlanTier, QuestionCategory, RadarDataPoint } from '@/types/app.types';
+import { dimensionDisplayRowsFromRadar } from '@/lib/utils/report-radar-dimensions';
 
 export async function GET(request: Request): Promise<NextResponse | Response> {
   try {
@@ -105,12 +92,12 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
             .in('answer_id', answerIds)
         : { data: [] };
 
-    // ── Build dimension scores from radar_data ────────────────────────────────
+    // ── Build dimension scores from radar_data (keys + display labels) ─────────
     const radarData = (report.radar_data as RadarDataPoint[]) ?? [];
-    const dimensionScores = Object.entries(DIMENSION_LABELS).map(([, label]) => {
-      const point = radarData.find((r) => r.dimension === label);
-      return { label, score: point?.score ?? 0 };
-    });
+    const dimensionScores = dimensionDisplayRowsFromRadar(radarData).map(({ label, score }) => ({
+      label,
+      score,
+    }));
 
     // ── Build question items ──────────────────────────────────────────────────
     const pdfQuestions = (questions ?? []).map((q) => {

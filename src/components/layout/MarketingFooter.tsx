@@ -74,8 +74,7 @@ export function MarketingFooter() {
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              AI-powered mock interviews, resume analysis, and placement preparation
-              platform — built for students and professionals targeting top companies.
+              AI-powered mock interviews and resume-aware scoring — built for Indian campus and early-career hiring. Now in private beta.
             </p>
 
             {/* CTA */}

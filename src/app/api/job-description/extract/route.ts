@@ -15,6 +15,7 @@ import {
 } from '@/lib/pdf/parser';
 import { assertLooksLikeJobDescription } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
+import { safeText } from '@/lib/utils/sanitize';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -135,7 +136,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: jdCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId }, { status: 422 });
     }
 
-    const clipped = rawText.trim().slice(0, 12_000);
+    const clipped = safeText(rawText, 12_000);
     return NextResponse.json({ text: clipped, requestId: reqId });
   } catch (err) {
     console.error(`[job-description/extract][${reqId}] Unexpected error:`, err);

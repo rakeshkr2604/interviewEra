@@ -1,6 +1,16 @@
 import { z } from 'zod';
 import { INTERVIEWER_IDS } from '@/lib/config/interviewers';
 import type { InterviewGoal } from '@/types/onboarding.types';
+import { safeText } from '@/lib/utils/sanitize';
+
+/** Strict display name (auth + public.users.name). ASCII letters, spaces, apostrophe, hyphen. */
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-zA-Z\s'-]{2,50}$/,
+    'Name must be 2–50 characters (letters, spaces, apostrophes, or hyphens only).',
+  );
 
 export const resumeUploadSchema = z.object({
   userId: z.string().uuid(),
@@ -15,7 +25,12 @@ export const INTERVIEW_GOAL_IDS = [
 
 export const interviewStartSchema = z.object({
   resumeId: z.string().uuid(),
-  role: z.string().min(1).max(100),
+  role: z
+    .string()
+    .min(1)
+    .max(100)
+    .transform((s) => safeText(s, 100))
+    .refine((s) => s.length >= 1, 'Role is required.'),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   interviewerId: z.enum(INTERVIEWER_IDS),
   goal: z.enum(INTERVIEW_GOAL_IDS).optional().default('general_practice'),
@@ -27,13 +42,23 @@ export const interviewStartSchema = z.object({
   // Optional: Pro feature — use a pre-built domain pack instead of AI-generated questions
   domainPackId: z.string().uuid().optional(),
   // Optional: pasted employer JD — used only for question personalization (max 12k chars server-side).
-  jobDescription: z.string().max(12000).optional(),
+  jobDescription: z
+    .union([z.undefined(), z.null(), z.string().max(12000)])
+    .transform((val) => {
+      if (val == null) return undefined;
+      const t = safeText(val, 12000);
+      return t === '' ? undefined : t;
+    }),
 });
 
 export const interviewAnswerSchema = z.object({
   interviewId: z.string().uuid(),
   questionId: z.string().uuid(),
-  answerText: z.string().min(1).max(5000),
+  answerText: z
+    .string()
+    .max(5000)
+    .transform((s) => safeText(s, 5000))
+    .refine((s) => s.length >= 1, 'Answer cannot be empty.'),
   answerMode: z.enum(['text', 'voice']).optional(),
   /** Matches Settings → Interview → answer style (localStorage). Optional for older clients. */
   answerStyle: z.enum(['concise', 'balanced', 'detailed']).optional(),
@@ -68,5 +93,13 @@ export const standardPaymentVerifySchema = z.object({
 
 // referredUserId is obtained from the authenticated session server-side, not from the request body
 export const referralApplySchema = z.object({
-  referralCode: z.string().min(1),
+  referralCode: z
+    .string()
+    .min(1)
+    .max(80)
+    .transform((s) => safeText(s, 80)),
+});
+
+export const profileNamePatchSchema = z.object({
+  name: displayNameSchema,
 });

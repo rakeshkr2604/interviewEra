@@ -75,11 +75,11 @@ export async function aggregateReport(
   const round1 = (v: number) => Math.round(v * 10) / 10;
 
   const radarData: RadarDataPoint[] = [
-    { dimension: 'Communication', score: round1(dimSums.communication_clarity / n) },
-    { dimension: 'Technical', score: round1(dimSums.technical_depth / n) },
-    { dimension: 'Structure', score: round1(dimSums.answer_structure / n) },
-    { dimension: 'Confidence', score: round1(dimSums.confidence / n) },
-    { dimension: 'Relevance', score: round1(dimSums.relevance / n) },
+    { dimension: 'communication_clarity', score: round1(dimSums.communication_clarity / n) },
+    { dimension: 'technical_depth', score: round1(dimSums.technical_depth / n) },
+    { dimension: 'answer_structure', score: round1(dimSums.answer_structure / n) },
+    { dimension: 'confidence', score: round1(dimSums.confidence / n) },
+    { dimension: 'relevance', score: round1(dimSums.relevance / n) },
   ];
 
   // Fetch trend data: up to 4 prior completed reports + current interview as final point.

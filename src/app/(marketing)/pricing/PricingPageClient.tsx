@@ -244,11 +244,11 @@ export function PricingPageClient() {
               <span style={{ color: T.acc2 }}>₹5L–₹20L</span> in lost offers.
             </p>
             <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, maxWidth: 520, margin: '0 auto 8px' }}>
-              Start <strong style={{ color: T.text }}>free</strong>, no card. Most upgrade after their <strong style={{ color: T.text }}>first session</strong> once they see a real score.
+              Start <strong style={{ color: T.text }}>free</strong>, no card. Upgrade when you want PDF export, replay, and full analysis on every answer.
             </p>
             <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, maxWidth: 520, margin: '0 auto' }}>
-              Most who practise through the season choose <strong style={{ color: T.text }}>Pro</strong> — about{' '}
-              <strong style={{ color: T.acc2 }}>₹{proPerDay}/day</strong>, less than one coffee.
+              On <strong style={{ color: T.text }}>Pro</strong> you unlock full feedback, PDF export, and replay — about{' '}
+              <strong style={{ color: T.acc2 }}>₹{proPerDay}/day</strong> at monthly billing, less than one coffee.
             </p>
           </div>
 
@@ -294,7 +294,7 @@ export function PricingPageClient() {
 
             {/* Pro */}
             <div className="pr-card pr-card--pop">
-              <span className="pr-card-badge">Most students choose Pro</span>
+              <span className="pr-card-badge">Popular for heavy practice</span>
               <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Pro</h3>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.acc2, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>

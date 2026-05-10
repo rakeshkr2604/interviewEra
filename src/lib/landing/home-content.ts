@@ -12,7 +12,7 @@ export const TRANSFORMATION_BAD_SEGMENTS = [
 ] as const;
 
 export const TRANSFORMATION = {
-  title: 'From random answers → structured answers that get shortlisted',
+  title: 'From random answers → structured answers panels can score',
   subtitle:
     'Same question. Two ways to answer. Spot the difference in two seconds — vague vs. evidence-backed.',
   question: 'Tell me about a time you solved a hard technical problem under a deadline.',
@@ -32,26 +32,12 @@ export const TRANSFORMATION = {
   ] as const,
 } as const;
 
+/** Placeholder strip — replace with aggregated, opt-in learner stats post-launch. */
 export const RESULTS_PROOF = {
-  title: 'Students are improving before they sit for real interviews',
-  subtitle: 'Semi-anonymous profiles — same kinds of outcomes we see after scored mocks.',
-  stories: [
-    {
-      name: 'Ayush',
-      college: 'B.Tech CSE · Tier-3 college',
-      outcome: 'Improved from 4.6 → 7.4 in 3 sessions',
-    },
-    {
-      name: 'Priya S.',
-      college: 'DU · B.Com (Hons)',
-      outcome: 'Shortlisted at 2 companies after practice',
-    },
-    {
-      name: 'Arjun K.',
-      college: 'Private engg · ECE',
-      outcome: 'Structure 4.2 → 7.1 before core drives',
-    },
-  ] as const,
+  title: 'Private beta · resume-aware scored practice',
+  subtitle:
+    'We are validating the product with early users — no fabricated placement or shortlist stories.',
+  stories: [] as const,
 } as const;
 
 export const RESUME_WOW = {
@@ -65,8 +51,8 @@ export const RESUME_WOW = {
 } as const;
 
 export const PRESSURE_MISTAKES = {
-  title: 'Three mistakes that silently kill your shortlist chances',
-  kicker: 'You don’t even realise you’re making them — until the rejection mail lands.',
+  title: 'Three mistakes that hurt interview scores under pressure',
+  kicker: 'Easy to overlook until feedback shows the pattern.',
   items: [
     {
       title: 'No structure',
@@ -83,20 +69,8 @@ export const PRESSURE_MISTAKES = {
   ],
 } as const;
 
-export const TESTIMONIALS = [
-  {
-    name: 'Ananya K.',
-    college: 'NIT Trichy · CSE',
-    result: 'Shortlisted at 3 product companies',
-    quote: 'Random stories → STAR. Feedback matched what seniors said panels actually score.',
-  },
-  {
-    name: 'Rahul M.',
-    college: 'VIT · ECE',
-    result: 'First offer after 12 scored sessions',
-    quote: 'Questions were from my resume — I knew what to fix before each process.',
-  },
-] as const;
+/** Not used on the homepage UI — landing uses an explicit beta block instead of quotes. */
+export const TESTIMONIALS = [] as const;
 
 export const PROBLEM_POINTS = [
   {
@@ -129,7 +103,7 @@ export const SOLUTION_POINTS = [
   },
   {
     title: 'AI scores + next steps',
-    body: 'Five weighted dimensions with clear gaps so each session increases placement odds.',
+    body: 'Five weighted dimensions with clear gaps so each session surfaces what to improve next.',
     icon: 'chart' as const,
   },
 ] as const;
@@ -172,8 +146,8 @@ export const FEATURE_PILLARS = [
   },
   {
     id: 'outcomes',
-    title: 'Outcomes',
-    subtitle: 'Raise placement probability',
+    title: 'Practice loop',
+    subtitle: 'Measure progress between sessions',
     icon: 'target' as const,
     bullets: ['Progress across sessions', 'Know what to fix before D-Day'],
   },
@@ -198,7 +172,7 @@ export const EVALUATION_DIMENSIONS = [
 
 /** High-impact positioning: ChatGPT / generic vs InterviewEra (replaces neutral feature table) */
 export const POSITIONING_MICRO_KICKER =
-  'Most students already use ChatGPT — but still struggle in interviews';
+  'Many candidates already use ChatGPT — but still struggle in live interviews';
 
 export const POSITIONING_HEADLINE = "Why ChatGPT practice isn't enough for placements";
 
@@ -226,7 +200,7 @@ export const POSITIONING_LEFT = {
 
 export const POSITIONING_RIGHT = {
   label: 'InterviewEra',
-  tone: 'Built for real placement outcomes',
+  tone: 'Built for structured placement-style practice',
   items: [
     'Resume-personalized sessions',
     'Structured scoring (5 dimensions)',

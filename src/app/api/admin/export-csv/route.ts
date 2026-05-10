@@ -3,7 +3,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 function escapeCSV(value: string | number | null | undefined): string {
   if (value === null || value === undefined) return '';
-  const str = String(value);
+  let str = String(value);
+  // Mitigate spreadsheet formula injection (=, +, -, @, \t, \r prefixes)
+  if (/^[=+\-@\t\r]/.test(str)) {
+    str = `'${str.replace(/'/g, "''")}`;
+  }
   // Wrap in quotes if contains comma, newline, or double-quote
   if (str.includes(',') || str.includes('\n') || str.includes('"')) {
     return `"${str.replace(/"/g, '""')}"`;

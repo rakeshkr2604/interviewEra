@@ -57,7 +57,7 @@ export default function SignupPage() {
                   Create your account
                 </h1>
                 <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-                  Join thousands of students practicing structured mocks with clear feedback — built for placement season
+                  Now in private beta — join the waitlist for resume-aware mocks with rubric scoring, built for placement season
                   and early-career interviews.
                 </p>
               </div>

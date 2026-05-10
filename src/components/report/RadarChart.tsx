@@ -8,20 +8,18 @@ import {
   PolarRadiusAxis,
   ResponsiveContainer,
 } from 'recharts';
-
-interface RadarDataPoint {
-  dimension: string;
-  score: number;
-}
+import type { RadarDataPoint } from '@/types/app.types';
+import { radarChartRowsFromRadar } from '@/lib/utils/report-radar-dimensions';
 
 interface RadarChartProps {
   data: RadarDataPoint[];
 }
 
 export function RadarChart({ data }: RadarChartProps) {
+  const chartData = radarChartRowsFromRadar(data);
   return (
     <ResponsiveContainer width="100%" height={300}>
-      <RechartsRadarChart data={data}>
+      <RechartsRadarChart data={chartData}>
         <PolarGrid />
         <PolarAngleAxis dataKey="dimension" />
         <PolarRadiusAxis domain={[0, 10]} tick={false} axisLine={false} />

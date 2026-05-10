@@ -1,10 +1,11 @@
 import { ImageResponse } from 'next/og';
 import React from 'react';
+import { safeText } from '@/lib/utils/sanitize';
 
 export async function GET(request: Request): Promise<Response> {
   const { searchParams } = new URL(request.url);
   const score = parseFloat(searchParams.get('score') ?? '0');
-  const role = searchParams.get('role') ?? 'Interview';
+  const role = safeText(searchParams.get('role') ?? 'Interview', 120);
 
   const scoreDisplay = isNaN(score) ? '—' : score.toFixed(1);
   const scoreColor =

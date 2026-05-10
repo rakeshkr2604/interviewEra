@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { parseResume } from '@/lib/openai/parse-resume';
+import { sanitizeParsedResume } from '@/lib/utils/sanitize-parsed-resume';
 
 export const maxDuration = 60;
 
@@ -54,7 +55,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // ── AI parsing ────────────────────────────────────────────────────────────
     let parsedData: Awaited<ReturnType<typeof parseResume>>;
     try {
-      parsedData = await parseResume(resume.raw_text);
+      parsedData = sanitizeParsedResume(await parseResume(resume.raw_text));
     } catch (err) {
       console.error('[resume/parse] AI parsing failed:', err);
       await createServiceClient()

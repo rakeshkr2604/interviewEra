@@ -19,7 +19,7 @@ export interface ReportPDFProps {
   difficulty: string;
   completedAt: string;
   overallScore: number;
-  dimensionScores: Array<{ label: string; score: number }>;
+  dimensionScores: Array<{ label: string; score: number | null }>;
   questions: PDFQuestionItem[];
 }
 
@@ -78,7 +78,8 @@ const s = StyleSheet.create({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function scoreColor(score: number): string {
+function scoreColor(score: number | null): string {
+  if (score == null) return '#9ca3af';
   if (score >= 7) return '#16a34a';
   if (score >= 5) return '#ca8a04';
   return '#dc2626';
@@ -90,7 +91,10 @@ function categoryColors(cat: string): { bg: string; text: string } {
   return { bg: '#ffedd5', text: '#c2410c' };
 }
 
-function BarFill({ score }: { score: number }) {
+function BarFill({ score }: { score: number | null }) {
+  if (score == null) {
+    return <View style={s.barTrack} />;
+  }
   return (
     <View style={s.barTrack}>
       <View style={[s.barFill, { width: `${score * 10}%`, backgroundColor: scoreColor(score) }]} />
@@ -144,7 +148,7 @@ function CoverPage({ role, difficulty, completedAt, overallScore, dimensionScore
             <View style={s.dimLabelRow}>
               <Text style={s.dimLabel}>{label}</Text>
               <Text style={[s.dimValue, { color: scoreColor(score) }]}>
-                {score.toFixed(1)} / 10
+                {score == null ? '—' : `${score.toFixed(1)}`} / 10
               </Text>
             </View>
             <BarFill score={score} />

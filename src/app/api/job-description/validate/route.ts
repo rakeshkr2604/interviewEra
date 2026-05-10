@@ -2,9 +2,15 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { assertLooksLikeJobDescription } from '@/lib/documents/document-classification';
+import { safeText } from '@/lib/utils/sanitize';
 
 const bodySchema = z.object({
-  text: z.string().min(12).max(12_000),
+  text: z
+    .string()
+    .min(12)
+    .max(12_000)
+    .transform((s) => safeText(s, 12_000))
+    .refine((s) => s.length >= 12, 'Text is too short.'),
 });
 
 export async function POST(request: Request): Promise<NextResponse> {

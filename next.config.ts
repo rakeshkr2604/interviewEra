@@ -85,7 +85,7 @@ const nextConfig: NextConfig = {
     const siteWww = 'https://www.interviewera.com';
     const siteTwin = `${siteApex} ${siteWww}`;
 
-    // CSP notes:
+    // CSP notes (defense-in-depth; escaped output + sanitization on write remain required):
     // - 'unsafe-inline' on script-src is required for Next.js hydration chunks and the
     //   theme-init blocking script in layout.tsx. Nonce-based CSP is a future improvement.
     // - 'unsafe-eval' is added in development only — React dev mode uses eval() for stack

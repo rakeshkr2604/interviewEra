@@ -27,7 +27,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
       icon: '📊',
       iconBg: T.okdim,
       title: 'Get a score — not a feeling',
-      body: 'Every answer is scored on 5 weighted dimensions. You see exactly where you fall below 7.0 — the shortlist threshold — with specific gaps to fix before the next company process.',
+      body: 'Every answer is scored on 5 weighted dimensions. You see exactly where you sit versus the practice band highlighted in-product (often around 7.0) — plus specific gaps to fix before your next mock.',
     },
   ];
 
@@ -237,12 +237,12 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
       level: 'Interview this week',
       levelColor: T.acc2,
       title: 'Run a full mock right now',
-      body: "No time for modules. Run a full 5-question scored session and find out if you're above 7.0 — the threshold panels use to decide shortlists — before they do.",
+      body: "No time for modules. Run a full scored session and benchmark yourself against the same rubric you see after each answer — before a real panel does.",
       cta: 'Start full mock interview →',
       ctaColor: T.warn,
       href: isLoggedIn ? '/dashboard' : '/signup',
       outcome: "You'll know",
-      outcomeStrong: "if you're shortlist-ready today",
+      outcomeStrong: 'where you stand on the rubric today',
       recommended: false,
     },
   ];

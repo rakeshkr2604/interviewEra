@@ -123,16 +123,14 @@ export function MarketingPricingSection() {
         <span style={{ color: 'var(--accent-primary)' }}>₹5L–₹20L</span> in lost offers.
       </p>
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
-        Most students upgrade after their <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>first session</span>{' '}
-        once they see a real score — start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card.
+        Start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card — upgrade when you want PDF export, replay, and full analysis per answer.
       </p>
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
-        Most who practise through the season choose{' '}
-        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Pro</span> — about{' '}
+        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Pro</span> works out to about{' '}
         <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
           ₹{proPerDay}/day
         </span>{' '}
-        on monthly billing, less than one coffee, vs walking in blind.
+        on monthly billing — less than one coffee vs the cost of walking in under-prepared.
       </p>
       <BillingCycleToggle value={cycle} onChange={setCycle} id="marketing-billing" variant="default" />
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
@@ -217,7 +215,7 @@ export function MarketingPricingSection() {
               className="px-3 py-1 text-xs font-semibold whitespace-nowrap text-white shadow-md"
               style={{ background: 'var(--accent-primary)', boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)' }}
             >
-              Most students choose Pro
+              Popular for heavy practice
             </Badge>
           </div>
           <CardHeader className="pb-2 pt-2">

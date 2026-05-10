@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
+import { displayNameSchema } from '@/lib/validations/schemas';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -72,12 +73,22 @@ export function SignupForm() {
     setLoading(true);
 
     try {
+      const nameCheck = displayNameSchema.safeParse(name);
+      if (!nameCheck.success) {
+        setFeedback({
+          kind: 'error',
+          text: nameCheck.error.issues[0]?.message ?? 'Please enter a valid name.',
+        });
+        return;
+      }
+      const safeName = nameCheck.data;
+
       const supabase = createClient();
 
       const { data, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { name } },
+        options: { data: { name: safeName } },
       });
 
       if (signUpError) {

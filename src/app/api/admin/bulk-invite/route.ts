@@ -139,10 +139,10 @@ export async function POST(request: Request): Promise<NextResponse> {
             subject: `You've been invited to InterviewEra by ${org.name}`,
             html: `
               <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px">
-                <h2 style="margin-bottom:8px">Practice interviews. Get placed.</h2>
+                <h2 style="margin-bottom:8px">You&apos;re invited to InterviewEra</h2>
                 <p style="color:#555">
                   <strong>${org.name}</strong> has invited you to InterviewEra — an AI-powered
-                  mock interview platform used by students at top colleges across India.
+                  mock interview platform in private beta, built for structured campus and internship prep.
                 </p>
                 <p style="color:#555">
                   Your campus plan gives you <strong>unlimited practice interviews</strong>

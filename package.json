@@ -16,6 +16,8 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "verify:pdf": "tsx scripts/verify-pdf-extract.ts",
     "generate:pdf-fixtures": "tsx scripts/generate-pdf-fixtures.tsx",
     "generate:favicon-ico": "node scripts/generate-favicon-ico.mjs"
@@ -33,6 +35,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "isomorphic-dompurify": "^3.12.0",
     "lucide-react": "^0.552.0",
     "motion": "^12.38.0",
     "next": "^16.2.4",
@@ -65,7 +68,8 @@
     "supabase": "^2.98.0",
     "tailwindcss": "^4.1.16",
     "tsx": "^4.20.6",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
   },
   "overrides": {
     "uuid": "^11.0.0",

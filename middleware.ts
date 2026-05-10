@@ -55,6 +55,18 @@ function forwardedHost(request: NextRequest): string {
   return host ? host.toLowerCase() : '';
 }
 
+/** Vercel preview thumbnails, Lighthouse, crawlers — skip session/auth work (still after www normalize). */
+function shouldBypassMiddlewareForUserAgent(userAgent: string | null): boolean {
+  const ua = (userAgent ?? '').toLowerCase();
+  return (
+    ua.includes('vercel') ||
+    ua.includes('lighthouse') ||
+    ua.includes('crawler') ||
+    /\bbot\b/.test(ua) ||
+    ua.endsWith('bot') // googlebot, bingbot, etc. (avoid naive `includes('bot')` → Roboto-style false positives)
+  );
+}
+
 export async function middleware(request: NextRequest) {
   const host = forwardedHost(request);
   if (host === `www.${PRODUCTION_APEX}`) {
@@ -62,6 +74,10 @@ export async function middleware(request: NextRequest) {
     url.hostname = PRODUCTION_APEX;
     url.protocol = 'https:';
     return NextResponse.redirect(url, 308);
+  }
+
+  if (shouldBypassMiddlewareForUserAgent(request.headers.get('user-agent'))) {
+    return NextResponse.next();
   }
 
   const pathname = request.nextUrl.pathname;
@@ -139,10 +155,10 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Run on app HTML and on `/_next/static/*` so `www` requests for CSS/JS
-     * also 308 to apex (cached HTML on www otherwise loads broken relative chunks).
-     * Skip `/_next/image` (optimizer), static files in /public via explicit names below.
+     * Skip middleware entirely for static chunks, image optimizer, RSC data, Vercel internals,
+     * well-known files, and common asset extensions (reduces edge work + avoids bot/thumbnail 403s).
+     * HTML document routes (/, /about, /pricing, …) still match so www→apex runs for real browsers.
      */
-    '/((?!_next/image|favicon.ico|site.webmanifest|robots.txt|sitemap.xml|opengraph-image.png|twitter-image.png).*)',
+    '/((?!_next/static|_next/image|_next/data|_vercel/|favicon\\.ico|site\\.webmanifest|robots\\.txt|sitemap\\.xml|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|woff2?|ttf|otf|eot|webmanifest)$).*)',
   ],
 };

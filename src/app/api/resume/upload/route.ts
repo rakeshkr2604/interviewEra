@@ -15,6 +15,7 @@ import {
 } from '@/lib/pdf/parser';
 import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
+import { safeText } from '@/lib/utils/sanitize';
 
 // pdfjs-dist is a Node-only library (Buffer + node:module). Pin the
 // runtime explicitly — never ship this on Edge, where the module would
@@ -183,7 +184,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       rawText = new TextDecoder().decode(parseBytes);
     }
 
-    if (!rawText.trim()) {
+    const sanitizedRaw = safeText(rawText, 400_000);
+    if (!sanitizedRaw.trim()) {
       return NextResponse.json(
         {
           error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
@@ -194,7 +196,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const resumeDocCheck = assertLooksLikeResume(rawText);
+    const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
     if (!resumeDocCheck.ok) {
       return NextResponse.json(
         { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
@@ -229,7 +231,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // ── Step 5: Create resume record with extracted text ──────────────────────
     const { data: resume, error: insertError } = await supabase
       .from('resumes')
-      .insert({ user_id: user.id, file_url: publicUrl, raw_text: rawText, status: 'parsing' })
+      .insert({ user_id: user.id, file_url: publicUrl, raw_text: sanitizedRaw, status: 'parsing' })
       .select()
       .single();
 

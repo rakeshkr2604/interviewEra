@@ -151,9 +151,8 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                   marginBottom: '32px',
                 }}
               >
-                Upload your resume. Get grilled on what you actually wrote. Every answer is scored on 5 dimensions — the
-                exact criteria campus panels use to build their shortlists. No more guessing. No more hoping. Just a
-                number that tells you the truth.
+                Upload your resume. Get questioned on what you actually wrote. Every answer is scored on five rubric-aligned
+                dimensions inside InterviewEra — so you practise with clearer feedback instead of vibes-only prep.
               </p>
 
               <LandingHeroCtaIsland />

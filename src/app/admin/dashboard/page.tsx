@@ -246,6 +246,7 @@ export default async function CampusAdminDashboardPage() {
               {students.map((s) => (
                 <tr key={s.id} className="hover:bg-gray-50">
                   <td className="px-5 py-3">
+                    {/* Plain {text} children are React-escaped — never use dangerouslySetInnerHTML for user fields. */}
                     <p className="font-medium text-gray-900">{s.name ?? '—'}</p>
                     <p className="text-xs text-gray-400">{s.email}</p>
                   </td>

@@ -135,7 +135,7 @@ export default function AboutPage() {
             className="text-xs font-medium tracking-wide"
             style={{ color: 'var(--text-muted)' }}
           >
-            Built for placement season · Resume-aware · Rubric-scored · Honest feedback you can act on
+            Now in private beta — join the waitlist · Built for placement season · Resume-aware · Rubric-scored feedback
           </p>
 
           {/* Secondary nav */}
