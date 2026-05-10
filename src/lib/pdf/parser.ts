@@ -8,8 +8,6 @@
  */
 
 import { existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import type { PDFParseUserCode } from '@/lib/pdf/parser-errors';
@@ -49,6 +47,11 @@ export {
 
 const MIN_USEFUL_CHARS = 20;
 
+/** Root of the installed `pdfjs-dist` package (server: project `node_modules`). */
+function pdfJsPackageRootCandidates(): string[] {
+  return [join(process.cwd(), 'node_modules', 'pdfjs-dist')];
+}
+
 interface PdfJsTextItem {
   str?: string;
 }
@@ -60,27 +63,6 @@ interface PdfJsTextItem {
  */
 export function pdfParseOperationalHint(): string {
   return '[pdf-parse][operational] In Vercel → Logs: filter `[pdf-parse][diag]` or `[pdf-parse][attempt]`; match Request ID from network tab `x-vercel-id`; compare Deployment Git SHA.';
-}
-
-function resolvePdfJsPackageRootFromRequire(): string | null {
-  try {
-    const req = createRequire(import.meta.url);
-    return dirname(req.resolve('pdfjs-dist/package.json'));
-  } catch {
-    return null;
-  }
-}
-
-function resolvePdfJsPackageRootFromEntry(): string | null {
-  try {
-    const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
-    const entryUrl = import.meta.resolve(pkgSpec);
-    const entryPath = fileURLToPath(entryUrl);
-    const buildDir = dirname(entryPath);
-    return dirname(dirname(buildDir));
-  } catch {
-    return null;
-  }
 }
 
 function toAssetPaths(pkgRoot: string): { standardFontDataUrl: string; cMapUrl: string } {
@@ -97,13 +79,8 @@ function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: stri
   const sf = paths.standardFontDataUrl.replace(/\/$/, '');
   const cm = paths.cMapUrl.replace(/\/$/, '');
   const pkgRoot = dirname(sf);
-  let resolvedViaEntry = '';
-  try {
-    const pkgSpec = ['pdfjs-dist', 'legacy', 'build', 'pdf.mjs'].join('/');
-    resolvedViaEntry = fileURLToPath(import.meta.resolve(pkgSpec));
-  } catch {
-    resolvedViaEntry = '(import.meta.resolve failed)';
-  }
+  const legacy = join(process.cwd(), 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.mjs');
+  const resolvedViaEntry = existsSync(legacy) ? legacy : '(legacy entry missing)';
   console.error(
     '[pdf-parse][vercel]',
     reason,
@@ -123,11 +100,7 @@ function logPdfJsResolveDiag(paths: { standardFontDataUrl: string; cMapUrl: stri
 function getAssetPaths(): { standardFontDataUrl: string; cMapUrl: string } | null {
   if (cachedAssetPaths !== undefined) return cachedAssetPaths;
   try {
-    const roots = [
-      resolvePdfJsPackageRootFromRequire(),
-      resolvePdfJsPackageRootFromEntry(),
-      join(process.cwd(), 'node_modules', 'pdfjs-dist'),
-    ].filter((r): r is string => Boolean(r));
+    const roots = pdfJsPackageRootCandidates();
 
     for (const root of roots) {
       const paths = toAssetPaths(root);
