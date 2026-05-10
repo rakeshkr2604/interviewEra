@@ -46,7 +46,7 @@ export function ensurePdfJsNodeGlobalsSync(): void {
       g.ImageData = canvas.ImageData;
     }
   } catch (err) {
-    console.error(
+    console.warn(
       '[pdfjs-node] failed to load @napi-rs/canvas; pdfjs may throw (e.g. DOMMatrix is not defined)',
       err instanceof Error ? err.message : err,
     );

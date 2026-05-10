@@ -173,10 +173,25 @@ function pdfJsExceptionFields(err: unknown): Record<string, string> {
   };
 }
 
+type LogLevel = 'error' | 'warn' | 'info';
+
+function logWithLevel(level: LogLevel, ...args: unknown[]): void {
+  if (level === 'warn') {
+    console.warn(...args);
+    return;
+  }
+  if (level === 'info') {
+    console.info(...args);
+    return;
+  }
+  console.error(...args);
+}
+
 function logPdfParseDiag(
   event: string,
   errOrEmpty: unknown,
   extra: Record<string, string | number | boolean | undefined> = {},
+  level: LogLevel = 'error',
 ): void {
   const payload = {
     event,
@@ -186,11 +201,11 @@ function logPdfParseDiag(
     vercel_env: process.env.VERCEL_ENV ?? '',
     node: process.version,
   };
-  console.error('[pdf-parse][diag]', JSON.stringify(payload));
+  logWithLevel(level, '[pdf-parse][diag]', JSON.stringify(payload));
 }
 
 function logPdfExtractAttempt(extra: Record<string, string | number | boolean | undefined>): void {
-  console.error('[pdf-parse][attempt]', JSON.stringify(extra));
+  console.info('[pdf-parse][attempt]', JSON.stringify(extra));
 }
 
 function isInfrastructureThrownError(err: unknown): boolean {
@@ -428,7 +443,7 @@ export async function extractText(
     logPdfParseDiag('canvas_globals_missing', new Error('DOMMatrix/Path2D/ImageData not set'), {
       phase: 'pdf_parse_fallback_only',
       byteLength: bytes.byteLength,
-    });
+    }, 'warn');
     try {
       const t = await extractWithPdfParse(bytes);
       if (t.length >= MIN_USEFUL_CHARS) return t;
