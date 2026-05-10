@@ -23,8 +23,9 @@ export const INTERVIEW_GOAL_IDS = [
   'general_practice',
 ] as const satisfies readonly InterviewGoal[];
 
+/** Accepts trimmed resume id plus numeric fields that may arrive as null (JSON serialization of NaN). */
 export const interviewStartSchema = z.object({
-  resumeId: z.string().uuid(),
+  resumeId: z.preprocess((v) => (typeof v === 'string' ? v.trim() : v), z.string().uuid()),
   role: z
     .string()
     .min(1)
@@ -35,17 +36,51 @@ export const interviewStartSchema = z.object({
   interviewerId: z.enum(INTERVIEWER_IDS),
   goal: z.enum(INTERVIEW_GOAL_IDS).optional().default('general_practice'),
   interviewMode: z.enum(['technical', 'hr_behavioral']).optional().default('technical'),
-  experienceYears: z.number().int().min(0).max(60).optional().default(0),
+  experienceYears: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      if (typeof val === 'number') {
+        if (!Number.isFinite(val)) return undefined;
+        return Math.trunc(val);
+      }
+      if (typeof val === 'string') {
+        const n = Number.parseInt(val.trim(), 10);
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    },
+    z.number().int().min(0).max(60).optional().default(0),
+  ),
   // Optional: client sends question count from feature defaults / env (clamped client-side and server-side).
   // Clamped server-side to [4, 10] before use.
-  questionCount: z.number().int().min(4).max(10).optional(),
+  questionCount: z.preprocess(
+    (val) => {
+      if (val === null || val === undefined || val === '') return undefined;
+      if (typeof val === 'number') {
+        if (!Number.isFinite(val)) return undefined;
+        return Math.trunc(val);
+      }
+      if (typeof val === 'string') {
+        const n = Number.parseInt(String(val).trim(), 10);
+        return Number.isFinite(n) ? n : undefined;
+      }
+      return undefined;
+    },
+    z.number().int().min(4).max(10).optional(),
+  ),
   // Optional: Pro feature — use a pre-built domain pack instead of AI-generated questions
   domainPackId: z.string().uuid().optional(),
   // Optional: pasted employer JD — used only for question personalization (max 12k chars server-side).
+  // Preprocess rejects non-text payloads (bad clients / mistaken objects) instead of failing the whole request.
   jobDescription: z
-    .union([z.undefined(), z.null(), z.string().max(12000)])
+    .preprocess((raw) => {
+      if (raw === null || raw === undefined || raw === '') return undefined;
+      if (typeof raw === 'string') return raw;
+      if (typeof raw === 'number' && Number.isFinite(raw)) return String(raw);
+      return undefined;
+    }, z.string().max(12000).optional())
     .transform((val) => {
-      if (val == null) return undefined;
+      if (val == null || val === '') return undefined;
       const t = safeText(val, 12000);
       return t === '' ? undefined : t;
     }),

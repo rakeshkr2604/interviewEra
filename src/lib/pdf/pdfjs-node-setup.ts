@@ -5,9 +5,40 @@ import { isPdfParserDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
 
 let setupDone = false;
 
-/** Avoid `import.meta.url` here — Webpack emits Critical dependency warnings when bundling server actions that import the PDF stack. */
-function nodeRequireFromProject(): ReturnType<typeof createRequire> {
-  return createRequire(join(process.cwd(), 'package.json'));
+/** Webpack dev/server bundles wrap `require`; bypass so `createRequire` returns the real callable. */
+function getProjectScopedRequireFn(): ReturnType<typeof createRequire> | null {
+  const cwdPkg = join(process.cwd(), 'package.json');
+  const g = globalThis as typeof globalThis & {
+    __non_webpack_require__?: (specifier: string) => unknown;
+  };
+
+  try {
+    if (typeof g.__non_webpack_require__ === 'function') {
+      const moduleMod = g.__non_webpack_require__('node:module') as typeof import('node:module');
+      const projectRequireFn = moduleMod.createRequire(cwdPkg);
+      if (typeof projectRequireFn === 'function') {
+        return projectRequireFn;
+      }
+    }
+  } catch {
+    /* fall through to undecorated createRequire */
+  }
+
+  try {
+    const fn = createRequire(cwdPkg);
+    if (typeof fn === 'function') {
+      return fn;
+    }
+    if (!isPdfParserDiagnosticsEnabled()) return null;
+    console.info('[pdfjs-node] createRequire did not yield a callable require — check webpack/native module wrapping.');
+  } catch (err) {
+    if (!isPdfParserDiagnosticsEnabled()) return null;
+    console.info(
+      '[pdfjs-node] createRequire failed',
+      err instanceof Error ? err.message : err,
+    );
+  }
+  return null;
 }
 
 /**
@@ -30,8 +61,10 @@ export function ensurePdfJsNodeGlobalsSync(): void {
   }
 
   try {
-    const req = nodeRequireFromProject();
-    const canvas = req('@napi-rs/canvas') as {
+    const projectRequire = getProjectScopedRequireFn();
+    if (!projectRequire) return;
+
+    const canvas = projectRequire('@napi-rs/canvas') as {
       DOMMatrix: unknown;
       Path2D: unknown;
       ImageData: unknown;

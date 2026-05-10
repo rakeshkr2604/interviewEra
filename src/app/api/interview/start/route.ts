@@ -53,8 +53,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const validation = interviewStartSchema.safeParse(rawBody);
     if (!validation.success) {
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('[interview/start] validation_failed', validation.error.flatten());
+      }
       return NextResponse.json(
-        { error: validation.error.issues[0].message },
+        { error: validation.error.issues[0]?.message ?? 'Invalid request body' },
         { status: 400 }
       );
     }

@@ -440,7 +440,11 @@ export default function OnboardingPage() {
           interviewerId: data.interviewerId,
           goal: data.goal,
           interviewMode,
-          experienceYears: data.experienceYears,
+          experienceYears:
+            typeof data.experienceYears === 'number' &&
+            Number.isFinite(data.experienceYears)
+              ? Math.trunc(data.experienceYears)
+              : 0,
           questionCount: difficultyQuestionCount(difficulty),
           ...(jobDescription ? { jobDescription } : {}),
         }),
