@@ -13,6 +13,11 @@ export function isUploadDiagnosticsEnabled(): boolean {
   );
 }
 
+/** Verbose PDF.js / `@napi-rs/canvas` fallback logs — same gate as upload diagnostics. */
+export function isPdfParserDiagnosticsEnabled(): boolean {
+  return isUploadDiagnosticsEnabled();
+}
+
 export function isDebugRoutesEnabled(): boolean {
   return process.env.IE_DEBUG_ROUTES === '1';
 }

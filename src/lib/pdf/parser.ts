@@ -19,6 +19,7 @@ import {
   PDFScannedNoTextError,
   PDFUnsupportedError,
 } from '@/lib/pdf/parser-errors';
+import { isPdfParserDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
 import { ensurePdfJsNodeGlobalsSync, hasPdfJsNodeGlobalsReady } from '@/lib/pdf/pdfjs-node-setup';
 
 export type { PDFParseUserCode };
@@ -440,10 +441,12 @@ export async function extractText(
   // When canvas native module failed on this Lambda, skip pdfjs import entirely;
   // pdf-parse does not need PDF.js DOMMatrix at load time.
   if (!canvasReady) {
-    logPdfParseDiag('canvas_globals_missing', new Error('DOMMatrix/Path2D/ImageData not set'), {
-      phase: 'pdf_parse_fallback_only',
-      byteLength: bytes.byteLength,
-    }, 'warn');
+    if (isPdfParserDiagnosticsEnabled()) {
+      logPdfParseDiag('canvas_globals_missing', new Error('DOMMatrix/Path2D/ImageData not set'), {
+        phase: 'pdf_parse_fallback_only',
+        byteLength: bytes.byteLength,
+      }, 'info');
+    }
     try {
       const t = await extractWithPdfParse(bytes);
       if (t.length >= MIN_USEFUL_CHARS) return t;

@@ -1,6 +1,8 @@
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 
+import { isPdfParserDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
+
 let setupDone = false;
 
 /** Avoid `import.meta.url` here — Webpack emits Critical dependency warnings when bundling server actions that import the PDF stack. */
@@ -46,7 +48,8 @@ export function ensurePdfJsNodeGlobalsSync(): void {
       g.ImageData = canvas.ImageData;
     }
   } catch (err) {
-    console.warn(
+    if (!isPdfParserDiagnosticsEnabled()) return;
+    console.info(
       '[pdfjs-node] failed to load @napi-rs/canvas; pdfjs may throw (e.g. DOMMatrix is not defined)',
       err instanceof Error ? err.message : err,
     );
