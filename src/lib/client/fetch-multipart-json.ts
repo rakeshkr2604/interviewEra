@@ -22,10 +22,9 @@ export async function fetchMultipartJson<T>(
     ...init,
   });
   const data = await parseResponseJsonSafe<T>(res);
-  if (process.env.NODE_ENV === 'development') {
-    if (!res.ok) {
-      console.warn(`[fetchMultipartJson] ${url} HTTP ${res.status}`, data);
-    }
+  if (!res.ok) {
+    const rid = res.headers.get('x-request-id') ?? res.headers.get('X-Request-Id');
+    console.warn('[fetchMultipartJson]', url, 'HTTP', res.status, 'requestId=', rid ?? 'n/a', data);
   }
   return { ok: res.ok, status: res.status, data };
 }

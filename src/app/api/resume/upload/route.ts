@@ -15,15 +15,16 @@ import {
 } from '@/lib/pdf/parser';
 import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
+import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
 import { normalizeExtractedDocumentText } from '@/lib/utils/sanitize';
 
 // pdfjs-dist is a Node-only library (Buffer + node:module). Pin the
 // runtime explicitly — never ship this on Edge, where the module would
 // fail to evaluate and we'd surface a generic 500 instead of CORRUPT.
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = MULTIPART_UPLOAD_MAX_BYTES;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
 
 const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
@@ -95,7 +96,20 @@ export async function POST(request: Request): Promise<NextResponse> {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.warn(`[resume/upload][${reqId}] auth failed`, authError?.message);
+      return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED', requestId: reqId }, { status: 401 });
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+      console.error(`[resume/upload][${reqId}] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY`);
+      return NextResponse.json(
+        {
+          error: 'Resume upload is temporarily unavailable. Please try again later.',
+          code: 'SERVER_CONFIG',
+          requestId: reqId,
+        },
+        { status: 503, headers: { 'X-Request-Id': reqId } },
+      );
     }
 
     // ── Rate limiting (5 uploads / 5 min per user) ────────────────────────────
@@ -131,8 +145,12 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
-        { error: 'File exceeds 5 MB limit' },
-        { status: 400 }
+        {
+          error: `File exceeds ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))} MB limit. Export a smaller PDF or use .txt.`,
+          code: 'FILE_TOO_LARGE',
+          requestId: reqId,
+        },
+        { status: 400, headers: { 'X-Request-Id': reqId } },
       );
     }
 
@@ -208,16 +226,27 @@ export async function POST(request: Request): Promise<NextResponse> {
     const serviceClient = createServiceClient();
     const timestamp = Date.now();
     const filePath = `resumes/${user.id}/${timestamp}${ext}`;
+    const extForMime = ext === '.txt' ? '.txt' : '.pdf';
+    const contentType = normalizedUploadContentType(file.type, extForMime);
+    const uploadBytes = Buffer.from(arrayBuffer);
+
+    console.info(
+      `[resume/upload][${reqId}] stage=storage_start vercel_id=${vercelId ?? 'n/a'} user=${user.id.slice(0, 8)} bytes=${uploadBytes.length} ext=${ext} content_type=${contentType}`,
+    );
 
     const { error: storageError } = await serviceClient.storage
       .from('resumes')
-      .upload(filePath, new Blob([arrayBuffer], { type: file.type || 'application/octet-stream' }), {
-        contentType: file.type || (ext === '.pdf' ? 'application/pdf' : 'text/plain'),
+      .upload(filePath, uploadBytes, {
+        contentType,
         upsert: false,
       });
 
     if (storageError) {
-      console.error(`[resume/upload][${reqId}] Storage error:`, storageError.message);
+      console.error(
+        `[resume/upload][${reqId}] stage=storage_error vercel_id=${vercelId ?? 'n/a'} message=${storageError.message}`,
+        'details:',
+        JSON.stringify(storageError),
+      );
       return NextResponse.json(
         {
           error:
@@ -234,6 +263,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     } = serviceClient.storage.from('resumes').getPublicUrl(filePath);
 
     // ── Step 5: Create resume record with extracted text ──────────────────────
+    console.info(`[resume/upload][${reqId}] stage=db_insert resume_path=${filePath}`);
+
     const { data: resume, error: insertError } = await supabase
       .from('resumes')
       .insert({ user_id: user.id, file_url: publicUrl, raw_text: sanitizedRaw, status: 'parsing' })
@@ -254,6 +285,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── Step 6: Return resumeId immediately — AI parsing runs in /api/resume/parse
     // This keeps the upload handler well under the serverless timeout limit.
+    console.info(`[resume/upload][${reqId}] stage=ok resume_id=${resume.id}`);
     return NextResponse.json({
       resumeId: resume.id,
       status: 'parsing',
@@ -261,8 +293,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
   } catch (err) {
     console.error(
-      `[resume/upload][${reqId}] Unexpected error:`,
-      err instanceof Error ? err.message : err,
+      `[resume/upload][${reqId}] stage=unhandled vercel_id=${vercelId ?? 'n/a'}`,
+      err instanceof Error ? err.stack ?? err.message : err,
     );
     return NextResponse.json(
       { error: 'Something went wrong on our side. Please try again.', code: 'INTERNAL', requestId: reqId },

@@ -23,9 +23,23 @@ export async function GET(): Promise<NextResponse> {
       )
     }
 
+    let storageResumes: { ok: boolean; message?: string } = { ok: true }
+    try {
+      const { error: storageError } = await supabase.storage.from('resumes').list('', { limit: 1 })
+      if (storageError) {
+        storageResumes = { ok: false, message: storageError.message }
+      }
+    } catch (e) {
+      storageResumes = {
+        ok: false,
+        message: e instanceof Error ? e.message : 'storage list failed',
+      }
+    }
+
     return NextResponse.json({
-      status: 'ok',
+      status: storageResumes.ok ? 'ok' : 'degraded',
       db: 'connected',
+      storageResumes,
       latencyMs: Date.now() - start,
       ts: new Date().toISOString(),
     })

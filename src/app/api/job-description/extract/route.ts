@@ -16,12 +16,13 @@ import {
 import { assertLooksLikeJobDescription } from '@/lib/documents/document-classification';
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
+import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits';
 import { safeText } from '@/lib/utils/sanitize';
 
 export const runtime = 'nodejs';
-export const maxDuration = 30;
+export const maxDuration = 60;
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MAX_FILE_SIZE = MULTIPART_UPLOAD_MAX_BYTES;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
 
 const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
@@ -69,7 +70,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     } = await supabase.auth.getUser();
 
     if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.warn(`[job-description/extract][${reqId}] auth failed`, authError?.message);
+      return NextResponse.json(
+        { error: 'Unauthorized', code: 'UNAUTHORIZED', requestId: reqId },
+        { status: 401, headers: { 'X-Request-Id': reqId } },
+      );
+    }
+
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()) {
+      console.error(`[job-description/extract][${reqId}] missing public Supabase env`);
+      return NextResponse.json(
+        { error: 'Service unavailable.', code: 'SERVER_CONFIG', requestId: reqId },
+        { status: 503, headers: { 'X-Request-Id': reqId } },
+      );
     }
 
     const rateLimit = await checkRateLimit(`jdextract:${user.id}`, 300, 10);
@@ -95,7 +108,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     if (file.size <= 0 || file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File must be non-empty and under 5 MB.' }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: `File must be non-empty and under ${Math.floor(MAX_FILE_SIZE / (1024 * 1024))} MB.`,
+          code: 'FILE_TOO_LARGE',
+          requestId: reqId,
+        },
+        { status: 400, headers: { 'X-Request-Id': reqId } },
+      );
     }
 
     const normalizedName = normalizeFileName(file.name);
@@ -107,6 +127,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     const arrayBuffer = await file.arrayBuffer();
     const parseBytes = new Uint8Array(arrayBuffer).slice();
 
+    console.info(
+      `[job-description/extract][${reqId}] stage=read vercel_id=${vercelReqIdHeader ?? 'n/a'} user=${user.id.slice(0, 8)} bytes=${parseBytes.byteLength} ext=${ext} mime=${(file.type || '').slice(0, 48)}`,
+    );
+
     let rawText = '';
     if (ext === '.pdf') {
       try {
@@ -117,9 +141,12 @@ export async function POST(request: Request): Promise<NextResponse> {
           source: 'job-description-extract',
         });
       } catch (err) {
-        const { message } = classifyPdfError(err);
-        console.error(`[job-description/extract][${reqId}] PDF parse failed`, err);
-        return NextResponse.json({ error: message, requestId: reqId }, { status: 422 });
+        const { message, code } = classifyPdfError(err);
+        console.error(`[job-description/extract][${reqId}] stage=pdf_error code=${code}`, err);
+        return NextResponse.json(
+          { error: message, code, requestId: reqId },
+          { status: 422, headers: { 'X-Request-Id': reqId } },
+        );
       }
     } else {
       rawText = new TextDecoder().decode(parseBytes);
@@ -127,23 +154,31 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (!rawText.trim()) {
       return NextResponse.json(
-        { error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT, requestId: reqId },
-        { status: 422 },
+        { error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT, code: 'SCANNED_NO_TEXT', requestId: reqId },
+        { status: 422, headers: { 'X-Request-Id': reqId } },
       );
     }
 
     const jdCheck = assertLooksLikeJobDescription(rawText);
     if (!jdCheck.ok) {
-      return NextResponse.json({ error: jdCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId }, { status: 422 });
+      return NextResponse.json(
+        { error: jdCheck.message, code: 'WRONG_DOCUMENT_TYPE', requestId: reqId },
+        { status: 422, headers: { 'X-Request-Id': reqId } },
+      );
     }
 
     const refined = refineJobDescriptionForUi(rawText);
     const clipped = safeText(refined, 12_000);
-    return NextResponse.json({ text: clipped, requestId: reqId });
+    console.info(`[job-description/extract][${reqId}] stage=ok chars=${clipped.length}`);
+    return NextResponse.json({ text: clipped, requestId: reqId }, { headers: { 'X-Request-Id': reqId } });
   } catch (err) {
-    console.error(`[job-description/extract][${reqId}] Unexpected error:`, err);
+    console.error(`[job-description/extract][${reqId}] stage=unhandled vercel_id=${vercelReqIdHeader ?? 'n/a'}`, err);
     return NextResponse.json(
-      { error: 'Something went wrong on our side. Please try again.', requestId: reqId },
+      {
+        error: 'Something went wrong on our side. Please try again.',
+        code: 'INTERNAL',
+        requestId: reqId,
+      },
       { status: 500, headers: { 'X-Request-Id': reqId } },
     );
   }

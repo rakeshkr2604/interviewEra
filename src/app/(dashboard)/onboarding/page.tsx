@@ -18,6 +18,7 @@ import { getInterviewerById } from '@/lib/config/interviewers'
 import { SINGLE_FILE_UPLOAD_MESSAGE } from '@/lib/http/form-data-single-file'
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json'
 import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
+import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
 import { ParsedJobDescriptionSections } from '@/components/onboarding/ParsedJobDescriptionSections'
@@ -48,6 +49,14 @@ type ResumeStatusPayload = {
 }
 
 const JD_PARSE_MIN_LEN = 40
+
+/** Append short support ref when API returns requestId (production debugging). */
+function withRequestRef(msg: string, requestId?: string): string {
+  if (!requestId?.trim()) return msg
+  return `${msg} Ref: ${requestId.trim()}`
+}
+
+type ApiErr = { error?: string; code?: string; requestId?: string }
 
 type JdParseStatus = 'idle' | 'parsing' | 'ready' | 'failed'
 
@@ -209,6 +218,13 @@ export default function OnboardingPage() {
 
   const handleUploadResume = async () => {
     if (!resumeFile || resumeState === 'uploading' || resumeState === 'processing') return
+    if (resumeFile.size > MULTIPART_UPLOAD_MAX_BYTES) {
+      setResumeState('failed')
+      setError(
+        `This file is too large (max ${String(Math.floor(MULTIPART_UPLOAD_MAX_BYTES / (1024 * 1024)))} MB). Try a smaller PDF or a .txt resume.`,
+      )
+      return
+    }
     setResumeState('uploading')
     setError('')
     setParsedResume(null)
@@ -218,27 +234,48 @@ export default function OnboardingPage() {
       const formData = new FormData()
       formData.append('file', resumeFile)
 
-      const { ok, status, data: result } = await fetchMultipartJson<{
-        resumeId?: string
-        error?: string
-        code?: string
-      }>('/api/resume/upload', formData)
+      const { ok, status, data: result } = await fetchMultipartJson<ApiErr & { resumeId?: string }>(
+        '/api/resume/upload',
+        formData,
+      )
 
       if (!ok) {
         setResumeState('failed')
-        setError(
-          result.error ??
-            (status === 401
-              ? 'Your session expired. Refresh the page and sign in again.'
-              : status === 429
-                ? 'Too many uploads. Please wait a minute and try again.'
-                : status >= 500
-                  ? 'Our servers could not finish the upload. Please try again in a moment.'
-                  : 'Resume upload failed. Please try again.'),
-        )
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[onboarding] resume upload failed', status, result)
+        const rid = result.requestId
+        if (status === 413) {
+          setError(withRequestRef('Upload was rejected as too large. Use a file under 4 MB or paste text.', rid))
+          return
         }
+        if (result.code === 'STORAGE_FAILED') {
+          setError(
+            withRequestRef(
+              'We could not save your file to storage. If you just deployed, apply the Supabase migration for the resumes bucket and confirm the service role key on Vercel.',
+              rid,
+            ),
+          )
+          return
+        }
+        if (result.code === 'SERVER_CONFIG' || result.code === 'MISSING_SERVICE_CONFIG') {
+          setError(withRequestRef('Upload service is misconfigured. Please try again later.', rid))
+          return
+        }
+        if (result.code === 'FILE_TOO_LARGE') {
+          setError(withRequestRef(result.error ?? 'File too large.', rid))
+          return
+        }
+        setError(
+          withRequestRef(
+            result.error ??
+              (status === 401
+                ? 'Your session expired. Refresh the page and sign in again.'
+                : status === 429
+                  ? 'Too many uploads. Please wait a minute and try again.'
+                  : status >= 500
+                    ? 'Our servers could not finish the upload. Please try again in a moment.'
+                    : 'Resume upload failed. Please try again.'),
+            rid,
+          ),
+        )
         return
       }
 
@@ -272,6 +309,7 @@ export default function OnboardingPage() {
     setStatusMessage('')
     setParsedResume(null)
     setResumeState('idle')
+    setJdExtractError('')
   }
 
   const handleNext = () => {
@@ -292,23 +330,30 @@ export default function OnboardingPage() {
     try {
       const fd = new FormData()
       fd.append('file', jdFile)
-      const { ok, status, data: payload } = await fetchMultipartJson<{
-        text?: string
-        error?: string
-      }>('/api/job-description/extract', fd)
+      const { ok, status, data: payload } = await fetchMultipartJson<ApiErr & { text?: string }>(
+        '/api/job-description/extract',
+        fd,
+      )
 
       if (!ok) {
-        setJdExtractError(
-          payload.error ??
-            (status === 401
-              ? 'Your session expired. Refresh the page and sign in again.'
-              : status === 429
-                ? 'Too many requests. Please wait a minute.'
-                : 'Could not read this file. Try pasting the job text, or use a .txt export.'),
-        )
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('[onboarding] JD extract failed', status, payload)
+        const rid = payload.requestId
+        if (status === 413) {
+          setJdExtractError(withRequestRef('This file is too large to upload (max 4 MB). Paste the text instead.', rid))
+          return
         }
+        setJdExtractError(
+          withRequestRef(
+            payload.error ??
+              (status === 401
+                ? 'Your session expired. Refresh the page and sign in again.'
+                : status === 429
+                  ? 'Too many requests. Please wait a minute.'
+                  : payload.code === 'WRONG_DOCUMENT_TYPE'
+                    ? 'This file does not look like a job description. Paste the posting text or use a JD PDF.'
+                    : 'Could not read this file. Try pasting the job text, or use a .txt export.'),
+            rid,
+          ),
+        )
         return
       }
       if (payload.text) {

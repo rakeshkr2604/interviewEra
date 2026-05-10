@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseJsClient } from '@supabase/supabase-js';
 import { cookies, headers } from 'next/headers';
 
 export async function createClient() {
@@ -34,17 +35,25 @@ export async function createClient() {
   );
 }
 
-// Service client bypasses RLS — use only in API routes after manual auth validation.
-// No-op cookie handlers: service role key doesn't need session cookies.
+/**
+ * Service-role Supabase client for API routes (bypasses RLS).
+ * Uses `@supabase/supabase-js` directly — not `createServerClient` from `@supabase/ssr`,
+ * which is optimized for cookie-backed user sessions and can mis-handle storage/admin
+ * calls in some Node serverless runtimes.
+ */
 export function createServiceClient() {
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() { return []; },
-        setAll() {},
-      },
-    }
-  );
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (!url || !serviceKey) {
+    throw new Error(
+      '[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (required for createServiceClient).',
+    );
+  }
+  return createSupabaseJsClient(url, serviceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  });
 }
