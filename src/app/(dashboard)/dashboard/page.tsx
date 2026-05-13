@@ -5,6 +5,7 @@ import { CreditBadge } from '@/components/layout/CreditBadge'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
 import { DashboardWelcomeCard } from './DashboardWelcomeCard'
+import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
 
@@ -30,7 +31,11 @@ export default async function DashboardPage() {
         )
       `
 
-  const [{ data: userData, error: userError }, { data: interviewsRaw }] = await Promise.all([
+  const [
+    { data: userData, error: userError },
+    { data: interviewsRaw },
+    { data: progressSnap, error: progressErr },
+  ] = await Promise.all([
     supabase
       .from('users')
       .select('name, plan_tier, credits_remaining, placement_date, created_at')
@@ -42,10 +47,36 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
       .limit(5),
+    supabase
+      .from('user_progress')
+      .select('current_tier, current_streak, total_xp, total_sessions')
+      .eq('user_id', user.id)
+      .maybeSingle(),
   ])
 
   if (userError) {
     console.error('dashboard user fetch', userError.message)
+  }
+
+  const progressTableMissing = Boolean(
+    progressErr &&
+      (String(progressErr.code) === '42P01' ||
+        (/user_progress/i.test(progressErr.message ?? '') &&
+          /does not exist/i.test(progressErr.message ?? ''))),
+  )
+
+  const retentionDashboardSnap =
+    progressTableMissing
+      ? null
+      : {
+          current_tier: Number(progressSnap?.current_tier ?? 1) || 1,
+          current_streak: Number(progressSnap?.current_streak ?? 0) || 0,
+          total_xp: Number(progressSnap?.total_xp ?? 0) || 0,
+          total_sessions: Number(progressSnap?.total_sessions ?? 0) || 0,
+        }
+
+  if (progressErr && !progressTableMissing) {
+    console.error('dashboard user_progress fetch', progressErr.message)
   }
 
   const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
@@ -82,6 +113,8 @@ export default async function DashboardPage() {
         creditsRemaining={creditsRemaining}
         completedCount={completedCount}
       />
+
+      <RetentionProgressCard snap={retentionDashboardSnap} />
 
       <DashboardMain rows={rows} userData={userData} />
     </>

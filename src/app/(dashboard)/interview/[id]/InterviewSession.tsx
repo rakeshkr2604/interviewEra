@@ -7,6 +7,11 @@ import { VoiceAnswerInput } from '@/components/interview/VoiceAnswerInput';
 import { ProgressBar } from '@/components/interview/ProgressBar';
 import type { AnswerMode, Question } from '@/types/app.types';
 import { readAnswerStyle } from '@/lib/settings/client-preferences';
+import {
+  TierUnlockCelebrationDialog,
+  type TierCelebrationPayload,
+} from '@/components/retention/TierUnlockCelebrationDialog';
+import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention';
 
 type SessionState =
   | 'answering'
@@ -37,6 +42,7 @@ export function InterviewSession({
   const [lastResult, setLastResult] = useState<AnswerResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [completingError, setCompletingError] = useState<string | null>(null);
+  const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null);
 
   const currentQuestion = questions[currentIndex];
   const totalQuestions = questions.length;
@@ -52,7 +58,11 @@ export function InterviewSession({
         body: JSON.stringify({ interviewId }),
       });
 
-      const data = (await res.json()) as { reportId?: string; error?: string };
+      const data = (await res.json()) as {
+        reportId?: string;
+        error?: string;
+        retention?: InterviewCompleteRetentionPayload | null;
+      };
 
       if (!res.ok || !data.reportId) {
         setCompletingError(
@@ -62,8 +72,37 @@ export function InterviewSession({
         return;
       }
 
+      const reportHref = `/report/${data.reportId}`;
+
+      if (
+        typeof window !== 'undefined' &&
+        data.retention &&
+        typeof data.retention.streak === 'number'
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('ie-streak-updated', { detail: { streak: data.retention.streak } }),
+        );
+      }
+
+      if (
+        data.retention?.tierUnlocked &&
+        typeof data.retention.newTier === 'number' &&
+        data.retention.newTier != null
+      ) {
+        setCelebration({
+          newTier: data.retention.newTier,
+          newBadges: [...(data.retention.newBadges ?? [])],
+          reportHref,
+          progressHint: data.retention.progress ?? null,
+          nextTierNumber: data.retention.nextTierNumber ?? null,
+          nextTierProgressPercent: data.retention.nextTierProgressPercent ?? 0,
+        });
+        setSessionState('done');
+        return;
+      }
+
       setSessionState('done');
-      router.push(`/report/${data.reportId}`);
+      router.push(reportHref);
     } catch {
       setCompletingError('Network error while generating report. Please try again.');
       setSessionState('answering');
@@ -122,35 +161,59 @@ export function InterviewSession({
         setSessionState('answering');
       }
     },
-    [interviewId, currentQuestion, isLastQuestion, completeInterview]
+    [interviewId, currentQuestion, isLastQuestion, completeInterview],
+  );
+
+  const celebrationDialog = (
+    <TierUnlockCelebrationDialog
+      key={celebration ? `${celebration.newTier}-${celebration.reportHref}` : 'idle'}
+      open={celebration !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          const href = celebration?.reportHref;
+          setCelebration(null);
+          if (href) {
+            router.push(href);
+          }
+        }
+      }}
+      data={celebration}
+    />
   );
 
   if (!currentQuestion || currentIndex >= totalQuestions) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <h2 className="text-xl font-semibold">Generating your report…</h2>
-        <p className="mt-2 text-muted-foreground">
-          All questions answered. Wrapping up your interview.
-        </p>
-      </div>
+      <>
+        <div className="mx-auto max-w-lg py-16 text-center">
+          <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <h2 className="text-xl font-semibold">Generating your report…</h2>
+          <p className="mt-2 text-muted-foreground">
+            All questions answered. Wrapping up your interview.
+          </p>
+        </div>
+        {celebrationDialog}
+      </>
     );
   }
 
   if (sessionState === 'completing' || sessionState === 'done') {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
-        <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <h2 className="text-xl font-semibold">Generating your report…</h2>
-        <p className="mt-2 text-muted-foreground">
-          Our AI is analyzing your answers. This takes about 10–15 seconds.
-        </p>
-      </div>
+      <>
+        <div className="mx-auto max-w-lg py-16 text-center">
+          <div className="mx-auto mb-6 h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <h2 className="text-xl font-semibold">Generating your report…</h2>
+          <p className="mt-2 text-muted-foreground">
+            Our AI is analyzing your answers. This takes about 10–15 seconds.
+          </p>
+        </div>
+        {celebrationDialog}
+      </>
     );
   }
 
   return (
-    <div className="mx-auto w-full max-w-[min(100%,960px)] space-y-6 px-4 py-8 lg:max-w-4xl lg:px-8">
+    <>
+      <div className="mx-auto w-full max-w-[min(100%,960px)] space-y-6 px-4 py-8 lg:max-w-4xl lg:px-8">
       <ProgressBar current={currentIndex + 1} total={totalQuestions} />
 
       <QuestionCard
@@ -202,5 +265,7 @@ export function InterviewSession({
         isSubmitting={sessionState === 'submitting'}
       />
     </div>
+    {celebrationDialog}
+    </>
   );
 }

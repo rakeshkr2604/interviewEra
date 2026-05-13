@@ -19,6 +19,11 @@ import { Mic, MicOff, SkipForward, RotateCcw, Send } from 'lucide-react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { readAnswerStyle } from '@/lib/settings/client-preferences'
+import {
+  TierUnlockCelebrationDialog,
+  type TierCelebrationPayload,
+} from '@/components/retention/TierUnlockCelebrationDialog'
+import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -62,6 +67,7 @@ export default function InterviewSessionPage() {
   const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
   /** Matches TimerCircle denominator for the active answering phase */
   const [answerTimeBudget, setAnswerTimeBudget] = useState(TIME_PER_QUESTION)
+  const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null)
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
 
@@ -130,18 +136,63 @@ export default function InterviewSessionPage() {
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
 
+  const celebrationDialog = (
+    <TierUnlockCelebrationDialog
+      key={celebration ? `${celebration.newTier}-${celebration.reportHref}` : 'idle'}
+      open={celebration !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          const href = celebration?.reportHref
+          setCelebration(null)
+          if (href) router.push(href)
+        }
+      }}
+      data={celebration}
+    />
+  )
+
   // ─── Complete Interview (defined first — used by Next/Skip) ─
   const handleCompleteInterview = useCallback(async () => {
     setPhase('completed')
     try {
-      const result = await api.post<{ reportId?: string; error?: string }>('/api/interview/complete', { interviewId })
+      const result = await api.post<{
+        reportId?: string
+        error?: string
+        retention?: InterviewCompleteRetentionPayload | null
+      }>('/api/interview/complete', { interviewId })
       const reportId = result.data.reportId
       if (!reportId) {
         setFetchError(result.data.error ?? 'Report generation failed. Please try again.')
         setPhase('feedback')
         return
       }
-      router.push(`/report/${reportId}`)
+      const href = `/report/${reportId}`
+      const retention = result.data.retention ?? null
+      if (
+        typeof window !== 'undefined' &&
+        retention &&
+        typeof retention.streak === 'number'
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('ie-streak-updated', { detail: { streak: retention.streak } }),
+        )
+      }
+      if (
+        retention?.tierUnlocked &&
+        typeof retention.newTier === 'number' &&
+        retention.newTier != null
+      ) {
+        setCelebration({
+          newTier: retention.newTier,
+          newBadges: [...(retention.newBadges ?? [])],
+          reportHref: href,
+          progressHint: retention.progress ?? null,
+          nextTierNumber: retention.nextTierNumber ?? null,
+          nextTierProgressPercent: retention.nextTierProgressPercent ?? 0,
+        })
+        return
+      }
+      router.push(href)
     } catch {
       setFetchError('Report generation failed. Please try again.')
       setPhase('feedback')
@@ -336,14 +387,21 @@ export default function InterviewSessionPage() {
 
   if (phase === 'completed') {
     return (
-      <div className="flex min-h-screen items-center justify-center"
-           style={{ background: 'var(--page-gradient)' }}>
-        <div className="text-center space-y-3">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full
-                          border-2 border-(--accent-success) border-t-transparent" />
-          <p className="text-(--text-secondary) text-sm">Generating your report...</p>
+      <>
+        <div
+          className="flex min-h-screen items-center justify-center"
+          style={{ background: 'var(--page-gradient)' }}
+        >
+          <div className="text-center space-y-3">
+            <div
+              className="mx-auto h-10 w-10 animate-spin rounded-full
+                          border-2 border-(--accent-success) border-t-transparent"
+            />
+            <p className="text-(--text-secondary) text-sm">Generating your report...</p>
+          </div>
         </div>
-      </div>
+        {celebrationDialog}
+      </>
     )
   }
 
@@ -351,8 +409,11 @@ export default function InterviewSessionPage() {
   const progressPct = Math.round((currentIndex / totalQuestions) * 100)
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-10"
-         style={{ background: 'var(--page-gradient)' }}>
+    <>
+      <div
+        className="min-h-screen px-4 py-6 sm:px-6 lg:px-10"
+        style={{ background: 'var(--page-gradient)' }}
+      >
       <div className="mx-auto w-full max-w-[min(100%,1600px)]">
 
         {/* ── Top Bar ── */}
@@ -743,5 +804,7 @@ export default function InterviewSessionPage() {
         </div>
       </div>
     </div>
+    {celebrationDialog}
+    </>
   )
 }

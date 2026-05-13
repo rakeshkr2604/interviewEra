@@ -5,6 +5,7 @@ import { Menu } from 'lucide-react'
 import { usePathname } from 'next/navigation'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { StreakCounter } from '@/components/layout/StreakCounter'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { cn } from '@/lib/utils'
 
@@ -103,9 +104,10 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <span style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
+          <span className="min-w-0 flex-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
             <BrandWordmarkSplit />
           </span>
+          <StreakCounter />
         </header>
 
         <main

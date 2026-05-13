@@ -8,6 +8,7 @@ export const metadata = privatePageMetadata({
   path: '/analytics',
 })
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
+import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import {
   normalizeRadarRowToDimensionKey,
   REPORT_DIMENSION_LABELS,
@@ -18,11 +19,19 @@ export default async function AnalyticsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: completedInterviews } = await supabase
-    .from('interviews')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('status', 'completed')
+  const [{ data: completedInterviews }, { data: progressSnap, error: progressErr }] =
+    await Promise.all([
+      supabase
+        .from('interviews')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'completed'),
+      supabase
+        .from('user_progress')
+        .select('current_tier, current_streak, total_xp, total_sessions')
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
   const completedInterviewIds = (completedInterviews ?? []).map((item) => item.id as string)
 
@@ -75,6 +84,27 @@ export default async function AnalyticsPage() {
 
   const hasTrend = trendPoints.length >= 2
 
+  const progressTableMissing = Boolean(
+    progressErr &&
+      (String(progressErr.code) === '42P01' ||
+        (/user_progress/i.test(progressErr.message ?? '') &&
+          /does not exist/i.test(progressErr.message ?? ''))),
+  )
+
+  const retentionDashboardSnap =
+    progressTableMissing
+      ? null
+      : {
+          current_tier: Number(progressSnap?.current_tier ?? 1) || 1,
+          current_streak: Number(progressSnap?.current_streak ?? 0) || 0,
+          total_xp: Number(progressSnap?.total_xp ?? 0) || 0,
+          total_sessions: Number(progressSnap?.total_sessions ?? 0) || 0,
+        }
+
+  if (progressErr && !progressTableMissing) {
+    console.error('analytics user_progress fetch', progressErr.message)
+  }
+
   return (
     <>
       <DashboardPageHeader
@@ -82,6 +112,10 @@ export default async function AnalyticsPage() {
         title="Performance analytics"
         subtitle="Score trend, skill breakdown, and improvement signals from your completed mocks."
       />
+
+      <div className="-mt-4 mb-6">
+        <RetentionProgressCard snap={retentionDashboardSnap} />
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Score Trend */}

@@ -11,11 +11,13 @@ import {
   Settings,
   CreditCard,
   Shield,
+  Award,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { createClient } from '@/lib/supabase/client'
 import type { PlanTier } from '@/types/app.types'
 import { ThemeToggle } from './ThemeToggle'
+import { StreakCounter } from './StreakCounter'
 
 const BRAND_MARK = '/brand/logos/icon-only.svg'
 
@@ -42,6 +44,7 @@ const NAV_SECTIONS = [
   {
     label: 'ACCOUNT',
     items: [
+      { href: '/profile/badges', label: 'Badges', icon: Award },
       { href: '/settings', label: 'Settings', icon: Settings },
       { href: '/upgrade', label: 'Pricing', icon: CreditCard },
       { href: '/admin/dashboard', label: 'Admin', icon: Shield },
@@ -161,6 +164,9 @@ export function Sidebar({
           >
             Practice studio
           </p>
+          <div className="mt-3">
+            <StreakCounter className="w-fit max-w-full" />
+          </div>
         </div>
       </div>
 

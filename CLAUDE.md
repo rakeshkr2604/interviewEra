@@ -346,6 +346,12 @@ Use `createServiceClient()` in API routes when writing after credit deduction or
 
 ---
 
+## SUPABASE MIGRATIONS (OPERATOR PREFERENCE)
+
+**Production schema changes:** apply manually in the **Supabase Dashboard → SQL Editor** using the SQL in `supabase/migrations/` (numeric order). Do **not** assume Supabase CLI `link` / `db push` is used on this machine; source of truth for “what ran in prod” is whatever was executed in the dashboard.
+
+---
+
 ## TWO INTERVIEW SESSION FLOWS
 
 There are two distinct interview UIs — do not conflate them:

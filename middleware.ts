@@ -140,6 +140,7 @@ export async function middleware(request: NextRequest) {
     PUBLIC_ROUTES.has(pathname) ||
     pathname.startsWith('/tools/') ||
     pathname.startsWith('/blog') ||
+    pathname.startsWith('/open/badges') ||
     isSeoSitemapPath;
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
