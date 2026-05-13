@@ -32,14 +32,14 @@ const dmSans = DM_Sans({
 });
 
 /**
- * Mono — marketing hero + scorecard use tabular metrics; preload so first paint matches final font metrics.
+ * Mono — used for code + landing metrics. Not LCP-critical on blog/marketing; avoid render-blocking preload.
  */
 const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "600", "700"],
-  preload: true,
+  preload: false,
   adjustFontFallback: true,
 });
 

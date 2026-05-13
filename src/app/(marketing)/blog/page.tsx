@@ -16,6 +16,14 @@ export const revalidate = 3600;
 
 const BLOG_POSTS = [
   {
+    title: 'Top 10 Interview Questions for Freshers in India 2026',
+    description:
+      'Honest sample answers, common mistakes, and scoring tips for the fresher interview questions asked across Indian campus placements.',
+    href: '/blog/top-10-interview-questions-freshers-india-2026',
+    category: 'Fresher Interviews',
+    readTime: '10 min read',
+  },
+  {
     title: 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026',
     description:
       'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',

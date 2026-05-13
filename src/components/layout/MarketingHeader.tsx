@@ -62,7 +62,7 @@ export function MarketingHeader() {
     };
     const w = window as IdleWindow;
     const handle: number | ReturnType<typeof setTimeout> = w.requestIdleCallback
-      ? w.requestIdleCallback(() => void work(), { timeout: 1500 })
+      ? w.requestIdleCallback(() => void work(), { timeout: 3200 })
       : setTimeout(() => void work(), 0);
 
     return () => {

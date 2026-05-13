@@ -89,6 +89,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.75,
     },
     {
+      url: `${baseUrl}/blog/top-10-interview-questions-freshers-india-2026`,
+      lastModified: now,
+      changeFrequency: 'monthly',
+      priority: 0.85,
+    },
+    {
       url: `${baseUrl}/blog/top-dsa-interview-questions`,
       lastModified: now,
       changeFrequency: 'monthly',
