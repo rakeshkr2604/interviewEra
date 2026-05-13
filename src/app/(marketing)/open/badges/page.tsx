@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { BADGE_DISPLAY } from '@/lib/retention/badge-copy'
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata'
-import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { parseBadgeKeysFromShareParam } from '@/lib/retention/parse-share-badges'
 
 interface PageProps {
@@ -41,11 +41,12 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
   const sp = await searchParams
   const earned = parseBadgeKeysFromShareParam(sp.badges)
 
-  /** Same path as `generateMetadata` — relative so the link works on prod, previews, and local without env drift. */
+  /** Same path as `generateMetadata`; absolute URL ignores polluted NEXT_PUBLIC_APP_URL (localhost). */
   const canonicalPath =
     earned.length > 0
       ? `/open/badges?badges=${encodeURIComponent(earned.join(','))}`
       : '/open/badges'
+  const canonicalHref = canonicalUrl(canonicalPath)
 
   return (
     <div className="mx-auto max-w-xl px-4 py-14 text-center">
@@ -84,14 +85,19 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
         >
           Start free on InterviewEra
         </Link>
-        <Link
-          href={canonicalPath}
-          prefetch={false}
+        {/*
+          Use a real <a> + absolute href + new tab: Next.js <Link> often no-ops when href matches the
+          current URL (same page), so users think the control is broken.
+        */}
+        <a
+          href={canonicalHref}
+          target="_blank"
+          rel="noopener noreferrer"
           className="rounded-xl border px-6 py-3 text-sm font-semibold opacity-85"
           style={{ borderColor: 'var(--card-border)' }}
         >
           Canonical link
-        </Link>
+        </a>
       </div>
     </div>
   )
