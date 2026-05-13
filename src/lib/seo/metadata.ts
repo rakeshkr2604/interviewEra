@@ -1,5 +1,5 @@
 import { Metadata } from 'next'
-import { getCanonicalSiteOrigin } from './site-url'
+import { canonicalUrl, getCanonicalSiteOrigin } from './site-url'
 
 const BASE_URL = getCanonicalSiteOrigin()
 const BRAND = 'InterviewEra'
@@ -82,7 +82,7 @@ export function generateMetadata({
   openGraphType = 'website',
 }: PageSeoParams): Metadata {
   const promoTitle = socialTitle ?? brandPageTitle(title)
-  const url = `${BASE_URL}${path}`
+  const url = canonicalUrl(path)
   const image = ogImage || `${BASE_URL}/og/default.png`
 
   const robotsBlock: Metadata['robots'] = noIndex
@@ -125,6 +125,14 @@ export function generateMetadata({
 /** Self-canonical + `noindex` for authenticated app routes (aligned with `robots.txt` disallow). */
 export function privatePageMetadata(input: Omit<PageSeoParams, 'noIndex'>): Metadata {
   return generateMetadata({ ...input, noIndex: true })
+}
+
+/**
+ * Auth / recovery flows — `noindex` so they do not compete in search, `follow` so equity
+ * still flows to linked marketing pages (Google still recommends crawlable auth when thin).
+ */
+export function authPageMetadata(input: Omit<PageSeoParams, 'noIndex' | 'noIndexFollow'>): Metadata {
+  return generateMetadata({ ...input, noIndex: true, noIndexFollow: true })
 }
 
 export const PAGE_SEO = {

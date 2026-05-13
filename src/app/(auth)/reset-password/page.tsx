@@ -5,9 +5,9 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { ResetPasswordForm } from './ResetPasswordForm';
-import { privatePageMetadata } from '@/lib/seo/metadata';
+import { authPageMetadata } from '@/lib/seo/metadata';
 
-export const metadata = privatePageMetadata({
+export const metadata = authPageMetadata({
   title: 'Set new password',
   description: 'Choose a new password for your InterviewEra account.',
   path: '/reset-password',

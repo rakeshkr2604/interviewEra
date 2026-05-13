@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 
 interface JoinPageProps {
@@ -18,5 +18,5 @@ export default async function JoinPage({ searchParams }: JoinPageProps) {
     });
   }
 
-  redirect('/signup');
+  permanentRedirect('/signup');
 }

@@ -69,11 +69,20 @@ function shouldBypassMiddlewareForUserAgent(userAgent: string | null): boolean {
 
 export async function middleware(request: NextRequest) {
   const host = forwardedHost(request);
+  /** Align with `vercel.json` + GSC: single 301 hop to HTTPS apex (not 308, for parity with platform redirects). */
   if (host === `www.${PRODUCTION_APEX}`) {
     const url = request.nextUrl.clone();
     url.hostname = PRODUCTION_APEX;
     url.protocol = 'https:';
-    return NextResponse.redirect(url, 308);
+    return NextResponse.redirect(url, 301);
+  }
+
+  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() ?? '';
+  if (host === PRODUCTION_APEX && proto === 'http') {
+    const url = request.nextUrl.clone();
+    url.hostname = PRODUCTION_APEX;
+    url.protocol = 'https:';
+    return NextResponse.redirect(url, 301);
   }
 
   if (shouldBypassMiddlewareForUserAgent(request.headers.get('user-agent'))) {
@@ -121,10 +130,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(callbackUrl);
   }
 
+  const isSeoSitemapPath =
+    pathname === '/sitemap.xml' ||
+    pathname === '/pages-sitemap.xml' ||
+    pathname === '/blog-sitemap.xml' ||
+    pathname === '/tools-sitemap.xml';
+
   const isPublic =
     PUBLIC_ROUTES.has(pathname) ||
     pathname.startsWith('/tools/') ||
-    pathname.startsWith('/blog');
+    pathname.startsWith('/blog') ||
+    isSeoSitemapPath;
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
 
@@ -179,6 +195,6 @@ export const config = {
      * well-known files, and common asset extensions (reduces edge work + avoids bot/thumbnail 403s).
      * HTML document routes (/, /about, /pricing, …) still match so www→apex runs for real browsers.
      */
-    '/((?!_next/static|_next/image|_next/data|_vercel/|favicon\\.ico|site\\.webmanifest|robots\\.txt|sitemap\\.xml|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|woff2?|ttf|otf|eot|webmanifest)$).*)',
+    '/((?!_next/static|_next/image|_next/data|_vercel/|favicon\\.ico|robots\\.txt|sitemap\\.xml|pages-sitemap\\.xml|blog-sitemap\\.xml|tools-sitemap\\.xml|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|woff2?|ttf|otf|eot)$).*)',
   ],
 };

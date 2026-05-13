@@ -1,4 +1,5 @@
 import MarketingLayout from '@/app/(marketing)/layout';
+import { HomeMoneyPageLinks } from '@/components/seo/HomeMoneyPageLinks';
 import LandingHero from '@/components/landing/LandingHero';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
 import { PAGE_SEO } from '@/lib/seo/metadata';
@@ -23,6 +24,7 @@ export default function Page() {
           countPill={<HeroBetaPill />}
         />
         <LandingHomeClient />
+        <HomeMoneyPageLinks />
       </main>
     </MarketingLayout>
   );

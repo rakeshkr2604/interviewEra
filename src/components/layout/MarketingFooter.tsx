@@ -9,7 +9,9 @@ const PRODUCT_LINKS = [
   { href: '/about', label: 'About' },
   { href: '/pricing', label: 'Pricing' },
   { href: '/campus', label: 'For Colleges' },
-  { href: '/tools/question-generator', label: 'Free Tools' },
+  { href: '/tools/question-generator', label: 'Question generator' },
+  { href: '/tools/ats-checker', label: 'ATS resume checker' },
+  { href: '/tools/star-builder', label: 'STAR answer builder' },
 ] as const;
 
 const LEGAL_LINKS = [

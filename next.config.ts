@@ -59,7 +59,7 @@ const nextConfig: NextConfig = {
       {
         source: '/manifest.json',
         destination: '/site.webmanifest',
-        permanent: false,
+        permanent: true,
       },
       {
         source: '/onboarding/avatar',
@@ -142,7 +142,14 @@ const nextConfig: NextConfig = {
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
     ];
 
-    return [{ source: "/(.*)", headers: securityHeaders }];
+    const nonIndexAssetHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] as const;
+
+    return [
+      { source: "/site.webmanifest", headers: [...nonIndexAssetHeaders] },
+      { source: "/manifest.json", headers: [...nonIndexAssetHeaders] },
+      { source: "/_next/static/media/:path*", headers: [...nonIndexAssetHeaders] },
+      { source: "/(.*)", headers: securityHeaders },
+    ];
   },
 };
 

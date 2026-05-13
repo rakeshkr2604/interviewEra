@@ -7,9 +7,9 @@ import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { LoginForm } from './LoginForm';
 
-import { privatePageMetadata } from '@/lib/seo/metadata';
+import { authPageMetadata } from '@/lib/seo/metadata';
 
-export const metadata = privatePageMetadata({
+export const metadata = authPageMetadata({
   title: 'Login',
   description: 'Sign in to InterviewEra — AI mock interviews tailored to your resume.',
   path: '/login',
