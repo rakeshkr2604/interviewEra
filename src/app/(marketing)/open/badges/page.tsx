@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
 import { BADGE_DISPLAY } from '@/lib/retention/badge-copy'
+import { parseBadgeKeysFromShareParam } from '@/lib/retention/parse-share-badges'
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata'
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
-import { parseBadgeKeysFromShareParam } from '@/lib/retention/parse-share-badges'
+import { CopyBadgeShareLinkButton } from '@/components/retention/CopyBadgeShareLinkButton'
 
 interface PageProps {
   searchParams: Promise<{ badges?: string }>
@@ -85,19 +86,11 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
         >
           Start free on InterviewEra
         </Link>
-        {/*
-          Use a real <a> + absolute href + new tab: Next.js <Link> often no-ops when href matches the
-          current URL (same page), so users think the control is broken.
-        */}
-        <a
-          href={canonicalHref}
-          target="_blank"
-          rel="noopener noreferrer"
+        <CopyBadgeShareLinkButton
+          url={canonicalHref}
           className="rounded-xl border px-6 py-3 text-sm font-semibold opacity-85"
-          style={{ borderColor: 'var(--card-border)' }}
-        >
-          Canonical link
-        </a>
+          style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+        />
       </div>
     </div>
   )
