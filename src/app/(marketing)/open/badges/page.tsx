@@ -2,7 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { BADGE_DISPLAY } from '@/lib/retention/badge-copy'
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata'
-import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
+import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { parseBadgeKeysFromShareParam } from '@/lib/retention/parse-share-badges'
 
 interface PageProps {
@@ -41,11 +41,11 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
   const sp = await searchParams
   const earned = parseBadgeKeysFromShareParam(sp.badges)
 
-  const absolute = canonicalUrl(
+  /** Same path as `generateMetadata` — relative so the link works on prod, previews, and local without env drift. */
+  const canonicalPath =
     earned.length > 0
       ? `/open/badges?badges=${encodeURIComponent(earned.join(','))}`
-      : '/open/badges',
-  )
+      : '/open/badges'
 
   return (
     <div className="mx-auto max-w-xl px-4 py-14 text-center">
@@ -84,13 +84,14 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
         >
           Start free on InterviewEra
         </Link>
-        <a
-          href={absolute}
+        <Link
+          href={canonicalPath}
+          prefetch={false}
           className="rounded-xl border px-6 py-3 text-sm font-semibold opacity-85"
           style={{ borderColor: 'var(--card-border)' }}
         >
           Canonical link
-        </a>
+        </Link>
       </div>
     </div>
   )
