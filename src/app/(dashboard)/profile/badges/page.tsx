@@ -18,12 +18,6 @@ export const metadata: Metadata = privatePageMetadata({
   path: '/profile/badges',
 })
 
-function shareOrigin(): string {
-  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim()?.replace(/\/$/, '')
-  if (raw) return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`
-  return getCanonicalSiteOrigin()
-}
-
 function parseEarnedKeys(raw: unknown): Set<BadgeKey> {
   const have = new Set<BadgeKey>()
   if (!Array.isArray(raw)) return have
@@ -55,10 +49,11 @@ export default async function ProfileBadgesPage() {
 
   const orderedEarnedForShare = BADGE_KEYS.filter((k) => earnedKeys.has(k))
 
+  const origin = getCanonicalSiteOrigin()
   const sharePage =
     orderedEarnedForShare.length > 0
-      ? `${shareOrigin()}/open/badges?badges=${encodeURIComponent(orderedEarnedForShare.join(','))}`
-      : `${shareOrigin()}/open/badges`
+      ? `${origin}/open/badges?badges=${encodeURIComponent(orderedEarnedForShare.join(','))}`
+      : `${origin}/open/badges`
   const linkedInHref = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
     sharePage,
   )}`
