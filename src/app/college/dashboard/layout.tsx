@@ -34,6 +34,17 @@ export default async function CollegeDashboardLayout({
 
   if (!user) redirect('/login');
 
+  // Fetch plan_tier to gate the campus admin area
+  const { data: profile } = await supabase
+    .from('users')
+    .select('plan_tier')
+    .eq('id', user.id)
+    .single();
+
+  if (profile?.plan_tier !== 'campus_admin') {
+    redirect('/dashboard');
+  }
+
   const org = await getCampusOrg(user.id);
 
   if (!org) {

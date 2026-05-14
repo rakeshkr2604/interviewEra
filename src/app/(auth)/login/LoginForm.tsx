@@ -71,7 +71,26 @@ export function LoginForm({ next }: LoginFormProps) {
         return;
       }
 
-      router.push(next ?? '/dashboard');
+      // If an explicit next param is provided, always honour it (e.g. invite accept flow).
+      if (next) {
+        router.push(next);
+        return;
+      }
+
+      // Role-based default redirect: campus admins go to their T&P dashboard.
+      const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+      let destination = '/dashboard';
+      if (loggedInUser) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('plan_tier')
+          .eq('id', loggedInUser.id)
+          .single();
+        if (profile?.plan_tier === 'campus_admin') {
+          destination = '/college/dashboard';
+        }
+      }
+      router.push(destination);
     } catch {
       setError('An unexpected error occurred. Please try again.');
     } finally {

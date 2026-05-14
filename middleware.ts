@@ -10,6 +10,8 @@ const PUBLIC_ROUTES = new Set([
   '/pricing',
   '/about',
   '/campus',
+  '/college',        // college marketing/landing page
+  '/college/signup', // T&P officer signup form
   '/join',
   '/privacy',
   '/terms',

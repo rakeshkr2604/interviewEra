@@ -19,18 +19,46 @@ export function AdminTopBar() {
         </span>
         <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <Link
-            href="/admin/dashboard"
+            href="/college/dashboard"
             className="transition-opacity hover:opacity-80"
             style={{ color: 'var(--text-secondary)' }}
           >
             Dashboard
           </Link>
           <Link
-            href="/admin/bulk-invite"
+            href="/college/dashboard/students"
+            className="transition-opacity hover:opacity-80"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Students
+          </Link>
+          <Link
+            href="/college/dashboard/students"
             className="transition-opacity hover:opacity-80"
             style={{ color: 'var(--text-secondary)' }}
           >
             Invite Students
+          </Link>
+          <Link
+            href="/college/dashboard/deadlines"
+            className="transition-opacity hover:opacity-80"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Deadlines
+          </Link>
+          <Link
+            href="/college/dashboard/analytics"
+            className="transition-opacity hover:opacity-80"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Analytics
+          </Link>
+          <Link
+            href="/college/dashboard/settings"
+            className="transition-opacity hover:opacity-80"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            Settings
           </Link>
         </nav>
       </div>
