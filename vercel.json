@@ -1,5 +1,5 @@
 {
-  "installCommand": "npm install --no-fund --no-audit --loglevel=error",
+  "installCommand": "npm install --no-fund --no-audit --loglevel=error --include=dev",
   "functions": {
     "src/app/api/resume/upload/route.ts": { "maxDuration": 60 },
     "src/app/api/resume/parse/route.ts": { "maxDuration": 60 },
