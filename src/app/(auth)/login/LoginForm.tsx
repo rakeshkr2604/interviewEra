@@ -41,7 +41,11 @@ const inputClass = cn(
 
 const cardInnerBg = 'color-mix(in srgb, var(--card-bg) 94%, transparent)';
 
-export function LoginForm() {
+interface LoginFormProps {
+  next?: string;
+}
+
+export function LoginForm({ next }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +71,7 @@ export function LoginForm() {
         return;
       }
 
-      router.push('/dashboard');
+      router.push(next ?? '/dashboard');
     } catch {
       setError('An unexpected error occurred. Please try again.');
     } finally {

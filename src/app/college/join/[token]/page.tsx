@@ -105,7 +105,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
               Sign in with your email to accept the invitation.
             </p>
             <Link
-              href={`/login?email=${encodeURIComponent(invite.email)}`}
+              href={`/login?email=${encodeURIComponent(invite.email)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
               className="block w-full rounded-lg bg-blue-600 px-4 py-2.5 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
             >
               Sign In
@@ -113,7 +113,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
             <p className="text-center text-sm text-gray-600">
               Don't have an account?{' '}
               <Link
-                href={`/signup?email=${encodeURIComponent(invite.email)}`}
+                href={`/signup?email=${encodeURIComponent(invite.email)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
                 className="font-semibold text-blue-600 hover:text-blue-700"
               >
                 Create one

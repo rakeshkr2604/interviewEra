@@ -7,6 +7,10 @@ import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { SignupForm } from './SignupForm';
 import { authPageMetadata } from '@/lib/seo/metadata';
 
+interface SignupPageProps {
+  searchParams: Promise<{ next?: string; email?: string }>;
+}
+
 export const metadata = authPageMetadata({
   title: 'Sign up',
   description:
@@ -21,7 +25,9 @@ const BULLETS = [
   { icon: CalendarPlus, text: 'Optional placement month helps us tune your prep rhythm' },
 ] as const;
 
-export default function SignupPage() {
+export default async function SignupPage({ searchParams }: SignupPageProps) {
+  const { next: rawNext } = await searchParams;
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : undefined;
   return (
     <div
       className="ie-landing-premium min-h-screen"
@@ -59,7 +65,7 @@ export default function SignupPage() {
                   Create your account
                 </h1>
                 <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-                  Now in private beta — join the waitlist for resume-aware mocks with rubric scoring, built for placement season
+                  AI mock interviews tailored to your resume, with rubric-scored feedback built for placement season
                   and early-career interviews.
                 </p>
               </div>
@@ -82,7 +88,7 @@ export default function SignupPage() {
               </ul>
             </>
           }
-          right={<SignupForm />}
+          right={<SignupForm next={next} />}
         />
       </AuthPremiumShell>
     </div>

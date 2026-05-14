@@ -57,7 +57,11 @@ function SelectShell({ id, label, children }: { id: string; label: string; child
   );
 }
 
-export function SignupForm() {
+interface SignupFormProps {
+  next?: string;
+}
+
+export function SignupForm({ next }: SignupFormProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -103,7 +107,7 @@ export function SignupForm() {
       }
 
       if (data.session) {
-        router.push('/dashboard');
+        router.push(next ?? '/dashboard');
       } else {
         setFeedback({
           kind: 'success',

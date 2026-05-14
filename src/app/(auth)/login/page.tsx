@@ -16,6 +16,10 @@ export const metadata = authPageMetadata({
   path: '/login',
 });
 
+interface LoginPageProps {
+  searchParams: Promise<{ next?: string; email?: string }>;
+}
+
 type Bullet =
   | { kind: 'lucide'; icon: LucideIcon; text: string }
   | { kind: 'brand'; text: string };
@@ -26,7 +30,10 @@ const BULLETS: Bullet[] = [
   { kind: 'brand', text: 'Free to start — upgrade when you want deeper analytics' },
 ];
 
-export default function LoginPage() {
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const { next: rawNext } = await searchParams;
+  // Validate: only allow same-origin paths to prevent open-redirect
+  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : undefined;
   return (
     <div
       className="ie-landing-premium min-h-screen"
@@ -103,7 +110,7 @@ export default function LoginPage() {
               </ul>
             </>
           }
-          right={<LoginForm />}
+          right={<LoginForm next={next} />}
         />
       </AuthPremiumShell>
     </div>

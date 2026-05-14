@@ -133,35 +133,80 @@ export async function POST(request: Request): Promise<NextResponse> {
     for (let i = 0; i < insertedInvites.length; i += BATCH_SIZE) {
       const batch = insertedInvites.slice(i, i + BATCH_SIZE);
       const results = await Promise.allSettled(
-        batch.map((invite) =>
-          resend.emails.send({
+        batch.map((invite) => {
+          const inviteUrl = `${appUrl}/college/join/${invite.token}`;
+          return resend.emails.send({
             from: 'InterviewEra Campus <campus@interviewera.com>',
             to: invite.email,
-            subject: `You've been invited to InterviewEra by ${org.name}`,
-            html: `
-              <div style="font-family:sans-serif;max-width:520px;margin:auto;padding:32px">
-                <h2 style="margin-bottom:8px">You&apos;re invited to InterviewEra</h2>
-                <p style="color:#555">
-                  <strong>${org.name}</strong> has invited you to InterviewEra — an AI-powered
-                  mock interview platform in private beta, built for structured campus and internship prep.
-                </p>
-                <p style="color:#555">
-                  Your campus plan gives you <strong>unlimited practice interviews</strong>
-                  with detailed AI feedback.
-                </p>
-                <a
-                  href="${appUrl}/join?token=${invite.token}"
-                  style="display:inline-block;margin-top:20px;padding:12px 24px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600"
-                >
-                  Accept Invitation
-                </a>
-                <p style="margin-top:24px;font-size:12px;color:#999">
-                  This link is unique to your email. Do not share it.
-                </p>
-              </div>
-            `,
-          })
-        )
+            subject: `${org.name} has invited you to join InterviewEra`,
+            html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>You're invited to InterviewEra</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#f4f5f7;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:560px;">
+          <tr>
+            <td style="padding-bottom:24px;text-align:center;">
+              <span style="font-size:20px;font-weight:700;color:#1e293b;letter-spacing:-0.3px;">Interview<span style="color:#2563eb;">Era</span></span>
+            </td>
+          </tr>
+          <tr>
+            <td style="background-color:#ffffff;border-radius:12px;padding:40px 40px 32px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+              <p style="margin:0 0 24px;font-size:13px;font-weight:600;color:#2563eb;text-transform:uppercase;letter-spacing:0.06em;">${org.name}</p>
+              <h1 style="margin:0 0 12px;font-size:24px;font-weight:700;color:#0f172a;line-height:1.3;">You're invited to join InterviewEra</h1>
+              <p style="margin:0 0 20px;font-size:15px;color:#475569;line-height:1.65;">
+                Your T&amp;P department has enrolled you in <strong style="color:#0f172a;">${org.name}</strong>'s
+                campus placement preparation program, powered by InterviewEra.
+              </p>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin:0 0 28px;background-color:#f8fafc;border-radius:8px;padding:20px 20px 12px;">
+                <tr>
+                  <td>
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:600;color:#0f172a;">Your campus plan includes:</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Unlimited AI mock interviews, tailored to your resume</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Detailed scoring across 5 performance dimensions</p>
+                    <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Progress tracking and placement-readiness analytics</p>
+                    <p style="margin:0 0 0;font-size:14px;color:#475569;">&#10003; &nbsp;Interview replay and model answer comparison</p>
+                  </td>
+                </tr>
+              </table>
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td align="center" style="padding:4px 0 24px;">
+                    <a href="${inviteUrl}" style="display:inline-block;background-color:#2563eb;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 36px;border-radius:8px;letter-spacing:0.01em;">
+                      Accept Invitation &rarr;
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 20px;font-size:13px;color:#64748b;text-align:center;">This invitation expires in <strong>7 days</strong>.</p>
+              <hr style="border:none;border-top:1px solid #e2e8f0;margin:0 0 20px;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;line-height:1.6;">
+                This invitation was sent to <strong>${invite.email}</strong>. If you did not expect this email,
+                you can safely ignore it — your account will not be activated unless you click the button above.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px 0 0;text-align:center;">
+              <p style="margin:0;font-size:12px;color:#94a3b8;">
+                &copy; 2026 InterviewEra &nbsp;&middot;&nbsp; AI-powered campus placement preparation
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`,
+          });
+        })
       );
 
       for (const result of results) {
