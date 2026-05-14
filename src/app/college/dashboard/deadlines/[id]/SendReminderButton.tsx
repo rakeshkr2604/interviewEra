@@ -56,20 +56,35 @@ export function SendReminderButton({
       <button
         onClick={handleSendReminder}
         disabled={loading}
-        className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:pointer-events-none disabled:opacity-60"
+        className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+        style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
       >
         <Mail className="h-4 w-4" />
         {loading ? 'Sending...' : `Send Reminder (${incompleteStuents.length})`}
       </button>
 
       {error && (
-        <div className="fixed bottom-4 right-4 rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700 max-w-sm">
+        <div
+          className="fixed bottom-4 right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
+          style={{
+            background: 'color-mix(in srgb, var(--accent-danger) 8%, var(--card-bg))',
+            borderColor: 'color-mix(in srgb, var(--accent-danger) 30%, transparent)',
+            color: 'var(--accent-danger)',
+          }}
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div className="fixed bottom-4 right-4 rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700 max-w-sm">
+        <div
+          className="fixed bottom-4 right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
+          style={{
+            background: 'color-mix(in srgb, var(--accent-success) 8%, var(--card-bg))',
+            borderColor: 'color-mix(in srgb, var(--accent-success) 30%, transparent)',
+            color: 'var(--accent-success)',
+          }}
+        >
           Reminders sent to {incompleteStuents.length} student{incompleteStuents.length !== 1 ? 's' : ''}!
         </div>
       )}

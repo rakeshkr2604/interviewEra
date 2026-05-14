@@ -90,7 +90,6 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
     ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
     : null;
 
-  // Active this week = completed at least one interview in last 7 days
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
   const activeThisWeek = new Set(
@@ -99,7 +98,6 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
       .map((i) => i.user_id)
   ).size;
 
-  // Per-student score map for top performers
   const scoresByStudent: Record<string, number[]> = {};
   const completedByStudent: Record<string, number> = {};
   (reports ?? []).forEach((r) => {
@@ -166,18 +164,20 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5">
+    <div
+      className="dashboard-premium-card p-5"
+    >
       <div className="flex items-start justify-between">
-        <p className="text-sm font-medium text-gray-500">{label}</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-lg"
-          style={{ background: accent ?? '#eff6ff' }}
+          style={{ background: accent ?? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
         >
-          <Icon className="h-4 w-4 text-blue-600" />
+          <Icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
         </span>
       </div>
-      <p className="mt-3 text-3xl font-bold text-gray-900">{value}</p>
-      {sub && <p className="mt-1 text-xs text-gray-400">{sub}</p>}
+      <p className="mt-3 text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+      {sub && <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
     </div>
   );
 }
@@ -200,14 +200,23 @@ export default async function CollegeDashboardPage() {
     <div className="space-y-8">
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Overview</h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.14em]"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            Campus
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            Overview
+          </h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             Track student performance and placement readiness.
           </p>
         </div>
         <Link
           href="/college/dashboard/students"
-          className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+          style={{ background: 'var(--accent-primary)' }}
         >
           + Invite Students
         </Link>
@@ -228,60 +237,67 @@ export default async function CollegeDashboardPage() {
               value={stats.completedInterviews}
               sub={`${stats.avgInterviewsPerStudent} avg per student`}
               icon={BarChart2}
-              accent="#f0fdf4"
+              accent="color-mix(in srgb, var(--accent-success) 12%, transparent)"
             />
             <StatCard
               label="Cohort Avg Score"
               value={stats.averageScore !== null ? `${stats.averageScore}/10` : '—'}
               sub="across all interviews"
               icon={TrendingUp}
-              accent="#fefce8"
+              accent="color-mix(in srgb, var(--accent-warning) 14%, transparent)"
             />
             <StatCard
               label="Placement Ready"
               value={stats.placementReadyCount}
               sub="avg score ≥ 7"
               icon={Award}
-              accent="#fdf4ff"
+              accent="color-mix(in srgb, #a855f7 12%, transparent)"
             />
           </div>
 
           {/* Secondary stats */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+            <div className="dashboard-premium-card p-5">
+              <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 <Activity className="h-4 w-4" />
                 Active This Week
               </div>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{stats.activeThisWeek}</p>
-              <p className="text-xs text-gray-400">students completed an interview</p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.activeThisWeek}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>students completed an interview</p>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <p className="text-sm font-medium text-gray-500">Completion Rate</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{stats.completionRate}%</p>
-              <div className="mt-2 h-1.5 rounded-full bg-gray-100">
+            <div className="dashboard-premium-card p-5">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Completion Rate</p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.completionRate}%</p>
+              <div className="mt-2 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                 <div
-                  className="h-full rounded-full bg-blue-500"
-                  style={{ width: `${stats.completionRate}%` }}
+                  className="h-full rounded-full transition-all"
+                  style={{ width: `${stats.completionRate}%`, background: 'var(--accent-primary)' }}
                 />
               </div>
             </div>
-            <div className="rounded-xl border border-gray-200 bg-white p-5">
-              <p className="text-sm font-medium text-gray-500">Pending Invites</p>
-              <p className="mt-2 text-2xl font-bold text-gray-900">{stats.pendingInvites}</p>
-              <p className="text-xs text-gray-400">awaiting acceptance</p>
+            <div className="dashboard-premium-card p-5">
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Pending Invites</p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.pendingInvites}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>awaiting acceptance</p>
             </div>
           </div>
 
           {/* Top performers */}
           {stats.topPerformers.length > 0 && (
-            <div className="rounded-xl border border-gray-200 bg-white">
-              <div className="border-b border-gray-100 px-5 py-4">
-                <h3 className="text-base font-semibold text-gray-900">Top Performers</h3>
+            <div className="dashboard-premium-card overflow-hidden">
+              <div
+                className="border-b px-5 py-4"
+                style={{ borderColor: 'var(--card-border)' }}
+              >
+                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Top Performers</h3>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div>
                 {stats.topPerformers.map((p, i) => (
-                  <div key={p.email} className="flex items-center justify-between px-5 py-3">
+                  <div
+                    key={p.email}
+                    className="flex items-center justify-between px-5 py-3 transition-colors"
+                    style={{ borderBottom: i < stats.topPerformers.length - 1 ? `1px solid var(--card-border)` : undefined }}
+                  >
                     <div className="flex items-center gap-3">
                       <span
                         className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
@@ -290,11 +306,11 @@ export default async function CollegeDashboardPage() {
                         {i + 1}
                       </span>
                       <div>
-                        <p className="text-sm font-semibold text-gray-900">{p.name ?? '—'}</p>
-                        <p className="text-xs text-gray-400">{p.email}</p>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{p.name ?? '—'}</p>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.email}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-bold text-gray-900">{p.score}/10</span>
+                    <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{p.score}/10</span>
                   </div>
                 ))}
               </div>
@@ -311,65 +327,79 @@ export default async function CollegeDashboardPage() {
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-5 py-4 transition-shadow hover:shadow-sm"
+                className="dashboard-premium-card flex items-center justify-between px-5 py-4 transition-all hover:-translate-y-0.5"
               >
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50">
-                    <item.icon className="h-4 w-4 text-blue-600" />
+                  <span
+                    className="flex h-9 w-9 items-center justify-center rounded-lg"
+                    style={{ background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
+                  >
+                    <item.icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{item.label}</p>
-                    <p className="text-xs text-gray-400">{item.sub}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.sub}</p>
                   </div>
                 </div>
-                <ArrowRight className="h-4 w-4 text-gray-300" />
+                <ArrowRight className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
               </Link>
             ))}
           </div>
         </>
       ) : (
-        /* Production-grade empty state */
+        /* Empty state */
         <div className="space-y-6">
-          <div className="rounded-2xl border-2 border-dashed border-gray-200 bg-gray-50 px-8 py-16 text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600">
+          <div
+            className="rounded-2xl border-2 border-dashed px-8 py-16 text-center"
+            style={{ borderColor: 'var(--card-border)', background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)' }}
+          >
+            <div
+              className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
+              style={{ background: 'var(--accent-primary)' }}
+            >
               <Users className="h-8 w-8 text-white" />
             </div>
-            <h3 className="text-xl font-bold text-gray-900">No students enrolled yet</h3>
-            <p className="mx-auto mt-2 max-w-sm text-sm text-gray-500">
-              Invite your students by uploading a CSV or entering emails manually. They&apos;ll
-              receive a professional onboarding email with instructions to get started.
+            <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>No students enrolled yet</h3>
+            <p className="mx-auto mt-2 max-w-sm text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Invite your students by uploading a CSV or entering emails manually.
             </p>
             <div className="mt-6 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link
                 href="/college/dashboard/students"
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+                style={{ background: 'var(--accent-primary)' }}
               >
                 Invite Students
                 <ArrowRight className="h-4 w-4" />
               </Link>
               {stats.pendingInvites > 0 && (
-                <p className="text-sm text-gray-500">
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {stats.pendingInvites} invitation{stats.pendingInvites !== 1 ? 's' : ''} pending
-                  acceptance
                 </p>
               )}
             </div>
           </div>
 
-          {/* Seat summary even when empty */}
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          {/* Seat summary */}
+          <div className="dashboard-premium-card p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-500">Seats Available</p>
-                <p className="mt-1 text-2xl font-bold text-gray-900">
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Seats Available</p>
+                <p className="mt-1 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {stats.seatCount - stats.seatsUsed}
-                  <span className="ml-1 text-base font-normal text-gray-400">
+                  <span className="ml-1 text-base font-normal" style={{ color: 'var(--text-muted)' }}>
                     / {stats.seatCount} total
                   </span>
                 </p>
               </div>
-              <div className="h-12 w-12 rounded-full border-4 border-blue-100 flex items-center justify-center">
-                <span className="text-xs font-bold text-blue-600">
+              <div
+                className="flex h-12 w-12 items-center justify-center rounded-full border-4"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)',
+                  background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
+                }}
+              >
+                <span className="text-xs font-bold" style={{ color: 'var(--accent-primary)' }}>
                   {stats.seatCount - stats.seatsUsed}
                 </span>
               </div>

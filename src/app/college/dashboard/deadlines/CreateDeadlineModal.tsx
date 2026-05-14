@@ -99,37 +99,48 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
     }
   }
 
+  const inputStyle = {
+    border: '1.5px solid var(--card-border)',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <button
         onClick={() => setOpen(true)}
-        className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+        className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+        style={{ background: 'var(--accent-primary)' }}
       >
         + Create Deadline
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Create Deadline</h2>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div
+            className="rounded-[22px] p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+            style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+          >
+            <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Create Deadline</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Title / Description <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Title / Description <span style={{ color: 'var(--accent-danger)' }}>*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="e.g., Complete baseline assessment"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Type <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  Type <span style={{ color: 'var(--accent-danger)' }}>*</span>
                 </label>
                 <div className="space-y-2">
                   {(['sessions', 'tier', 'score'] as const).map((type) => (
@@ -140,9 +151,9 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
                         value={type}
                         checked={formData.type === type}
                         onChange={(e) => setFormData({ ...formData, type: e.target.value as DeadlineType })}
-                        className="w-4 h-4 text-blue-600"
+                        className="w-4 h-4"
                       />
-                      <span className="text-sm text-gray-700">
+                      <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                         {type === 'sessions' ? '📝 Complete Sessions' : type === 'tier' ? '⬆️ Unlock Tier' : '⭐ Achieve Score'}
                       </span>
                     </label>
@@ -151,8 +162,8 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {targetLabels[formData.type]} <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  {targetLabels[formData.type]} <span style={{ color: 'var(--accent-danger)' }}>*</span>
                 </label>
                 <input
                   type="number"
@@ -162,19 +173,21 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
                   value={formData.targetValue}
                   onChange={(e) => setFormData({ ...formData, targetValue: e.target.value })}
                   placeholder={placeholders[formData.type]}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  style={inputStyle}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Due Date <span className="text-red-500">*</span>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+                  Due Date <span style={{ color: 'var(--accent-danger)' }}>*</span>
                 </label>
                 <input
                   type="date"
                   value={formData.dueDate}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2"
+                  style={inputStyle}
                 />
               </div>
 
@@ -183,19 +196,33 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
                   type="checkbox"
                   checked={formData.mandatory}
                   onChange={(e) => setFormData({ ...formData, mandatory: e.target.checked })}
-                  className="w-4 h-4 text-blue-600 rounded"
+                  className="w-4 h-4 rounded"
                 />
-                <span className="text-sm text-gray-700">Mandatory deadline</span>
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Mandatory deadline</span>
               </label>
 
               {error && (
-                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                <div
+                  className="rounded-xl border p-3 text-sm"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--accent-danger) 30%, transparent)',
+                    color: 'var(--accent-danger)',
+                  }}
+                >
                   {error}
                 </div>
               )}
 
               {success && (
-                <div className="rounded-lg bg-green-50 border border-green-200 p-3 text-sm text-green-700">
+                <div
+                  className="rounded-xl border p-3 text-sm"
+                  style={{
+                    background: 'color-mix(in srgb, var(--accent-success) 8%, transparent)',
+                    borderColor: 'color-mix(in srgb, var(--accent-success) 30%, transparent)',
+                    color: 'var(--accent-success)',
+                  }}
+                >
                   Deadline created successfully!
                 </div>
               )}
@@ -204,14 +231,16 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="flex-1 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="flex-1 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:opacity-80"
+                  style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-60"
+                  className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-60"
+                  style={{ background: 'var(--accent-primary)' }}
                 >
                   {loading ? 'Creating...' : 'Create Deadline'}
                 </button>

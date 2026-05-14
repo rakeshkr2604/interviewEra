@@ -169,69 +169,73 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
       <div>
         <Link
           href="/college/dashboard/deadlines"
-          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 mb-3"
+          className="inline-flex items-center gap-1 text-sm font-medium mb-3 transition-opacity hover:opacity-70"
+          style={{ color: 'var(--accent-primary)' }}
         >
           <ArrowLeft className="h-4 w-4" />
           Back to Deadlines
         </Link>
-        <h1 className="text-3xl font-semibold text-gray-900">{deadline.description}</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <h1 className="text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>{deadline.description}</h1>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
           {typeIcons[deadline.deadline_type]} {typeLabels[deadline.deadline_type]} — Target: {deadline.target_value}
         </p>
       </div>
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Due Date</p>
-          <p className={`mt-1 text-lg font-semibold ${isOverdue ? 'text-red-600' : 'text-gray-900'}`}>
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Due Date</p>
+          <p className="mt-1 text-lg font-semibold" style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
             {new Date(deadline.due_date).toLocaleDateString('en-IN')}
           </p>
-          <p className={`text-xs mt-1 ${isOverdue ? 'text-red-500' : 'text-gray-500'}`}>
+          <p className="text-xs mt-1" style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-muted)' }}>
             {isOverdue ? `Overdue by ${Math.abs(daysRemaining)} days` : `${daysRemaining} days remaining`}
           </p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Completion Rate</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">{completionPercentage}%</p>
-          <p className="text-xs mt-1 text-gray-500">
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Completion Rate</p>
+          <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{completionPercentage}%</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
             {stats.completed}/{stats.total} students
           </p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">In Progress</p>
-          <p className="mt-1 text-lg font-semibold text-blue-600">{stats.inProgress}</p>
-          <p className="text-xs mt-1 text-gray-500">students working</p>
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>In Progress</p>
+          <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--accent-primary)' }}>{stats.inProgress}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>students working</p>
         </div>
 
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Not Started</p>
-          <p className="mt-1 text-lg font-semibold text-gray-900">{stats.notStarted}</p>
-          <p className="text-xs mt-1 text-gray-500">students</p>
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Not Started</p>
+          <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.notStarted}</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>students</p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Overall Progress</h3>
+      <div className="dashboard-premium-card">
+        <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Overall Progress</h3>
         <div className="space-y-3">
           {/* Stacked Progress Bar */}
-          <div className="flex h-8 rounded-lg overflow-hidden border border-gray-300">
+          <div
+            className="flex h-8 rounded-xl overflow-hidden border"
+            style={{ borderColor: 'var(--card-border)' }}
+          >
             <div
-              className="bg-green-500 transition-all"
-              style={{ width: `${(stats.completed / stats.total) * 100}%` }}
+              className="transition-all"
+              style={{ width: `${(stats.completed / stats.total) * 100}%`, background: 'var(--accent-success)' }}
               title={`Completed: ${stats.completed}`}
             />
             <div
-              className="bg-blue-500 transition-all"
-              style={{ width: `${(stats.inProgress / stats.total) * 100}%` }}
+              className="transition-all"
+              style={{ width: `${(stats.inProgress / stats.total) * 100}%`, background: 'var(--accent-primary)' }}
               title={`In Progress: ${stats.inProgress}`}
             />
             <div
-              className="bg-gray-300 transition-all"
-              style={{ width: `${(stats.notStarted / stats.total) * 100}%` }}
+              className="transition-all flex-1"
+              style={{ background: 'var(--bg-tertiary, var(--bg-secondary))' }}
               title={`Not Started: ${stats.notStarted}`}
             />
           </div>
@@ -239,20 +243,20 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
           {/* Legend */}
           <div className="grid grid-cols-3 gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-green-500" />
-              <span className="text-gray-600">
+              <div className="w-3 h-3 rounded-full" style={{ background: 'var(--accent-success)' }} />
+              <span style={{ color: 'var(--text-secondary)' }}>
                 Completed: <span className="font-semibold">{stats.completed}</span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500" />
-              <span className="text-gray-600">
+              <div className="w-3 h-3 rounded-full" style={{ background: 'var(--accent-primary)' }} />
+              <span style={{ color: 'var(--text-secondary)' }}>
                 In Progress: <span className="font-semibold">{stats.inProgress}</span>
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-gray-300" />
-              <span className="text-gray-600">
+              <div className="w-3 h-3 rounded-full" style={{ background: 'var(--card-border)' }} />
+              <span style={{ color: 'var(--text-secondary)' }}>
                 Not Started: <span className="font-semibold">{stats.notStarted}</span>
               </span>
             </div>
@@ -268,7 +272,10 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
             incompleteStuents={incomplete.map((s) => s.email)}
             deadlineDescription={deadline.description ?? 'Deadline'}
           />
-          <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+          <button
+            className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
+          >
             <Download className="h-4 w-4" />
             Export CSV
           </button>

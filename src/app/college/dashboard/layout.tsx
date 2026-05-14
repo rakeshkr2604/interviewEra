@@ -1,16 +1,8 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { Users, BarChart3, Calendar, Settings, Home } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const navItems = [
-  { href: '/college/dashboard', label: 'Overview', icon: Home },
-  { href: '/college/dashboard/students', label: 'Students', icon: Users },
-  { href: '/college/dashboard/deadlines', label: 'Deadlines', icon: Calendar },
-  { href: '/college/dashboard/analytics', label: 'Analytics', icon: BarChart3 },
-  { href: '/college/dashboard/settings', label: 'Settings', icon: Settings },
-];
+import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
+import { CollegeDashboardNav } from './CollegeDashboardNav';
 
 async function getCampusOrg(adminUserId: string) {
   const serviceClient = createServiceClient();
@@ -34,7 +26,6 @@ export default async function CollegeDashboardLayout({
 
   if (!user) redirect('/login');
 
-  // Fetch plan_tier to gate the campus admin area
   const { data: profile } = await supabase
     .from('users')
     .select('plan_tier')
@@ -52,49 +43,85 @@ export default async function CollegeDashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">{org.name}</h1>
-              <p className="text-sm text-gray-600">T&P Officer Dashboard</p>
-            </div>
-            <Link
-              href="/dashboard"
-              className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Back to Student Mode
+    <div
+      className="ie-landing-type min-h-screen"
+      style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
+    >
+      {/* ── Header ───────────────────────────────────────────────────── */}
+      <header
+        className="sticky top-0 z-20 border-b"
+        style={{
+          background: 'color-mix(in srgb, var(--bg-secondary) 96%, transparent)',
+          borderColor: 'var(--card-border)',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3">
+            <Link href="/college/dashboard" className="flex items-baseline gap-1.5 shrink-0">
+              <BrandWordmarkSplit />
+              <span
+                className="text-xs font-semibold rounded-full px-2 py-0.5"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                  color: 'var(--accent-primary)',
+                }}
+              >
+                Campus
+              </span>
             </Link>
+            <div
+              className="hidden sm:block h-5 w-px"
+              style={{ background: 'var(--card-border)' }}
+              aria-hidden
+            />
+            <div className="hidden sm:block">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {org.name}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                T&amp;P Officer Dashboard
+              </p>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="mx-auto max-w-7xl">
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-5 p-4 sm:p-6">
+          <Link
+            href="/dashboard"
+            className="rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{
+              borderColor: 'var(--card-border)',
+              background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            Student Mode
+          </Link>
+        </div>
+      </header>
+
+      {/* ── Body ─────────────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+        <div className="flex gap-6 lg:gap-8">
           {/* Sidebar */}
-          <nav className="space-y-1 lg:col-span-1">
-            <ul className="space-y-1">
-              {navItems.map(({ href, label, icon: Icon }) => (
-                <li key={href}>
-                  <Link
-                    href={href}
-                    className={cn(
-                      'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                      'hover:bg-gray-100 text-gray-700'
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
+          <aside className="hidden w-52 shrink-0 lg:block">
+            <div className="sticky top-[4.5rem] space-y-6">
+              <CollegeDashboardNav />
+            </div>
+          </aside>
+
+          {/* Mobile nav strip */}
+          <div
+            className="lg:hidden w-full mb-4 overflow-x-auto flex gap-1 rounded-2xl border p-1.5"
+            style={{
+              borderColor: 'var(--card-border)',
+              background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+            }}
+          >
+            <CollegeDashboardNav />
+          </div>
 
           {/* Content */}
-          <div className="lg:col-span-4">{children}</div>
+          <main className="min-w-0 flex-1">{children}</main>
         </div>
       </div>
     </div>

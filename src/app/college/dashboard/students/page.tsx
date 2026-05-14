@@ -118,14 +118,18 @@ export default async function StudentsPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Manage Students</h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--accent-primary)' }}>
+            Campus Portal
+          </p>
+          <h2 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Manage Students</h2>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             View and manage your enrolled students.
           </p>
         </div>
         <Link
           href="#invite"
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+          style={{ background: 'var(--accent-primary)' }}
         >
           + Invite Students
         </Link>
@@ -133,16 +137,22 @@ export default async function StudentsPage() {
 
       {/* Enrolled Students Table */}
       {students.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
+        <div
+          className="dashboard-premium-card overflow-hidden"
+          style={{ padding: 0 }}
+        >
           <StudentListTable students={students} />
         </div>
       )}
 
       {/* Empty State */}
       {students.length === 0 && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-          <h3 className="text-lg font-semibold text-gray-900">No students enrolled yet</h3>
-          <p className="mt-1 text-sm text-gray-600">
+        <div
+          className="rounded-[22px] border-2 border-dashed p-12 text-center"
+          style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+        >
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>No students enrolled yet</h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             Start by inviting your students to the platform.
           </p>
         </div>
@@ -155,28 +165,41 @@ export default async function StudentsPage() {
 
       {/* Pending Invites */}
       {pendingInvites.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-          <div className="border-b px-5 py-3 flex items-center justify-between">
-            <h3 className="text-sm font-medium text-gray-900">Pending Invitations</h3>
-            <span className="text-xs text-gray-400">{pendingInvites.length} total</span>
+        <div className="dashboard-premium-card overflow-hidden" style={{ padding: 0 }}>
+          <div
+            className="border-b px-5 py-3 flex items-center justify-between"
+            style={{ borderColor: 'var(--card-border)' }}
+          >
+            <h3 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Pending Invitations</h3>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{pendingInvites.length} total</span>
           </div>
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
+            <thead className="text-xs uppercase tracking-wide" style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
               <tr>
                 <th className="px-5 py-2.5 text-left font-medium">Email</th>
                 <th className="px-5 py-2.5 text-left font-medium">Invited</th>
                 <th className="px-5 py-2.5 text-center font-medium">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody style={{ borderColor: 'var(--card-border)' }}>
               {pendingInvites.map((inv) => (
-                <tr key={inv.email} className="hover:bg-gray-50">
-                  <td className="px-5 py-3 text-gray-900">{inv.email}</td>
-                  <td className="px-5 py-3 text-xs text-gray-500">
+                <tr
+                  key={inv.email}
+                  className="border-t"
+                  style={{ borderColor: 'var(--card-border)' }}
+                >
+                  <td className="px-5 py-3" style={{ color: 'var(--text-primary)' }}>{inv.email}</td>
+                  <td className="px-5 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
                     {new Date(inv.invited_at).toLocaleDateString('en-IN')}
                   </td>
                   <td className="px-5 py-3 text-center">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                    <span
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      style={{
+                        background: 'color-mix(in srgb, var(--accent-warning) 15%, transparent)',
+                        color: 'var(--accent-warning)',
+                      }}
+                    >
                       Pending
                     </span>
                   </td>
@@ -188,17 +211,20 @@ export default async function StudentsPage() {
       )}
 
       {/* Seat Info */}
-      <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+      <div
+        className="rounded-[22px] border p-4"
+        style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+      >
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-medium text-gray-900">Seats Used</p>
-            <p className="mt-1 text-2xl font-semibold text-gray-900">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Seats Used</p>
+            <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>
               {seatsUsed} / {org.seat_count}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm font-medium text-gray-900">Available Seats</p>
-            <p className="mt-1 text-2xl font-semibold text-blue-600">{seatsAvailable}</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Available Seats</p>
+            <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-primary)' }}>{seatsAvailable}</p>
           </div>
         </div>
       </div>

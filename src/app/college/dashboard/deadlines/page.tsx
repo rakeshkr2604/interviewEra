@@ -130,8 +130,11 @@ export default async function DeadlinesPage() {
     <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-900">Deadlines</h2>
-          <p className="mt-1 text-sm text-gray-600">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--accent-primary)' }}>
+            Campus Portal
+          </p>
+          <h2 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>Deadlines</h2>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             Set milestones for your students to reach.
           </p>
         </div>
@@ -139,10 +142,13 @@ export default async function DeadlinesPage() {
       </div>
 
       {deadlines.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-          <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-4 text-lg font-semibold text-gray-900">No deadlines yet</h3>
-          <p className="mt-1 text-sm text-gray-600">
+        <div
+          className="rounded-[22px] border-2 border-dashed p-12 text-center"
+          style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+        >
+          <Calendar className="mx-auto h-12 w-12" style={{ color: 'var(--text-muted)' }} />
+          <h3 className="mt-4 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>No deadlines yet</h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
             Create your first deadline to help students stay on track.
           </p>
         </div>
@@ -152,27 +158,33 @@ export default async function DeadlinesPage() {
             <Link
               key={deadline.id}
               href={`/college/dashboard/deadlines/${deadline.id}`}
-              className="block rounded-lg border border-gray-200 bg-white p-6 hover:shadow-md transition-shadow"
+              className="dashboard-premium-card block transition-all hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-2xl">{typeIcons[deadline.deadline_type]}</span>
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                    <span
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      style={{
+                        background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                        color: 'var(--accent-primary)',
+                      }}
+                    >
                       {typeLabels[deadline.deadline_type]}
                     </span>
                   </div>
-                  <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">
+                  <h3 className="text-lg font-semibold line-clamp-2" style={{ color: 'var(--text-primary)' }}>
                     {deadline.description ?? `Complete ${deadline.target_value} ${deadline.deadline_type}`}
                   </h3>
                 </div>
                 {deadline.isOverdue && (
-                  <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 ml-2" />
+                  <AlertCircle className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: 'var(--accent-danger)' }} />
                 )}
               </div>
 
               {deadline.description && (
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                <p className="text-sm mb-4 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
                   {deadline.description}
                 </p>
               )}
@@ -180,18 +192,24 @@ export default async function DeadlinesPage() {
               <div className="space-y-3">
                 {/* Due Date */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">Due Date</span>
-                  <span className={`text-sm font-semibold ${deadline.isOverdue ? 'text-red-600' : 'text-gray-900'}`}>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Due Date</span>
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: deadline.isOverdue ? 'var(--accent-danger)' : 'var(--text-primary)' }}
+                  >
                     {new Date(deadline.due_date).toLocaleDateString('en-IN')}
                   </span>
                 </div>
 
                 {/* Days Remaining */}
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600">
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                     {deadline.isOverdue ? 'Overdue by' : 'Days remaining'}
                   </span>
-                  <span className={`text-sm font-semibold ${deadline.isOverdue ? 'text-red-600' : 'text-blue-600'}`}>
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: deadline.isOverdue ? 'var(--accent-danger)' : 'var(--accent-primary)' }}
+                  >
                     {deadline.daysRemaining} {deadline.daysRemaining === 1 ? 'day' : 'days'}
                   </span>
                 </div>
@@ -199,25 +217,28 @@ export default async function DeadlinesPage() {
                 {/* Progress Bar */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Progress</span>
-                    <span className="text-sm font-semibold text-gray-900">
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Progress</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                       {deadline.completedStudents}/{deadline.totalStudents} completed
                     </span>
                   </div>
-                  <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+                  <div
+                    className="h-2 rounded-full overflow-hidden"
+                    style={{ background: 'var(--bg-tertiary, color-mix(in srgb, var(--card-border) 60%, transparent))' }}
+                  >
                     <div
-                      className="h-full bg-blue-600 transition-all"
-                      style={{ width: `${deadline.completionPercentage}%` }}
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${deadline.completionPercentage}%`, background: 'var(--accent-primary)' }}
                     />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                     {deadline.completionPercentage}% complete
                   </p>
                 </div>
 
                 {/* Target Info */}
-                <div className="rounded-lg bg-gray-50 p-3">
-                  <p className="text-xs text-gray-600">
+                <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                     <span className="font-medium">Target:</span> {deadline.target_value}
                     {deadline.deadline_type === 'tier' ? ' Tier' : deadline.deadline_type === 'score' ? ' / 10' : ' Sessions'}
                   </p>

@@ -189,8 +189,11 @@ export default async function AnalyticsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold text-gray-900">Analytics</h1>
-        <p className="mt-2 text-sm text-gray-600">
+        <p className="mb-1 text-xs font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--accent-primary)' }}>
+          Campus Portal
+        </p>
+        <h1 className="text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>Analytics</h1>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
           Cohort performance insights and placement readiness tracking.
         </p>
       </div>

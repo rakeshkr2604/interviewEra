@@ -130,63 +130,41 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
 
   if (!data) {
     return (
-      <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
-        <p className="text-gray-600">No analytics data available. Invite students to get started.</p>
+      <div className="dashboard-premium-card p-12 text-center">
+        <p style={{ color: 'var(--text-secondary)' }}>No analytics data available. Invite students to get started.</p>
       </div>
     );
   }
 
+  const rangeButtonStyle = (active: boolean) =>
+    active
+      ? { background: 'var(--accent-primary)', color: '#fff' }
+      : { border: '1.5px solid var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' };
+
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="flex flex-col gap-4 rounded-lg border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className="dashboard-premium-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => handleDateRangeChange('7')}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              dateRange === '7'
-                ? 'bg-blue-600 text-white'
-                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Last 7 days
-          </button>
-          <button
-            onClick={() => handleDateRangeChange('30')}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              dateRange === '30'
-                ? 'bg-blue-600 text-white'
-                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Last 30 days
-          </button>
-          <button
-            onClick={() => handleDateRangeChange('90')}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              dateRange === '90'
-                ? 'bg-blue-600 text-white'
-                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            Last 90 days
-          </button>
-          <button
-            onClick={() => handleDateRangeChange('all')}
-            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-              dateRange === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'border border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            All time
-          </button>
+          {(['7', '30', '90', 'all'] as DateRange[]).map((range) => (
+            <button
+              key={range}
+              onClick={() => handleDateRangeChange(range)}
+              className="rounded-xl px-3 py-1.5 text-sm font-medium transition-all hover:-translate-y-0.5"
+              style={rangeButtonStyle(dateRange === range)}
+            >
+              {range === '7' ? 'Last 7 days' : range === '30' ? 'Last 30 days' : range === '90' ? 'Last 90 days' : 'All time'}
+            </button>
+          ))}
         </div>
 
         <div className="flex gap-2">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            className="inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all hover:-translate-y-0.5"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
           >
             <Download className="h-4 w-4" />
             Export CSV
@@ -194,7 +172,8 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium transition-all hover:-translate-y-0.5 disabled:opacity-50"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -204,28 +183,28 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Total Students</p>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{data.totalStudents}</p>
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Total Students</p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>{data.totalStudents}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Placement Ready</p>
-          <p className="mt-1 text-2xl font-semibold text-green-600">{data.placementReady.ready}</p>
-          <p className="text-xs text-gray-500">
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Placement Ready</p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-success)' }}>{data.placementReady.ready}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {data.totalStudents > 0 ? Math.round((data.placementReady.ready / data.totalStudents) * 100) : 0}%
           </p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Almost Ready</p>
-          <p className="mt-1 text-2xl font-semibold text-blue-600">{data.placementReady.almostReady}</p>
-          <p className="text-xs text-gray-500">
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Almost Ready</p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-primary)' }}>{data.placementReady.almostReady}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {data.totalStudents > 0 ? Math.round((data.placementReady.almostReady / data.totalStudents) * 100) : 0}%
           </p>
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <p className="text-xs font-medium text-gray-500 uppercase">Needs Work</p>
-          <p className="mt-1 text-2xl font-semibold text-amber-600">{data.placementReady.needsWork}</p>
-          <p className="text-xs text-gray-500">
+        <div className="dashboard-premium-card">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Needs Work</p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-warning)' }}>{data.placementReady.needsWork}</p>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {data.totalStudents > 0 ? Math.round((data.placementReady.needsWork / data.totalStudents) * 100) : 0}%
           </p>
         </div>
@@ -234,42 +213,42 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
       {/* Charts Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Tier Distribution */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Tier Distribution</h2>
+        <div className="dashboard-premium-card">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Tier Distribution</h2>
           {data.tierDistribution.some((t) => t.count > 0) ? (
             <TierDistributionChart data={data.tierDistribution} />
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-500">
+            <div className="flex items-center justify-center h-64" style={{ color: 'var(--text-muted)' }}>
               No data available
             </div>
           )}
         </div>
 
         {/* Placement Ready Breakdown */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Placement Ready Breakdown</h2>
+        <div className="dashboard-premium-card">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Placement Ready Breakdown</h2>
           <PlacementReadyChart data={data.placementReady} totalStudents={data.totalStudents} />
         </div>
 
         {/* Score Trend */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Score Trend (Last 30 Days)</h2>
+        <div className="dashboard-premium-card lg:col-span-2">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Score Trend (Last 30 Days)</h2>
           {data.scoreTrend.some((t) => t.score > 0) ? (
             <ScoreTrendChart data={data.scoreTrend} />
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-500">
+            <div className="flex items-center justify-center h-64" style={{ color: 'var(--text-muted)' }}>
               No score data available
             </div>
           )}
         </div>
 
         {/* Session Activity */}
-        <div className="rounded-lg border border-gray-200 bg-white p-6 lg:col-span-2">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Session Activity (Last 90 Days)</h2>
+        <div className="dashboard-premium-card lg:col-span-2">
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Session Activity (Last 90 Days)</h2>
           {data.sessionActivity.some((s) => s.count > 0) ? (
             <SessionActivityHeatmap data={data.sessionActivity} />
           ) : (
-            <div className="flex items-center justify-center h-64 text-gray-500">
+            <div className="flex items-center justify-center h-64" style={{ color: 'var(--text-muted)' }}>
               No session data available
             </div>
           )}
@@ -277,7 +256,7 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
       </div>
 
       {/* Last Updated */}
-      <div className="text-xs text-gray-500">
+      <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
         Last updated: {new Date(data.generatedAt).toLocaleString('en-IN')}
       </div>
     </div>

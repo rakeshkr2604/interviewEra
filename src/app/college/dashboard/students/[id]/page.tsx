@@ -87,22 +87,21 @@ async function getStudentDetails(adminUserId: string, studentId: string) {
   return { org, enrollment, progress, interviews: interviewsWithScores };
 }
 
+const tierStyleMap: Record<number, { bg: string; color: string; label: string }> = {
+  1: { bg: 'color-mix(in srgb, var(--text-muted) 12%, transparent)', color: 'var(--text-secondary)', label: 'Tier 1' },
+  2: { bg: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)', color: 'var(--accent-primary)', label: 'Tier 2' },
+  3: { bg: 'color-mix(in srgb, #a855f7 14%, transparent)', color: '#a855f7', label: 'Tier 3' },
+  4: { bg: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)', color: 'var(--accent-warning)', label: 'Tier 4' },
+};
+
 function TierBadge({ tier }: { tier: number }) {
-  const colors = {
-    1: 'bg-gray-100 text-gray-800',
-    2: 'bg-blue-100 text-blue-800',
-    3: 'bg-purple-100 text-purple-800',
-    4: 'bg-amber-100 text-amber-800',
-  };
-  const labels: Record<number, string> = {
-    1: 'Tier 1',
-    2: 'Tier 2',
-    3: 'Tier 3',
-    4: 'Tier 4',
-  };
+  const s = tierStyleMap[tier] ?? tierStyleMap[1];
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${colors[tier as keyof typeof colors] || colors[1]}`}>
-      {labels[tier] || 'Tier 1'}
+    <span
+      className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+      style={{ background: s.bg, color: s.color }}
+    >
+      {s.label}
     </span>
   );
 }
@@ -116,14 +115,14 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, children }: StatCardProps) {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <p className="text-sm font-medium text-gray-600">{label}</p>
+    <div className="dashboard-premium-card">
+      <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
       {children ? (
         <div className="mt-2">{children}</div>
       ) : (
         <>
-          <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
-          {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
+          <p className="mt-2 text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>{value}</p>
+          {sub && <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
         </>
       )}
     </div>
@@ -155,45 +154,49 @@ export default async function StudentDetailPage({ params }: PageProps) {
         <div>
           <Link
             href="/college/dashboard/students"
-            className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 mb-3"
+            className="inline-flex items-center gap-1 text-sm font-medium mb-3 transition-opacity hover:opacity-70"
+            style={{ color: 'var(--accent-primary)' }}
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Students
           </Link>
-          <h1 className="text-3xl font-semibold text-gray-900">{enrollment.users.name ?? 'Student'}</h1>
-          <p className="mt-1 text-sm text-gray-600">{enrollment.users.email}</p>
+          <h1 className="text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>{enrollment.users.name ?? 'Student'}</h1>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{enrollment.users.email}</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50">
+        <button
+          className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
+          style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
+        >
           <Download className="h-4 w-4" />
           Export Report
         </button>
       </div>
 
       {/* Profile Info Card */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
+      <div className="dashboard-premium-card">
+        <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Profile Information</h2>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase">Branch</p>
-            <p className="mt-1 text-base font-semibold text-gray-900">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Branch</p>
+            <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
               {enrollment.branch ?? '—'}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase">Roll Number</p>
-            <p className="mt-1 text-base font-semibold text-gray-900">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Roll Number</p>
+            <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
               {enrollment.roll_number ?? '—'}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase">Year</p>
-            <p className="mt-1 text-base font-semibold text-gray-900">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Year</p>
+            <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
               {enrollment.year ? `Year ${enrollment.year}` : '—'}
             </p>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase">Enrolled</p>
-            <p className="mt-1 text-base font-semibold text-gray-900">
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Enrolled</p>
+            <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
               {new Date(enrollment.enrolled_at).toLocaleDateString('en-IN')}
             </p>
           </div>
@@ -230,26 +233,36 @@ export default async function StudentDetailPage({ params }: PageProps) {
 
       {/* Interview History */}
       {completedInterviews.length > 0 && (
-        <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-          <div className="border-b px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Interview History</h2>
+        <div className="dashboard-premium-card overflow-hidden" style={{ padding: 0 }}>
+          <div
+            className="border-b px-6 py-4"
+            style={{ borderColor: 'var(--card-border)' }}
+          >
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Interview History</h2>
           </div>
-          <div className="divide-y divide-gray-100">
+          <div>
             {completedInterviews.map((interview) => (
               <div
                 key={interview.id}
-                className="flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+                className="flex items-center justify-between px-6 py-4 border-t transition-colors hover:opacity-80"
+                style={{ borderColor: 'var(--card-border)' }}
               >
                 <div className="flex-1">
-                  <p className="font-medium text-gray-900">{interview.role}</p>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
-                    <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium">
+                  <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{interview.role}</p>
+                  <div className="mt-1 flex items-center gap-2 text-sm">
+                    <span
+                      className="rounded-full px-2 py-1 text-xs font-medium"
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
                       {interview.difficulty.charAt(0).toUpperCase() + interview.difficulty.slice(1)}
                     </span>
-                    <span className="text-gray-500">
+                    <span style={{ color: 'var(--text-muted)' }}>
                       {interview.question_count} questions
                     </span>
-                    <span className="text-gray-500">
+                    <span style={{ color: 'var(--text-muted)' }}>
                       {new Date(interview.completed_at).toLocaleDateString('en-IN')}
                     </span>
                   </div>
@@ -257,18 +270,19 @@ export default async function StudentDetailPage({ params }: PageProps) {
                 <div className="text-right">
                   {interview.score !== null ? (
                     <>
-                      <p className="text-2xl font-semibold text-gray-900">
+                      <p className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {(interview.score as number).toFixed(1)}
                       </p>
-                      <p className="text-xs text-gray-500">/10</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>/10</p>
                     </>
                   ) : (
-                    <p className="text-gray-400">—</p>
+                    <p style={{ color: 'var(--text-muted)' }}>—</p>
                   )}
                 </div>
                 <Link
                   href={`/report/${interview.id}`}
-                  className="ml-6 inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                  className="ml-6 inline-flex items-center rounded-xl border px-3 py-1.5 text-xs font-medium transition-all hover:-translate-y-0.5"
+                  style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
                 >
                   View Report
                 </Link>
@@ -280,10 +294,13 @@ export default async function StudentDetailPage({ params }: PageProps) {
 
       {/* No interviews */}
       {interviews.length === 0 && (
-        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-12 text-center">
-          <h3 className="text-lg font-semibold text-gray-900">No interviews yet</h3>
-          <p className="mt-1 text-sm text-gray-600">
-            This student hasn't completed any interviews yet.
+        <div
+          className="rounded-[22px] border-2 border-dashed p-12 text-center"
+          style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+        >
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>No interviews yet</h3>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            This student hasn&apos;t completed any interviews yet.
           </p>
         </div>
       )}
