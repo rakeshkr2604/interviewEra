@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, View, Text, StyleSheet } from '@react-pdf/renderer';
+import type { ScoreJustification } from '@/types/app.types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ export interface ReportPDFProps {
   overallScore: number;
   dimensionScores: Array<{ label: string; score: number | null }>;
   questions: PDFQuestionItem[];
+  scoreJustification?: ScoreJustification | null;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -71,7 +73,24 @@ const s = StyleSheet.create({
   },
   modelLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#1d4ed8', marginBottom: 2 },
   modelText: { fontSize: 9, color: '#374151', lineHeight: 1.5 },
-  // Footer
+  // Score justification (overall)
+  justifyBox: {
+    marginTop: 12,
+    padding: 10,
+    backgroundColor: '#f5f3ff',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ddd6fe',
+  },
+  justifyTitle: { fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#111827', marginBottom: 4 },
+  justifyBody: { fontSize: 9, color: '#374151', lineHeight: 1.5, marginBottom: 8 },
+  justifyColTitle: {
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    color: '#111827',
+    marginBottom: 3,
+    marginTop: 4,
+  },
   footer: { position: 'absolute', bottom: 24, left: 48, right: 48, flexDirection: 'row', justifyContent: 'space-between' },
   footerText: { fontSize: 8, color: '#9ca3af' },
 });
@@ -113,7 +132,14 @@ function PageFooter({ role }: { role: string }) {
 
 // ─── Pages ────────────────────────────────────────────────────────────────────
 
-function CoverPage({ role, difficulty, completedAt, overallScore, dimensionScores }: Omit<ReportPDFProps, 'questions'>) {
+function CoverPage({
+  role,
+  difficulty,
+  completedAt,
+  overallScore,
+  dimensionScores,
+  scoreJustification,
+}: Omit<ReportPDFProps, 'questions'>) {
   return (
     <Page size="A4" style={s.page}>
       <PageFooter role={role} />
@@ -130,13 +156,34 @@ function CoverPage({ role, difficulty, completedAt, overallScore, dimensionScore
       <View style={s.divider} />
 
       {/* Overall score */}
-      <View style={{ marginBottom: 24 }}>
+      <View style={{ marginBottom: 16 }}>
         <Text style={s.sectionTitle}>Overall Score</Text>
         <Text style={[s.scoreBig, { color: scoreColor(overallScore) }]}>
           {overallScore.toFixed(1)}
         </Text>
         <Text style={s.scoreLabel}>out of 10.0</Text>
       </View>
+
+      {scoreJustification ? (
+        <View style={s.justifyBox} wrap={false}>
+          <Text style={s.justifyTitle}>Why this score?</Text>
+          <Text style={s.justifyBody}>{scoreJustification.why_this_score}</Text>
+          <Text style={s.justifyColTitle}>Key strengths</Text>
+          {(scoreJustification.key_strengths ?? []).map((line, idx) => (
+            <View key={`s-${idx}`} style={s.bulletRow}>
+              <Text style={s.bullet}>•</Text>
+              <Text style={s.bulletText}>{line}</Text>
+            </View>
+          ))}
+          <Text style={s.justifyColTitle}>Areas to improve</Text>
+          {(scoreJustification.improvement_areas ?? []).map((line, idx) => (
+            <View key={`i-${idx}`} style={s.bulletRow}>
+              <Text style={s.bullet}>•</Text>
+              <Text style={s.bulletText}>{line}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <View style={s.divider} />
 
@@ -249,6 +296,7 @@ export function ReportPDF({
   overallScore,
   dimensionScores,
   questions,
+  scoreJustification = null,
 }: ReportPDFProps) {
   return (
     <Document
@@ -262,6 +310,7 @@ export function ReportPDF({
         completedAt={completedAt}
         overallScore={overallScore}
         dimensionScores={dimensionScores}
+        scoreJustification={scoreJustification}
       />
       <QuestionsPage questions={questions} role={role} />
       <AnalysisPage questions={questions} role={role} />

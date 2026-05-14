@@ -1,6 +1,6 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
-import type { QuestionRubric, DimensionScores, DetailedAnalysis } from '@/types/app.types';
+import type { QuestionRubric, DimensionScores, DetailedAnalysis, ScoreJustification } from '@/types/app.types';
 import type { AnswerStyle } from '@/lib/settings/client-preferences';
 
 export type EvaluationProvider = 'openrouter' | 'openai' | 'mistral';
@@ -17,6 +17,7 @@ export interface EvaluationResult {
   overall_score: number;
   dimension_scores: DimensionScores;
   feedback_text: string;
+  score_justification: ScoreJustification;
   detailed_analysis: DetailedAnalysis;
   provider: EvaluationProvider;
 }
@@ -49,12 +50,43 @@ function extractJSON(content: string): string {
   return content.trim();
 }
 
-function isValidEvaluation(data: unknown): data is EvaluationResult {
+function normalizeScoreJustification(raw: unknown): ScoreJustification | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const why =
+    typeof o.why_this_score === 'string' ? o.why_this_score.replace(/\s+/g, ' ').trim() : '';
+  if (!why) return null;
+
+  const pickTwo = (key: string): [string, string] => {
+    const arr = Array.isArray(o[key]) ? o[key] : [];
+    const strs = (arr as unknown[])
+      .filter((x): x is string => typeof x === 'string')
+      .map((s) => s.replace(/\s+/g, ' ').trim())
+      .filter(Boolean);
+    const fallbackB =
+      strs.length > 0 ? 'Extend the strongest thread with metrics or clearer trade-offs.' : '—';
+    const a = strs[0] ?? 'Ground feedback in specifics from your answer.';
+    const b = strs[1] ?? strs[0] ?? fallbackB;
+    return [a, b];
+  };
+
+  const [sa, sb] = pickTwo('key_strengths');
+  const [ia, ib] = pickTwo('improvement_areas');
+
+  return {
+    why_this_score: why,
+    key_strengths: [sa, sb],
+    improvement_areas: [ia, ib],
+  };
+}
+
+function isValidEvaluation(data: unknown): data is Omit<EvaluationResult, 'provider'> {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
 
   if (typeof d.overall_score !== 'number') return false;
   if (typeof d.feedback_text !== 'string') return false;
+  if (normalizeScoreJustification(d.score_justification) === null) return false;
 
   const dims = d.dimension_scores as Record<string, unknown>;
   if (!dims || typeof dims !== 'object') return false;
@@ -116,6 +148,11 @@ function buildPrompt(
     `    "relevance": number\n` +
     `  },\n` +
     `  "feedback_text": string (2–3 sentences, specific and actionable),\n` +
+    `  "score_justification": {\n` +
+    `    "why_this_score": string (2–3 sentences explaining why the overall score fits THIS answer; reference concrete content from the answer; do NOT reveal scoring formulas, rubric weights, dimension percentages, or how numbers are combined),\n` +
+    `    "key_strengths": string[] (exactly 2 items: specific things done well in this answer),\n` +
+    `    "improvement_areas": string[] (exactly 2 items: specific actionable improvements for this answer)\n` +
+    `  },\n` +
     `  "detailed_analysis": {\n` +
     `    "strengths": string[],\n` +
     `    "improvements": string[],\n` +
@@ -126,7 +163,10 @@ function buildPrompt(
   );
 }
 
-function normalizeResult(parsed: EvaluationResult, provider: EvaluationProvider): EvaluationResult {
+function normalizeResult(
+  parsed: Omit<EvaluationResult, 'provider'>,
+  provider: EvaluationProvider,
+): EvaluationResult {
   const dims: DimensionScores = {
     communication_clarity: clamp(parsed.dimension_scores.communication_clarity),
     technical_depth: clamp(parsed.dimension_scores.technical_depth),
@@ -136,22 +176,28 @@ function normalizeResult(parsed: EvaluationResult, provider: EvaluationProvider)
   };
 
   const overallScore = clamp(computeWeightedScore(dims));
+  const scoreJustification = normalizeScoreJustification(parsed.score_justification);
+  if (!scoreJustification) {
+    throw new Error('score_justification normalization failed');
+  }
 
   return {
     overall_score: overallScore,
     dimension_scores: dims,
     feedback_text: parsed.feedback_text,
+    score_justification: scoreJustification,
     detailed_analysis: {
       strengths: parsed.detailed_analysis.strengths,
       improvements: parsed.detailed_analysis.improvements,
       model_answer_hint: parsed.detailed_analysis.model_answer_hint,
       keywords_missing: parsed.detailed_analysis.keywords_missing,
+      score_justification: scoreJustification,
     },
     provider,
   };
 }
 
-function tryParseResponse(content: string): EvaluationResult | null {
+function tryParseResponse(content: string): Omit<EvaluationResult, 'provider'> | null {
   try {
     const parsed: unknown = JSON.parse(extractJSON(content));
     if (!isValidEvaluation(parsed)) return null;

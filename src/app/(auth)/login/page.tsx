@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import type { LucideIcon } from 'lucide-react';
 import { ArrowLeft, Shield, Zap } from 'lucide-react';
 import { AuthBrandChipIcon, AUTH_BRAND_MARK_PATH } from '@/components/auth/AuthBrandChipIcon';
@@ -86,7 +87,7 @@ export default function LoginPage() {
                         const Icon = item.icon;
                         return <Icon className="size-4" aria-hidden />;
                       })() : (
-                        <img
+                        <Image
                           src={AUTH_BRAND_MARK_PATH}
                           width={36}
                           height={36}

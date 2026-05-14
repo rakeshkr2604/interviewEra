@@ -1,18 +1,23 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { privatePageMetadata } from '@/lib/seo/metadata'
+import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
+import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
+import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
+import {
+  normalizeRadarRowToDimensionKey,
+  REPORT_DIMENSION_LABELS,
+} from '@/lib/utils/report-radar-dimensions'
+import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
+import type { UserProgressRow } from '@/lib/retention/types'
 
 export const metadata = privatePageMetadata({
   title: 'Analytics',
   description: 'Performance analytics and trends for your mock interviews.',
   path: '/analytics',
 })
-import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
-import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
-import {
-  normalizeRadarRowToDimensionKey,
-  REPORT_DIMENSION_LABELS,
-} from '@/lib/utils/report-radar-dimensions'
+
+export const dynamic = 'force-dynamic'
 
 export default async function AnalyticsPage() {
   const supabase = await createClient()
@@ -26,11 +31,7 @@ export default async function AnalyticsPage() {
         .select('id')
         .eq('user_id', user.id)
         .eq('status', 'completed'),
-      supabase
-        .from('user_progress')
-        .select('current_tier, current_streak, total_xp, total_sessions')
-        .eq('user_id', user.id)
-        .maybeSingle(),
+      supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
     ])
 
   const completedInterviewIds = (completedInterviews ?? []).map((item) => item.id as string)
@@ -91,15 +92,9 @@ export default async function AnalyticsPage() {
           /does not exist/i.test(progressErr.message ?? ''))),
   )
 
-  const retentionDashboardSnap =
-    progressTableMissing
-      ? null
-      : {
-          current_tier: Number(progressSnap?.current_tier ?? 1) || 1,
-          current_streak: Number(progressSnap?.current_streak ?? 0) || 0,
-          total_xp: Number(progressSnap?.total_xp ?? 0) || 0,
-          total_sessions: Number(progressSnap?.total_sessions ?? 0) || 0,
-        }
+  const retentionDashboardSnap = progressTableMissing
+    ? null
+    : await buildRetentionDashboardSnapFromRow((progressSnap as UserProgressRow | null) ?? null)
 
   if (progressErr && !progressTableMissing) {
     console.error('analytics user_progress fetch', progressErr.message)
@@ -107,6 +102,7 @@ export default async function AnalyticsPage() {
 
   return (
     <>
+      <RetentionProgressRefreshListener />
       <DashboardPageHeader
         eyebrow="Insights"
         title="Performance analytics"

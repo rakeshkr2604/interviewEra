@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>InterviewEra — LinkedIn Banner</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  body { margin: 0; font-family: 'Plus Jakarta Sans', sans-serif; background: #050505; }
+
+  /* Banner base */
+  .banner {
+    width: 1128px;
+    height: 191px;
+    position: relative;
+    overflow: hidden;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+
+  /* Profile pic safe-zone */
+  .safe-zone {
+    position: absolute;
+    left: 56px;
+    bottom: -56px;
+    width: 152px;
+    height: 152px;
+    border: 2px dashed rgba(255,255,255,0.22);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+  }
+  .show-safe .safe-zone { display: block; }
+
+  /* ───── Banner 1: Dark Premium ───── */
+  .b1 {
+    background:
+      radial-gradient(ellipse 60% 110% at 78% 40%, rgba(129,140,248,0.22) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 80% at 100% 100%, rgba(6,182,212,0.10) 0%, transparent 60%),
+      linear-gradient(135deg, #0A0F1F 0%, #0E1428 50%, #0F172A 100%);
+    color: white;
+  }
+  .b1::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.022) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.022) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: -1px -1px;
+    mask-image: linear-gradient(90deg, transparent 0%, black 28%, black 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 28%, black 100%);
+  }
+  .b1::after {
+    content: '';
+    position: absolute;
+    top: 0; right: 0;
+    width: 1px; height: 100%;
+    background: linear-gradient(180deg, transparent, rgba(99,102,241,0.5), transparent);
+  }
+
+  /* ───── Banner 2: Light Premium ───── */
+  .b2 {
+    background:
+      radial-gradient(ellipse 70% 110% at 88% 50%, rgba(99,102,241,0.18) 0%, transparent 55%),
+      radial-gradient(ellipse 50% 90% at 100% 0%, rgba(139,92,246,0.10) 0%, transparent 60%),
+      linear-gradient(180deg, #FAFAFB 0%, #F2F2F5 100%);
+    color: #0F172A;
+  }
+  .b2::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px);
+    background-size: 36px 36px;
+    mask-image: linear-gradient(90deg, transparent 0%, black 32%, black 78%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 32%, black 78%, transparent 100%);
+  }
+
+  /* ───── Banner 3: Linear-style Code ───── */
+  .b3 {
+    background:
+      radial-gradient(ellipse 50% 110% at 70% 50%, rgba(99,102,241,0.28) 0%, transparent 60%),
+      linear-gradient(180deg, #08080C 0%, #0F0F18 100%);
+    color: white;
+  }
+  .b3::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 100% 6px;
+    mask-image: linear-gradient(90deg, transparent 0%, black 30%, black 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, black 30%, black 100%);
+  }
+
+  /* Common content positioning */
+  .banner-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 56px 0 240px;
+    z-index: 5;
+  }
+
+  /* Brand block */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .brand-icon {
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
+    filter: drop-shadow(0 8px 24px rgba(99,102,241,0.35));
+  }
+
+  .brand-text-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .brand-name {
+    font-size: 36px;
+    font-weight: 600;
+    letter-spacing: -0.9px;
+    line-height: 1;
+  }
+
+  .brand-name strong { font-weight: 800; }
+
+  .tagline {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: -0.05px;
+  }
+
+  /* Right product visual */
+  .product-cluster {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* Status chip */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 11px;
+    border-radius: 100px;
+    background: rgba(99,102,241,0.10);
+    border: 1px solid rgba(129,140,248,0.30);
+    font-size: 10px;
+    font-weight: 600;
+    color: #C7D2FE;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.04em;
+  }
+  .b2 .chip { color: #4338CA; background: rgba(99,102,241,0.07); border-color: rgba(99,102,241,0.22); }
+
+  .chip .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: #34D399;
+    box-shadow: 0 0 6px #10B981, 0 0 12px rgba(16,185,129,0.5);
+  }
+
+  /* Score card UI */
+  .ui-score {
+    background: linear-gradient(180deg, rgba(30,41,59,0.7), rgba(15,23,42,0.55));
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 178px;
+    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .b2 .ui-score {
+    background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.7));
+    border: 1px solid rgba(15,23,42,0.06);
+    box-shadow: 0 12px 28px -10px rgba(15,23,42,0.12), inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+
+  .ui-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.5);
+  }
+  .b2 .ui-head { color: #64748B; }
+
+  .ui-head .stamp { color: #34D399; }
+  .b2 .ui-head .stamp { color: #059669; }
+
+  .ui-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; font-family: 'JetBrains Mono', monospace; }
+  .ui-row .lbl { font-size: 10.5px; opacity: 0.75; font-weight: 500; }
+  .b2 .ui-row .lbl { color: #475569; opacity: 1; }
+
+  .ui-row .val { font-size: 11.5px; font-weight: 600; color: #67E8F9; }
+  .ui-row .val.purple { color: #A5B4FC; }
+  .b2 .ui-row .val { color: #0E7490; }
+  .b2 .ui-row .val.purple { color: #4F46E5; }
+
+  .ui-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+  .b2 .ui-bar { background: rgba(15,23,42,0.06); }
+  .ui-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #6366F1, #06B6D4);
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(99,102,241,0.6);
+  }
+
+  /* Mini stat cluster (B1 extra) */
+  .mini-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-end;
+  }
+
+  .mini-stat {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10.5px;
+    color: rgba(255,255,255,0.55);
+  }
+  .b2 .mini-stat { color: #475569; }
+  .mini-stat .num { color: #C7D2FE; font-weight: 600; }
+  .b2 .mini-stat .num { color: #4F46E5; }
+
+  /* Banner 3 — code */
+  .b3-cluster {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.55);
+    background: rgba(0,0,0,0.25);
+    padding: 14px 18px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow: 0 12px 32px -10px rgba(0,0,0,0.6);
+  }
+  .b3-line { display: flex; gap: 14px; align-items: center; }
+  .b3-line .num { color: rgba(255,255,255,0.22); width: 14px; text-align: right; font-size: 10px; }
+  .b3-line .kw { color: #C7D2FE; }
+  .b3-line .str { color: #67E8F9; }
+  .b3-line .nm { color: rgba(255,255,255,0.92); }
+  .b3-line .cm { color: rgba(255,255,255,0.32); }
+  .b3-line .punc { color: rgba(255,255,255,0.4); }
+
+  .canvas-host { position: relative; }
+</style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script type="text/babel" data-presets="env,react">
+const { useState } = React;
+
+/* ─── Logo mark — chevron removed ─── */
+function LogoMark({ size = 60, accent = '#06B6D4' }) {
+  return (
+    <svg className="brand-icon" style={{ width: size, height: size }} viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="lg-bg" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#818CF8"/>
+          <stop offset="1" stopColor="#6366F1"/>
+        </linearGradient>
+      </defs>
+      <rect width="100" height="100" rx="22" fill="url(#lg-bg)"/>
+      <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fillOpacity="0.16"/>
+      <text x="50" y="58" fontFamily="'Plus Jakarta Sans',sans-serif" fontSize="32" fontWeight="700" fill="white" textAnchor="middle" letterSpacing="-1.2">IE</text>
+    </svg>
+  );
+}
+
+/* ─────────── BANNER 1: Dark Premium ─────────── */
+function Banner1() {
+  return (
+    <div className="banner b1">
+      <div className="safe-zone"></div>
+      <div className="banner-content">
+        <div className="brand">
+          <LogoMark />
+          <div className="brand-text-wrap">
+            <div className="brand-name">Interview<strong style={{ color: '#A5B4FC' }}>Era</strong></div>
+            <div className="tagline" style={{ color: 'rgba(226,232,240,0.62)' }}>Practice interviews with AI — not guesswork.</div>
+          </div>
+        </div>
+
+        <div className="product-cluster">
+          <div className="mini-stats">
+            <div className="chip"><span className="dot"></span>AI · LIVE EVAL</div>
+            <div className="mini-stat"><span className="num">5-rubric</span> scoring engine</div>
+            <div className="mini-stat"><span className="num">Resume-aware</span> questions</div>
+          </div>
+          <div className="ui-score">
+            <div className="ui-head">
+              <span>Mock · #2914</span>
+              <span className="stamp">● SCORED</span>
+            </div>
+            <div>
+              <div className="ui-row">
+                <span className="lbl">STAR</span>
+                <span className="val">8.4</span>
+              </div>
+              <div className="ui-bar" style={{ marginTop: 4 }}><div className="ui-bar-fill" style={{ width: '84%' }}></div></div>
+            </div>
+            <div>
+              <div className="ui-row">
+                <span className="lbl">Clarity</span>
+                <span className="val purple">9.1</span>
+              </div>
+              <div className="ui-bar" style={{ marginTop: 4 }}><div className="ui-bar-fill" style={{ width: '91%' }}></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── BANNER 2: Light Premium ─────────── */
+function Banner2() {
+  return (
+    <div className="banner b2">
+      <div className="safe-zone" style={{ borderColor: 'rgba(15,23,42,0.18)' }}></div>
+      <div className="banner-content">
+        <div className="brand">
+          <LogoMark />
+          <div className="brand-text-wrap">
+            <div className="brand-name" style={{ color: '#0F172A' }}>Interview<strong style={{ color: '#6366F1' }}>Era</strong></div>
+            <div className="tagline" style={{ color: '#475569' }}>AI-powered mock interviews and placement preparation.</div>
+          </div>
+        </div>
+
+        <div className="product-cluster">
+          <div className="mini-stats">
+            <div className="chip"><span className="dot"></span>LIVE AI EVAL</div>
+            <div className="mini-stat"><span className="num">5-rubric</span> scoring</div>
+            <div className="mini-stat"><span className="num">Resume-aware</span> Qs</div>
+          </div>
+          <div className="ui-score">
+            <div className="ui-head">
+              <span>Mock · #2914</span>
+              <span className="stamp">● SCORED</span>
+            </div>
+            <div>
+              <div className="ui-row">
+                <span className="lbl">STAR</span>
+                <span className="val">8.4</span>
+              </div>
+              <div className="ui-bar" style={{ marginTop: 4 }}><div className="ui-bar-fill" style={{ width: '84%' }}></div></div>
+            </div>
+            <div>
+              <div className="ui-row">
+                <span className="lbl">Clarity</span>
+                <span className="val purple">9.1</span>
+              </div>
+              <div className="ui-bar" style={{ marginTop: 4 }}><div className="ui-bar-fill" style={{ width: '91%' }}></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── BANNER 3: Code Aesthetic ─────────── */
+function Banner3() {
+  return (
+    <div className="banner b3">
+      <div className="safe-zone"></div>
+      <div className="banner-content">
+        <div className="brand">
+          <LogoMark />
+          <div className="brand-text-wrap">
+            <div className="brand-name">Interview<strong style={{ color: 'white' }}>Era</strong></div>
+            <div className="tagline" style={{ color: 'rgba(255,255,255,0.55)' }}>Structured interview practice for modern placements.</div>
+          </div>
+        </div>
+
+        <div className="b3-cluster">
+          <div className="b3-line"><span className="num">01</span><span className="cm">// resume-aware questioning</span></div>
+          <div className="b3-line">
+            <span className="num">02</span>
+            <span className="kw">interview</span><span className="punc">.</span><span className="nm">score</span><span className="punc">(</span><span className="str">"clarity"</span><span className="punc">)</span>
+          </div>
+          <div className="b3-line">
+            <span className="num">03</span>
+            <span className="punc">→</span>
+            <span style={{ color: '#67E8F9', fontWeight: 600 }}>9.1 / 10</span>
+            <span className="cm">// 5-rubric eval</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [showSafe, setShowSafe] = useState(false);
+
+  return (
+    <div style={{ minHeight: '100vh', padding: '40px 60px', background: '#050505', color: 'white' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '48px', maxWidth: '1228px' }}>
+        <div>
+          <div style={{ fontSize: '11px', fontFamily: "'JetBrains Mono', monospace", color: '#818CF8', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '10px' }}>InterviewEra · Brand</div>
+          <h1 style={{ fontSize: '34px', fontWeight: 700, letterSpacing: '-0.7px', margin: 0 }}>LinkedIn Company Banner</h1>
+          <p style={{ fontSize: '14px', color: '#94A3B8', marginTop: '8px', margin: 0 }}>Three directions · 1128 × 191 px · v2 — refined</p>
+        </div>
+        <button
+          onClick={() => setShowSafe(s => !s)}
+          style={{
+            background: showSafe ? 'rgba(99,102,241,0.22)' : 'rgba(255,255,255,0.04)',
+            border: '1px solid ' + (showSafe ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.1)'),
+            color: 'white',
+            padding: '10px 18px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontFamily: "'JetBrains Mono', monospace",
+            cursor: 'pointer',
+            letterSpacing: '0.04em'
+          }}
+        >
+          {showSafe ? '✓ ' : ''}Profile-pic safe zone
+        </button>
+      </div>
+
+      {[
+        { n: '01', title: 'Dark Premium', desc: 'Soft purple glow, glassmorphism score card, scoring rubric callouts.', el: <Banner1 /> },
+        { n: '02', title: 'Light Premium', desc: 'Off-white with gradient mesh. Matches a future light-mode product.', el: <Banner2 /> },
+        { n: '03', title: 'Code Aesthetic', desc: 'Linear/Vercel terminal-feel. Most distinctive for engineering audiences.', el: <Banner3 /> }
+      ].map(({ n, title, desc, el }) => (
+        <div key={n} style={{ marginBottom: '56px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '14px', maxWidth: '1128px' }}>
+            <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '11px', color: '#475569' }}>{n}</span>
+            <span style={{ fontSize: '14px', fontWeight: 600 }}>{title}</span>
+            <span style={{ fontSize: '12px', color: '#64748B' }}>— {desc}</span>
+          </div>
+          <div className={`canvas-host ${showSafe ? 'show-safe' : ''}`} style={{ borderRadius: '12px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 16px 48px -16px rgba(0,0,0,0.7)' }}>
+            {el}
+          </div>
+          <div style={{ marginTop: '10px', fontSize: '11px', color: '#475569', fontFamily: "'JetBrains Mono', monospace" }}>
+            1128 × 191 · linkedin-cover-{n}.png
+          </div>
+        </div>
+      ))}
+
+      <div style={{ marginTop: '60px', padding: '24px 28px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', maxWidth: '1128px' }}>
+        <div style={{ fontSize: '11px', fontFamily: "'JetBrains Mono', monospace", color: '#818CF8', letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '10px' }}>Export</div>
+        <div style={{ fontSize: '13px', color: '#CBD5E1', lineHeight: 1.7 }}>
+          Tell me which banner you want and I'll save a clean 1128 × 191 PNG ready to upload to LinkedIn.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body>
+</html>

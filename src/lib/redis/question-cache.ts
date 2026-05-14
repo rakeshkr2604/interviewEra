@@ -39,6 +39,8 @@ export interface QuestionCacheSessionContext {
   interviewerId: string;
   /** djb2 fingerprint of trimmed JD prefix; "0" when absent */
   jdFingerprint: string;
+  /** Retention tier (1–4); partitions cache so tier-aware questions don't leak across tiers. */
+  tier: number;
 }
 
 /** Stable hash for Redis cache partitioning when JD text differs */
@@ -53,7 +55,7 @@ export function computeJdFingerprint(jobDescription: string | undefined): string
 }
 
 function hashSessionContext(session: QuestionCacheSessionContext): string {
-  const sig = `${session.goal}|${session.interviewMode}|${session.experienceYears}|${session.interviewerId}|${session.jdFingerprint}`;
+  const sig = `${session.goal}|${session.interviewMode}|${session.experienceYears}|${session.interviewerId}|${session.jdFingerprint}|t${session.tier}`;
   let h = 5381;
   for (let i = 0; i < sig.length; i++) {
     h = ((h << 5) + h) ^ sig.charCodeAt(i);

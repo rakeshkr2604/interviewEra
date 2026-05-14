@@ -16,7 +16,6 @@ export function computeNextTierProgressPercent(
   progress: Pick<
     UserProgressRow,
     | 'total_sessions'
-    | 'sessions_at_current_tier'
     | 'max_dimension_score'
     | 'last_5_sessions_avg'
     | 'overall_avg_score'
@@ -29,7 +28,6 @@ export function computeNextTierProgressPercent(
 
   const nextTierNumber = tier + 1;
   const totalSessions = progress.total_sessions ?? 0;
-  const sessionsAtTier = progress.sessions_at_current_tier ?? 0;
   const maxDim = progress.max_dimension_score ?? null;
   const last5 = progress.last_5_sessions_avg ?? null;
   const overall = progress.overall_avg_score ?? null;
@@ -43,7 +41,8 @@ export function computeNextTierProgressPercent(
   }
 
   if (nextTierNumber === 3) {
-    const sessionsRatio = Math.min(1, sessionsAtTier / TIER_3_UNLOCK.minSessions);
+    // Match `evaluateUnlockCriteria` (TIERS.ADVANCED): lifetime session log count, not `sessions_at_current_tier`.
+    const sessionsRatio = Math.min(1, totalSessions / TIER_3_UNLOCK.minSessions);
     const rollingRatio =
       last5 === null ? 0 : Math.min(1, last5 / TIER_3_UNLOCK.minRollingAvg);
     const pct = Math.round(((sessionsRatio + rollingRatio) / 2) * 100);
@@ -63,7 +62,6 @@ export function formatProgressMessage(
   progress: Pick<
     UserProgressRow,
     | 'total_sessions'
-    | 'sessions_at_current_tier'
     | 'max_dimension_score'
     | 'last_5_sessions_avg'
     | 'overall_avg_score'
@@ -77,7 +75,6 @@ export function formatProgressMessage(
   }
 
   const totalSessions = progress.total_sessions ?? 0;
-  const sessionsAtTier = progress.sessions_at_current_tier ?? 0;
   const maxDim = progress.max_dimension_score ?? null;
   const last5 = progress.last_5_sessions_avg ?? null;
   const overall = progress.overall_avg_score ?? null;
@@ -94,20 +91,24 @@ export function formatProgressMessage(
       return `Reach at least ${scoreFloor.toFixed(1)} on any dimension (${scoreGap.toFixed(1)} to go).`;
     }
   } else if (nextTier === 3) {
-    const sessionsNeeded = Math.max(0, TIER_3_UNLOCK.minSessions - sessionsAtTier);
+    const sessionsNeeded = Math.max(0, TIER_3_UNLOCK.minSessions - totalSessions);
     const target = TIER_3_UNLOCK.minRollingAvg;
     const gap = last5 === null ? target : Math.max(0, target - last5);
 
     if (sessionsNeeded > 0) {
-      return `Complete ${sessionsNeeded} more session${sessionsNeeded > 1 ? 's' : ''} at this tier (${TIER_3_UNLOCK.minSessions}-session rolling window).`;
+      return `Complete ${sessionsNeeded} more quality session${sessionsNeeded > 1 ? 's' : ''} (need ${TIER_3_UNLOCK.minSessions}+ logged sessions for the rolling window).`;
     }
     if (gap > 0) {
       return `Raise your last-${TIER_3_UNLOCK.rollingWindow} average to ${target.toFixed(1)} (${gap.toFixed(1)} to go).`;
     }
   } else if (nextTier === 4) {
+    const sessionsNeeded = Math.max(0, TIER_4_UNLOCK.minSessions - totalSessions);
     const target = TIER_4_UNLOCK.minOverallAvg;
     const gap = overall === null ? target : Math.max(0, target - overall);
 
+    if (sessionsNeeded > 0) {
+      return `Complete ${sessionsNeeded} more session${sessionsNeeded > 1 ? 's' : ''} (${TIER_4_UNLOCK.minSessions}+ quality sessions toward Mock Panel).`;
+    }
     if (overall === null || gap > 0) {
       return `Reach a ${target.toFixed(1)} overall lifetime average (${gap.toFixed(1)} points to go).`;
     }

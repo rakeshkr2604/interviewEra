@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InterviewEra — Brand Assets</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --purple: #6366F1;
+    --blue: #3B82F6;
+    --cyan: #06B6D4;
+    --dark: #0F172A;
+    --card: #1E293B;
+    --border: rgba(255,255,255,0.08);
+    --text: #F8FAFC;
+    --muted: #94A3B8;
+    --success: #10B981;
+  }
+
+  body {
+    background: var(--dark);
+    color: var(--text);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    line-height: 1.6;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ── PRINT PAGE SETUP ── */
+  @media print {
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    body {
+      background: var(--dark) !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+
+    .page-break {
+      break-before: page;
+    }
+
+    .no-break {
+      break-inside: avoid;
+    }
+
+    /* Hide auto-print script errors */
+    script { display: none; }
+  }
+
+  /* ── PAGES ── */
+  .sheet {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto;
+    background: var(--dark);
+    padding: 14mm 16mm;
+    position: relative;
+  }
+
+  /* Header strip */
+  .sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 8mm;
+    border-bottom: 0.3mm solid rgba(255,255,255,0.12);
+    margin-bottom: 10mm;
+  }
+
+  .header-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-logo .wordmark {
+    font-size: 16px;
+    font-weight: 500;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .header-logo .wordmark strong {
+    font-weight: 700;
+    color: var(--purple);
+  }
+
+  .header-tag {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Section */
+  .section {
+    margin-bottom: 9mm;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 5mm;
+    padding-bottom: 3mm;
+    border-bottom: 0.3mm solid rgba(255,255,255,0.08);
+  }
+
+  .section-title {
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .section-count {
+    font-size: 9px;
+    color: rgba(148,163,184,0.4);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Cards grid */
+  .cards {
+    display: grid;
+    gap: 4mm;
+  }
+
+  .cards-3col { grid-template-columns: repeat(3, 1fr); }
+  .cards-2col { grid-template-columns: repeat(2, 1fr); }
+
+  .card {
+    border-radius: 6px;
+    border: 0.3mm solid rgba(255,255,255,0.1);
+    overflow: hidden;
+    break-inside: avoid;
+  }
+
+  .card-preview {
+    padding: 8mm 6mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28mm;
+  }
+
+  .card-preview.dark  { background: #0F172A; }
+  .card-preview.light { background: #F8FAFC; }
+  .card-preview.white { background: #ffffff; }
+  .card-preview.mid   { background: #64748B; }
+
+  .card-footer {
+    padding: 3mm 4mm;
+    background: rgba(255,255,255,0.03);
+    border-top: 0.3mm solid rgba(255,255,255,0.08);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-label { font-size: 8px; font-weight: 500; color: var(--muted); }
+  .card-file  { font-size: 7.5px; color: rgba(148,163,184,0.5); font-family: 'JetBrains Mono', monospace; }
+
+  /* Favicon grid */
+  .favicon-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 3mm;
+  }
+
+  .favicon-card {
+    border-radius: 5px;
+    border: 0.3mm solid rgba(255,255,255,0.1);
+    overflow: hidden;
+    text-align: center;
+    break-inside: avoid;
+  }
+
+  .favicon-preview {
+    background: #1E293B;
+    padding: 4mm 2mm;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 14mm;
+  }
+
+  .favicon-label {
+    padding: 2mm;
+    background: rgba(255,255,255,0.03);
+    border-top: 0.3mm solid rgba(255,255,255,0.08);
+    font-size: 6.5px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Palette */
+  .palette {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 3mm;
+  }
+
+  .swatch {
+    border-radius: 5px;
+    overflow: hidden;
+    border: 0.3mm solid rgba(255,255,255,0.1);
+    break-inside: avoid;
+  }
+
+  .swatch-color { height: 14mm; }
+
+  .swatch-info {
+    padding: 2mm 2.5mm;
+    background: rgba(255,255,255,0.03);
+    border-top: 0.3mm solid rgba(255,255,255,0.08);
+  }
+
+  .swatch-name { font-size: 7px; font-weight: 600; color: var(--text); margin-bottom: 1px; }
+  .swatch-hex  { font-size: 6.5px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Typography */
+  .type-sample {
+    background: var(--card);
+    border: 0.3mm solid rgba(255,255,255,0.1);
+    border-radius: 6px;
+    padding: 5mm 6mm;
+    margin-bottom: 3mm;
+    break-inside: avoid;
+  }
+
+  .type-meta {
+    font-size: 7.5px;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    margin-bottom: 3mm;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  /* Code */
+  .code-block {
+    background: rgba(0,0,0,0.4);
+    border: 0.3mm solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    padding: 4mm 5mm;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: #94A3B8;
+    line-height: 1.75;
+    break-inside: avoid;
+    margin-bottom: 3mm;
+  }
+
+  .code-block .cm   { color: #475569; }
+  .code-block .kw   { color: var(--purple); }
+  .code-block .str  { color: var(--cyan); }
+  .code-block .prop { color: #A78BFA; }
+
+  /* Badge */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(16,185,129,0.12);
+    border: 0.3mm solid rgba(16,185,129,0.25);
+    color: var(--success);
+    font-size: 8px;
+    font-weight: 600;
+    padding: 1.5mm 3mm;
+    border-radius: 20px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  /* Page footer */
+  .sheet-footer {
+    position: absolute;
+    bottom: 8mm;
+    left: 16mm;
+    right: 16mm;
+    display: flex;
+    justify-content: space-between;
+    font-size: 7px;
+    color: rgba(148,163,184,0.35);
+    font-family: 'JetBrains Mono', monospace;
+    border-top: 0.2mm solid rgba(255,255,255,0.06);
+    padding-top: 3mm;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════
+     PAGE 1 — Logo Mark + Full Logo
+═══════════════════════════════════════ -->
+<div class="sheet">
+  <div class="sheet-header">
+    <div class="header-logo">
+      <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="22" fill="#6366F1"/>
+        <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fill-opacity="0.15"/>
+        <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+        <path d="M62 36L70 43L62 50" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div class="wordmark">Interview<strong>Era</strong></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge"><span class="dot"></span>Brand Assets v1.0</span>
+      <span class="header-tag">May 2026</span>
+    </div>
+  </div>
+
+  <!-- LOGO MARK -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Logo Mark</span>
+      <span class="section-count">icon-only</span>
+    </div>
+    <div class="cards cards-3col">
+      <div class="card">
+        <div class="card-preview dark">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" width="72" height="72">
+            <rect width="100" height="100" rx="22" fill="#6366F1"/>
+            <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fill-opacity="0.15"/>
+            <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+            <path d="M62 36L70 43L62 50" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">On dark</span><span class="card-file">icon-only.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview light">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" width="72" height="72">
+            <rect width="100" height="100" rx="22" fill="#6366F1"/>
+            <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fill-opacity="0.15"/>
+            <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+            <path d="M62 36L70 43L62 50" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">On light</span><span class="card-file">icon-only.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview mid">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" width="72" height="72">
+            <rect width="100" height="100" rx="22" fill="white"/>
+            <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="#0F172A" fill-opacity="0.12"/>
+            <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="#0F172A" text-anchor="middle" letter-spacing="-1">IE</text>
+            <path d="M62 36L70 43L62 50" stroke="#0F172A" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">Monochrome</span><span class="card-file">icon-monochrome.svg</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULL LOGO -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Full Logo</span>
+      <span class="section-count">icon + wordmark</span>
+    </div>
+    <div class="cards cards-2col">
+      <div class="card">
+        <div class="card-preview dark" style="padding:8mm 6mm;">
+          <svg viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:200px;width:100%;">
+            <rect width="80" height="80" rx="18" fill="#6366F1"/>
+            <path d="M16 22C16 18.7 18.7 16 22 16H58C61.3 16 64 18.7 64 22V46C64 49.3 61.3 52 58 52H44L34 64V52H22C18.7 52 16 49.3 16 46V22Z" fill="white" fill-opacity="0.15"/>
+            <text x="40" y="46" font-family="'Plus Jakarta Sans',sans-serif" font-size="24" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-0.5">IE</text>
+            <path d="M49 28L56 34.5L49 41" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="96" y="37" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="500" fill="white" letter-spacing="-0.3">Interview</text>
+            <text x="96" y="62" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="700" fill="#6366F1" letter-spacing="-0.3">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">Dark background</span><span class="card-file">logo-dark-bg.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview white" style="padding:8mm 6mm;">
+          <svg viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:200px;width:100%;">
+            <rect width="80" height="80" rx="18" fill="#6366F1"/>
+            <path d="M16 22C16 18.7 18.7 16 22 16H58C61.3 16 64 18.7 64 22V46C64 49.3 61.3 52 58 52H44L34 64V52H22C18.7 52 16 49.3 16 46V22Z" fill="white" fill-opacity="0.15"/>
+            <text x="40" y="46" font-family="'Plus Jakarta Sans',sans-serif" font-size="24" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-0.5">IE</text>
+            <path d="M49 28L56 34.5L49 41" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="96" y="37" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="500" fill="#0F172A" letter-spacing="-0.3">Interview</text>
+            <text x="96" y="62" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="700" fill="#6366F1" letter-spacing="-0.3">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">Light background</span><span class="card-file">logo-light-bg.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview mid" style="padding:8mm 6mm;">
+          <svg viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:200px;width:100%;">
+            <rect width="80" height="80" rx="18" fill="white"/>
+            <path d="M16 22C16 18.7 18.7 16 22 16H58C61.3 16 64 18.7 64 22V46C64 49.3 61.3 52 58 52H44L34 64V52H22C18.7 52 16 49.3 16 46V22Z" fill="#0F172A" fill-opacity="0.12"/>
+            <text x="40" y="46" font-family="'Plus Jakarta Sans',sans-serif" font-size="24" font-weight="700" fill="#0F172A" text-anchor="middle" letter-spacing="-0.5">IE</text>
+            <path d="M49 28L56 34.5L49 41" stroke="#0F172A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="96" y="37" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="500" fill="white" letter-spacing="-0.3">Interview</text>
+            <text x="96" y="62" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="700" fill="white" letter-spacing="-0.3">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">Monochrome reversed</span><span class="card-file">logo-monochrome-dark.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview light" style="padding:8mm 6mm;">
+          <svg viewBox="0 0 320 80" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:200px;width:100%;">
+            <rect width="80" height="80" rx="18" fill="#0F172A"/>
+            <path d="M16 22C16 18.7 18.7 16 22 16H58C61.3 16 64 18.7 64 22V46C64 49.3 61.3 52 58 52H44L34 64V52H22C18.7 52 16 49.3 16 46V22Z" fill="white" fill-opacity="0.12"/>
+            <text x="40" y="46" font-family="'Plus Jakarta Sans',sans-serif" font-size="24" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-0.5">IE</text>
+            <path d="M49 28L56 34.5L49 41" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+            <text x="96" y="37" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="500" fill="#0F172A" letter-spacing="-0.3">Interview</text>
+            <text x="96" y="62" font-family="'Plus Jakarta Sans',sans-serif" font-size="22" font-weight="700" fill="#0F172A" letter-spacing="-0.3">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">Monochrome dark ink</span><span class="card-file">logo-monochrome-light.svg</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORDMARK -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Wordmark</span>
+      <span class="section-count">text only</span>
+    </div>
+    <div class="cards cards-2col">
+      <div class="card">
+        <div class="card-preview dark" style="padding:7mm 6mm;">
+          <svg viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:160px;width:100%;">
+            <text x="0" y="34" font-family="'Plus Jakarta Sans',sans-serif" font-size="32" font-weight="500" fill="white" letter-spacing="-0.5">Interview</text>
+            <text x="154" y="34" font-family="'Plus Jakarta Sans',sans-serif" font-size="32" font-weight="700" fill="#6366F1" letter-spacing="-0.5">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">On dark</span><span class="card-file">wordmark-dark.svg</span></div>
+      </div>
+      <div class="card">
+        <div class="card-preview white" style="padding:7mm 6mm;">
+          <svg viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="max-width:160px;width:100%;">
+            <text x="0" y="34" font-family="'Plus Jakarta Sans',sans-serif" font-size="32" font-weight="500" fill="#0F172A" letter-spacing="-0.5">Interview</text>
+            <text x="154" y="34" font-family="'Plus Jakarta Sans',sans-serif" font-size="32" font-weight="700" fill="#6366F1" letter-spacing="-0.5">Era</text>
+          </svg>
+        </div>
+        <div class="card-footer"><span class="card-label">On light</span><span class="card-file">wordmark-light.svg</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>interviewera.com — Brand Assets v1.0</span>
+    <span>Page 1 of 2</span>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════
+     PAGE 2 — Favicons, Colors, Type, Code
+═══════════════════════════════════════ -->
+<div class="sheet page-break">
+  <div class="sheet-header">
+    <div class="header-logo">
+      <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" rx="22" fill="#6366F1"/>
+        <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fill-opacity="0.15"/>
+        <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+        <path d="M62 36L70 43L62 50" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div class="wordmark">Interview<strong>Era</strong></div>
+    </div>
+    <span class="header-tag">Brand Assets v1.0 — May 2026</span>
+  </div>
+
+  <!-- FAVICONS -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Favicon Set</span>
+      <span class="section-count">13 files</span>
+    </div>
+    <div class="favicon-grid">
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/favicon-16x16.png" width="16" height="16" alt="16x16"></div>
+        <div class="favicon-label">16×16</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/favicon-32x32.png" width="32" height="32" alt="32x32"></div>
+        <div class="favicon-label">32×32</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/favicon-48x48.png" width="48" height="48" alt="48x48"></div>
+        <div class="favicon-label">48×48</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/apple-touch-icon.png" width="48" height="48" alt="apple"></div>
+        <div class="favicon-label">apple 180</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/android-chrome-192x192.png" width="48" height="48" alt="192"></div>
+        <div class="favicon-label">android 192</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/android-chrome-512x512.png" width="48" height="48" alt="512"></div>
+        <div class="favicon-label">android 512</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview"><img src="assets/favicons/mstile-150x150.png" width="48" height="48" alt="mstile"></div>
+        <div class="favicon-label">mstile 150</div>
+      </div>
+      <div class="favicon-card">
+        <div class="favicon-preview" style="background:#fff;">
+          <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" width="40" height="40">
+            <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="#6366F1"/>
+            <text x="50" y="57" font-family="'Plus Jakarta Sans',sans-serif" font-size="30" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+            <path d="M62 36L70 43L62 50" stroke="#06B6D4" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+          </svg>
+        </div>
+        <div class="favicon-label">safari.svg</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COLOR PALETTE -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Color Palette</span>
+    </div>
+    <div class="palette">
+      <div class="swatch"><div class="swatch-color" style="background:#6366F1;"></div><div class="swatch-info"><div class="swatch-name">Primary Purple</div><div class="swatch-hex">#6366F1</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#3B82F6;"></div><div class="swatch-info"><div class="swatch-name">Primary Blue</div><div class="swatch-hex">#3B82F6</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#06B6D4;"></div><div class="swatch-info"><div class="swatch-name">Accent Cyan</div><div class="swatch-hex">#06B6D4</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#10B981;"></div><div class="swatch-info"><div class="swatch-name">Success</div><div class="swatch-hex">#10B981</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#F59E0B;"></div><div class="swatch-info"><div class="swatch-name">Warning</div><div class="swatch-hex">#F59E0B</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#EF4444;"></div><div class="swatch-info"><div class="swatch-name">Error</div><div class="swatch-hex">#EF4444</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#0F172A;border:0.3mm solid rgba(255,255,255,0.12);"></div><div class="swatch-info"><div class="swatch-name">Dark BG</div><div class="swatch-hex">#0F172A</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#1E293B;"></div><div class="swatch-info"><div class="swatch-name">Dark Card</div><div class="swatch-hex">#1E293B</div></div></div>
+      <div class="swatch"><div class="swatch-color" style="background:#94A3B8;"></div><div class="swatch-info"><div class="swatch-name">Text Muted</div><div class="swatch-hex">#94A3B8</div></div></div>
+    </div>
+  </div>
+
+  <!-- TYPOGRAPHY -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Typography</span>
+    </div>
+    <div class="type-sample">
+      <div class="type-meta">Plus Jakarta Sans — Primary / UI font</div>
+      <div style="font-size:24px;font-weight:700;letter-spacing:-0.5px;margin-bottom:4px;">Know your score.</div>
+      <div style="font-size:13px;font-weight:500;color:#94A3B8;margin-bottom:8px;">AI-powered mock interview platform for Indian campus hiring.</div>
+      <div style="font-size:10px;color:#64748B;font-weight:400;max-width:480px;">Upload your resume. Get grilled on what you actually wrote. Every answer is scored on 5 dimensions — the exact criteria campus panels use.</div>
+    </div>
+    <div class="type-sample">
+      <div class="type-meta">JetBrains Mono — Code / Data labels</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:500;color:#06B6D4;">STAR structure — 8.4 / 10</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:#94A3B8;margin-top:4px;">--primary-purple: #6366F1;</div>
+    </div>
+  </div>
+
+  <!-- NEXT.JS CODE -->
+  <div class="section no-break">
+    <div class="section-header">
+      <span class="section-title">Next.js Implementation</span>
+      <span class="section-count">copy-paste ready</span>
+    </div>
+    <div class="code-block">
+<span class="cm">{"{"}"icons": {"{"}</span>
+<span class="prop">  icon</span>: [
+    {"{"} <span class="str">url</span>: <span class="str">"/favicon/favicon-32x32.png"</span>, <span class="str">sizes</span>: <span class="str">"32x32"</span> {"}"},
+    {"{"} <span class="str">url</span>: <span class="str">"/favicon/favicon-16x16.png"</span>, <span class="str">sizes</span>: <span class="str">"16x16"</span> {"}"}
+  ],
+  <span class="prop">apple</span>: <span class="str">"/favicon/apple-touch-icon.png"</span>,
+  <span class="prop">shortcut</span>: <span class="str">"/favicon/favicon-48x48.png"</span>
+{"}"},
+<span class="prop">themeColor</span>: <span class="str">"#6366F1"</span>,
+<span class="prop">manifest</span>: <span class="str">"/favicon/site.webmanifest"</span>
+    </div>
+    <div class="code-block">
+<span class="cm">{"<"}!-- Safari + Windows --{">"}</span>
+<span class="kw">{"<"}link</span> <span class="prop">rel</span>=<span class="str">"mask-icon"</span> <span class="prop">href</span>=<span class="str">"/favicon/safari-pinned-tab.svg"</span> <span class="prop">color</span>=<span class="str">"#6366F1"</span>{">"}
+<span class="kw">{"<"}meta</span> <span class="prop">name</span>=<span class="str">"msapplication-TileColor"</span> <span class="prop">content</span>=<span class="str">"#6366F1"</span>{">"}
+<span class="kw">{"<"}meta</span> <span class="prop">name</span>=<span class="str">"theme-color"</span> <span class="prop">content</span>=<span class="str">"#0F172A"</span>{">"}
+    </div>
+  </div>
+
+  <div class="sheet-footer">
+    <span>interviewera.com — Brand Assets v1.0</span>
+    <span>Page 2 of 2</span>
+  </div>
+</div>
+
+<script>
+  document.fonts.ready.then(function() {
+    setTimeout(function() {
+      window.print();
+    }, 500);
+  });
+</script>
+
+</body>
+</html>

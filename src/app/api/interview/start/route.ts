@@ -14,6 +14,7 @@ import {
 import type { ParsedResume, QuestionCategory, InterviewSessionContext } from '@/types/app.types';
 import { getInterviewerById } from '@/lib/config/interviewers';
 import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
+import { getUserProgress } from '@/lib/retention';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -97,12 +98,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       sessionContext.jobDescription = jobDescription;
     }
 
+    const userTier = (await getUserProgress(user.id))?.current_tier ?? 1;
     const cacheSession = {
       goal,
       interviewMode,
       experienceYears,
       interviewerId,
       jdFingerprint: computeJdFingerprint(jobDescription),
+      tier: userTier,
     };
     const interviewer = getInterviewerById(interviewerId);
     if (!interviewer) {
@@ -245,6 +248,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             experienceYears,
             interviewerId,
             jobDescription,
+            userId: user.id,
           });
         } catch (err) {
           await refundCredit(user.id);

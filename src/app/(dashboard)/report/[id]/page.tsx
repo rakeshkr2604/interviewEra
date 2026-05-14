@@ -17,7 +17,9 @@ import type {
   DetailedAnalysis,
   QuestionCategory,
   QuestionRubric,
+  ScoreJustification,
 } from '@/types/app.types';
+import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
 
 const exportPdfLinkClass =
   'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
@@ -120,6 +122,13 @@ export default async function ReportPage({ params }: ReportPageProps) {
     .select('answer_id, overall_score, feedback_text, detailed_analysis')
     .in('answer_id', answerIds);
 
+  const perAnswerJustifications: ScoreJustification[] = (evaluations ?? []).flatMap((e) => {
+    const d = e.detailed_analysis as DetailedAnalysis | null | undefined;
+    const j = d?.score_justification;
+    return j && typeof j.why_this_score === 'string' && j.why_this_score.trim() ? [j] : [];
+  });
+  const reportScoreJustification = aggregateScoreJustifications(perAnswerJustifications);
+
   // Build breakdown — compute keyword counts from raw data regardless of plan tier
   const breakdown = (questions ?? []).map((q) => {
     const answer = (answers ?? []).find((a) => a.question_id === q.id) ?? null;
@@ -216,6 +225,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
             overallScore={report.overall_score as number}
             role={interview.role as string}
             completedAt={completedAt}
+            scoreJustification={reportScoreJustification}
           />
         </div>
         <ReportPanel
