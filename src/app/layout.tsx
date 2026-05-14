@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
+import { AuthStateWatcher } from "@/components/shared/AuthStateWatcher";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
@@ -138,6 +139,7 @@ export default function RootLayout({
           }}
         />
         <ThemeProvider>
+          <AuthStateWatcher />
           <OfflineBanner />
           {children}
         </ThemeProvider>
