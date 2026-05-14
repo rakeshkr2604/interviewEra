@@ -3,8 +3,8 @@
  * Mirrors webhook grant amounts in lib/razorpay/client subscription flow.
  */
 export const PLAN_ACTIVATION_CREDITS: Record<string, number> = {
-  starter: 12,
-  pro: 30,
+  starter: 8,
+  pro: 25,
   starter_annual: 144,
   pro_annual: 360,
 }

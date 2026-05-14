@@ -55,9 +55,11 @@ preparation SaaS for Indian students. This is a production project, not a tutori
    - After all retries: show "AI temporarily unavailable. Try again in 30 seconds."
 
 4. **CREDIT-BASED MODEL:** No free trials. Credits only.
-   - Free: 5 credits (lifetime)
-   - Starter (₹99/mo): 12 credits/month
-   - Pro (₹249/mo): 30 credits/month
+   - Free: 3 credits (lifetime) — DB default still `5`; only new signups get 3 once the signup trigger is migrated. Existing free users are grandfathered.
+   - Starter (₹149/mo): 8 credits/month
+   - Pro (₹399/mo): 25 credits/month
+   - Annual plans (₹799/yr starter, ₹1999/yr pro) and their credit grants (144/360) are unchanged this cycle — repricing pending.
+   - Placement Season (₹999 one-time, 90 days unlimited) is approved but not yet wired (needs `plan_tier` enum value, one-time payment webhook, and unlimited-credit handling).
    - Credits deduct on interview START, not completion
 
 5. **FIRST INTERVIEW = 6 QUESTIONS ONLY** (not 10). Reduces abandonment.
@@ -68,14 +70,16 @@ preparation SaaS for Indian students. This is a production project, not a tutori
 
 ## PRICING TIERS (MEMORIZE THIS)
 
-| Feature               | Free      | Starter ₹99/mo | Pro ₹249/mo | Campus ₹799/student/yr |
-|-----------------------|-----------|----------------|-------------|------------------------|
-| Interview Credits     | 5 (total) | 12/month        | 30/month    | Unlimited              |
-| Score Report          | Basic      | Full feedback   | Full + Analysis | Full + Cohort      |
+| Feature               | Free      | Starter ₹149/mo | Pro ₹399/mo | Campus ₹799/student/yr |
+|-----------------------|-----------|-----------------|-------------|------------------------|
+| Interview Credits     | 3 (total) | 8/month         | 25/month    | Unlimited              |
+| Score Report          | Basic     | Full feedback   | Full + Analysis | Full + Cohort      |
 | Detailed Analysis     | BLURRED   | BLURRED         | ✅ Visible  | ✅ Visible             |
 | Model Answer Compare  | BLURRED   | BLURRED         | ✅ Visible  | ✅ Visible             |
 | PDF Export            | ❌        | ❌              | ✅          | ✅                     |
 | Interview Replay      | ❌        | ❌              | ✅          | ✅                     |
+
+Annual: Starter ₹799/yr (144 credits), Pro ₹1999/yr (360 credits) — repricing deferred. Placement Season ₹999 one-time / 90-day unlimited is approved but not yet wired (see CREDIT-BASED MODEL note).
 
 ---
 

@@ -11,8 +11,8 @@ export const razorpay = new Razorpay({
 
 // Amount in paise (100 paise = ₹1)
 const PLAN_AMOUNTS: Record<string, number> = {
-  starter: 9900,          // ₹99/mo
-  pro: 24900,             // ₹249/mo
+  starter: 14900,         // ₹149/mo
+  pro: 39900,             // ₹399/mo
   starter_annual: 79900,  // ₹799/yr
   pro_annual: 199900,     // ₹1,999/yr
 };

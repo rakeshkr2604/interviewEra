@@ -40,7 +40,7 @@ const SECTIONS = [
     content: [
       {
         sub: 'Free Tier',
-        text: '5 lifetime credits are provided at no cost. No payment method is required to start. Free credits do not expire.',
+        text: 'New free accounts receive 3 lifetime credits at no cost. Accounts created before May 14, 2026 received 5 lifetime credits. No payment method is required to start. Free credits do not expire.',
       },
       {
         sub: 'Credit Deduction',
@@ -48,7 +48,7 @@ const SECTIONS = [
       },
       {
         sub: 'Paid Subscriptions',
-        text: 'Starter (₹99/month) and Pro (₹249/month) subscriptions are billed in advance. Annual plans are billed annually at a discounted rate. Pricing is in Indian Rupees (INR) and includes applicable GST.',
+        text: 'Starter (₹149/month) and Pro (₹399/month) subscriptions are billed in advance. Annual plans are billed annually at a discounted rate. Pricing is in Indian Rupees (INR) and includes applicable GST.',
       },
       {
         sub: 'Payment Processing',

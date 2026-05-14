@@ -229,7 +229,7 @@ export function PricingPageClient() {
             <span style={{ color: T.acc2 }}>No surprises.</span>
           </h1>
           <p style={{ fontSize: 'clamp(14px, 2vw, 16px)', lineHeight: 1.8, color: T.text2, maxWidth: 520, margin: '0 auto' }}>
-            Start free with 5 credits — no card needed. Upgrade when you&apos;re ready to practise seriously for placement season.
+            Start free with 3 credits — no card needed. Upgrade when you&apos;re ready to practise seriously for placement season.
           </p>
         </div>
       </section>

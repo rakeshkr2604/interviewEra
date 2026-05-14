@@ -5,13 +5,13 @@
 
 export const BILLING_AMOUNTS = {
   starter: {
-    monthlyInr: 99,
+    monthlyInr: 149,
     annualTotalInr: 799,
     /** Effective monthly when billed annually (display only) */
     annualEquivMonthlyInr: 67,
   },
   pro: {
-    monthlyInr: 249,
+    monthlyInr: 399,
     annualTotalInr: 1999,
     annualEquivMonthlyInr: 167,
   },
@@ -19,7 +19,7 @@ export const BILLING_AMOUNTS = {
 
 /** Free tier rows: ✓ / ✕ must match dashboard */
 export const FREE_TIER_FEATURES = [
-  { text: '5 lifetime credits', included: true as const },
+  { text: '3 lifetime credits', included: true as const },
   { text: 'Basic score report', included: true as const },
   { text: 'Detailed analysis (blurred preview)', included: false as const },
   { text: 'Model answer comparisons (blurred preview)', included: false as const },
@@ -27,7 +27,7 @@ export const FREE_TIER_FEATURES = [
 
 /** Paid tiers — same strings everywhere (credits = CLAUDE.md) */
 export const STARTER_FEATURES = [
-  '12 credits per month',
+  '8 credits per month',
   'Full AI feedback on every answer',
   '5 dimension scores per answer',
   'Progress tracking across sessions',
@@ -35,7 +35,7 @@ export const STARTER_FEATURES = [
 ] as const;
 
 export const PRO_FEATURES = [
-  '30 credits per month',
+  '25 credits per month',
   'Full feedback + detailed analysis',
   'Model answer comparisons',
   'Keyword gap analysis',

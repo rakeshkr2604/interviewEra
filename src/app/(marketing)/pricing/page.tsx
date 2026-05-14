@@ -5,7 +5,7 @@ import { generateMetadata } from '@/lib/seo/metadata';
 export const metadata: Metadata = generateMetadata({
   title: 'Pricing',
   description:
-    'Simple, transparent pricing for InterviewEra. Start free with 5 credits, upgrade to Starter or Pro for unlimited scored mock interviews.',
+    'Simple, transparent pricing for InterviewEra. Start free with 3 credits. AI mock interviews from ₹149/month.',
   path: '/pricing',
 });
 

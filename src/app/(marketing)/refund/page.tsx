@@ -35,7 +35,7 @@ const SECTIONS = [
       },
       {
         sub: 'Free Credits',
-        text: 'The 5 lifetime free credits cannot be refunded or transferred. Unused free credits do not carry over if you delete your account.',
+        text: 'The lifetime free credits (3 for new signups, 5 for accounts created before May 14, 2026) cannot be refunded or transferred. Unused free credits do not carry over if you delete your account.',
       },
     ],
   },
