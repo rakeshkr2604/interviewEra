@@ -74,6 +74,9 @@ function FAQItem({ q, a }: { q: string; a: string }) {
 }
 
 export function PricingPageClient() {
+  // TEMPORARILY HIDDEN: annual billing toggle (2026-05-14) — cycle fixed to 'monthly'
+  // Annual plans still fully supported in backend; toggle hidden to defer annual repricing.
+  // Uncomment setCycle and unwrap {false &&} to restore toggle.
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
 
   const starterPrice = cycle === 'annual' ? BILLING_AMOUNTS.starter.annualEquivMonthlyInr : BILLING_AMOUNTS.starter.monthlyInr;
@@ -252,10 +255,12 @@ export function PricingPageClient() {
             </p>
           </div>
 
-          {/* Billing toggle */}
-          <div style={{ marginBottom: 32 }}>
-            <BillingCycleToggle value={cycle} onChange={setCycle} id="pricing-billing" variant="default" />
-          </div>
+          {/* Billing toggle — TEMPORARILY HIDDEN (2026-05-14) — annual plans still supported in backend */}
+          {false && (
+            <div style={{ marginBottom: 32 }}>
+              <BillingCycleToggle value={cycle} onChange={setCycle} id="pricing-billing" variant="default" />
+            </div>
+          )}
 
           {/* Cards */}
           <div className="pr-cards">
