@@ -25,24 +25,35 @@ async function getStudentDetails(adminUserId: string, studentId: string) {
 
   if (!org) return null;
 
+  // Verify the student belongs to this org (via users.campus_org_id).
+  const { data: userData } = await serviceClient
+    .from('users')
+    .select('id, name, email, created_at, campus_org_id')
+    .eq('id', studentId)
+    .single();
+
+  if (!userData || userData.campus_org_id !== org.id) return null;
+
+  // Fetch enrollment row if it exists; fall back to defaults for users enrolled
+  // before migration 018 ran (they'll get a backfill row the next time join is called).
   const { data: enrollmentData } = await serviceClient
     .from('college_enrollments')
     .select('branch, roll_number, year, enrollment_status, enrolled_at, total_sessions, avg_score, current_tier')
     .eq('user_id', studentId)
     .eq('college_id', org.id)
-    .single();
+    .maybeSingle();
 
-  if (!enrollmentData) return null;
-
-  const { data: userData } = await serviceClient
-    .from('users')
-    .select('id, name, email, created_at')
-    .eq('id', studentId)
-    .single();
-
-  if (!userData) return null;
-
-  const enrollment = { ...enrollmentData, users: userData };
+  const enrollment = {
+    branch: enrollmentData?.branch ?? null,
+    roll_number: enrollmentData?.roll_number ?? null,
+    year: enrollmentData?.year ?? null,
+    enrollment_status: enrollmentData?.enrollment_status ?? 'active',
+    enrolled_at: enrollmentData?.enrolled_at ?? userData.created_at,
+    total_sessions: enrollmentData?.total_sessions ?? 0,
+    avg_score: enrollmentData?.avg_score ?? null,
+    current_tier: enrollmentData?.current_tier ?? 1,
+    users: userData,
+  };
 
   const { data: progress } = await serviceClient
     .from('user_progress')

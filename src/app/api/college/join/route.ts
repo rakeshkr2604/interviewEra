@@ -97,6 +97,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
     }
 
+    // Write enrollment row — college_enrollments is the source of truth for the
+    // admin dashboard. Use upsert so re-runs of the accept flow are idempotent.
+    const { error: enrollError } = await serviceClient
+      .from('college_enrollments')
+      .upsert(
+        {
+          user_id: user.id,
+          college_id: orgId,
+          enrollment_status: 'active',
+          enrolled_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,college_id' }
+      );
+
+    if (enrollError) {
+      // Non-fatal: user is updated; log and continue so the student is not stuck.
+      console.error('[college/join] Enrollment row write error:', enrollError);
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Invitation accepted successfully',
