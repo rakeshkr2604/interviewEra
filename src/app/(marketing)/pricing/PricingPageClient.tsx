@@ -86,7 +86,7 @@ export function PricingPageClient() {
   const proPerDay    = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
 
   return (
-    <>
+    <div style={{ color: 'var(--text-primary)', background: '#ffffff' }}>
       {/* ─── Responsive + cross-browser styles ─── */}
       <style>{`
         /* Base resets for cross-browser consistency */
@@ -358,6 +358,6 @@ export function PricingPageClient() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
