@@ -121,6 +121,8 @@ export function StartInterviewForm({
         eyebrow="Practice"
         title="Start interview"
         subtitle="Configure your mock session. Starting uses 1 credit."
+        backHref="/dashboard"
+        backLabel="Dashboard"
       />
 
       <div className="dashboard-premium-card mx-auto max-w-lg space-y-6 p-6 sm:p-8">

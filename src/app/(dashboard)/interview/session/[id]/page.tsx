@@ -15,7 +15,7 @@ import { analyzeFillerWords } from '@/hooks/useFillerDetection'
 import type { FillerAnalysis } from '@/hooks/useFillerDetection'
 import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
 import { api } from '@/services/api'
-import { Mic, MicOff, SkipForward, RotateCcw, Send } from 'lucide-react'
+import { Mic, MicOff, SkipForward, RotateCcw, Send, X } from 'lucide-react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { readAnswerStyle } from '@/lib/settings/client-preferences'
@@ -432,18 +432,34 @@ export default function InterviewSessionPage() {
             </p>
           </div>
 
-          {/* Top progress bar */}
-          <div className="hidden md:block w-48">
-            <div className="flex justify-between text-xs text-(--text-muted) mb-1">
-              <span>Question {currentIndex + 1} of {totalQuestions}</span>
-              <span>{progressPct}%</span>
+          {/* Top progress bar + Exit */}
+          <div className="flex items-center gap-4">
+            <div className="hidden md:block w-48">
+              <div className="flex justify-between text-xs text-(--text-muted) mb-1">
+                <span>Question {currentIndex + 1} of {totalQuestions}</span>
+                <span>{progressPct}%</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-(--bg-tertiary)">
+                <div
+                  className="h-full rounded-full bg-(--accent-primary) transition-all duration-500"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
             </div>
-            <div className="h-1.5 w-full rounded-full bg-(--bg-tertiary)">
-              <div
-                className="h-full rounded-full bg-(--accent-primary) transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Exit this interview? Your progress on this question will be lost.')) {
+                  router.push('/dashboard');
+                }
+              }}
+              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-red-50 hover:border-red-300 hover:text-red-600"
+              style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
+              aria-label="Exit interview"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+              Exit
+            </button>
           </div>
         </div>
 

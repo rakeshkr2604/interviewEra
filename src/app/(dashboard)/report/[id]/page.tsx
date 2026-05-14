@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
@@ -189,6 +190,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
         eyebrow="Insights"
         title="Interview report"
         subtitle={`${interview.role as string} · ${interview.difficulty as string} difficulty`}
+        backHref="/history"
+        backLabel="Interview history"
         action={
           canSeeDetails ? (
             <a
@@ -561,6 +564,42 @@ export default async function ReportPage({ params }: ReportPageProps) {
         overallScore={report.overall_score as number}
         role={interview.role as string}
       />
+
+      {/* Practice again CTA */}
+      <div
+        className="rounded-2xl border-2 p-6 text-center sm:p-8"
+        style={{
+          borderColor: 'var(--card-border)',
+          background: 'color-mix(in srgb, var(--accent-primary) 6%, var(--card-bg))',
+        }}
+      >
+        <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+          Ready to improve your score?
+        </p>
+        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+          Each session targets your weak areas. Consistent practice builds placement readiness.
+        </p>
+        <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <Link
+            href="/interview/new"
+            className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+            style={{ background: 'var(--accent-primary)' }}
+          >
+            Start Another Interview
+          </Link>
+          <Link
+            href="/history"
+            className="inline-flex items-center gap-2 rounded-xl border-2 px-6 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
+            style={{
+              borderColor: 'var(--card-border)',
+              background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            View All Reports
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
