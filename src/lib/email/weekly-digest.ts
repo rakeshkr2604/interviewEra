@@ -2,10 +2,10 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { Resend } from 'resend';
 import { createServiceClient } from '@/lib/supabase/server';
 import type { DimensionScores } from '@/types/app.types';
+import { getBaseUrl } from '@/lib/server/get-base-url';
 
 const FROM_EMAIL = 'InterviewEra <transactional@interviewera.com>';
 const REPLY_TO = 'support@interviewera.com';
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
 
 // ─── Unsubscribe token helpers ────────────────────────────────────────────────
 
@@ -201,7 +201,7 @@ function buildEmailHtml(data: DigestData): string {
       : '';
 
   const unsubToken = generateUnsubToken(user.id);
-  const unsubUrl = `${APP_URL}/api/email/unsubscribe?userId=${encodeURIComponent(user.id)}&token=${unsubToken}`;
+  const unsubUrl = `${getBaseUrl()}/api/email/unsubscribe?userId=${encodeURIComponent(user.id)}&token=${unsubToken}`;
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -212,7 +212,7 @@ function buildEmailHtml(data: DigestData): string {
     <p style="margin:8px 0;color:#374151;">Last week: <strong>${lastWeekCount} interview${lastWeekCount !== 1 ? 's' : ''} completed</strong>, avg score <strong>${lastWeekAvg}/10</strong>${deltaStr}</p>
     ${weakLine}
     <div style="margin-top:24px;">
-      <a href="${APP_URL}/interview/new" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;font-size:14px;">Practice Now →</a>
+      <a href="${getBaseUrl()}/interview/new" style="display:inline-block;background:#2563eb;color:#fff;text-decoration:none;padding:10px 20px;border-radius:6px;font-weight:600;font-size:14px;">Practice Now →</a>
     </div>
     <p style="margin-top:32px;font-size:12px;color:#9ca3af;">
       <a href="${unsubUrl}" style="color:#9ca3af;">Unsubscribe from weekly digest</a>

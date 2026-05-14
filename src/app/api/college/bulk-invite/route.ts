@@ -3,6 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { Resend } from 'resend';
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
+import { getBaseUrl } from '@/lib/server/get-base-url';
 
 const bodySchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
@@ -118,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
+    const appUrl = getBaseUrl();
     let emailErrors = 0;
 
     const BATCH_SIZE = 50;

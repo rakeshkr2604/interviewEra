@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { Resend } from 'resend';
 import { z } from 'zod';
+import { getBaseUrl } from '@/lib/server/get-base-url';
 
 const bodySchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
@@ -124,7 +125,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── Send invite emails via Resend ──────────────────────────────────────────
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://interviewera.com';
+    const appUrl = getBaseUrl();
     let emailErrors = 0;
 
     // Send in batches of 50 to respect Resend rate limits
