@@ -6,10 +6,16 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
 import { DashboardWelcomeCard } from './DashboardWelcomeCard'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
+import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
+import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
+import type { UserProgressRow } from '@/lib/retention/types'
 
 export const metadata = PAGE_SEO.dashboard
+
+/** Always read latest `user_progress` + `tier_config` for the placement card. */
+export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -47,11 +53,7 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
       .limit(5),
-    supabase
-      .from('user_progress')
-      .select('current_tier, current_streak, total_xp, total_sessions')
-      .eq('user_id', user.id)
-      .maybeSingle(),
+    supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
   ])
 
   if (userError) {
@@ -65,15 +67,9 @@ export default async function DashboardPage() {
           /does not exist/i.test(progressErr.message ?? ''))),
   )
 
-  const retentionDashboardSnap =
-    progressTableMissing
-      ? null
-      : {
-          current_tier: Number(progressSnap?.current_tier ?? 1) || 1,
-          current_streak: Number(progressSnap?.current_streak ?? 0) || 0,
-          total_xp: Number(progressSnap?.total_xp ?? 0) || 0,
-          total_sessions: Number(progressSnap?.total_sessions ?? 0) || 0,
-        }
+  const retentionDashboardSnap = progressTableMissing
+    ? null
+    : await buildRetentionDashboardSnapFromRow((progressSnap as UserProgressRow | null) ?? null)
 
   if (progressErr && !progressTableMissing) {
     console.error('dashboard user_progress fetch', progressErr.message)
@@ -95,6 +91,7 @@ export default async function DashboardPage() {
 
   return (
     <>
+      <RetentionProgressRefreshListener />
       <DashboardPageHeader
         eyebrow={
           <>

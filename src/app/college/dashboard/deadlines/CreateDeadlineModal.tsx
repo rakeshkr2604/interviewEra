@@ -2,16 +2,14 @@
 
 import { useState } from 'react';
 import { Dialog } from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
 
 interface CreateDeadlineModalProps {
-  orgId: string;
   orgName: string;
 }
 
 type DeadlineType = 'sessions' | 'tier' | 'score';
 
-export function CreateDeadlineModal({ orgId }: CreateDeadlineModalProps) {
+export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

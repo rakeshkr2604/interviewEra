@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { Clock, Lock, Mail } from 'lucide-react';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
@@ -223,7 +224,7 @@ export function MarketingFooter() {
           style={{ color: 'var(--text-muted)' }}
         >
           <p className="flex items-center gap-2">
-            <img
+            <Image
               src={BRAND_MARK_PATH}
               width={20}
               height={20}

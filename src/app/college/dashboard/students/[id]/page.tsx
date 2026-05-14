@@ -76,6 +76,49 @@ async function getStudentDetails(adminUserId: string, studentId: string) {
   return { org, enrollment, progress, interviews: interviewsWithScores };
 }
 
+function TierBadge({ tier }: { tier: number }) {
+  const colors = {
+    1: 'bg-gray-100 text-gray-800',
+    2: 'bg-blue-100 text-blue-800',
+    3: 'bg-purple-100 text-purple-800',
+    4: 'bg-amber-100 text-amber-800',
+  };
+  const labels: Record<number, string> = {
+    1: 'Tier 1',
+    2: 'Tier 2',
+    3: 'Tier 3',
+    4: 'Tier 4',
+  };
+  return (
+    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${colors[tier as keyof typeof colors] || colors[1]}`}>
+      {labels[tier] || 'Tier 1'}
+    </span>
+  );
+}
+
+interface StatCardProps {
+  label: string;
+  value?: string | number;
+  sub?: string;
+  children?: React.ReactNode;
+}
+
+function StatCard({ label, value, sub, children }: StatCardProps) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <p className="text-sm font-medium text-gray-600">{label}</p>
+      {children ? (
+        <div className="mt-2">{children}</div>
+      ) : (
+        <>
+          <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
+          {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
+        </>
+      )}
+    </div>
+  );
+}
+
 export default async function StudentDetailPage({ params }: PageProps) {
   const { id: studentId } = await params;
   const supabase = await createClient();
@@ -93,50 +136,6 @@ export default async function StudentDetailPage({ params }: PageProps) {
 
   const { enrollment, progress, interviews } = data;
   const completedInterviews = interviews.filter((i) => i.status === 'completed');
-
-  const TierBadge = ({ tier }: { tier: number }) => {
-    const colors = {
-      1: 'bg-gray-100 text-gray-800',
-      2: 'bg-blue-100 text-blue-800',
-      3: 'bg-purple-100 text-purple-800',
-      4: 'bg-amber-100 text-amber-800',
-    };
-    const labels: Record<number, string> = {
-      1: 'Tier 1',
-      2: 'Tier 2',
-      3: 'Tier 3',
-      4: 'Tier 4',
-    };
-    return (
-      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${colors[tier as keyof typeof colors] || colors[1]}`}>
-        {labels[tier] || 'Tier 1'}
-      </span>
-    );
-  };
-
-  const StatCard = ({
-    label,
-    value,
-    sub,
-    children,
-  }: {
-    label: string;
-    value?: string | number;
-    sub?: string;
-    children?: React.ReactNode;
-  }) => (
-    <div className="rounded-lg border border-gray-200 bg-white p-6">
-      <p className="text-sm font-medium text-gray-600">{label}</p>
-      {children ? (
-        <div className="mt-2">{children}</div>
-      ) : (
-        <>
-          <p className="mt-2 text-3xl font-semibold text-gray-900">{value}</p>
-          {sub && <p className="mt-1 text-xs text-gray-500">{sub}</p>}
-        </>
-      )}
-    </div>
-  );
 
   return (
     <div className="space-y-8">

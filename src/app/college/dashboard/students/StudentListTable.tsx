@@ -23,6 +23,61 @@ interface StudentListTableProps {
   students: StudentWithProgress[];
 }
 
+function TierBadge({ tier }: { tier: number }) {
+  const colors = {
+    1: 'bg-gray-100 text-gray-800',
+    2: 'bg-blue-100 text-blue-800',
+    3: 'bg-purple-100 text-purple-800',
+    4: 'bg-amber-100 text-amber-800',
+  };
+  const labels: Record<number, string> = {
+    1: 'Tier 1',
+    2: 'Tier 2',
+    3: 'Tier 3',
+    4: 'Tier 4',
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[tier as keyof typeof colors] || colors[1]}`}>
+      {labels[tier] || 'Tier 1'}
+    </span>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const colors = {
+    active: 'bg-green-100 text-green-800',
+    completed: 'bg-blue-100 text-blue-800',
+    dropped: 'bg-red-100 text-red-800',
+  };
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status as keyof typeof colors] || colors.active}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
+    </span>
+  );
+}
+
+interface SortButtonProps {
+  field: SortField;
+  label: string;
+  sortField: SortField;
+  sortDesc: boolean;
+  toggleSort: (field: SortField) => void;
+}
+
+function SortButton({ field, label, sortField, sortDesc, toggleSort }: SortButtonProps) {
+  return (
+    <button
+      onClick={() => toggleSort(field)}
+      className="flex items-center gap-1 font-medium hover:text-gray-900 transition-colors"
+    >
+      {label}
+      {sortField === field && (
+        <ArrowUpDown className={`h-3 w-3 ${sortDesc ? 'rotate-180' : ''}`} />
+      )}
+    </button>
+  );
+}
+
 export function StudentListTable({ students }: StudentListTableProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortField, setSortField] = useState<SortField>('name');
@@ -80,51 +135,6 @@ export function StudentListTable({ students }: StudentListTableProps) {
     }
   };
 
-  const TierBadge = ({ tier }: { tier: number }) => {
-    const colors = {
-      1: 'bg-gray-100 text-gray-800',
-      2: 'bg-blue-100 text-blue-800',
-      3: 'bg-purple-100 text-purple-800',
-      4: 'bg-amber-100 text-amber-800',
-    };
-    const labels: Record<number, string> = {
-      1: 'Tier 1',
-      2: 'Tier 2',
-      3: 'Tier 3',
-      4: 'Tier 4',
-    };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[tier as keyof typeof colors] || colors[1]}`}>
-        {labels[tier] || 'Tier 1'}
-      </span>
-    );
-  };
-
-  const StatusBadge = ({ status }: { status: string }) => {
-    const colors = {
-      active: 'bg-green-100 text-green-800',
-      completed: 'bg-blue-100 text-blue-800',
-      dropped: 'bg-red-100 text-red-800',
-    };
-    return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors[status as keyof typeof colors] || colors.active}`}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
-      </span>
-    );
-  };
-
-  const SortButton = ({ field, label }: { field: SortField; label: string }) => (
-    <button
-      onClick={() => toggleSort(field)}
-      className="flex items-center gap-1 font-medium hover:text-gray-900 transition-colors"
-    >
-      {label}
-      {sortField === field && (
-        <ArrowUpDown className={`h-3 w-3 ${sortDesc ? 'rotate-180' : ''}`} />
-      )}
-    </button>
-  );
-
   return (
     <div className="space-y-4">
       {/* Search Bar */}
@@ -147,17 +157,17 @@ export function StudentListTable({ students }: StudentListTableProps) {
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
             <tr>
               <th className="px-5 py-3 text-left font-medium">
-                <SortButton field="name" label="Name / Email" />
+                <SortButton field="name" label="Name / Email" sortField={sortField} sortDesc={sortDesc} toggleSort={toggleSort} />
               </th>
               <th className="px-5 py-3 text-left font-medium">Branch / Roll</th>
               <th className="px-5 py-3 text-center font-medium">
-                <SortButton field="sessions" label="Sessions" />
+                <SortButton field="sessions" label="Sessions" sortField={sortField} sortDesc={sortDesc} toggleSort={toggleSort} />
               </th>
               <th className="px-5 py-3 text-center font-medium">
-                <SortButton field="score" label="Avg Score" />
+                <SortButton field="score" label="Avg Score" sortField={sortField} sortDesc={sortDesc} toggleSort={toggleSort} />
               </th>
               <th className="px-5 py-3 text-center font-medium">
-                <SortButton field="tier" label="Tier" />
+                <SortButton field="tier" label="Tier" sortField={sortField} sortDesc={sortDesc} toggleSort={toggleSort} />
               </th>
               <th className="px-5 py-3 text-center font-medium">Status</th>
               <th className="px-5 py-3 text-center font-medium">Actions</th>

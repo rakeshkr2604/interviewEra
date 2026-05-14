@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { cn } from '@/lib/utils';
 
@@ -44,7 +45,7 @@ export function BrandHomeLink({
       )}
       aria-label="InterviewEra home"
     >
-      <img
+      <Image
         src={BRAND_MARK_PATH}
         width={size}
         height={size}

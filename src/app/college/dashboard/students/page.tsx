@@ -57,7 +57,23 @@ async function getStudentData(adminUserId: string) {
     .eq('college_id', org.id)
     .order('enrolled_at', { ascending: false });
 
-  const students: StudentWithProgress[] = (enrollments ?? []).map((e: any) => ({
+  interface EnrollmentRow {
+    user_id: string;
+    branch: string | null;
+    roll_number: string | null;
+    enrollment_status: string;
+    enrolled_at: string;
+    total_sessions: number | null;
+    avg_score: number | null;
+    current_tier: number | null;
+    users: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+  }
+
+  const students: StudentWithProgress[] = (enrollments as EnrollmentRow[] | null ?? []).map((e) => ({
     id: e.users.id,
     name: e.users.name,
     email: e.users.email,
@@ -134,7 +150,7 @@ export default async function StudentsPage() {
 
       {/* Bulk Invite Section */}
       <div id="invite">
-        <BulkInviteForm orgId={org.id} orgName={org.name} seatsAvailable={seatsAvailable} />
+        <BulkInviteForm seatsAvailable={seatsAvailable} />
       </div>
 
       {/* Pending Invites */}

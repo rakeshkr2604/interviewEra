@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { cn } from '@/lib/utils';
 
 interface InviteResult {
   invited: number;
@@ -19,12 +18,10 @@ function parseCSV(text: string): string[] {
 }
 
 interface BulkInviteFormProps {
-  orgId: string;
-  orgName: string;
   seatsAvailable: number;
 }
 
-export function BulkInviteForm({ orgId, seatsAvailable }: BulkInviteFormProps) {
+export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
   const [emails, setEmails] = useState<string[]>([]);
   const [rawInput, setRawInput] = useState('');
   const [loading, setLoading] = useState(false);

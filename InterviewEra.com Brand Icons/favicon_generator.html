@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Favicon Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700&display=swap" rel="stylesheet">
+</head>
+<body style="background:#0F172A; color:white; font-family:sans-serif; padding:20px;">
+<h2>Generating favicon PNGs...</h2>
+<div id="status"></div>
+<div id="previews" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:20px;"></div>
+
+<script>
+const sizes = [
+  { name: 'favicon-16x16', w: 16, h: 16 },
+  { name: 'favicon-32x32', w: 32, h: 32 },
+  { name: 'favicon-48x48', w: 48, h: 48 },
+  { name: 'apple-touch-icon', w: 180, h: 180 },
+  { name: 'android-chrome-72x72', w: 72, h: 72 },
+  { name: 'android-chrome-96x96', w: 96, h: 96 },
+  { name: 'android-chrome-128x128', w: 128, h: 128 },
+  { name: 'android-chrome-144x144', w: 144, h: 144 },
+  { name: 'android-chrome-152x152', w: 152, h: 152 },
+  { name: 'android-chrome-192x192', w: 192, h: 192 },
+  { name: 'android-chrome-384x384', w: 384, h: 384 },
+  { name: 'android-chrome-512x512', w: 512, h: 512 },
+  { name: 'mstile-150x150', w: 150, h: 150 },
+];
+
+function drawIcon(ctx, w, h) {
+  const s = w / 100; // scale factor
+
+  // Background rounded rect
+  const r = 22 * s;
+  ctx.beginPath();
+  ctx.moveTo(r, 0);
+  ctx.lineTo(w - r, 0);
+  ctx.quadraticCurveTo(w, 0, w, r);
+  ctx.lineTo(w, h - r);
+  ctx.quadraticCurveTo(w, h, w - r, h);
+  ctx.lineTo(r, h);
+  ctx.quadraticCurveTo(0, h, 0, h - r);
+  ctx.lineTo(0, r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.closePath();
+  ctx.fillStyle = '#6366F1';
+  ctx.fill();
+
+  // Speech bubble overlay
+  ctx.beginPath();
+  const bx1 = 22*s, by1 = 20*s, bx2 = 78*s, by2 = 66*s, br = 6*s;
+  ctx.moveTo(bx1 + br, by1);
+  ctx.lineTo(bx2 - br, by1);
+  ctx.quadraticCurveTo(bx2, by1, bx2, by1 + br);
+  ctx.lineTo(bx2, by2 - br);
+  ctx.quadraticCurveTo(bx2, by2, bx2 - br, by2);
+  ctx.lineTo(54*s, by2);
+  ctx.lineTo(42*s, 80*s);
+  ctx.lineTo(42*s, by2);
+  ctx.lineTo(bx1 + br, by2);
+  ctx.quadraticCurveTo(bx1, by2, bx1, by2 - br);
+  ctx.lineTo(bx1, by1 + br);
+  ctx.quadraticCurveTo(bx1, by1, bx1 + br, by1);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.13)';
+  ctx.fill();
+
+  // IE text
+  const fontSize = Math.max(8, Math.round(30 * s));
+  ctx.font = `700 ${fontSize}px "Plus Jakarta Sans", Inter, sans-serif`;
+  ctx.fillStyle = 'white';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.letterSpacing = `-${1*s}px`;
+  ctx.fillText('IE', w * 0.5, h * 0.52);
+
+  // Cyan chevron (only at larger sizes)
+  if (w >= 48) {
+    ctx.beginPath();
+    ctx.moveTo(62*s, 36*s);
+    ctx.lineTo(70*s, 43*s);
+    ctx.lineTo(62*s, 50*s);
+    ctx.strokeStyle = '#06B6D4';
+    ctx.lineWidth = 3 * s;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+}
+
+const results = {};
+
+async function generate() {
+  // Wait for font to load
+  await document.fonts.ready;
+
+  const previews = document.getElementById('previews');
+
+  for (const size of sizes) {
+    const canvas = document.createElement('canvas');
+    canvas.width = size.w;
+    canvas.height = size.h;
+    const ctx = canvas.getContext('2d');
+    drawIcon(ctx, size.w, size.h);
+
+    results[size.name] = canvas.toDataURL('image/png');
+
+    // Show preview
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'text-align:center;';
+    const img = document.createElement('img');
+    img.src = results[size.name];
+    img.style.cssText = `width:${Math.min(size.w, 96)}px;height:${Math.min(size.h, 96)}px;image-rendering:pixelated;border:1px solid #333;`;
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:10px;color:#94A3B8;margin-top:4px;';
+    label.textContent = size.name;
+    wrapper.appendChild(img);
+    wrapper.appendChild(label);
+    previews.appendChild(wrapper);
+  }
+
+  document.getElementById('status').textContent = `✓ Generated ${sizes.length} icons`;
+  window.__faviconResults = results;
+  window.__faviconReady = true;
+}
+
+generate();
+</script>
+</body>
+</html>

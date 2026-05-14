@@ -3,6 +3,8 @@ import { callMistralChat } from '@/lib/mistral/client';
 import type { ParsedResume, Question } from '@/types/app.types';
 import type { InterviewGoal } from '@/types/onboarding.types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
+import { getTierConfig, getUserProgress } from '@/lib/retention';
+import type { TierPromptModifiers, UserTierId } from '@/lib/retention';
 
 export class QuestionGenerationError extends Error {
   constructor(message: string) {
@@ -33,6 +35,8 @@ export interface GenerateQuestionsInput {
   interviewerId: InterviewerId;
   /** Employer JD excerpt — improves role alignment when present */
   jobDescription?: string;
+  /** When provided, calibration is sharpened with the user's retention tier. */
+  userId?: string;
 }
 
 function goalToneRules(goal: InterviewGoal): string {
@@ -175,6 +179,55 @@ function isValidQuestionsResponse(
   });
 }
 
+function getTierSpecificGuidance(tier: UserTierId): string {
+  switch (tier) {
+    case 1:
+      return (
+        `- Lean on basic behavioral questions and resume-rooted prompts.\n` +
+        `- Keep technical asks fundamental; test communication and basic problem-solving.`
+      );
+    case 2:
+      return (
+        `- Go deeper on technical reasoning and follow-up probes.\n` +
+        `- Introduce light system-design thinking and advanced problem-solving.`
+      );
+    case 3:
+      return (
+        `- Include service-company patterns (TCS/Infosys/Wipro style) where relevant.\n` +
+        `- Ask about scalability, trade-offs, multi-part scenarios, and production realities.`
+      );
+    case 4:
+      return (
+        `- Use panel-style prompts with multiple angles and stress framing.\n` +
+        `- Weave in cross-functional, leadership, and ownership considerations.`
+      );
+    default:
+      return '';
+  }
+}
+
+function tierCalibrationBlock(
+  tier: UserTierId,
+  modifiers: TierPromptModifiers | null,
+): string {
+  const difficultyHint = modifiers?.difficulty?.trim();
+  const types = modifiers?.question_types?.filter((t) => typeof t === 'string' && t.length > 0);
+  const lines = [`Retention tier: Tier ${tier} — calibrate difficulty accordingly.`];
+  if (difficultyHint) lines.push(`Tier difficulty band: ${difficultyHint}.`);
+  if (types && types.length > 0) lines.push(`Tier question types to favor: ${types.join(', ')}.`);
+  const guidance = getTierSpecificGuidance(tier);
+  if (guidance) lines.push(guidance);
+  return lines.join('\n');
+}
+
+async function resolveTierCalibration(userId: string): Promise<string> {
+  const progress = await getUserProgress(userId);
+  const tier: UserTierId = (progress?.current_tier as UserTierId | undefined) ?? 1;
+  const cfg = await getTierConfig(tier);
+  const modifiers = (cfg?.prompt_modifiers ?? null) as TierPromptModifiers | null;
+  return tierCalibrationBlock(tier, modifiers);
+}
+
 async function callOpenAI(prompt: string): Promise<string> {
   const { content } = await completeInterviewChat({
     messages: [{ role: 'user', content: prompt }],
@@ -208,12 +261,15 @@ export async function generateQuestions({
   experienceYears,
   interviewerId,
   jobDescription,
+  userId,
 }: GenerateQuestionsInput): Promise<GenerateQuestionsResult> {
   const resumeSummary = buildResumeSummary(parsedResume, role);
   const jdSnippet = jobDescription?.trim().slice(0, 3500);
   const jdBlock = jdSnippet
     ? `\nEmployer job description (align competencies and scenarios with this posting; do not paste it verbatim into questions):\n${jdSnippet}\n`
     : '';
+
+  const tierBlock = userId ? await resolveTierCalibration(userId) : '';
 
   const calibration =
     [
@@ -222,7 +278,10 @@ export async function generateQuestions({
       difficultyRules(difficulty),
       interviewModeRules(interviewMode),
       interviewerPersonaRules(interviewerId),
-    ].join('\n');
+      tierBlock,
+    ]
+      .filter((s) => s.length > 0)
+      .join('\n');
 
   const prompt =
     `You are an expert interviewer at a top Indian tech company.\n` +

@@ -3,8 +3,9 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ReportPDF } from '@/components/report/ReportPDF';
-import type { DetailedAnalysis, PlanTier, QuestionCategory, RadarDataPoint } from '@/types/app.types';
+import type { DetailedAnalysis, PlanTier, QuestionCategory, RadarDataPoint, ScoreJustification } from '@/types/app.types';
 import { dimensionDisplayRowsFromRadar } from '@/lib/utils/report-radar-dimensions';
+import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
 
 export async function GET(request: Request): Promise<NextResponse | Response> {
   try {
@@ -121,6 +122,13 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
       };
     });
 
+    const perAnswerJustifications: ScoreJustification[] = (evaluations ?? []).flatMap((e) => {
+      const d = e.detailed_analysis as DetailedAnalysis | null | undefined;
+      const j = d?.score_justification;
+      return j && typeof j.why_this_score === 'string' && j.why_this_score.trim() ? [j] : [];
+    });
+    const scoreJustification = aggregateScoreJustifications(perAnswerJustifications);
+
     const completedAt = interview.completed_at
       ? new Date(interview.completed_at as string).toLocaleDateString('en-IN', {
           day: 'numeric',
@@ -138,6 +146,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
         overallScore={report.overall_score as number}
         dimensionScores={dimensionScores}
         questions={pdfQuestions}
+        scoreJustification={scoreJustification}
       />
     );
 

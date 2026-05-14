@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { privatePageMetadata } from '@/lib/seo/metadata';
-import { ArrowLeft, Mail, Download } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { StudentDeadlineList } from './StudentDeadlineList';
 import { SendReminderButton } from './SendReminderButton';
 
@@ -16,14 +16,12 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-interface DeadlineDetail {
-  id: string;
-  deadline_type: 'sessions' | 'tier' | 'score';
-  target_value: number;
-  due_date: string;
-  description: string | null;
-  mandatory: boolean;
-  created_at: string;
+interface EnrollmentRow {
+  user_id: string;
+  users: {
+    name: string | null;
+    email: string;
+  }[];
 }
 
 interface StudentProgress {
@@ -78,7 +76,7 @@ async function getDeadlineDetails(adminUserId: string, deadlineId: string) {
     ])
   );
 
-  const students: StudentProgress[] = (enrollments ?? []).map((enrollment: any) => {
+  const students: StudentProgress[] = (enrollments ?? []).map((enrollment: EnrollmentRow) => {
     const progress = progressMap.get(enrollment.user_id);
     let currentValue: number | null = null;
     let status: 'completed' | 'in_progress' | 'not_started' = 'not_started';
@@ -105,8 +103,8 @@ async function getDeadlineDetails(adminUserId: string, deadlineId: string) {
 
     return {
       userId: enrollment.user_id,
-      name: enrollment.users.name,
-      email: enrollment.users.email,
+      name: enrollment.users[0]?.name ?? null,
+      email: enrollment.users[0]?.email ?? '',
       currentValue,
       status,
     };

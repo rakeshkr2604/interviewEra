@@ -153,11 +153,19 @@ export interface DimensionScores {
   relevance: number;
 }
 
+/** Per-answer score rationale returned by AI evaluation (stored inside `detailed_analysis` JSONB). */
+export interface ScoreJustification {
+  why_this_score: string;
+  key_strengths: string[];
+  improvement_areas: string[];
+}
+
 export interface DetailedAnalysis {
   strengths: string[];
   improvements: string[];
   model_answer_hint: string;
   keywords_missing: string[];
+  score_justification?: ScoreJustification;
 }
 
 export interface Evaluation {

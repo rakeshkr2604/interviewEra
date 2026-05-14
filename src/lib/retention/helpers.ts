@@ -83,10 +83,13 @@ export async function getTierConfig(tierId: number): Promise<TierConfig | null> 
       .maybeSingle();
 
     if (error) {
+      /** `42P01`: Postgres undefined_table; `PGRST205`: table not exposed / absent from REST schema cache */
       const missingRelation =
-        error.code === '42P01' || error.message.toLowerCase().includes('does not exist');
+        error.code === '42P01' ||
+        error.code === 'PGRST205' ||
+        error.message.toLowerCase().includes('does not exist');
       if (missingRelation) {
-        logger.warn('helper_tier_config_unavailable', { tierId: bounded });
+        logger.warn('helper_tier_config_unavailable', { tierId: bounded, code: error.code });
         return null;
       }
       logger.error('helper_get_tier_config_failed', {

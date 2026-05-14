@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -144,7 +145,7 @@ export function Sidebar({
         className="flex items-center gap-3 border-b px-4 py-5"
         style={{ borderColor: 'var(--card-border)' }}
       >
-        <img
+        <Image
           src={BRAND_MARK}
           width={44}
           height={44}
@@ -262,7 +263,7 @@ export function Sidebar({
             e.currentTarget.style.color = 'var(--text-secondary)'
           }}
         >
-          <img
+          <Image
             src={BRAND_MARK}
             width={28}
             height={28}

@@ -63,7 +63,7 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
   const scores = (reports ?? []).map((r) => r.overall_score).filter((s): s is number => s !== null);
   const averageScore = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
 
-  const placementReadyCount = students.filter((s) => {
+  const placementReadyCount = students.filter(() => {
     const myScores = scores.filter((score) => score >= 7);
     return myScores.length > 0;
   }).length;

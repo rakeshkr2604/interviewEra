@@ -135,7 +135,7 @@ export default async function DeadlinesPage() {
             Set milestones for your students to reach.
           </p>
         </div>
-        <CreateDeadlineModal orgId={org.id} orgName={org.name} />
+        <CreateDeadlineModal orgName={org.name} />
       </div>
 
       {deadlines.length === 0 ? (
