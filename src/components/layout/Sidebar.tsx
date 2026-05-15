@@ -238,8 +238,8 @@ export function Sidebar({
 
       {/* Bottom: Theme + Logout */}
       <div
-        className="border-t px-3 py-4 space-y-2"
-        style={{ borderColor: 'var(--card-border)' }}
+        className="border-t px-3 pt-4 space-y-2"
+        style={{ borderColor: 'var(--card-border)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
       >
         <div className="flex items-center justify-between px-2">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>

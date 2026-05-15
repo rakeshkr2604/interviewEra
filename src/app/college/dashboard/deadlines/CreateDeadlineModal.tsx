@@ -129,7 +129,10 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
 
       {open && (
         <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center"
+          style={{
+            padding: 'max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px))',
+          }}
           onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
         >
           <div

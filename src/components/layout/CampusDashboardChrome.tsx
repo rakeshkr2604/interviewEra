@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { CampusSidebar } from './CampusSidebar'
@@ -20,6 +20,24 @@ export function CampusDashboardChrome({
 }: CampusDashboardChromeProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
+  // iOS body scroll lock: prevents background page rubber-banding through
+  // the mobile drawer overlay on Safari/PWA. Saves + restores scroll position.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !mobileOpen) return;
+    const scrollY = window.scrollY;
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY);
+    };
+  }, [mobileOpen])
+
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--bg-secondary)' }}>
       {/* Mobile overlay */}
@@ -35,7 +53,7 @@ export function CampusDashboardChrome({
       {/* Sidebar */}
       <div
         className={[
-          'fixed left-0 top-0 z-40 flex h-screen w-[min(15.25rem,88vw)] max-w-[246px] flex-col border-r transition-transform duration-200 ease-out',
+          'fixed left-0 top-0 z-40 flex h-dvh w-[min(15.25rem,88vw)] max-w-[246px] flex-col border-r transition-transform duration-200 ease-out',
           'lg:w-[15.25rem] lg:max-w-none lg:translate-x-0',
           mobileOpen ? 'translate-x-0' : '-translate-x-full',
         ].join(' ')}
@@ -97,8 +115,9 @@ export function CampusDashboardChrome({
 
         {/* Mobile top bar */}
         <header
-          className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 py-3 lg:hidden"
+          className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 pb-3 lg:hidden"
           style={{
+            paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
             borderColor: 'var(--card-border)',
             background: 'color-mix(in srgb, var(--card-bg) 96%, transparent)',
             backdropFilter: 'blur(12px)',

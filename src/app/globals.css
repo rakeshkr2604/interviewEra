@@ -55,6 +55,8 @@ code, pre, .font-mono {
   transition-property: background-color, background, border-color, color, fill, stroke, opacity, box-shadow;
   transition-timing-function: ease;
   transition-duration: 200ms;
+  /* Remove iOS/Android grey tap flash — the app has its own active/hover states. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Override — elements where transition looks wrong */
@@ -1309,4 +1311,33 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
 
 @media (prefers-reduced-motion: reduce) {
   .ie-live-pulse, .ie-cursor-blink { animation: none !important; }
+}
+
+/* ─── iOS / PWA Safe-Area & Scroll Architecture ─────────────────────────── *
+ *                                                                             *
+ * layout.tsx sets viewportFit: "cover" — this makes env(safe-area-inset-*)   *
+ * available. We do NOT set safe areas globally; instead each fixed/sticky     *
+ * surface that can overlap the notch or home indicator opts in explicitly.    *
+ * ─────────────────────────────────────────────────────────────────────────── */
+
+/* Overscroll containment: prevents the page behind a drawer/modal from
+   rubber-band scrolling on iOS when the inner scroll hits its boundary. */
+.ie-overscroll-contain {
+  overscroll-behavior: contain;
+}
+
+/* Touch-momentum scrolling. Needed on iOS < 16 for overflow containers.
+   Harmless no-op on modern iOS/Android and desktop. */
+.ie-touch-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Body scroll lock: applied via JS when a mobile drawer is open.
+   position:fixed + saved scrollY preserves scroll position on iOS.
+   See useMobileDrawer pattern in DashboardChrome / CampusDashboardChrome. */
+.ie-body-locked {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  touch-action: none;
 }

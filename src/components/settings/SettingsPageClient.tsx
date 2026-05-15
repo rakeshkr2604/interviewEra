@@ -86,7 +86,7 @@ export function SettingsPageClient({
             <div
               className={cn(
                 SETTINGS_CARD_SHELL,
-                'min-h-0 lg:flex lg:min-h-[min(27.5rem,calc(100vh-14rem))] lg:flex-col',
+                'min-h-0 lg:flex lg:min-h-[min(27.5rem,calc(100dvh-14rem))] lg:flex-col',
               )}
             >
               <div className="flex min-h-0 flex-1 flex-col">

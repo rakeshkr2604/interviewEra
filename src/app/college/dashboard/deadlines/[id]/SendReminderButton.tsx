@@ -65,8 +65,9 @@ export function SendReminderButton({
 
       {error && (
         <div
-          className="fixed bottom-4 right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
+          className="fixed right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
           style={{
+            bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
             background: 'color-mix(in srgb, var(--accent-danger) 8%, var(--card-bg))',
             borderColor: 'color-mix(in srgb, var(--accent-danger) 30%, transparent)',
             color: 'var(--accent-danger)',
@@ -78,8 +79,9 @@ export function SendReminderButton({
 
       {success && (
         <div
-          className="fixed bottom-4 right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
+          className="fixed right-4 rounded-xl border p-3 text-sm max-w-sm z-50"
           style={{
+            bottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
             background: 'color-mix(in srgb, var(--accent-success) 8%, var(--card-bg))',
             borderColor: 'color-mix(in srgb, var(--accent-success) 30%, transparent)',
             color: 'var(--accent-success)',

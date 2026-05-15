@@ -227,8 +227,8 @@ export function CampusSidebar({
 
       {/* Bottom: Student Mode + Theme + Logout */}
       <div
-        className="border-t px-3 py-4 space-y-2"
-        style={{ borderColor: 'var(--card-border)' }}
+        className="border-t px-3 pt-4 space-y-2"
+        style={{ borderColor: 'var(--card-border)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
       >
         {/* Student Mode quick link */}
         <Link
