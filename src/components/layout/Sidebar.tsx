@@ -48,7 +48,7 @@ const NAV_SECTIONS = [
       { href: '/profile/badges', label: 'Badges', icon: Award },
       { href: '/settings', label: 'Settings', icon: Settings },
       { href: '/upgrade', label: 'Pricing', icon: CreditCard },
-      { href: '/admin/dashboard', label: 'Admin', icon: Shield },
+      { href: '/college/dashboard', label: 'Campus Admin', icon: Shield },
     ],
   },
 ]
@@ -118,7 +118,7 @@ export function Sidebar({
     () =>
       NAV_SECTIONS.map((section) => ({
         ...section,
-        items: section.items.filter((item) => item.href !== '/admin/dashboard' || canAccessAdmin),
+        items: section.items.filter((item) => item.href !== '/college/dashboard' || canAccessAdmin),
       })),
     [canAccessAdmin],
   )
