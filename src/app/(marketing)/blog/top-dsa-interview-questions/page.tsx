@@ -5,20 +5,44 @@ import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
 import { DsaPrepTimelineChart, DsaTopicFrequencyChart } from '@/components/blog/visualizations/BlogDynamicCharts';
 
-import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata, schemaIds } from '@/lib/seo/metadata';
+import { JsonLdScript } from '@/components/seo/JsonLdScript';
+import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 const DSA_META_TITLE = 'Top DSA Interview Questions & Topic Map (2026)';
+const DSA_CANONICAL_PATH = '/blog/top-dsa-interview-questions';
+const DSA_DATE = '2026-05-01';
+const ORIGIN = getCanonicalSiteOrigin();
 
 export const metadata: Metadata = generateMetadata({
   title: DSA_META_TITLE,
   description:
     'Which DSA topics show up most in OAs and technical rounds — with charts, must-solve problem patterns, and a realistic prep timeline.',
-  path: '/blog/top-dsa-interview-questions',
+  path: DSA_CANONICAL_PATH,
   socialTitle: brandArticleOgTitle(DSA_META_TITLE),
   keywords:
     'DSA interview questions, coding interview topics, placement DSA preparation, LeetCode patterns, OA preparation India',
   openGraphType: 'article',
 });
+
+const DSA_ARTICLE_LD = articleJsonLd({
+  headline: DSA_META_TITLE,
+  description: 'Which DSA topics show up most in OAs and technical rounds — with charts, must-solve problem patterns, and a realistic prep timeline.',
+  canonicalUrl: canonicalUrl(DSA_CANONICAL_PATH),
+  datePublished: DSA_DATE,
+  authorName: 'InterviewEra Team',
+  publisherId: schemaIds.organization,
+});
+
+const DSA_BREADCRUMB_LD = breadcrumbListJsonLd(
+  [
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: 'DSA Interview Questions', path: DSA_CANONICAL_PATH },
+  ],
+  ORIGIN,
+);
 
 const SECTION_IDS = [
   ['#topic-landscape', 'Topic landscape (chart)'],
@@ -35,7 +59,10 @@ const SECTION_IDS = [
 
 export default function TopDsaInterviewQuestionsPage() {
   return (
-    <BlogMarketingShell backHref="/blog" backLabel="All guides">
+    <>
+      <JsonLdScript id="dsa-article-ld" data={DSA_ARTICLE_LD} />
+      <JsonLdScript id="dsa-breadcrumb-ld" data={DSA_BREADCRUMB_LD} />
+      <BlogMarketingShell backHref="/blog" backLabel="All guides">
       <article className="ie-blog-prose mx-auto w-full max-w-3xl xl:max-w-[48rem] 2xl:max-w-[52rem]">
         <header className="mb-10 sm:mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm" style={{ color: 'var(--accent-primary)' }}>
@@ -222,5 +249,6 @@ export default function TopDsaInterviewQuestionsPage() {
         </div>
       </article>
     </BlogMarketingShell>
+    </>
   );
 }

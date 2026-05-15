@@ -68,3 +68,33 @@ export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown
     publisher: { '@id': input.publisherId },
   };
 }
+
+export interface WebApplicationJsonLdInput {
+  name: string;
+  description: string;
+  url: string;
+  /** e.g. "Free" or price string like "0" */
+  price?: string;
+  priceCurrency?: string;
+  /** Organization `@id` URI */
+  providerId: string;
+}
+
+export function webApplicationJsonLd(input: WebApplicationJsonLdInput): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: input.name,
+    description: input.description,
+    url: input.url,
+    applicationCategory: 'EducationalApplication',
+    operatingSystem: 'Web',
+    isAccessibleForFree: true,
+    offers: {
+      '@type': 'Offer',
+      price: input.price ?? '0',
+      priceCurrency: input.priceCurrency ?? 'INR',
+    },
+    provider: { '@id': input.providerId },
+  };
+}

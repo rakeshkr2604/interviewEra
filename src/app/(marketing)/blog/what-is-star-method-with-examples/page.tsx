@@ -3,20 +3,44 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
-import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata, schemaIds } from '@/lib/seo/metadata';
+import { JsonLdScript } from '@/components/seo/JsonLdScript';
+import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 const STAR_META_TITLE = 'What Is the STAR Method? With Examples for Indian Students';
+const STAR_CANONICAL_PATH = '/blog/what-is-star-method-with-examples';
+const STAR_DATE = '2026-05-01';
+const ORIGIN = getCanonicalSiteOrigin();
 
 export const metadata: Metadata = generateMetadata({
   title: STAR_META_TITLE,
   description:
     'Learn the STAR method for behavioral interviews. Includes 5 full STAR examples for common questions like "Tell me about a time you failed" and "Describe a conflict."',
-  path: '/blog/what-is-star-method-with-examples',
+  path: STAR_CANONICAL_PATH,
   socialTitle: brandArticleOgTitle(STAR_META_TITLE),
   keywords:
     'STAR method examples, STAR interview answers, behavioral interview STAR method, situation task action result examples, STAR method India placement',
   openGraphType: 'article',
 });
+
+const STAR_ARTICLE_LD = articleJsonLd({
+  headline: STAR_META_TITLE,
+  description: 'Learn the STAR method for behavioral interviews. Includes 5 full STAR examples for common questions like "Tell me about a time you failed" and "Describe a conflict."',
+  canonicalUrl: canonicalUrl(STAR_CANONICAL_PATH),
+  datePublished: STAR_DATE,
+  authorName: 'InterviewEra Team',
+  publisherId: schemaIds.organization,
+});
+
+const STAR_BREADCRUMB_LD = breadcrumbListJsonLd(
+  [
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: 'STAR Method Guide', path: STAR_CANONICAL_PATH },
+  ],
+  ORIGIN,
+);
 
 interface StarExample {
   question: string;
@@ -104,7 +128,10 @@ const STAR_STRIP_STYLES = [
 
 export default function WhatIsStarMethodWithExamples() {
   return (
-    <BlogMarketingShell backHref="/blog" backLabel="All guides">
+    <>
+      <JsonLdScript id="star-article-ld" data={STAR_ARTICLE_LD} />
+      <JsonLdScript id="star-breadcrumb-ld" data={STAR_BREADCRUMB_LD} />
+      <BlogMarketingShell backHref="/blog" backLabel="All guides">
       <article className="ie-blog-prose mx-auto w-full max-w-3xl xl:max-w-[48rem] 2xl:max-w-[52rem]">
         <header className="mb-10 sm:mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm" style={{ color: 'var(--accent-primary)' }}>
@@ -310,5 +337,6 @@ export default function WhatIsStarMethodWithExamples() {
         </div>
       </article>
     </BlogMarketingShell>
+    </>
   );
 }

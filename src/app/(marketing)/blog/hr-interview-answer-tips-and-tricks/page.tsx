@@ -4,20 +4,44 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 import { HrAnswerFlowDiagram, HrAnswerQualityRadar } from '@/components/blog/visualizations/BlogDynamicCharts';
 
-import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata, schemaIds } from '@/lib/seo/metadata';
+import { JsonLdScript } from '@/components/seo/JsonLdScript';
+import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 const HR_META_TITLE = 'HR Interview Answer Tips & Tricks (With Framework Visuals)';
+const HR_CANONICAL_PATH = '/blog/hr-interview-answer-tips-and-tricks';
+const HR_DATE = '2026-05-01';
+const ORIGIN = getCanonicalSiteOrigin();
 
 export const metadata: Metadata = generateMetadata({
   title: HR_META_TITLE,
   description:
     'Answer HR and managerial round questions with structure: radar model for answer quality, step-by-step delivery flow, and traps to avoid.',
-  path: '/blog/hr-interview-answer-tips-and-tricks',
+  path: HR_CANONICAL_PATH,
   socialTitle: brandArticleOgTitle(HR_META_TITLE),
   keywords:
     'HR interview tips, HR round preparation India, tell me about yourself, behavioral interview HR, campus placement HR',
   openGraphType: 'article',
 });
+
+const HR_ARTICLE_LD = articleJsonLd({
+  headline: HR_META_TITLE,
+  description: 'Answer HR and managerial round questions with structure: radar model for answer quality, step-by-step delivery flow, and traps to avoid.',
+  canonicalUrl: canonicalUrl(HR_CANONICAL_PATH),
+  datePublished: HR_DATE,
+  authorName: 'InterviewEra Team',
+  publisherId: schemaIds.organization,
+});
+
+const HR_BREADCRUMB_LD = breadcrumbListJsonLd(
+  [
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: 'HR Interview Tips', path: HR_CANONICAL_PATH },
+  ],
+  ORIGIN,
+);
 
 const SECTION_IDS = [
   ['#why-hr', 'Why HR filters strong candidates'],
@@ -30,7 +54,10 @@ const SECTION_IDS = [
 
 export default function HrInterviewAnswerTipsPage() {
   return (
-    <BlogMarketingShell backHref="/blog" backLabel="All guides">
+    <>
+      <JsonLdScript id="hr-article-ld" data={HR_ARTICLE_LD} />
+      <JsonLdScript id="hr-breadcrumb-ld" data={HR_BREADCRUMB_LD} />
+      <BlogMarketingShell backHref="/blog" backLabel="All guides">
       <article className="ie-blog-prose mx-auto w-full max-w-3xl xl:max-w-[48rem] 2xl:max-w-[52rem]">
         <header className="mb-10 sm:mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm" style={{ color: 'var(--accent-primary)' }}>
@@ -191,5 +218,6 @@ export default function HrInterviewAnswerTipsPage() {
         </div>
       </article>
     </BlogMarketingShell>
+    </>
   );
 }

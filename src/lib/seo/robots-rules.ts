@@ -15,6 +15,8 @@ export const ROBOTS_DISALLOW_PREFIXES = [
   '/upgrade',
   '/feedback',
   '/auth/callback',
+  '/college/dashboard',
+  '/college/signup',
   '/tools/question-generator/results',
   '/tools/ats-checker/results',
   '/tools/star-builder/results',

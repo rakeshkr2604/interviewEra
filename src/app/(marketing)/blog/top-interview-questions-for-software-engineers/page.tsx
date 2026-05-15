@@ -3,20 +3,44 @@ import Link from 'next/link';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 
-import { brandArticleOgTitle, generateMetadata } from '@/lib/seo/metadata';
+import { brandArticleOgTitle, generateMetadata, schemaIds } from '@/lib/seo/metadata';
+import { JsonLdScript } from '@/components/seo/JsonLdScript';
+import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
 const SWE_META_TITLE = 'Top Interview Questions for Software Engineers (2026)';
+const SWE_CANONICAL_PATH = '/blog/top-interview-questions-for-software-engineers';
+const SWE_DATE = '2026-05-01';
+const ORIGIN = getCanonicalSiteOrigin();
 
 export const metadata: Metadata = generateMetadata({
   title: SWE_META_TITLE,
   description:
     'The most commonly asked software engineer interview questions — DSA, system design, and behavioral — with tips on what interviewers are really looking for.',
-  path: '/blog/top-interview-questions-for-software-engineers',
+  path: SWE_CANONICAL_PATH,
   socialTitle: brandArticleOgTitle(SWE_META_TITLE),
   keywords:
     'software engineer interview questions, SWE interview questions, coding interview questions, technical interview questions India, SDE interview preparation',
   openGraphType: 'article',
 });
+
+const SWE_ARTICLE_LD = articleJsonLd({
+  headline: SWE_META_TITLE,
+  description: 'The most commonly asked software engineer interview questions — DSA, system design, and behavioral — with tips on what interviewers are really looking for.',
+  canonicalUrl: canonicalUrl(SWE_CANONICAL_PATH),
+  datePublished: SWE_DATE,
+  authorName: 'InterviewEra Team',
+  publisherId: schemaIds.organization,
+});
+
+const SWE_BREADCRUMB_LD = breadcrumbListJsonLd(
+  [
+    { name: 'Home', path: '/' },
+    { name: 'Blog', path: '/blog' },
+    { name: 'Software Engineer Interview Questions', path: SWE_CANONICAL_PATH },
+  ],
+  ORIGIN,
+);
 
 interface QSection {
   id: string;
@@ -105,7 +129,10 @@ const SECTIONS: QSection[] = [
 
 export default function TopInterviewQuestionsForSoftwareEngineers() {
   return (
-    <BlogMarketingShell backHref="/blog" backLabel="All guides">
+    <>
+      <JsonLdScript id="swe-article-ld" data={SWE_ARTICLE_LD} />
+      <JsonLdScript id="swe-breadcrumb-ld" data={SWE_BREADCRUMB_LD} />
+      <BlogMarketingShell backHref="/blog" backLabel="All guides">
       <article className="ie-blog-prose mx-auto w-full max-w-3xl xl:max-w-[48rem] 2xl:max-w-[52rem]">
         <header className="mb-10 sm:mb-12">
           <p className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm" style={{ color: 'var(--accent-primary)' }}>
@@ -238,5 +265,6 @@ export default function TopInterviewQuestionsForSoftwareEngineers() {
         </div>
       </article>
     </BlogMarketingShell>
+    </>
   );
 }

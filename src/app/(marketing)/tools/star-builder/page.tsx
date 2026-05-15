@@ -1,7 +1,10 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { BookOpen, ClipboardCheck, Shield, Sparkles } from 'lucide-react';
-import { generateMetadata } from '@/lib/seo/metadata';
+import { generateMetadata, schemaIds } from '@/lib/seo/metadata';
+import { JsonLdScript } from '@/components/seo/JsonLdScript';
+import { webApplicationJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 import { StarBuilderForm } from './StarBuilderForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
@@ -19,6 +22,25 @@ export const metadata: Metadata = generateMetadata({
     'interview answer builder',
   ],
 });
+
+const ORIGIN = getCanonicalSiteOrigin();
+
+const STAR_WEBAPP_LD = webApplicationJsonLd({
+  name: 'STAR Answer Builder',
+  description:
+    'Structure behavioral interview answers using the STAR method. Get a polished, scored answer with improvement tips — free, no sign-up required.',
+  url: canonicalUrl('/tools/star-builder'),
+  providerId: schemaIds.organization,
+});
+
+const STAR_BREADCRUMB_LD = breadcrumbListJsonLd(
+  [
+    { name: 'Home', path: '/' },
+    { name: 'Free Tools', path: '/tools/star-builder' },
+    { name: 'STAR Answer Builder', path: '/tools/star-builder' },
+  ],
+  ORIGIN,
+);
 
 const BULLETS = [
   {
@@ -47,7 +69,10 @@ const STAR_LEGEND = [
 
 export default function StarBuilderPage() {
   return (
-    <FreeToolPageLayout
+    <>
+      <JsonLdScript id="star-webapp-ld" data={STAR_WEBAPP_LD} />
+      <JsonLdScript id="star-breadcrumb-ld" data={STAR_BREADCRUMB_LD} />
+      <FreeToolPageLayout
       eyebrow="Free tool · no sign-up"
       eyebrowIcon={Sparkles}
       title="STAR method answer builder"
@@ -100,5 +125,6 @@ export default function StarBuilderPage() {
     >
       <StarBuilderForm />
     </FreeToolPageLayout>
+    </>
   );
 }

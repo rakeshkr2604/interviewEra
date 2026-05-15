@@ -1,5 +1,10 @@
+import type { Metadata } from 'next';
 import { permanentRedirect } from 'next/navigation';
 import { cookies } from 'next/headers';
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 interface JoinPageProps {
   searchParams: Promise<{ ref?: string }>;

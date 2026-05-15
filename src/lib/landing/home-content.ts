@@ -230,7 +230,7 @@ export const POSITIONING_WHY_MATTERS = {
 export const PRICING_FAQ = [
   {
     q: 'What is a credit?',
-    a: 'One credit starts one mock interview session. Credits reset monthly on Starter and Pro; Free includes 5 lifetime credits.',
+    a: 'One credit starts one mock interview session. Credits reset monthly on Starter and Pro; Free includes 3 lifetime credits.',
   },
   {
     q: 'Do I need a card for the free tier?',

@@ -4,9 +4,9 @@
  */
 
 export const CAMPUS_META = {
-  title: 'Campus placements',
+  title: 'AI Mock Interviews for Campus Placements',
   description:
-    'Structured mock interviews for entire batches, verified readiness before Day 1, no extra T&P workload — from ₹799/student/year.',
+    'Train your entire placement batch with AI mock interviews — cohort analytics, unlimited sessions, and zero extra T&P workload. From ₹799/student/year.',
 } as const;
 
 /** Shown under hero CTAs (replaces duplicate stat cards for cleaner hierarchy). */
