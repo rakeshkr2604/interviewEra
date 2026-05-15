@@ -18,6 +18,18 @@ const TIER_LABELS = {
   4: 'Tier 4',
 };
 
+function getTooltipStyle() {
+  if (typeof window === 'undefined') return {};
+  const s = getComputedStyle(document.documentElement);
+  return {
+    backgroundColor: s.getPropertyValue('--card-bg').trim() || '#ffffff',
+    border: `1px solid ${s.getPropertyValue('--card-border').trim() || '#e5e7eb'}`,
+    borderRadius: '8px',
+    color: s.getPropertyValue('--text-primary').trim() || '#111827',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+  };
+}
+
 export function TierDistributionChart({ data }: TierDistributionChartProps) {
   const chartData = data.map((item) => ({
     ...item,
@@ -30,29 +42,24 @@ export function TierDistributionChart({ data }: TierDistributionChartProps) {
         data={chartData}
         margin={{ top: 20, right: 30, left: 0, bottom: 0 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+        <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" />
         <XAxis
           dataKey="name"
-          stroke="#6b7280"
-          style={{ fontSize: '14px' }}
+          stroke="var(--text-muted)"
+          tick={{ fill: 'var(--text-secondary)', fontSize: 14 }}
         />
         <YAxis
-          stroke="#6b7280"
-          style={{ fontSize: '14px' }}
+          stroke="var(--text-muted)"
+          tick={{ fill: 'var(--text-secondary)', fontSize: 14 }}
         />
         <Tooltip
-          contentStyle={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #e5e7eb',
-            borderRadius: '8px',
-            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-          }}
+          contentStyle={getTooltipStyle()}
           formatter={(value) => {
             if (typeof value !== 'number') return ['', ''];
             return [value.toString(), 'Students'];
           }}
         />
-        <Bar dataKey="count" fill="#3b82f6" radius={[8, 8, 0, 0]} />
+        <Bar dataKey="count" fill="var(--accent-primary)" radius={[8, 8, 0, 0]} />
       </BarChart>
     </ResponsiveContainer>
   );

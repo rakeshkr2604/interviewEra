@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Dialog } from '@/components/ui/dialog';
+import { useState, useEffect, useId } from 'react';
+import { useRouter } from 'next/navigation';
 
 interface CreateDeadlineModalProps {
   orgName: string;
@@ -10,6 +10,8 @@ interface CreateDeadlineModalProps {
 type DeadlineType = 'sessions' | 'tier' | 'score';
 
 export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
+  const router = useRouter();
+  const titleId = useId();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +36,15 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
     tier: 'e.g., 2',
     score: 'e.g., 7.5',
   };
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -90,7 +101,7 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
       setTimeout(() => {
         setOpen(false);
         setSuccess(false);
-        window.location.reload();
+        router.refresh();
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -106,9 +117,10 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <>
       <button
         onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
         className="rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
         style={{ background: 'var(--accent-primary)' }}
       >
@@ -116,12 +128,18 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false); }}
+        >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={titleId}
             className="rounded-[22px] p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
             style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
           >
-            <h2 className="text-xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Create Deadline</h2>
+            <h2 id={titleId} className="text-xl font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Create Deadline</h2>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -142,12 +160,12 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
                 <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
                   Type <span style={{ color: 'var(--accent-danger)' }}>*</span>
                 </label>
-                <div className="space-y-2">
+                <div role="radiogroup" aria-label="Deadline type" className="space-y-2">
                   {(['sessions', 'tier', 'score'] as const).map((type) => (
                     <label key={type} className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="radio"
-                        name="type"
+                        name="deadline-type"
                         value={type}
                         checked={formData.type === type}
                         onChange={(e) => setFormData({ ...formData, type: e.target.value as DeadlineType })}
@@ -203,6 +221,7 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
 
               {error && (
                 <div
+                  role="alert"
                   className="rounded-xl border p-3 text-sm"
                   style={{
                     background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
@@ -216,6 +235,7 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
 
               {success && (
                 <div
+                  role="status"
                   className="rounded-xl border p-3 text-sm"
                   style={{
                     background: 'color-mix(in srgb, var(--accent-success) 8%, transparent)',
@@ -249,6 +269,6 @@ export function CreateDeadlineModal({}: CreateDeadlineModalProps) {
           </div>
         </div>
       )}
-    </Dialog>
+    </>
   );
 }

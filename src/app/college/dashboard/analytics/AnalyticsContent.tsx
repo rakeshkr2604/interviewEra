@@ -1,11 +1,29 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { RefreshCw, Download } from 'lucide-react';
-import { TierDistributionChart } from './charts/TierDistributionChart';
-import { ScoreTrendChart } from './charts/ScoreTrendChart';
-import { SessionActivityHeatmap } from './charts/SessionActivityHeatmap';
-import { PlacementReadyChart } from './charts/PlacementReadyChart';
+
+const ChartSkeleton = () => (
+  <div className="flex items-center justify-center h-64 animate-pulse rounded-xl" style={{ background: 'var(--bg-secondary)' }} />
+);
+
+const TierDistributionChart = dynamic(
+  () => import('./charts/TierDistributionChart').then((m) => ({ default: m.TierDistributionChart })),
+  { loading: ChartSkeleton, ssr: false }
+);
+const ScoreTrendChart = dynamic(
+  () => import('./charts/ScoreTrendChart').then((m) => ({ default: m.ScoreTrendChart })),
+  { loading: ChartSkeleton, ssr: false }
+);
+const SessionActivityHeatmap = dynamic(
+  () => import('./charts/SessionActivityHeatmap').then((m) => ({ default: m.SessionActivityHeatmap })),
+  { loading: ChartSkeleton, ssr: false }
+);
+const PlacementReadyChart = dynamic(
+  () => import('./charts/PlacementReadyChart').then((m) => ({ default: m.PlacementReadyChart })),
+  { loading: ChartSkeleton, ssr: false }
+);
 
 interface TierDistribution {
   tier: number;
@@ -145,7 +163,7 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
     <div className="space-y-6">
       {/* Controls */}
       <div
-        className="dashboard-premium-card flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
+        className="dashboard-premium-card p-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex flex-wrap gap-2">
           {(['7', '30', '90', 'all'] as DateRange[]).map((range) => (
@@ -183,25 +201,25 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Total Students</p>
           <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>{data.totalStudents}</p>
         </div>
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Placement Ready</p>
           <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-success)' }}>{data.placementReady.ready}</p>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {data.totalStudents > 0 ? Math.round((data.placementReady.ready / data.totalStudents) * 100) : 0}%
           </p>
         </div>
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Almost Ready</p>
           <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-primary)' }}>{data.placementReady.almostReady}</p>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             {data.totalStudents > 0 ? Math.round((data.placementReady.almostReady / data.totalStudents) * 100) : 0}%
           </p>
         </div>
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Needs Work</p>
           <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--accent-warning)' }}>{data.placementReady.needsWork}</p>
           <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -213,7 +231,7 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
       {/* Charts Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Tier Distribution */}
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Tier Distribution</h2>
           {data.tierDistribution.some((t) => t.count > 0) ? (
             <TierDistributionChart data={data.tierDistribution} />
@@ -225,13 +243,13 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
         </div>
 
         {/* Placement Ready Breakdown */}
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Placement Ready Breakdown</h2>
           <PlacementReadyChart data={data.placementReady} totalStudents={data.totalStudents} />
         </div>
 
         {/* Score Trend */}
-        <div className="dashboard-premium-card lg:col-span-2">
+        <div className="dashboard-premium-card p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Score Trend (Last 30 Days)</h2>
           {data.scoreTrend.some((t) => t.score > 0) ? (
             <ScoreTrendChart data={data.scoreTrend} />
@@ -243,7 +261,7 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
         </div>
 
         {/* Session Activity */}
-        <div className="dashboard-premium-card lg:col-span-2">
+        <div className="dashboard-premium-card p-5 lg:col-span-2">
           <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Session Activity (Last 90 Days)</h2>
           {data.sessionActivity.some((s) => s.count > 0) ? (
             <SessionActivityHeatmap data={data.sessionActivity} />

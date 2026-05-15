@@ -115,7 +115,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, children }: StatCardProps) {
   return (
-    <div className="dashboard-premium-card">
+    <div className="dashboard-premium-card p-5">
       <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
       {children ? (
         <div className="mt-2">{children}</div>
@@ -173,7 +173,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
       </div>
 
       {/* Profile Info Card */}
-      <div className="dashboard-premium-card">
+      <div className="dashboard-premium-card p-5">
         <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Profile Information</h2>
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
           <div>

@@ -11,15 +11,26 @@ interface SessionActivityHeatmapProps {
   data: SessionDay[];
 }
 
-function getColor(count: number, maxCount: number): string {
-  if (count === 0) return 'bg-gray-100';
+function getCellStyle(count: number, maxCount: number): React.CSSProperties {
+  if (count === 0) {
+    return { background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' };
+  }
   const intensity = count / maxCount;
-
-  if (intensity <= 0.25) return 'bg-blue-100';
-  if (intensity <= 0.5) return 'bg-blue-300';
-  if (intensity <= 0.75) return 'bg-blue-500';
-  return 'bg-blue-700';
+  // Use accent-primary with increasing opacity for heat levels
+  const opacity = intensity <= 0.25 ? 0.2 : intensity <= 0.5 ? 0.45 : intensity <= 0.75 ? 0.7 : 1;
+  return {
+    background: `color-mix(in srgb, var(--accent-primary) ${Math.round(opacity * 100)}%, transparent)`,
+    border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+  };
 }
+
+const LEGEND_LEVELS = [
+  { label: 'None', opacity: 0 },
+  { label: 'Low', opacity: 0.2 },
+  { label: 'Medium', opacity: 0.45 },
+  { label: 'High', opacity: 0.7 },
+  { label: 'Very High', opacity: 1 },
+];
 
 function getWeekNumber(dateStr: string): number {
   const date = new Date(dateStr + 'T00:00:00');
@@ -32,7 +43,7 @@ export function SessionActivityHeatmap({ data }: SessionActivityHeatmapProps) {
   const [hoveredDate, setHoveredDate] = useState<string | null>(null);
 
   if (data.length === 0) {
-    return <div className="text-center text-gray-500">No session data</div>;
+    return <div className="text-center" style={{ color: 'var(--text-muted)' }}>No session data</div>;
   }
 
   const maxCount = Math.max(...data.map((d) => d.count), 1);
@@ -57,7 +68,8 @@ export function SessionActivityHeatmap({ data }: SessionActivityHeatmapProps) {
           {dayNames.map((day) => (
             <div
               key={day}
-              className="h-10 w-10 flex items-center justify-center text-xs font-medium text-gray-600"
+              className="h-10 w-10 flex items-center justify-center text-xs font-medium"
+              style={{ color: 'var(--text-secondary)' }}
             >
               {day}
             </div>
@@ -80,7 +92,7 @@ export function SessionActivityHeatmap({ data }: SessionActivityHeatmapProps) {
 
               return (
                 <div key={weekNum} className="flex gap-1">
-                  <div className="w-12 flex items-center text-xs text-gray-500">
+                  <div className="w-12 flex items-center text-xs" style={{ color: 'var(--text-muted)' }}>
                     W{weekNum}
                   </div>
                   {allDays.map((day, idx) => {
@@ -91,7 +103,8 @@ export function SessionActivityHeatmap({ data }: SessionActivityHeatmapProps) {
                     return (
                       <div
                         key={day.date}
-                        className={`h-10 w-10 rounded border border-gray-300 flex items-center justify-center cursor-pointer transition-all ${getColor(day.count, maxCount)}`}
+                        className="h-10 w-10 rounded flex items-center justify-center cursor-pointer transition-all"
+                        style={getCellStyle(day.count, maxCount)}
                         onMouseEnter={() => setHoveredDate(day.date)}
                         onMouseLeave={() => setHoveredDate(null)}
                         title={`${day.date}: ${day.count} session${day.count !== 1 ? 's' : ''}`}
@@ -108,28 +121,24 @@ export function SessionActivityHeatmap({ data }: SessionActivityHeatmapProps) {
         </div>
 
         {/* Legend */}
-        <div className="mt-6 flex items-center gap-4">
-          <span className="text-sm text-gray-600">Activity:</span>
-          <div className="flex gap-1 items-center">
-            <div className="h-6 w-6 bg-gray-100 border border-gray-300 rounded text-xs" />
-            <span className="text-xs text-gray-600">None</span>
-          </div>
-          <div className="flex gap-1 items-center">
-            <div className="h-6 w-6 bg-blue-100 border border-gray-300 rounded text-xs" />
-            <span className="text-xs text-gray-600">Low</span>
-          </div>
-          <div className="flex gap-1 items-center">
-            <div className="h-6 w-6 bg-blue-300 border border-gray-300 rounded text-xs" />
-            <span className="text-xs text-gray-600">Medium</span>
-          </div>
-          <div className="flex gap-1 items-center">
-            <div className="h-6 w-6 bg-blue-500 border border-gray-300 rounded text-xs" />
-            <span className="text-xs text-gray-600">High</span>
-          </div>
-          <div className="flex gap-1 items-center">
-            <div className="h-6 w-6 bg-blue-700 border border-gray-300 rounded text-xs" />
-            <span className="text-xs text-gray-600">Very High</span>
-          </div>
+        <div className="mt-6 flex flex-wrap items-center gap-4">
+          <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>Activity:</span>
+          {LEGEND_LEVELS.map(({ label, opacity }) => (
+            <div key={label} className="flex gap-1.5 items-center">
+              <div
+                className="h-5 w-5 rounded"
+                style={
+                  opacity === 0
+                    ? { background: 'var(--bg-secondary)', border: '1px solid var(--card-border)' }
+                    : {
+                        background: `color-mix(in srgb, var(--accent-primary) ${Math.round(opacity * 100)}%, transparent)`,
+                        border: '1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+                      }
+                }
+              />
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>

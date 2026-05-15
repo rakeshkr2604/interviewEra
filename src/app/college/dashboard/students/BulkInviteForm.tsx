@@ -88,7 +88,7 @@ export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
   }
 
   return (
-    <div className="dashboard-premium-card space-y-5">
+    <div className="dashboard-premium-card p-6 space-y-5">
       <div>
         <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Invite Students</h3>
         <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>

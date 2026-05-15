@@ -58,7 +58,7 @@ function SettingsCard({ children, id }: { children: React.ReactNode; id?: string
   return (
     <section
       id={id}
-      className="dashboard-premium-card"
+      className="dashboard-premium-card p-6"
     >
       {children}
     </section>

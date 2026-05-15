@@ -4,13 +4,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { cn } from '@/lib/utils';
-
-const inputClass = cn(
-  'w-full rounded-lg border-2 px-4 py-2.5 text-sm shadow-none transition-[color,box-shadow]',
-  'focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-100 focus-visible:outline-none',
-  'border-gray-200 bg-white text-gray-900 placeholder:text-gray-400'
-);
 
 export function CollegeSignupForm() {
   const [collegeName, setCollegeName] = useState('');
@@ -22,6 +15,12 @@ export function CollegeSignupForm() {
   const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const inputStyle = {
+    border: '1.5px solid var(--card-border)',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-primary)',
+  } as React.CSSProperties;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -112,44 +111,51 @@ export function CollegeSignupForm() {
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+    <div
+      className="rounded-lg p-6"
+      style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+    >
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">T&P Officer Registration</h1>
-        <p className="mt-2 text-sm text-gray-600">Set up your college account for placement training.</p>
+        <h1 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>T&P Officer Registration</h1>
+        <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>Set up your college account for placement training.</p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="college-name" className="block text-sm font-medium text-gray-700">
-            College Name <span className="text-red-500">*</span>
+          <label htmlFor="college-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            College Name <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="college-name"
             value={collegeName}
             onChange={(e) => setCollegeName(e.target.value)}
             placeholder="e.g., Indian Institute of Technology"
-            className={inputClass}
+            autoComplete="organization"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="officer-name" className="block text-sm font-medium text-gray-700">
-            Your Name <span className="text-red-500">*</span>
+          <label htmlFor="officer-name" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Your Name <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="officer-name"
             value={officerName}
             onChange={(e) => setOfficerName(e.target.value)}
             placeholder="e.g., Priya Sharma"
-            className={inputClass}
+            autoComplete="name"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email <span className="text-red-500">*</span>
+          <label htmlFor="email" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Email <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="email"
@@ -157,14 +163,16 @@ export function CollegeSignupForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="tp@college.edu"
-            className={inputClass}
+            autoComplete="email"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-            Phone <span className="text-red-500">*</span>
+          <label htmlFor="phone" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Phone <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="phone"
@@ -172,14 +180,16 @@ export function CollegeSignupForm() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+91 98765 43210"
-            className={inputClass}
+            autoComplete="tel"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
         </div>
 
         <div>
-          <label htmlFor="student-count" className="block text-sm font-medium text-gray-700">
-            Estimated Student Count <span className="text-red-500">*</span>
+          <label htmlFor="student-count" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Estimated Student Count <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="student-count"
@@ -188,15 +198,17 @@ export function CollegeSignupForm() {
             value={studentCount}
             onChange={(e) => setStudentCount(e.target.value)}
             placeholder="e.g., 150"
-            className={inputClass}
+            autoComplete="off"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
-          <p className="mt-1 text-xs text-gray-500">Used for pricing and seat allocation.</p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>Used for pricing and seat allocation.</p>
         </div>
 
         <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-            Password <span className="text-red-500">*</span>
+          <label htmlFor="password" className="block text-sm font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>
+            Password <span style={{ color: 'var(--accent-danger)' }}>*</span>
           </label>
           <input
             id="password"
@@ -205,19 +217,25 @@ export function CollegeSignupForm() {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Minimum 8 characters"
             minLength={8}
-            className={inputClass}
+            autoComplete="new-password"
+            className="w-full rounded-lg border-2 px-4 py-2.5 text-sm transition-[border-color] focus-visible:outline-none focus-visible:border-[var(--accent-primary)]"
+            style={inputStyle}
             required
           />
         </div>
 
         {feedback && (
           <div
-            className={cn(
-              'rounded-lg border px-4 py-3 text-sm font-medium',
-              feedback.kind === 'error'
-                ? 'border-red-200 bg-red-50 text-red-700'
-                : 'border-green-200 bg-green-50 text-green-700'
-            )}
+            className="rounded-lg border px-4 py-3 text-sm font-medium"
+            style={{
+              background: feedback.kind === 'error'
+                ? 'color-mix(in srgb, var(--accent-danger) 8%, transparent)'
+                : 'color-mix(in srgb, var(--accent-success) 8%, transparent)',
+              borderColor: feedback.kind === 'error'
+                ? 'color-mix(in srgb, var(--accent-danger) 30%, transparent)'
+                : 'color-mix(in srgb, var(--accent-success) 30%, transparent)',
+              color: feedback.kind === 'error' ? 'var(--accent-danger)' : 'var(--accent-success)',
+            }}
             role={feedback.kind === 'error' ? 'alert' : 'status'}
           >
             {feedback.text}
@@ -227,14 +245,15 @@ export function CollegeSignupForm() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-60"
+          className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
+          style={{ background: 'var(--accent-primary)' }}
         >
           {loading ? 'Creating account…' : 'Create Account'}
         </button>
 
-        <p className="text-center text-sm text-gray-600">
+        <p className="text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
           Already registered?{' '}
-          <Link href="/login" className="font-semibold text-blue-600 hover:text-blue-700">
+          <Link href="/login" className="font-semibold hover:underline" style={{ color: 'var(--accent-primary)' }}>
             Sign in
           </Link>
         </p>

@@ -110,6 +110,7 @@ export function StudentDeadlineList({ students, deadlineType, targetValue }: Stu
                     if (sortField === 'name') setSortDesc(!sortDesc);
                     else { setSortField('name'); setSortDesc(false); }
                   }}
+                  aria-label={`Sort by name${sortField === 'name' ? (sortDesc ? ', currently descending' : ', currently ascending') : ''}`}
                   className="transition-colors hover:opacity-70"
                   style={{ color: 'var(--text-muted)' }}
                 >
@@ -122,6 +123,7 @@ export function StudentDeadlineList({ students, deadlineType, targetValue }: Stu
                     if (sortField === 'value') setSortDesc(!sortDesc);
                     else { setSortField('value'); setSortDesc(false); }
                   }}
+                  aria-label={`Sort by ${typeLabels[deadlineType]}${sortField === 'value' ? (sortDesc ? ', currently descending' : ', currently ascending') : ''}`}
                   className="transition-colors hover:opacity-70"
                   style={{ color: 'var(--text-muted)' }}
                 >
@@ -135,6 +137,7 @@ export function StudentDeadlineList({ students, deadlineType, targetValue }: Stu
                     if (sortField === 'status') setSortDesc(!sortDesc);
                     else { setSortField('status'); setSortDesc(false); }
                   }}
+                  aria-label={`Sort by status${sortField === 'status' ? (sortDesc ? ', currently descending' : ', currently ascending') : ''}`}
                   className="transition-colors hover:opacity-70"
                   style={{ color: 'var(--text-muted)' }}
                 >

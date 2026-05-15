@@ -158,7 +158,7 @@ export default async function DeadlinesPage() {
             <Link
               key={deadline.id}
               href={`/college/dashboard/deadlines/${deadline.id}`}
-              className="dashboard-premium-card block transition-all hover:-translate-y-0.5"
+              className="dashboard-premium-card p-5 block transition-all hover:-translate-y-0.5"
             >
               <div className="flex items-start justify-between mb-4">
                 <div>
@@ -182,12 +182,6 @@ export default async function DeadlinesPage() {
                   <AlertCircle className="h-5 w-5 flex-shrink-0 ml-2" style={{ color: 'var(--accent-danger)' }} />
                 )}
               </div>
-
-              {deadline.description && (
-                <p className="text-sm mb-4 line-clamp-2" style={{ color: 'var(--text-secondary)' }}>
-                  {deadline.description}
-                </p>
-              )}
 
               <div className="space-y-3">
                 {/* Due Date */}

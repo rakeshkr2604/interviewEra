@@ -134,26 +134,42 @@ export default async function CollegeLandingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       {/* ── Nav ─────────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-30 border-b border-gray-100 bg-white/95 backdrop-blur">
+      <header
+        className="sticky top-0 z-30 border-b"
+        style={{
+          borderColor: 'var(--card-border)',
+          background: 'color-mix(in srgb, var(--bg-primary) 92%, transparent)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+        }}
+      >
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/" className="text-lg font-bold text-gray-900">
-            Interview<span className="text-blue-600">Era</span>
-            <span className="ml-2 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">
+          <Link href="/" className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+            Interview<span style={{ color: 'var(--accent-primary)' }}>Era</span>
+            <span
+              className="ml-2 rounded-full px-2 py-0.5 text-xs font-semibold"
+              style={{
+                background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                color: 'var(--accent-primary)',
+              }}
+            >
               Campus
             </span>
           </Link>
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
+              className="text-sm font-medium transition-opacity hover:opacity-70"
+              style={{ color: 'var(--text-secondary)' }}
             >
               Sign In
             </Link>
             <Link
               href="/college/signup"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ background: 'var(--accent-primary)' }}
             >
               Sign Up Free
             </Link>
@@ -162,47 +178,71 @@ export default async function CollegeLandingPage() {
       </header>
 
       {/* ── Hero ────────────────────────────────────────────────────────────── */}
-      <section className="bg-gradient-to-b from-blue-50 to-white px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24">
+      <section
+        className="px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24"
+        style={{
+          background: 'linear-gradient(to bottom, color-mix(in srgb, var(--accent-primary) 6%, var(--bg-primary)), var(--bg-primary))',
+        }}
+      >
         <div className="mx-auto max-w-3xl">
-          <span className="inline-block rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+          <span
+            className="inline-block rounded-full px-3 py-1 text-xs font-semibold"
+            style={{
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              color: 'var(--accent-primary)',
+              border: '1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent)',
+            }}
+          >
             For T&P Officers &amp; Placement Cells
           </span>
-          <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight text-gray-900 sm:text-5xl md:text-6xl">
+          <h1 className="mt-4 text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-6xl" style={{ color: 'var(--text-primary)' }}>
             Prepare Your Entire Batch{' '}
-            <span className="text-blue-600">for Placements</span>
+            <span style={{ color: 'var(--accent-primary)' }}>for Placements</span>
           </h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-gray-600">
+          <p className="mx-auto mt-5 max-w-xl text-lg" style={{ color: 'var(--text-secondary)' }}>
             Give every student unlimited AI mock interviews, rubric-scored feedback, and a clear
             path to placement readiness — all managed from one dashboard.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/college/signup"
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-blue-200 transition-all hover:bg-blue-700 hover:-translate-y-0.5"
+              className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-semibold text-white transition-all hover:opacity-90 hover:-translate-y-0.5"
+              style={{
+                background: 'var(--accent-primary)',
+                boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
+              }}
             >
               Sign Up for Your College
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/campus"
-              className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-6 py-3 text-base font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+              className="inline-flex items-center gap-2 rounded-xl border px-6 py-3 text-base font-semibold transition-colors hover:opacity-80"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'var(--card-bg)',
+                color: 'var(--text-secondary)',
+              }}
             >
               Book a Demo
             </Link>
           </div>
-          <p className="mt-4 text-xs text-gray-400">
+          <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>
             No credit card required · Setup in under 5 minutes
           </p>
         </div>
       </section>
 
       {/* ── Stats row ───────────────────────────────────────────────────────── */}
-      <section className="border-y border-gray-100 bg-gray-50 px-4 py-10 sm:px-6">
+      <section
+        className="border-y px-4 py-10 sm:px-6"
+        style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+      >
         <div className="mx-auto grid max-w-4xl grid-cols-2 gap-8 text-center sm:grid-cols-4">
           {VALUE_PROPS.map((v) => (
             <div key={v.label}>
-              <p className="text-3xl font-bold text-blue-600">{v.stat}</p>
-              <p className="mt-1 text-xs text-gray-500">{v.label}</p>
+              <p className="text-3xl font-bold" style={{ color: 'var(--accent-primary)' }}>{v.stat}</p>
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{v.label}</p>
             </div>
           ))}
         </div>
@@ -211,10 +251,10 @@ export default async function CollegeLandingPage() {
       {/* ── Features grid ───────────────────────────────────────────────────── */}
       <section className="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div className="mb-12 text-center">
-          <h2 className="text-3xl font-bold text-gray-900">
+          <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
             Everything a T&P cell needs
           </h2>
-          <p className="mt-3 text-gray-500">
+          <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>
             From bulk onboarding to individual progress tracking — in one platform.
           </p>
         </div>
@@ -222,24 +262,31 @@ export default async function CollegeLandingPage() {
           {FEATURES.map(({ icon: Icon, title, desc }) => (
             <div
               key={title}
-              className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm transition-shadow hover:shadow-md"
+              className="rounded-xl p-6 transition-shadow hover:shadow-md"
+              style={{
+                background: 'var(--card-bg)',
+                border: '1px solid var(--card-border)',
+              }}
             >
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
-                <Icon className="h-5 w-5 text-blue-600" />
+              <span
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg"
+                style={{ background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
+              >
+                <Icon className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} />
               </span>
-              <h3 className="mt-4 text-base font-semibold text-gray-900">{title}</h3>
-              <p className="mt-2 text-sm text-gray-500">{desc}</p>
+              <h3 className="mt-4 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+              <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>{desc}</p>
             </div>
           ))}
         </div>
       </section>
 
       {/* ── Pricing ─────────────────────────────────────────────────────────── */}
-      <section className="bg-gray-50 px-4 py-20 sm:px-6" id="pricing">
+      <section className="px-4 py-20 sm:px-6" style={{ background: 'var(--bg-secondary)' }} id="pricing">
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center">
-            <h2 className="text-3xl font-bold text-gray-900">Transparent pricing</h2>
-            <p className="mt-3 text-gray-500">
+            <h2 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Transparent pricing</h2>
+            <p className="mt-3" style={{ color: 'var(--text-secondary)' }}>
               Annual plans — billed once per academic year. No per-student overage fees.
             </p>
           </div>
@@ -247,28 +294,36 @@ export default async function CollegeLandingPage() {
             {PRICING.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative rounded-2xl border bg-white p-7 ${
-                  plan.highlight
-                    ? 'border-blue-500 shadow-xl shadow-blue-100'
-                    : 'border-gray-200 shadow-sm'
-                }`}
+                className="relative rounded-2xl p-7"
+                style={{
+                  background: 'var(--card-bg)',
+                  border: plan.highlight
+                    ? '2px solid var(--accent-primary)'
+                    : '1px solid var(--card-border)',
+                  boxShadow: plan.highlight
+                    ? '0 8px 32px color-mix(in srgb, var(--accent-primary) 16%, transparent)'
+                    : undefined,
+                }}
               >
                 {plan.highlight && (
-                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-blue-600 px-3 py-1 text-xs font-semibold text-white">
+                  <span
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-1 text-xs font-semibold text-white"
+                    style={{ background: 'var(--accent-primary)' }}
+                  >
                     Most Popular
                   </span>
                 )}
-                <p className="text-sm font-semibold text-gray-500">{plan.name}</p>
-                <p className="mt-2 text-4xl font-bold text-gray-900">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>{plan.name}</p>
+                <p className="mt-2 text-4xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {plan.price}
-                  <span className="text-base font-normal text-gray-400">{plan.period}</span>
+                  <span className="text-base font-normal" style={{ color: 'var(--text-muted)' }}>{plan.period}</span>
                 </p>
-                <p className="mt-1 text-xs text-gray-400">{plan.seats}</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{plan.seats}</p>
 
                 <ul className="mt-6 space-y-3">
                   {plan.features.map((f) => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                    <li key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--accent-success)' }} />
                       {f}
                     </li>
                   ))}
@@ -276,20 +331,25 @@ export default async function CollegeLandingPage() {
 
                 <Link
                   href={plan.name === 'Premium' ? '/campus' : '/college/signup'}
-                  className={`mt-8 block rounded-xl px-4 py-2.5 text-center text-sm font-semibold transition-colors ${
+                  className="mt-8 block rounded-xl px-4 py-2.5 text-center text-sm font-semibold transition-opacity hover:opacity-90"
+                  style={
                     plan.highlight
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'border border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
-                  }`}
+                      ? { background: 'var(--accent-primary)', color: '#fff' }
+                      : {
+                          border: '1px solid var(--card-border)',
+                          background: 'var(--bg-secondary)',
+                          color: 'var(--text-primary)',
+                        }
+                  }
                 >
                   {plan.cta}
                 </Link>
               </div>
             ))}
           </div>
-          <p className="mt-8 text-center text-xs text-gray-400">
+          <p className="mt-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
             Need a custom quote?{' '}
-            <Link href="/campus" className="text-blue-600 hover:underline">
+            <Link href="/campus" className="hover:underline" style={{ color: 'var(--accent-primary)' }}>
               Talk to our team
             </Link>
           </p>
@@ -297,25 +357,29 @@ export default async function CollegeLandingPage() {
       </section>
 
       {/* ── CTA banner ──────────────────────────────────────────────────────── */}
-      <section className="bg-blue-600 px-4 py-16 text-center sm:px-6">
+      <section
+        className="px-4 py-16 text-center sm:px-6"
+        style={{ background: 'var(--accent-primary)' }}
+      >
         <div className="mx-auto max-w-2xl">
           <h2 className="text-3xl font-bold text-white">
             Ready to upgrade your placement cell?
           </h2>
-          <p className="mt-3 text-blue-100">
+          <p className="mt-3 text-white/80">
             Set up your campus in under 5 minutes. Invite your first batch today.
           </p>
           <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
             <Link
               href="/college/signup"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ color: 'var(--accent-primary)' }}
             >
               Sign Up for Your College
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/campus"
-              className="inline-flex items-center gap-2 rounded-xl border border-blue-400 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
             >
               Book a Demo
             </Link>
@@ -324,12 +388,15 @@ export default async function CollegeLandingPage() {
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────────────────── */}
-      <footer className="border-t border-gray-100 px-4 py-8 text-center text-xs text-gray-400 sm:px-6">
+      <footer
+        className="border-t px-4 py-8 text-center text-xs sm:px-6"
+        style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
+      >
         <p>
           © {new Date().getFullYear()} InterviewEra &nbsp;·&nbsp;
-          <Link href="/privacy" className="hover:text-gray-600">Privacy</Link>
+          <Link href="/privacy" className="hover:opacity-70">Privacy</Link>
           &nbsp;·&nbsp;
-          <Link href="/terms" className="hover:text-gray-600">Terms</Link>
+          <Link href="/terms" className="hover:opacity-70">Terms</Link>
         </p>
       </footer>
     </div>

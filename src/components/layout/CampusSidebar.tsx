@@ -64,6 +64,7 @@ function NavItem({
         onClick={onNavigate}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        aria-current={isActive ? 'page' : undefined}
         className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-none"
         style={
           isActive

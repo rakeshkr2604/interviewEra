@@ -22,12 +22,13 @@ export default async function CollegeSignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
       <div className="w-full max-w-md">
         <div className="mb-4">
           <Link
             href="/college"
-            className="inline-flex items-center gap-1 text-sm font-medium text-gray-500 transition-colors hover:text-gray-800"
+            className="inline-flex items-center gap-1 text-sm font-medium transition-colors hover:opacity-70"
+            style={{ color: 'var(--text-secondary)' }}
           >
             <ChevronLeft className="h-4 w-4" aria-hidden />
             Back to Campus overview

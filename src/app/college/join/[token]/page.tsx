@@ -50,19 +50,26 @@ export default async function JoinInvitePage({ params }: PageProps) {
 
   if (error === 'expired') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--page-gradient, #f8fafc)' }}>
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-amber-50">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+        <div
+          className="w-full max-w-md rounded-2xl p-8 text-center"
+          style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)' }}
+          >
             <span className="text-2xl">⏰</span>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Invitation Already Used</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Invitation Already Used</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             This invitation link has already been accepted. If you already have an account, sign in
             to continue your placement preparation.
           </p>
           <Link
             href="/login"
-            className="mt-6 inline-flex h-10 items-center rounded-xl bg-blue-600 px-6 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+            className="mt-6 inline-flex h-10 items-center rounded-xl px-6 text-sm font-semibold text-white transition-colors hover:opacity-90"
+            style={{ background: 'var(--accent-primary)' }}
           >
             Sign In
           </Link>
@@ -73,13 +80,19 @@ export default async function JoinInvitePage({ params }: PageProps) {
 
   if (!invite || !org) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--page-gradient, #f8fafc)' }}>
-        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-8 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-50">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+        <div
+          className="w-full max-w-md rounded-2xl p-8 text-center"
+          style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in srgb, var(--accent-danger) 10%, transparent)' }}
+          >
             <span className="text-2xl">🔗</span>
           </div>
-          <h1 className="text-xl font-semibold text-gray-900">Invalid Invitation</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Invalid Invitation</h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
             This invitation link is invalid or has expired. Contact your T&amp;P officer for a new
             invitation.
           </p>
@@ -89,21 +102,31 @@ export default async function JoinInvitePage({ params }: PageProps) {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--page-gradient, #f8fafc)' }}>
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
       <div className="w-full max-w-md">
         {/* Org badge */}
         <div className="mb-6 text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700">
+          <span
+            className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold"
+            style={{
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              color: 'var(--accent-primary)',
+              border: '1px solid color-mix(in srgb, var(--accent-primary) 25%, transparent)',
+            }}
+          >
             🏛️ {org.name}
           </span>
         </div>
 
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+        <div
+          className="rounded-2xl p-8"
+          style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+        >
           {user ? (
             <>
               <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-gray-900">Joining your campus program</h1>
-                <p className="mt-2 text-sm text-gray-500">
+                <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Joining your campus program</h1>
+                <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
                   Setting up your account for {org.name}…
                 </p>
               </div>
@@ -118,16 +141,22 @@ export default async function JoinInvitePage({ params }: PageProps) {
           ) : (
             <>
               <div className="mb-6 text-center">
-                <h1 className="text-2xl font-bold text-gray-900">You&apos;re invited!</h1>
-                <p className="mt-2 text-sm text-gray-600">
+                <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>You&apos;re invited!</h1>
+                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   <strong>{org.name}</strong> has invited you to join their campus placement
                   preparation program on InterviewEra.
                 </p>
               </div>
 
-              <div className="mb-6 rounded-xl border border-gray-100 bg-gray-50 p-4 text-sm text-gray-700">
-                <p className="font-medium text-gray-900">Your campus plan includes:</p>
-                <ul className="mt-2 space-y-1.5 text-gray-600">
+              <div
+                className="mb-6 rounded-xl p-4 text-sm"
+                style={{
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--card-border)',
+                }}
+              >
+                <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Your campus plan includes:</p>
+                <ul className="mt-2 space-y-1.5" style={{ color: 'var(--text-secondary)' }}>
                   <li>✓ Unlimited AI mock interviews</li>
                   <li>✓ Detailed scoring across 5 dimensions</li>
                   <li>✓ Progress tracking and placement readiness</li>
@@ -138,15 +167,17 @@ export default async function JoinInvitePage({ params }: PageProps) {
               <div className="space-y-3">
                 <Link
                   href={`/login?email=${encodeURIComponent(invite.email)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
-                  className="block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                  className="block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:opacity-90"
+                  style={{ background: 'var(--accent-primary)' }}
                 >
                   Sign In to Accept
                 </Link>
-                <p className="text-center text-xs text-gray-500">
+                <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
                   New to InterviewEra?{' '}
                   <Link
                     href={`/signup?email=${encodeURIComponent(invite.email)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
-                    className="font-semibold text-blue-600 hover:text-blue-700"
+                    className="font-semibold hover:underline"
+                    style={{ color: 'var(--accent-primary)' }}
                   >
                     Create a free account
                   </Link>
@@ -156,7 +187,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-gray-400">
+        <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
           Invitation sent to {invite.email}
         </p>
       </div>

@@ -5,13 +5,13 @@ import { Mail } from 'lucide-react';
 
 interface SendReminderButtonProps {
   deadlineId: string;
-  incompleteStuents: string[];
+  incompleteStudents: string[];
   deadlineDescription: string;
 }
 
 export function SendReminderButton({
   deadlineId,
-  incompleteStuents,
+  incompleteStudents,
   deadlineDescription,
 }: SendReminderButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -19,7 +19,7 @@ export function SendReminderButton({
   const [success, setSuccess] = useState(false);
 
   async function handleSendReminder() {
-    if (incompleteStuents.length === 0) return;
+    if (incompleteStudents.length === 0) return;
 
     setLoading(true);
     setError(null);
@@ -31,7 +31,7 @@ export function SendReminderButton({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deadlineId,
-          emails: incompleteStuents,
+          emails: incompleteStudents,
           deadlineDescription,
         }),
       });
@@ -60,7 +60,7 @@ export function SendReminderButton({
         style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
       >
         <Mail className="h-4 w-4" />
-        {loading ? 'Sending...' : `Send Reminder (${incompleteStuents.length})`}
+        {loading ? 'Sending...' : `Send Reminder (${incompleteStudents.length})`}
       </button>
 
       {error && (
@@ -85,7 +85,7 @@ export function SendReminderButton({
             color: 'var(--accent-success)',
           }}
         >
-          Reminders sent to {incompleteStuents.length} student{incompleteStuents.length !== 1 ? 's' : ''}!
+          Reminders sent to {incompleteStudents.length} student{incompleteStudents.length !== 1 ? 's' : ''}!
         </div>
       )}
     </>

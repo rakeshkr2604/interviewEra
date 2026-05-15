@@ -68,12 +68,18 @@ export function JoinInviteForm({
   if (emailMismatch) {
     return (
       <div className="space-y-5">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+        <div
+          className="rounded-xl p-4"
+          style={{
+            background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent-warning) 30%, transparent)',
+          }}
+        >
           <div className="flex gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--accent-warning)' }} />
             <div>
-              <p className="text-sm font-semibold text-amber-900">Wrong account</p>
-              <p className="mt-1 text-sm text-amber-800">
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Wrong account</p>
+              <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                 This invitation is for <strong>{inviteEmail}</strong> but you're signed in as{' '}
                 <strong>{userEmail}</strong>. Please sign out and sign in with the correct account,
                 or create a new account using your college email.
@@ -84,7 +90,8 @@ export function JoinInviteForm({
 
         <a
           href={`/login?email=${encodeURIComponent(inviteEmail)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
-          className="block w-full rounded-xl bg-blue-600 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          className="block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:opacity-90"
+          style={{ background: 'var(--accent-primary)' }}
         >
           Sign in with {inviteEmail}
         </a>
@@ -95,9 +102,9 @@ export function JoinInviteForm({
   if (feedback?.kind === 'success') {
     return (
       <div className="flex flex-col items-center gap-4 py-4 text-center">
-        <CheckCircle className="h-12 w-12 text-green-500" />
+        <CheckCircle className="h-12 w-12" style={{ color: 'var(--accent-success)' }} />
         <div>
-          <p className="text-base font-semibold text-gray-900">{feedback.text}</p>
+          <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{feedback.text}</p>
         </div>
       </div>
     );
@@ -106,13 +113,21 @@ export function JoinInviteForm({
   if (feedback?.kind === 'error') {
     return (
       <div className="space-y-4">
-        <div className="flex gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
-          <p className="text-sm font-medium text-red-800">{feedback.text}</p>
+        <div
+          className="flex gap-3 rounded-xl px-4 py-3"
+          role="alert"
+          style={{
+            background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--accent-danger) 30%, transparent)',
+          }}
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--accent-danger)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--accent-danger)' }}>{feedback.text}</p>
         </div>
         <button
           onClick={() => { calledRef.current = false; void handleAccept(); }}
-          className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+          className="w-full rounded-xl px-4 py-3 text-sm font-semibold text-white transition-colors hover:opacity-90"
+          style={{ background: 'var(--accent-primary)' }}
         >
           Try Again
         </button>
@@ -122,8 +137,8 @@ export function JoinInviteForm({
 
   return (
     <div className="flex flex-col items-center gap-3 py-4 text-center">
-      <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-      <p className="text-sm font-medium text-gray-600">Accepting your invitation…</p>
+      <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--accent-primary)' }} />
+      <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Accepting your invitation…</p>
     </div>
   );
 }

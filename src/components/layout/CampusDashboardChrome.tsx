@@ -102,6 +102,7 @@ export function CampusDashboardChrome({
             borderColor: 'var(--card-border)',
             background: 'color-mix(in srgb, var(--card-bg) 96%, transparent)',
             backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
           }}
         >
           <button

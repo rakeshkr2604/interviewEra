@@ -183,7 +183,7 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
 
       {/* Info Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Due Date</p>
           <p className="mt-1 text-lg font-semibold" style={{ color: isOverdue ? 'var(--accent-danger)' : 'var(--text-primary)' }}>
             {new Date(deadline.due_date).toLocaleDateString('en-IN')}
@@ -193,7 +193,7 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Completion Rate</p>
           <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{completionPercentage}%</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
@@ -201,13 +201,13 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
           </p>
         </div>
 
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>In Progress</p>
           <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--accent-primary)' }}>{stats.inProgress}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>students working</p>
         </div>
 
-        <div className="dashboard-premium-card">
+        <div className="dashboard-premium-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Not Started</p>
           <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>{stats.notStarted}</p>
           <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>students</p>
@@ -215,7 +215,7 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
       </div>
 
       {/* Progress Bar */}
-      <div className="dashboard-premium-card">
+      <div className="dashboard-premium-card p-5">
         <h3 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Overall Progress</h3>
         <div className="space-y-3">
           {/* Stacked Progress Bar */}
@@ -269,7 +269,7 @@ export default async function DeadlineDetailPage({ params }: PageProps) {
         <div className="flex gap-3">
           <SendReminderButton
             deadlineId={deadlineId}
-            incompleteStuents={incomplete.map((s) => s.email)}
+            incompleteStudents={incomplete.map((s) => s.email)}
             deadlineDescription={deadline.description ?? 'Deadline'}
           />
           <button
