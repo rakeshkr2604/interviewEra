@@ -421,7 +421,9 @@ export default async function CollegeLandingPage() {
             <a href="#solution" className="transition-opacity hover:opacity-70">Product</a>
             <a href="#pricing" className="transition-opacity hover:opacity-70">Pricing</a>
             <a href="#faq" className="transition-opacity hover:opacity-70">FAQ</a>
-            <Link href="/login" className="transition-opacity hover:opacity-70">Login</Link>
+            {/* No ?next param — LoginForm checks plan_tier and routes:
+                campus_admin → /college/dashboard | student → /dashboard */}
+            <Link href="/login" className="transition-opacity hover:opacity-70">Admin Login</Link>
           </nav>
 
           <Link
@@ -514,6 +516,12 @@ export default async function CollegeLandingPage() {
 
             <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
               50 students &nbsp;·&nbsp; 3 months &nbsp;·&nbsp; No credit card
+            </p>
+            <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Are you a student?{' '}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                Check your email — your college will send an invite link directly to you.
+              </span>
             </p>
           </div>
 
