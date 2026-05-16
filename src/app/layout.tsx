@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { NavbarSlot } from "@/components/layout/NavbarSlot";
 import { AuthStateWatcher } from "@/components/shared/AuthStateWatcher";
@@ -144,6 +145,7 @@ export default function RootLayout({
           <AuthStateWatcher />
           <OfflineBanner />
           {children}
+          <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
         <DeferredWebManifest />
         <DeferredVercelMetrics />
