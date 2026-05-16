@@ -23,10 +23,11 @@ import {
 } from 'lucide-react';
 
 export const metadata = generateMetadata({
-  title: 'Campus Placement Platform for T&P Officers — InterviewEra',
+  title: 'InterviewEra for Colleges | AI Mock Interviews + T&P Dashboard',
   description:
-    'AI mock interviews for your entire batch. Real-time T&P dashboard — track every student. ₹500–1,000 per student vs ₹5,000 for coaching. Free 3-month pilot.',
+    'Prepare your entire batch for placements. AI mock interviews + real-time analytics for ₹500–1,000 per student. Free 3-month pilot for 50 students.',
   path: '/college',
+  keywords: ['campus placement', 'T&P dashboard', 'mock interview platform', 'college placement training', 'AI mock interview for colleges', 'placement cell software India'],
 });
 
 // ─── Static data ───────────────────────────────────────────────────────────────
