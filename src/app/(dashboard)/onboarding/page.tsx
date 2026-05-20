@@ -230,14 +230,24 @@ export default function OnboardingPage() {
         if (result.code === 'STORAGE_FAILED') {
           setError(
             withRequestRef(
-              'We could not save your file to storage. If you just deployed, apply the Supabase migration for the resumes bucket and confirm the service role key on Vercel.',
+              result.error ?? 'We could not save your file to storage. If you just deployed, apply the Supabase migration for the resumes bucket and confirm the service role key on Vercel.',
               rid,
             ),
           )
           return
         }
-        if (result.code === 'SERVER_CONFIG' || result.code === 'MISSING_SERVICE_CONFIG') {
-          setError(withRequestRef('Upload service is misconfigured. Please try again later.', rid))
+        if (
+          result.code === 'SERVER_CONFIG' ||
+          result.code === 'MISSING_SERVICE_CONFIG' ||
+          result.code === 'ENV_MISSING' ||
+          result.code === 'SERVICE_CLIENT_ERROR'
+        ) {
+          setError(
+            withRequestRef(
+              result.error ?? 'Upload service is temporarily unavailable. Please try again later.',
+              rid,
+            ),
+          )
           return
         }
         if (result.code === 'USER_PROFILE_MISSING') {

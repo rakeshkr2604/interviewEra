@@ -22,6 +22,7 @@ import {
   isUploadDiagnosticsEnabled,
   shouldBypassResumeParsePipeline,
   shouldSkipResumeDbInsert,
+  supabaseServiceKeyFormat,
 } from '@/lib/debug/upload-diagnostics';
 
 // pdfjs-dist is Node-only; never Edge.
@@ -149,6 +150,22 @@ function hasPdfHeader(bytes: Uint8Array): boolean {
   return false;
 }
 
+const RESUME_BUCKET = 'resumes';
+
+function classifyStorageError(err: unknown): string {
+  if (!(err instanceof Object)) return 'Could not save your file to storage. Please retry.';
+  const e = err as { message?: string; statusCode?: string; error?: string };
+  const status = e.statusCode;
+  const msg = (e.message ?? e.error ?? '').toLowerCase();
+  if (status === '404' || msg.includes('not found') || msg.includes('does not exist')) {
+    return `Storage bucket "${RESUME_BUCKET}" not found. Create it in Supabase Dashboard → Storage.`;
+  }
+  if (status === '403' || status === '401' || msg.includes('permission') || msg.includes('unauthorized') || msg.includes('not allowed')) {
+    return 'Storage permission denied. Verify the service role key has storage access in Supabase.';
+  }
+  return 'Could not save your file to storage. Check your connection and retry.';
+}
+
 function diagPayload(stage: string, err: unknown, reqId: string): Record<string, unknown> {
   if (!isUploadDiagnosticsEnabled()) {
     return { error: 'Something went wrong on our side. Please try again.', code: 'INTERNAL', requestId: reqId };
@@ -203,12 +220,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       return jsonWithReq({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, 401, reqId);
     }
 
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || !process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-      console.error(`[resume/upload][${reqId}] missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY`);
+    const urlPresent = !!process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+    const svcKeyPresent = !!process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+    console.log('[UPLOAD_STAGE] env_presence', {
+      reqId,
+      urlPresent,
+      svcKeyPresent,
+      svcKeyFormat: supabaseServiceKeyFormat(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    });
+    if (!urlPresent || !svcKeyPresent) {
+      console.error(`[resume/upload][${reqId}] env vars absent — url:${urlPresent} svcKey:${svcKeyPresent}`);
       return jsonWithReq(
         {
-          error: 'Resume upload is temporarily unavailable. Please try again later.',
-          code: 'SERVER_CONFIG',
+          error: `Resume upload is misconfigured: ${!urlPresent ? 'NEXT_PUBLIC_SUPABASE_URL' : 'SUPABASE_SERVICE_ROLE_KEY'} is absent on this deployment.`,
+          code: 'ENV_MISSING',
         },
         503,
         reqId,
@@ -238,18 +263,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     try {
       serviceClient = createServiceClient();
     } catch (svcErr) {
-      console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, svcErr });
+      const svcErrMsg = svcErr instanceof Error ? svcErr.message : String(svcErr);
+      console.error('[UPLOAD_STAGE] createServiceClient_error', { reqId, message: svcErrMsg });
       return jsonWithReq(
         isUploadDiagnosticsEnabled()
           ? {
               ok: false,
               stage: 'createServiceClient',
-              error: svcErr instanceof Error ? svcErr.message : String(svcErr),
+              error: svcErrMsg,
               stack: svcErr instanceof Error ? svcErr.stack : undefined,
             }
           : {
-              error: 'Resume upload is temporarily unavailable.',
-              code: 'SERVER_CONFIG',
+              error: svcErrMsg,
+              code: 'SERVICE_CLIENT_ERROR',
             },
         503,
         reqId,
@@ -417,13 +443,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     console.log('[UPLOAD_STAGE] storage_upload_start', {
       reqId,
+      bucket: RESUME_BUCKET,
       path: filePath,
       bytes: uploadBytes.length,
       contentType,
+      mimeInput: file.type,
+      ext,
     });
 
     const { error: storageError } = await serviceClient.storage
-      .from('resumes')
+      .from(RESUME_BUCKET)
       .upload(filePath, uploadBytes, {
         contentType,
         upsert: false,
@@ -437,10 +466,10 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (storageError) {
+      const userMessage = classifyStorageError(storageError);
       return jsonWithReq(
         {
-          error:
-            'Could not store the file. Check your connection and retry. If this continues, your storage bucket may need configuration.',
+          error: userMessage,
           code: 'STORAGE_FAILED',
           ...(isUploadDiagnosticsEnabled()
             ? {
@@ -457,7 +486,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const {
       data: { publicUrl },
-    } = serviceClient.storage.from('resumes').getPublicUrl(filePath);
+    } = serviceClient.storage.from(RESUME_BUCKET).getPublicUrl(filePath);
 
     if (shouldSkipResumeDbInsert()) {
       console.warn('[UPLOAD_STAGE] IE_UPLOAD_SKIP_DB active — skipping DB insert', { reqId, filePath, publicUrl });

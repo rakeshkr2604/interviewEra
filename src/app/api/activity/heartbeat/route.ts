@@ -49,7 +49,16 @@ export async function POST(request: NextRequest) {
   const now       = new Date();
 
   // ── Skip if last beat was recent (< 90s ago) ─────────────────────────────
-  const svc = createServiceClient();
+  let svc: ReturnType<typeof createServiceClient>;
+  try {
+    svc = createServiceClient();
+  } catch (err) {
+    // Non-blocking: if the service client can't be initialised (e.g. env var
+    // absent or key format unrecognised), heartbeat is best-effort telemetry.
+    // Return ok so the UI doesn't surface a 500 toast to the user.
+    console.warn('[heartbeat] createServiceClient failed (non-blocking):', err instanceof Error ? err.message : String(err));
+    return NextResponse.json({ ok: true, skipped: true, reason: 'svc_unavailable' });
+  }
   const { data: existing } = await svc
     .from('user_activity')
     .select('last_seen_at')
