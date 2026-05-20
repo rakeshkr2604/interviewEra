@@ -180,7 +180,9 @@ export async function middleware(request: NextRequest) {
 
   // Unauthenticated user on a protected route → send to login (API returns JSON 401 from handlers)
   if (!user && !isPublic && !isApi) {
-    return NextResponse.redirect(new URL('/login', request.url));
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('next', pathname);
+    return NextResponse.redirect(loginUrl);
   }
 
   // Authenticated user on a pure auth route → send to dashboard

@@ -5,21 +5,20 @@ import { privatePageMetadata } from '@/lib/seo/metadata';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = privatePageMetadata({
-  title: 'Campus admin',
+  title: 'Campus Admin',
   description: 'InterviewEra campus administrator console.',
   path: '/admin',
 });
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const serviceClient = createServiceClient();
-  const { data: profile } = await serviceClient
+  // Only campus_admin plan_tier users can access /admin/*.
+  // Platform admins (founders) use /platform/* instead.
+  const svc = createServiceClient();
+  const { data: profile } = await svc
     .from('users')
     .select('plan_tier')
     .eq('id', user.id)

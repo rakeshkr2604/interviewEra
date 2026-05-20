@@ -35,7 +35,10 @@ export const interviewStartSchema = z.object({
   difficulty: z.enum(['easy', 'medium', 'hard']),
   interviewerId: z.enum(INTERVIEWER_IDS),
   goal: z.enum(INTERVIEW_GOAL_IDS).optional().default('general_practice'),
-  interviewMode: z.enum(['technical', 'hr_behavioral']).optional().default('technical'),
+  interviewMode: z
+    .enum(['technical', 'hr_behavioral', 'mixed'])
+    .optional()
+    .default('technical'),
   experienceYears: z.preprocess(
     (val) => {
       if (val === null || val === undefined || val === '') return undefined;
@@ -97,6 +100,8 @@ export const interviewAnswerSchema = z.object({
   answerMode: z.enum(['text', 'voice']).optional(),
   /** Matches Settings → Interview → answer style (localStorage). Optional for older clients. */
   answerStyle: z.enum(['concise', 'balanced', 'detailed']).optional(),
+  /** Wall-clock seconds from TTS-complete to submit. Used server-side to compute speech_metrics. */
+  durationSeconds: z.number().int().nonnegative().max(7200).optional(),
 });
 
 export const interviewCompleteSchema = z.object({

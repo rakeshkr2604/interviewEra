@@ -8,7 +8,7 @@ export interface OnboardingData {
   goal: InterviewGoal | null
   role: string
   experienceYears: number
-  mode: 'Technical' | 'HR'
+  mode: 'Technical' | 'HR' | 'Mixed'
   interviewerId: 'priya' | 'arjun' | null
   resumeId: string | null
   resumeText: string

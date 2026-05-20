@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { NavbarSlot } from "@/components/layout/NavbarSlot";
 import { AuthStateWatcher } from "@/components/shared/AuthStateWatcher";
+import { PostAuthRedirect } from "@/components/shared/PostAuthRedirect";
 import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
@@ -55,6 +57,12 @@ export const metadata: Metadata = {
     template: `${siteConfig.name} | %s`,
   },
   description: siteConfig.defaultDescription,
+  appleWebApp: {
+    capable: true,
+    title: siteConfig.name,
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -124,25 +132,17 @@ export default function RootLayout({
         <StructuredData />
       </head>
       <body className="min-h-full flex flex-col">
-        <script
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var saved = localStorage.getItem('ie-theme');
-                  var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                  var theme = saved === 'light' ? 'light' : saved === 'dark' ? 'dark' : (prefersDark ? 'dark' : 'light');
-                  var root = document.documentElement;
-                  root.setAttribute('data-theme', theme);
-                  if (theme === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
-                } catch(e) {}
-              })();
-            `,
+            __html: `(function(){try{var s=localStorage.getItem('ie-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s==='light'?'light':s==='dark'?'dark':(d?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',t);if(t==='dark')r.classList.add('dark');else r.classList.remove('dark');}catch(e){}})();`,
           }}
         />
         <ThemeProvider>
           <NavbarSlot />
           <AuthStateWatcher />
+          <PostAuthRedirect />
           <OfflineBanner />
           {children}
           <Toaster position="top-right" richColors closeButton />

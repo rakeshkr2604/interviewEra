@@ -47,3 +47,40 @@ supabase/.branches/
 # claude code — local machine-specific settings only
 .claude/settings.local.json
 .env.local
+
+# ─── Production hardening additions ──────────────────────────────────────────
+
+# Internal docs / audits (never ship to production repo)
+AI_AUDIT.md
+INFRASTRUCTURE_UPGRADE.md
+CLAUDE*.md
+*_REPORT.md
+*_SUMMARY.md
+*_PLAN.md
+*_STRATEGY.md
+*_AUDIT.md
+
+# Temporary / debug scratch docs
+notes/
+scratch/
+temp/
+drafts/
+
+# Local testing artifacts
+manual-test*
+test-output*
+logs/
+*.log
+
+# Claude / AI session scratch outputs
+.claude/
+claude-output/
+ai-output/
+
+# OS / editor junk
+Thumbs.db
+
+# Ensure env files never commit (re-state explicitly; .env.example is safe to track)
+.env
+.env.*
+!.env.example

@@ -4,7 +4,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 1;
 const BASE_DELAY_MS = 1000;
 const MAX_CONSECUTIVE_FAILURES = 5;
 const CIRCUIT_RESET_MS = 60_000;

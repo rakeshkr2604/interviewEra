@@ -247,7 +247,17 @@ export async function processInterviewRetention(
       questionsOrdered.findIndex((q) => q.id === b.question_id),
   );
 
-  const questionsAnswered = answersSorted.length;
+  // Count DISTINCT questions answered, not raw answer rows: a single question
+  // can have multiple answer rows now that the orchestrator asks in-place
+  // follow-ups. Capped at totalQuestions so it can never exceed it (the
+  // session_quality_log `answered_le_total` check constraint).
+  const distinctAnsweredQuestionIds = new Set(
+    (answers ?? []).map((a) => a.question_id as string),
+  );
+  const questionsAnswered = Math.min(
+    distinctAnsweredQuestionIds.size,
+    totalQuestions,
+  );
   const questionsSkipped = Math.max(0, totalQuestions - questionsAnswered);
   const avgAnswerDurationSec = computeAvgAnswerDurationSec({
     startedAtIso: interview.started_at as string | null,

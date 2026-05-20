@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
+    "@deepgram/sdk": "^5.2.0",
     "@napi-rs/canvas": "0.1.80",
     "@next/bundle-analyzer": "^16.2.6",
     "@react-pdf/renderer": "^4.3.3",

@@ -1,8 +1,14 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
+import { getTokenBudget } from '@/lib/ai/token-budget';
 import type { ParsedResume, Question } from '@/types/app.types';
 import type { InterviewGoal } from '@/types/onboarding.types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
+import {
+  modeGenerationRules,
+  normalizeInterviewMode,
+  partitionByMode,
+} from '@/lib/interview/interview-mode';
 import { getTierConfig, getUserProgress } from '@/lib/retention';
 import type { TierPromptModifiers, UserTierId } from '@/lib/retention';
 
@@ -30,7 +36,7 @@ export interface GenerateQuestionsInput {
   difficulty: 'easy' | 'medium' | 'hard';
   questionCount?: number;
   goal: InterviewGoal;
-  interviewMode: 'technical' | 'hr_behavioral';
+  interviewMode: 'technical' | 'hr_behavioral' | 'mixed';
   experienceYears: number;
   interviewerId: InterviewerId;
   /** Employer JD excerpt — improves role alignment when present */
@@ -93,22 +99,8 @@ function difficultyRules(difficulty: 'easy' | 'medium' | 'hard'): string {
   }
 }
 
-function interviewModeRules(interviewMode: 'technical' | 'hr_behavioral'): string {
-  if (interviewMode === 'hr_behavioral') {
-    return (
-      `Interview mode: HR / Behavioral — STAR-format behavioral stories must dominate. ` +
-      `Use situational prompts for the remainder. ` +
-      `Do NOT ask data-structure puzzles, algorithmic coding tasks, or textbook DSA. ` +
-      `Reserve the "technical" category label only for rare competency probes that are still non-DSA ` +
-      `(e.g. prioritization, stakeholder clarity); prefer "behavioral" and "situational".`
-    );
-  }
-  return (
-    `Interview mode: Technical — emphasize stack depth, system design where seniority allows, ` +
-    `DSA only when appropriate to the role (e.g. SWE) and never as the entire set; ` +
-    `keep behavioral/situational minimal but present for a realistic loop.`
-  );
-}
+// Strict mode rules live in lib/interview/interview-mode.ts (single source of
+// truth shared with the post-generation validator + follow-up lock).
 
 function interviewerPersonaRules(interviewerId: InterviewerId): string {
   const iv = getInterviewerById(interviewerId);
@@ -232,6 +224,7 @@ async function callOpenAI(prompt: string): Promise<string> {
   const { content } = await completeInterviewChat({
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
+    maxTokens: getTokenBudget('question_generation'),
   });
   return content;
 }
@@ -243,7 +236,7 @@ async function getAIContent(prompt: string): Promise<string> {
     console.warn('[AI] Interview AI chain failed for question generation, switching to Mistral:', openaiError);
 
     try {
-      return await callMistralChat(prompt, 0.7);
+      return await callMistralChat(prompt, 0.7, getTokenBudget('question_generation', 'mistral'));
     } catch (mistralError) {
       console.error('[AI] Interview AI chain and Mistral failed for question generation:', mistralError);
       throw mistralError;
@@ -263,6 +256,7 @@ export async function generateQuestions({
   jobDescription,
   userId,
 }: GenerateQuestionsInput): Promise<GenerateQuestionsResult> {
+  const canonicalMode = normalizeInterviewMode(interviewMode);
   const resumeSummary = buildResumeSummary(parsedResume, role);
   const jdSnippet = jobDescription?.trim().slice(0, 3500);
   const jdBlock = jdSnippet
@@ -276,7 +270,7 @@ export async function generateQuestions({
       goalToneRules(goal),
       seniorityRules(experienceYears),
       difficultyRules(difficulty),
-      interviewModeRules(interviewMode),
+      modeGenerationRules(canonicalMode),
       interviewerPersonaRules(interviewerId),
       tierBlock,
     ]
@@ -329,11 +323,54 @@ export async function generateQuestions({
     );
   }
 
-  if (parsed.questions.length < questionCount) {
+  // ── STRICT MODE ENFORCEMENT (non-negotiable trust rule) ──────────────────
+  // The model can ignore the prompt and emit out-of-mode questions. Those must
+  // NEVER reach the candidate, so validate every question's category and, if
+  // any violate the locked mode, regenerate once with an explicit correction.
+  let questions = parsed.questions;
+  let { valid, violating } = partitionByMode(questions, canonicalMode);
+
+  if (violating.length > 0) {
+    console.warn(
+      `[generate-questions] Mode "${canonicalMode}" violated by ${violating.length}/${questions.length} questions ` +
+        `(categories: ${[...new Set(violating.map((q) => q.category))].join(', ')}). Regenerating strictly.`
+    );
+
+    const strictPrompt =
+      prompt +
+      `\n\nCRITICAL CORRECTION: The previous attempt included disallowed categories. ` +
+      `${modeGenerationRules(canonicalMode)} ` +
+      `Return ONLY questions whose "category" is permitted for this mode. No exceptions.`;
+
+    try {
+      const retryContent = await getAIContent(strictPrompt);
+      const retryParsed: unknown = JSON.parse(extractJSON(retryContent));
+      if (isValidQuestionsResponse(retryParsed)) {
+        questions = retryParsed.questions;
+      }
+    } catch (regenErr) {
+      // Keep the first batch's valid subset rather than failing outright.
+      console.error('[generate-questions] Strict regeneration failed:', regenErr);
+    }
+
+    ({ valid, violating } = partitionByMode(questions, canonicalMode));
+    if (violating.length > 0) {
+      console.warn(
+        `[generate-questions] Dropping ${violating.length} still-violating question(s) after strict regen.`
+      );
+    }
+  }
+
+  // Only mode-valid questions survive; re-index so order stays contiguous.
+  const enforced = valid
+    .slice(0, questionCount)
+    .map((q, idx) => ({ ...q, order: idx }));
+
+  if (enforced.length < questionCount) {
     throw new QuestionGenerationError(
-      `AI generated ${parsed.questions.length} questions instead of ${questionCount}`
+      `Only ${enforced.length} mode-valid questions for "${canonicalMode}" (need ${questionCount})`
     );
   }
 
-  return { questions: parsed.questions.slice(0, questionCount) };
+  return { questions: enforced };
 }

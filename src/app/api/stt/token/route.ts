@@ -1,0 +1,216 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient as createSupabase, createServiceClient } from '@/lib/supabase/server';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { abuseGate, recordSTTTokenRequest } from '@/lib/abuse/risk-scorer';
+import { checkSTTQuota, checkAndAcquireSession } from '@/lib/quota/voice-quota';
+
+const EPHEMERAL_TTL_SECONDS = 120;
+
+function extractIP(request: NextRequest): string {
+  const forwarded = request.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  return 'unknown';
+}
+
+export async function POST(request: NextRequest) {
+  const t0 = Date.now();
+  const ip = extractIP(request);
+
+  // ── 1. Parse body ────────────────────────────────────────────────────────
+  let interviewId: string | undefined;
+  try {
+    const body = (await request.json()) as { interview_id?: string };
+    interviewId = body.interview_id?.trim();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+
+  if (!interviewId) {
+    return NextResponse.json({ error: 'interview_id is required' }, { status: 400 });
+  }
+
+  // ── 2. Auth ───────────────────────────────────────────────────────────────
+  const supabase = await createSupabase();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // ── 3. Abuse gate ─────────────────────────────────────────────────────────
+  const abuse = await abuseGate(user.id, ip);
+  if (!abuse.allowed) {
+    return NextResponse.json(
+      { error: 'Request blocked. Please try again later.' },
+      { status: 429, headers: abuse.block_ttl_s ? { 'Retry-After': String(abuse.block_ttl_s) } : {} },
+    );
+  }
+
+  // ── 4. IP rate limit — 20 tokens per IP per hour ─────────────────────────
+  const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20);
+  if (!ipRL.allowed) {
+    return NextResponse.json(
+      { error: 'Too many requests from this IP. Try again later.' },
+      { status: 429, headers: { 'Retry-After': String(ipRL.resetInSeconds) } },
+    );
+  }
+
+  // ── 5. User rate limit — 10 tokens per user per hour ─────────────────────
+  const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10);
+  if (!userRL.allowed) {
+    return NextResponse.json(
+      { error: 'Too many recording sessions. Please wait and try again.' },
+      { status: 429, headers: { 'Retry-After': String(userRL.resetInSeconds) } },
+    );
+  }
+
+  // ── 6. Resolve plan tier + session validation (parallel) ─────────────────
+  const serviceClient = createServiceClient();
+  const [{ data: userData }, { data: interview, error: dbError }] = await Promise.all([
+    serviceClient.from('users').select('plan_tier').eq('id', user.id).maybeSingle(),
+    serviceClient
+      .from('interviews')
+      .select('id, status')
+      .eq('id', interviewId)
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ]);
+
+  const planTier = userData?.plan_tier ?? 'free';
+
+  if (dbError) {
+    console.error('[stt/token] DB error during session validation:', dbError.message);
+    return NextResponse.json({ error: 'Session validation failed' }, { status: 500 });
+  }
+
+  if (!interview) {
+    // Avoid enumeration: same 403 for wrong user and non-existent interview
+    return NextResponse.json({ error: 'Interview session not found' }, { status: 403 });
+  }
+
+  if (interview.status !== 'in_progress') {
+    return NextResponse.json(
+      { error: 'STT is only available during an active interview session.' },
+      { status: 403 },
+    );
+  }
+
+  // ── 7. Monthly STT quota check ───────────────────────────────────────────
+  const quota = await checkSTTQuota(user.id, planTier);
+  if (!quota.allowed) {
+    return NextResponse.json(
+      {
+        error: 'Monthly voice recording quota exceeded. Text mode is still available.',
+        quota: { used: quota.used_seconds, limit: quota.limit_seconds },
+        fallback: 'text_mode',
+      },
+      { status: 429 },
+    );
+  }
+
+  // ── 8. Concurrency check ─────────────────────────────────────────────────
+  const concurrency = await checkAndAcquireSession(user.id, planTier);
+  if (!concurrency.allowed) {
+    return NextResponse.json(
+      {
+        error: `You already have ${concurrency.active_sessions} active voice session(s). Please end the current session first.`,
+        active_sessions: concurrency.active_sessions,
+        max_sessions: concurrency.max_sessions,
+      },
+      { status: 429 },
+    );
+  }
+
+  // ── 9. Require DEEPGRAM_PROJECT_ID — no master-key fallback ─────────────
+  const masterKey = process.env.DEEPGRAM_API_KEY;
+  const projectId = process.env.DEEPGRAM_PROJECT_ID;
+
+  if (!masterKey || !projectId) {
+    console.error('[stt/token] DEEPGRAM_API_KEY or DEEPGRAM_PROJECT_ID not configured');
+    return NextResponse.json(
+      { error: 'Voice recording is not configured on this server.' },
+      { status: 503 },
+    );
+  }
+
+  // ── 10. Record abuse signals (fire-and-forget) ────────────────────────────
+  void recordSTTTokenRequest(user.id, ip);
+
+  // ── 11. Create ephemeral Deepgram key (120 s TTL) ─────────────────────────
+  let ephemeralKey: string;
+  try {
+    const res = await fetch(
+      `https://api.deepgram.com/v1/projects/${projectId}/keys`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Token ${masterKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          comment: `stt|uid:${user.id}|iid:${interviewId}|t:${Date.now()}`,
+          scopes: ['usage:write'],
+          time_to_live_in_seconds: EPHEMERAL_TTL_SECONDS,
+        }),
+        signal: AbortSignal.timeout(8000),
+      },
+    );
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => res.statusText);
+      console.error('[stt/token] Deepgram key creation failed:', res.status, body);
+      return NextResponse.json(
+        { error: 'Could not create voice session. Please try again.' },
+        { status: 502 },
+      );
+    }
+
+    const data = (await res.json()) as { key?: string };
+    if (!data.key) {
+      console.error('[stt/token] Deepgram returned no key in response');
+      return NextResponse.json(
+        { error: 'Voice session initialization failed.' },
+        { status: 502 },
+      );
+    }
+    ephemeralKey = data.key;
+  } catch (err) {
+    const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    console.error('[stt/token] Deepgram API call failed:', isTimeout ? 'timeout' : err);
+    return NextResponse.json(
+      { error: 'Voice service temporarily unavailable.' },
+      { status: 502 },
+    );
+  }
+
+  // ── 12. Structured telemetry log ──────────────────────────────────────────
+  console.log(JSON.stringify({
+    event:             'stt_token_issued',
+    user_id:           user.id,
+    interview_id:      interviewId,
+    plan_tier:         planTier,
+    expires_in_seconds: EPHEMERAL_TTL_SECONDS,
+    quota_remaining_s: quota.remaining_seconds,
+    quota_warning:     quota.warning,
+    latency_ms:        Date.now() - t0,
+    ip,
+    user_agent:        request.headers.get('user-agent') ?? 'unknown',
+    ts:                new Date().toISOString(),
+  }));
+
+  // ── 13. Return session-bound token ───────────────────────────────────────
+  const response: Record<string, unknown> = {
+    token:              ephemeralKey,
+    expires_in_seconds: EPHEMERAL_TTL_SECONDS,
+    interview_id:       interviewId,
+    issued_at:          new Date().toISOString(),
+    quota_remaining_s:  quota.remaining_seconds,
+  };
+
+  if (quota.warning !== 'ok') {
+    response.quota_warning = quota.warning;
+  }
+
+  return NextResponse.json(response);
+}
+
+export const runtime = 'nodejs';

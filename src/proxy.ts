@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { updateSession } from '@/lib/supabase/middleware';
 
 // Routes that require authentication (unauthenticated → /login)
-const PROTECTED_PREFIXES = ['/college/dashboard', '/admin', '/dashboard', '/interview', '/report', '/settings', '/history', '/analytics', '/upgrade', '/feedback', '/profile', '/onboarding'];
+const PROTECTED_PREFIXES = ['/college/dashboard', '/admin', '/platform', '/dashboard', '/interview', '/report', '/settings', '/history', '/analytics', '/upgrade', '/feedback', '/profile', '/onboarding'];
 
 // Routes that require NO authentication (authenticated → /dashboard or /college/dashboard)
 const AUTH_ONLY_PATHS = ['/login', '/signup', '/forgot-password', '/reset-password'];

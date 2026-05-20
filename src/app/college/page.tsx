@@ -16,9 +16,7 @@ import {
   Phone,
   Search,
   TrendingDown,
-  TrendingUp,
   Upload,
-  Users,
   Wallet,
 } from 'lucide-react';
 
@@ -300,81 +298,6 @@ function MockDashboardHero() {
             </div>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function MockInviteUI() {
-  return (
-    <div
-      className="overflow-hidden rounded-xl border"
-      style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
-    >
-      <div className="border-b px-4 py-3" style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}>
-        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Bulk Invite Students</p>
-      </div>
-      <div className="space-y-3 p-4">
-        <div
-          className="flex flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed py-5"
-          style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))' }}
-        >
-          <Upload className="h-6 w-6" style={{ color: 'var(--accent-primary)' }} />
-          <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>students-batch-2025.csv</p>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>148 emails detected</p>
-        </div>
-        <div
-          className="flex items-center justify-between rounded-lg border px-3 py-2"
-          style={{ borderColor: 'color-mix(in srgb, #22c55e 25%, var(--card-border))', background: 'color-mix(in srgb, #22c55e 6%, transparent)' }}
-        >
-          <span className="text-xs font-medium" style={{ color: '#22c55e' }}>148 invitations sent</span>
-          <CheckCircle className="h-4 w-4" style={{ color: '#22c55e' }} />
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {[{ v: '148', l: 'Invited' }, { v: '112', l: 'Joined' }, { v: '36', l: 'Pending' }].map(({ v, l }) => (
-            <div key={l} className="rounded-lg py-2" style={{ background: 'var(--bg-secondary)' }}>
-              <p className="text-base font-bold" style={{ color: 'var(--accent-primary)' }}>{v}</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{l}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MockAnalyticsUI() {
-  return (
-    <div
-      className="overflow-hidden rounded-xl border"
-      style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
-    >
-      <div className="border-b px-4 py-3" style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}>
-        <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>Score Trend — Last 30 Days</p>
-      </div>
-      <div className="px-4 pb-3 pt-4">
-        {/* Fake bar chart */}
-        <div className="flex h-24 items-end gap-1.5">
-          {[4, 5, 4, 6, 5, 7, 6, 7, 8, 7, 8, 9, 8, 9].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t"
-              style={{
-                height: `${h * 10}%`,
-                background: i >= 10
-                  ? 'var(--accent-primary)'
-                  : 'color-mix(in srgb, var(--accent-primary) 35%, transparent)',
-              }}
-            />
-          ))}
-        </div>
-        <div className="mt-2 flex justify-between text-[9px]" style={{ color: 'var(--text-muted)' }}>
-          <span>Jan 15</span><span>Jan 22</span><span>Jan 29</span><span>Feb 5</span>
-        </div>
-        <div className="mt-3 flex items-center gap-2">
-          <TrendingUp className="h-4 w-4" style={{ color: '#22c55e' }} />
-          <span className="text-xs font-medium" style={{ color: '#22c55e' }}>Batch avg up 2.1 points in 30 days</span>
-        </div>
       </div>
     </div>
   );

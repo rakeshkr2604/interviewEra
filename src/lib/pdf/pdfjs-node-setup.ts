@@ -1,44 +1,61 @@
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
 
 import { isPdfParserDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
 
 let setupDone = false;
 
-/** Webpack dev/server bundles wrap `require`; bypass so `createRequire` returns the real callable. */
-function getProjectScopedRequireFn(): ReturnType<typeof createRequire> | null {
-  const cwdPkg = join(process.cwd(), 'package.json');
+interface CanvasGlobals {
+  DOMMatrix?: unknown;
+  Path2D?: unknown;
+  ImageData?: unknown;
+}
+
+/**
+ * Resolve `@napi-rs/canvas` without webpack flagging the import.
+ *
+ * `@napi-rs/canvas` is declared in `serverExternalPackages` (next.config.ts),
+ * so it must be required at runtime, not bundled. We never store/return the
+ * `require` function as a value (that is exactly what triggers webpack's
+ * "Critical dependency: require function is used in a way…" warning) —
+ * resolution is inlined:
+ *
+ *  - Webpack server build: `__non_webpack_require__` is emitted verbatim as a
+ *    real Node `require` and is NOT statically analyzed → no warning, and the
+ *    package stays external.
+ *  - Non-webpack (Turbopack / vitest / Node ESM): no `__non_webpack_require__`
+ *    exists, so fall back to `createRequire(import.meta.url)` — a static,
+ *    webpack-parseable argument (this branch is never reached under webpack).
+ */
+function loadNapiCanvas(): CanvasGlobals | null {
   const g = globalThis as typeof globalThis & {
     __non_webpack_require__?: (specifier: string) => unknown;
   };
 
   try {
     if (typeof g.__non_webpack_require__ === 'function') {
-      const moduleMod = g.__non_webpack_require__('node:module') as typeof import('node:module');
-      const projectRequireFn = moduleMod.createRequire(cwdPkg);
-      if (typeof projectRequireFn === 'function') {
-        return projectRequireFn;
-      }
+      return g.__non_webpack_require__('@napi-rs/canvas') as CanvasGlobals;
     }
-  } catch {
-    /* fall through to undecorated createRequire */
+  } catch (err) {
+    if (isPdfParserDiagnosticsEnabled()) {
+      console.info(
+        '[pdfjs-node] __non_webpack_require__("@napi-rs/canvas") failed',
+        err instanceof Error ? err.message : err,
+      );
+    }
+    return null;
   }
 
   try {
-    const fn = createRequire(cwdPkg);
-    if (typeof fn === 'function') {
-      return fn;
-    }
-    if (!isPdfParserDiagnosticsEnabled()) return null;
-    console.info('[pdfjs-node] createRequire did not yield a callable require — check webpack/native module wrapping.');
+    return createRequire(import.meta.url)('@napi-rs/canvas') as CanvasGlobals;
   } catch (err) {
-    if (!isPdfParserDiagnosticsEnabled()) return null;
-    console.info(
-      '[pdfjs-node] createRequire failed',
-      err instanceof Error ? err.message : err,
-    );
+    if (isPdfParserDiagnosticsEnabled()) {
+      console.info(
+        '[pdfjs-node] createRequire("@napi-rs/canvas") failed',
+        err instanceof Error ? err.message : err,
+      );
+    }
+    return null;
   }
-  return null;
 }
 
 /**
@@ -60,32 +77,18 @@ export function ensurePdfJsNodeGlobalsSync(): void {
     return;
   }
 
-  try {
-    const projectRequire = getProjectScopedRequireFn();
-    if (!projectRequire) return;
+  const canvas = loadNapiCanvas();
+  if (!canvas) return;
 
-    const canvas = projectRequire('@napi-rs/canvas') as {
-      DOMMatrix: unknown;
-      Path2D: unknown;
-      ImageData: unknown;
-    };
-    const g = globalThis as unknown as Record<string, unknown>;
-
-    if (typeof g.DOMMatrix === 'undefined' && canvas.DOMMatrix) {
-      g.DOMMatrix = canvas.DOMMatrix;
-    }
-    if (typeof g.Path2D === 'undefined' && canvas.Path2D) {
-      g.Path2D = canvas.Path2D;
-    }
-    if (typeof g.ImageData === 'undefined' && canvas.ImageData) {
-      g.ImageData = canvas.ImageData;
-    }
-  } catch (err) {
-    if (!isPdfParserDiagnosticsEnabled()) return;
-    console.info(
-      '[pdfjs-node] failed to load @napi-rs/canvas; pdfjs may throw (e.g. DOMMatrix is not defined)',
-      err instanceof Error ? err.message : err,
-    );
+  const g = globalThis as unknown as Record<string, unknown>;
+  if (typeof g.DOMMatrix === 'undefined' && canvas.DOMMatrix) {
+    g.DOMMatrix = canvas.DOMMatrix;
+  }
+  if (typeof g.Path2D === 'undefined' && canvas.Path2D) {
+    g.Path2D = canvas.Path2D;
+  }
+  if (typeof g.ImageData === 'undefined' && canvas.ImageData) {
+    g.ImageData = canvas.ImageData;
   }
 }
 

@@ -23,7 +23,7 @@ export type DomainPackDomain = 'dsa' | 'system_design' | 'hr';
 /** Stored on interviews.session_context — mirrors validated interview start payload */
 export interface InterviewSessionContext {
   goal: InterviewGoal;
-  interviewMode: 'technical' | 'hr_behavioral';
+  interviewMode: 'technical' | 'hr_behavioral' | 'mixed';
   experienceYears: number;
   interviewerId: 'priya' | 'arjun';
   /** Optional employer JD text used only for question personalization */
@@ -183,12 +183,81 @@ export interface RadarDataPoint {
   score: number;
 }
 
+export interface ReportSpeechSummary {
+  total_filler_count: number;
+  total_duration_seconds: number;
+  rate_per_minute: number;
+  severity: 'safe' | 'warning' | 'severe';
+  message: string;
+  /** Fillers as a percentage of total words spoken */
+  percentage: number;
+  top_fillers: { word: string; occurrences: number }[];
+  answers_with_metrics: number;
+  total_answers: number;
+  /** 'stored' = all exact durations used; 'partial' = mix; 'estimated' = all 130wpm fallback */
+  source: 'stored' | 'partial' | 'estimated';
+}
+
+// ─── Report intelligence types ────────────────────────────────────────────────
+
+export type SignalStrength = 'strong' | 'moderate' | 'weak';
+export type HiringSignal   = 'hire' | 'borderline' | 'reject';
+export type ReadinessLevel = 'ready' | 'developing' | 'early_stage';
+
+export interface ReportInsights {
+  executive_summary: {
+    narrative: string;
+    hiring_signal: HiringSignal;
+    readiness_level: ReadinessLevel;
+    role_fit_confidence: number;
+    strongest_dimension: string;
+    weakest_dimension: string;
+  };
+  hiring_signals: {
+    technical_ownership: SignalStrength;
+    communication_clarity: SignalStrength;
+    problem_solving: SignalStrength;
+    confidence_under_pressure: SignalStrength;
+    answer_structure: SignalStrength;
+    relevance: SignalStrength;
+  };
+  behavioral_patterns: string[];
+  communication: {
+    strengths: string[];
+    weaknesses: string[];
+    clarity_narrative: string;
+    confidence_progression: string;
+  };
+  technical: {
+    depth_assessment: string;
+    weak_patterns: string[];
+    strength_patterns: string[];
+  };
+  benchmarking: {
+    percentile_estimate: number;
+    comparison_narrative: string;
+    role_calibration: string;
+  };
+  improvement_roadmap: {
+    week_1: string[];
+    month_1: string[];
+    focus_areas: string[];
+  };
+}
+
+export interface ReportSummary {
+  speech: ReportSpeechSummary;
+  /** AI insight dossier — computed from per-answer evaluations at report creation time. */
+  insights?: ReportInsights;
+}
+
 export interface Report {
   id: string;
   interview_id: string;
   overall_score: number;
   radar_data: RadarDataPoint[];
   trend_data: RadarDataPoint[] | null;
+  summary: ReportSummary | null;
   generated_at: string;
 }
 

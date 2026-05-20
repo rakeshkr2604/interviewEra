@@ -8,8 +8,12 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { StreakCounter } from '@/components/layout/StreakCounter'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { cn } from '@/lib/utils'
+import { useHeartbeat } from '@/hooks/useHeartbeat'
 
 export function DashboardChrome({ children }: { children: React.ReactNode }) {
+  // Track authenticated user presence for admin analytics.
+  // Fires every 30s when the tab is visible; silently no-ops if the user is not logged in.
+  useHeartbeat();
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')

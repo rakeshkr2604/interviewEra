@@ -19,8 +19,16 @@ import type {
   QuestionCategory,
   QuestionRubric,
   ScoreJustification,
+  ReportSummary,
+  ReportSpeechSummary,
+  DimensionScores,
+  ReportInsights,
 } from '@/types/app.types';
 import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
+import { ExecutiveSummaryPanel } from '@/components/report/ExecutiveSummaryPanel';
+import { generateInsights } from '@/lib/report/insight-engine';
+import type { PerQuestionInsightData } from '@/lib/report/insight-engine';
+import { radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
 
 const exportPdfLinkClass =
   'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
@@ -76,7 +84,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
   // Fetch report
   const { data: report } = await supabase
     .from('reports')
-    .select('id, overall_score, radar_data, trend_data, interview_id, generated_at')
+    .select('id, overall_score, radar_data, trend_data, interview_id, generated_at, summary')
     .eq('id', id)
     .maybeSingle();
 
@@ -120,7 +128,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
   const { data: evaluations } = await supabase
     .from('evaluations')
-    .select('answer_id, overall_score, feedback_text, detailed_analysis')
+    .select('answer_id, overall_score, feedback_text, detailed_analysis, dimension_scores')
     .in('answer_id', answerIds);
 
   const perAnswerJustifications: ScoreJustification[] = (evaluations ?? []).flatMap((e) => {
@@ -129,6 +137,20 @@ export default async function ReportPage({ params }: ReportPageProps) {
     return j && typeof j.why_this_score === 'string' && j.why_this_score.trim() ? [j] : [];
   });
   const reportScoreJustification = aggregateScoreJustifications(perAnswerJustifications);
+
+  // ── Speech analytics ────────────────────────────────────────────────────
+  // Read the deterministic summary persisted at report generation time.
+  // Old reports (pre-Phase B) have no summary — show '—', no estimated data.
+  const storedSpeech = (report.summary as ReportSummary | null)?.speech as ReportSpeechSummary | null ?? null;
+
+  const sessionDurationLabel: string | null = storedSpeech
+    ? (() => {
+        const t = storedSpeech.total_duration_seconds;
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        return m > 0 ? `${m}m ${s}s` : `${s}s`;
+      })()
+    : null;
 
   // Build breakdown — compute keyword counts from raw data regardless of plan tier
   const breakdown = (questions ?? []).map((q) => {
@@ -169,6 +191,38 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
   const radarData = report.radar_data as RadarDataPoint[];
   const trendData = report.trend_data as RadarDataPoint[] | null;
+
+  // Compute AI insights from evaluation data (zero extra API calls)
+  const partialDimAvgs = radarScoresByDimensionKey(radarData);
+  const dimensionAverages: DimensionScores = {
+    communication_clarity: partialDimAvgs.communication_clarity ?? 5,
+    technical_depth:       partialDimAvgs.technical_depth ?? 5,
+    answer_structure:      partialDimAvgs.answer_structure ?? 5,
+    confidence:            partialDimAvgs.confidence ?? 5,
+    relevance:             partialDimAvgs.relevance ?? 5,
+  };
+  const perQuestions: PerQuestionInsightData[] = (questions ?? []).flatMap((q) => {
+    const answer = (answers ?? []).find((a) => a.question_id === q.id) ?? null;
+    const rawEval = answer ? ((evaluations ?? []).find((e) => e.answer_id === answer.id) ?? null) : null;
+    if (!rawEval) return [];
+    const detail = rawEval.detailed_analysis as DetailedAnalysis | null;
+    return [{
+      category: q.category as string,
+      score: rawEval.overall_score as number,
+      feedbackText: (rawEval.feedback_text as string) ?? '',
+      strengths: detail?.strengths ?? [],
+      improvements: detail?.improvements ?? [],
+      dimensionScores: (rawEval.dimension_scores as DimensionScores | null) ?? null,
+    }];
+  });
+  const insights: ReportInsights = generateInsights({
+    overallScore:      report.overall_score as number,
+    dimensionAverages,
+    perQuestions,
+    speechSummary:     storedSpeech,
+    role:              interview.role as string,
+    difficulty:        interview.difficulty as string,
+  });
 
   const completedAt = interview.completed_at
     ? new Date(interview.completed_at as string).toLocaleDateString('en-IN', {
@@ -221,6 +275,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
         }
       />
 
+      {/* AI Executive Summary */}
+      <ExecutiveSummaryPanel insights={insights} />
+
       {/* Score + Radar */}
       <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-4">
@@ -252,11 +309,30 @@ export default async function ReportPage({ params }: ReportPageProps) {
           Filler word analysis from your interview session. Industry benchmark: fewer than 3 filler words per
           minute.
         </p>
-        <div className="grid gap-3 text-center sm:grid-cols-3">
+        <div className="grid gap-3 text-center grid-cols-2 sm:grid-cols-4">
           {[
-            { label: 'Filler Words', value: '—', hint: 'Complete via voice mode' },
-            { label: 'Rate / min', value: '—', hint: 'Benchmark: <3' },
-            { label: 'Pattern', value: '—', hint: 'Safe / Warning / Severe' },
+            {
+              label: 'Filler Words',
+              value: storedSpeech ? String(storedSpeech.total_filler_count) : '—',
+              hint: storedSpeech ? `${storedSpeech.percentage}% of words` : 'Unavailable',
+            },
+            {
+              label: 'Rate / min',
+              value: storedSpeech ? String(storedSpeech.rate_per_minute) : '—',
+              hint: 'Benchmark: <3',
+            },
+            {
+              label: 'Pattern',
+              value: storedSpeech
+                ? storedSpeech.severity.charAt(0).toUpperCase() + storedSpeech.severity.slice(1)
+                : '—',
+              hint: 'Safe / Warning / Severe',
+            },
+            {
+              label: 'Duration',
+              value: sessionDurationLabel ?? '—',
+              hint: storedSpeech ? 'Total speaking time' : 'Unavailable',
+            },
           ].map((item) => (
             <div
               key={item.label}
@@ -278,9 +354,159 @@ export default async function ReportPage({ params }: ReportPageProps) {
             </div>
           ))}
         </div>
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Speech pattern data is available when you answer via microphone.
-        </p>
+
+        {storedSpeech && storedSpeech.top_fillers.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium shrink-0" style={{ color: 'var(--text-secondary)' }}>
+              Top fillers:
+            </span>
+            {storedSpeech.top_fillers.slice(0, 5).map(({ word, occurrences }) => (
+              <span
+                key={word}
+                className="rounded-full px-2.5 py-0.5 text-xs font-medium tabular-nums"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-warning) 18%, transparent)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {word} ×{occurrences}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {storedSpeech ? (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {storedSpeech.message}
+            {storedSpeech.source !== 'stored' && (
+              <span> · Duration partially estimated for some answers</span>
+            )}
+          </p>
+        ) : (
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            Speech data not available for this report.
+          </p>
+        )}
+      </ReportPanel>
+
+      {/* AI Candidate Intelligence — Pro-gated */}
+      <ReportPanel eyebrow="Intelligence" title="AI hiring intelligence" contentClassName="space-y-6">
+        <BlurredSection
+          userTier={planTier}
+          requiredTier="pro"
+          upgradeLabel="Upgrade to Pro to unlock AI hiring intelligence"
+        >
+          <div className="space-y-6">
+            {insights.behavioral_patterns.length > 0 && (
+              <div>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                  Behavioral Patterns
+                </p>
+                <ul className="space-y-2">
+                  {insights.behavioral_patterns.map((pattern, i) => (
+                    <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="mt-0.5 shrink-0 text-[10px]" style={{ color: 'var(--accent-primary)' }}>◆</span>
+                      {pattern}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <div>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Communication Intelligence
+              </p>
+              <p className="mb-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {insights.communication.clarity_narrative}
+              </p>
+              <p className="mb-3 text-sm leading-relaxed italic" style={{ color: 'var(--text-muted)' }}>
+                {insights.communication.confidence_progression}
+              </p>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {insights.communication.strengths.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-success)' }}>Strengths</p>
+                    <ul className="space-y-1">
+                      {insights.communication.strengths.map((s, i) => (
+                        <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {s}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {insights.communication.weaknesses.length > 0 && (
+                  <div>
+                    <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-danger)' }}>To improve</p>
+                    <ul className="space-y-1">
+                      {insights.communication.weaknesses.map((w, i) => (
+                        <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {w}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Technical Intelligence
+              </p>
+              <p className="mb-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {insights.technical.depth_assessment}
+              </p>
+              {(insights.technical.strength_patterns.length > 0 || insights.technical.weak_patterns.length > 0) && (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {insights.technical.strength_patterns.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-success)' }}>Patterns</p>
+                      <ul className="space-y-1">
+                        {insights.technical.strength_patterns.map((s, i) => (
+                          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {insights.technical.weak_patterns.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-danger)' }}>Gaps</p>
+                      <ul className="space-y-1">
+                        {insights.technical.weak_patterns.map((w, i) => (
+                          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div
+              className="rounded-xl border-2 p-4"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
+              }}
+            >
+              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Benchmarking
+              </p>
+              <div className="flex items-baseline gap-2 mb-2">
+                <span className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+                  {insights.benchmarking.percentile_estimate}th
+                </span>
+                <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  percentile
+                </span>
+              </div>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {insights.benchmarking.comparison_narrative}
+              </p>
+              <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                {insights.benchmarking.role_calibration}
+              </p>
+            </div>
+          </div>
+        </BlurredSection>
       </ReportPanel>
 
       <div className="space-y-6">
@@ -558,6 +784,65 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </div>
         ))}
       </div>
+
+      {/* Improvement Roadmap — Pro-gated */}
+      <ReportPanel eyebrow="Growth plan" title="Your 30-day improvement roadmap" contentClassName="space-y-5">
+        <BlurredSection
+          userTier={planTier}
+          requiredTier="pro"
+          upgradeLabel="Upgrade to Pro to unlock your personalized improvement roadmap"
+        >
+          <div className="space-y-5">
+            <div>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Focus Areas
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {insights.improvement_roadmap.focus_areas.map((area) => (
+                  <span
+                    key={area}
+                    className="rounded-full px-3 py-1 text-xs font-semibold"
+                    style={{
+                      background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                      color: 'var(--accent-primary)',
+                    }}
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div>
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
+                  This week
+                </p>
+                <ul className="space-y-3">
+                  {insights.improvement_roadmap.week_1.map((action, i) => (
+                    <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>{i + 1}. </span>
+                      {action}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
+                  30-day plan
+                </p>
+                <ul className="space-y-3">
+                  {insights.improvement_roadmap.month_1.map((action, i) => (
+                    <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>{i + 1}. </span>
+                      {action}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        </BlurredSection>
+      </ReportPanel>
 
       {/* Share card */}
       <ShareCard

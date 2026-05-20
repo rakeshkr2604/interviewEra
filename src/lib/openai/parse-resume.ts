@@ -1,5 +1,6 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
+import { getTokenBudget } from '@/lib/ai/token-budget';
 import type { ParsedResume } from '@/types/app.types';
 
 const PROMPT_TEMPLATE = `You are a resume parsing engine. Extract structured information from the following resume text.
@@ -51,6 +52,7 @@ async function callOpenAI(prompt: string): Promise<string> {
   const { content } = await completeInterviewChat({
     messages: [{ role: 'user', content: prompt }],
     temperature: 0,
+    maxTokens: getTokenBudget('resume_parse'),
   });
   return content;
 }
@@ -62,7 +64,7 @@ async function getAIContent(prompt: string): Promise<string> {
     console.warn('[AI] Interview AI chain failed, switching to Mistral:', openaiError);
 
     try {
-      return await callMistralChat(prompt, 0);
+      return await callMistralChat(prompt, 0, getTokenBudget('resume_parse', 'mistral'));
     } catch (mistralError) {
       console.error('[AI] Interview AI chain and Mistral failed:', mistralError);
       throw mistralError;

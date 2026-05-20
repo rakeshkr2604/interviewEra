@@ -49,6 +49,13 @@ export function createServiceClient() {
       '[supabase] Missing NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY (required for createServiceClient).',
     );
   }
+  if (!serviceKey.startsWith('eyJ')) {
+    // Service role key must be a JWT. Personal Access Tokens (sb_secret_...) do NOT work here.
+    throw new Error(
+      `[supabase] SUPABASE_SERVICE_ROLE_KEY is not a JWT — got prefix "${serviceKey.slice(0, 12)}...". ` +
+      'Go to Supabase Dashboard → Project Settings → API → copy the "service_role" secret (starts with eyJ).',
+    );
+  }
   return createSupabaseJsClient(url, serviceKey, {
     auth: {
       persistSession: false,

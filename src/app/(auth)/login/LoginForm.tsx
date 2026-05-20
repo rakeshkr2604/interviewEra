@@ -103,6 +103,12 @@ export function LoginForm({ next }: LoginFormProps) {
     setError(null);
 
     try {
+      // sessionStorage survives the OAuth tab navigation and is read by
+      // PostAuthRedirect (mounted in root layout) after sign-in fires.
+      // This works whether Supabase lands on /auth/callback or site root.
+      if (next) {
+        sessionStorage.setItem('auth_redirect', next);
+      }
       const supabase = createClient();
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { AvatarPlayer } from '@/components/avatar/AvatarPlayer'
@@ -10,12 +10,18 @@ import { FillerWordBadge } from '@/components/interview/FillerWordBadge'
 import { useAvatarSync } from '@/hooks/useAvatarSync'
 import { useTimer } from '@/hooks/useTimer'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
+import { useMicrophone } from '@/hooks/useMicrophone'
+import { useVoicePlayer } from '@/hooks/useVoicePlayer'
 import { useAutoGrowTextarea } from '@/hooks/useAutoGrowTextarea'
 import { analyzeFillerWords } from '@/hooks/useFillerDetection'
 import type { FillerAnalysis } from '@/hooks/useFillerDetection'
 import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
+import { StreamingSTT } from '@/lib/voice/stt-client'
+import { fetchSTTToken } from '@/lib/voice/stt-token'
+import type { VoiceMetadata } from '@/lib/interview/interview-orchestrator'
+import type { InterviewerTone } from '@/lib/voice/tts-client'
 import { api } from '@/services/api'
-import { Mic, MicOff, SkipForward, RotateCcw, Send, X } from 'lucide-react'
+import { Mic, MicOff, SkipForward, RotateCcw, Send, X, Radio } from 'lucide-react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { readAnswerStyle } from '@/lib/settings/client-preferences'
@@ -30,9 +36,32 @@ const TIME_PER_QUESTION = 60
 const TEXT_ANSWER_TIME_MULTIPLIER = 2
 const MAX_SKIPS = 2
 
+const THINKING_BAR_HEIGHTS = [0.4, 0.7, 1, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1, 0.6, 0.9]
+
+/** Cycles through analysis messages while the interviewer "thinks" — eliminates dead spinner. */
+function useThinkingMessage(active: boolean, interviewerName: string): string {
+  const msgs = useMemo(() => [
+    `${interviewerName} is reviewing what you said…`,
+    'Analyzing depth and structure…',
+    'Checking for key concepts…',
+    `${interviewerName} is forming a response…`,
+  ], [interviewerName])
+
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    if (!active) return
+    const t = setInterval(() => setIdx(i => (i + 1) % msgs.length), 1800)
+    return () => clearInterval(t)
+  }, [active, msgs.length])
+  // When not active: always show the first message so next activation opens fresh
+  return active ? msgs[idx] : msgs[0]
+}
+
 interface InterviewData {
   interviewId: string
   interviewerId: InterviewerId
+  role: string
+  difficulty: 'beginner' | 'intermediate' | 'advanced'
   answeredCount: number
   currentQuestionIndex: number
   questions: InterviewQuestion[]
@@ -64,16 +93,46 @@ export default function InterviewSessionPage() {
   const [fetchError, setFetchError] = useState('')
   const [spokenText, setSpokenText] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
-  const [inputMode, setInputMode] = useState<'voice' | 'text'>('voice')
+  const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>('voice')
   /** Matches TimerCircle denominator for the active answering phase */
   const [answerTimeBudget, setAnswerTimeBudget] = useState(TIME_PER_QUESTION)
   const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null)
+  // ─── Deepgram + ElevenLabs state ──────────────────────────
+  const [dgTranscript, setDgTranscript] = useState('')
+  const [dgInterim, setDgInterim] = useState('')
+  const [dgError, setDgError] = useState<string | null>(null)
+  const [dgRecordingSeconds, setDgRecordingSeconds] = useState(0)
+  // Voice tone from last processAnswer response; drives ElevenLabs on next question
+  const [lastVoiceMeta, setLastVoiceMeta] = useState<VoiceMetadata | null>(null)
+  // Orchestrator follow-up: when set, the NEXT interviewer turn is this probing
+  // question (asked in-place, not a new static slot) instead of questions[i+1].
+  const [pendingFollowUp, setPendingFollowUp] = useState<{
+    text: string
+    tone: InterviewerTone
+  } | null>(null)
+  // Max 1 follow-up per static question — keeps interview length bounded.
+  const followUpForIndexRef = useRef<number>(-1)
+  const dgSttRef = useRef<StreamingSTT | null>(null)
+  const dgMicCleanupRef = useRef<(() => void) | null>(null)
+  // Ref so the VAD callback can read the current phase without a stale closure
+  const phaseRef = useRef<SessionPhase>('loading')
+
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
+  const interviewerDisplayName = resolvedInterviewer?.name ?? 'The interviewer'
+  const thinkingMessage = useThinkingMessage(phase === 'submitting', interviewerDisplayName)
 
   // ─── Avatar + TTS ─────────────────────────────────────────
   const { isSpeaking, currentWordIndex, speechError, speakQuestion, stopSpeaking } =
     useAvatarSync(resolvedInterviewerId)
+
+  // ─── ElevenLabs TTS (Deepgram mode) ───────────────────────
+  const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
+  const { isPlaying: elIsPlaying, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
+
+  // ─── Deepgram Microphone (Deepgram mode) ──────────────────
+  const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
+    useMicrophone()
 
   // ─── Timer ────────────────────────────────────────────────
   const { timeLeft, start: startTimer, stop: stopTimer, reset: resetTimer } =
@@ -91,21 +150,38 @@ export default function InterviewSessionPage() {
     retryPermission,
     stopListening,
     resetTranscript,
+    getMergedTranscript,
+    hasRecentSpeech,
   } = useSpeechRecognition()
-  const useManualInput = inputMode === 'text' || !isMicSupported || permissionState === 'denied' || Boolean(micError)
+  const useManualInput = inputMode === 'text' || (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError)))
 
   const useManualInputRef = useRef(useManualInput)
   useManualInputRef.current = useManualInput
 
+  // Keep phaseRef in sync so Deepgram VAD callback reads current phase
+  useEffect(() => { phaseRef.current = phase }, [phase])
+
   useEffect(() => {
-    if (!isMicSupported || permissionState === 'denied' || Boolean(micError)) {
+    if (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError))) {
       setInputMode('text')
     }
-  }, [isMicSupported, permissionState, micError])
+  }, [isMicSupported, permissionState, micError, inputMode])
 
-  const answerText = useManualInput
-    ? manualAnswer.trim()
-    : (transcript + ' ' + interimTranscript).trim()
+  // Deepgram recording duration counter (debug + UI)
+  useEffect(() => {
+    if (!dgIsRecording) { setDgRecordingSeconds(0); return }
+    const iv = setInterval(() => setDgRecordingSeconds(s => s + 1), 1000)
+    return () => clearInterval(iv)
+  }, [dgIsRecording])
+
+  // Display-only merge of finalized + interim. The submit handler does NOT
+  // read this — it calls getMergedTranscript() directly so it sees the
+  // latest refs (no stale-closure race with the last interim).
+  const answerText = inputMode === 'deepgram'
+    ? dgTranscript.trim()
+    : useManualInput
+      ? manualAnswer.trim()
+      : (transcript + ' ' + interimTranscript).trim()
 
   const manualAnswerGrowEnabled = phase === 'candidate_answering' && useManualInput
   const manualAnswerRef = useAutoGrowTextarea(manualAnswer, manualAnswerGrowEnabled)
@@ -199,17 +275,89 @@ export default function InterviewSessionPage() {
     }
   }, [interviewId, router])
 
+  // ─── Deepgram STT helpers ─────────────────────────────────
+  // Ref so startDgListening's VAD callback can call handleSubmitAnswer without
+  // a forward-reference (handleSubmitAnswer is declared after startDgListening).
+  const handleSubmitAnswerRef = useRef<() => Promise<void>>(() => Promise.resolve())
+  // Same forward-reference pattern: the auto-flow effect calls handleNextQuestion
+  // which is declared further down.
+  const handleNextQuestionRef = useRef<() => void>(() => {})
+
+  const stopDgListening = useCallback(() => {
+    dgSttRef.current?.stop()
+    dgMicCleanupRef.current?.()
+    dgMicCleanupRef.current = null
+    dgStopRecording()
+  }, [dgStopRecording])
+
+  const startDgListening = useCallback(async () => {
+    setDgError(null)
+    setDgTranscript('')
+    setDgInterim('')
+
+    let token: string
+    try {
+      token = await fetchSTTToken(interviewId)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to start voice recording.'
+      setDgError(msg)
+      return
+    }
+
+    const stt = new StreamingSTT(token)
+    dgSttRef.current = stt
+
+    await stt.start({
+      onPartial: (chunk) => {
+        if (chunk.isFinal) {
+          setDgTranscript(prev => prev + chunk.text + ' ')
+          setDgInterim('')
+        } else {
+          setDgInterim(chunk.text)
+        }
+      },
+      onFinal: () => {
+        // VAD detected end of utterance — auto-submit if still answering.
+        // Called through ref to avoid a forward-declaration error.
+        if (phaseRef.current === 'candidate_answering') {
+          queueMicrotask(() => { void handleSubmitAnswerRef.current() })
+        }
+        stopDgListening()
+      },
+      onError: (err) => {
+        console.error('[DG STT]', err)
+        setDgError(err.message)
+        stopDgListening()
+      },
+    })
+
+    const cleanup = await dgStartRecording((data) => stt.sendAudio(data))
+    dgMicCleanupRef.current = cleanup
+  }, [dgStartRecording, stopDgListening, interviewId])
+
+  // Cleanup Deepgram on unmount
+  useEffect(() => {
+    return () => {
+      dgSttRef.current?.stop()
+      dgMicCleanupRef.current?.()
+    }
+  }, [])
+
   // ─── Speak current question when phase = avatar_speaking ──
   useEffect(() => {
     if (phase !== 'avatar_speaking' || !currentQuestion) return
 
-    const intro = currentIndex === 0
-      ? `Let us begin. Question ${currentIndex + 1}: ${currentQuestion.question_text}`
-      : `Question ${currentIndex + 1}: ${currentQuestion.question_text}`
+    // A pending orchestrator follow-up takes precedence over the static question:
+    // it's a contextual probe on the SAME question the candidate just answered.
+    const intro = pendingFollowUp
+      ? pendingFollowUp.text
+      : currentIndex === 0
+        ? `Let us begin. Question ${currentIndex + 1}: ${currentQuestion.question_text}`
+        : `Question ${currentIndex + 1}: ${currentQuestion.question_text}`
 
     setSpokenText(intro)
-    speakQuestion(intro, () => {
-      // TTS complete → 500ms pause → start timer + mic
+
+    const onTTSComplete = () => {
       setTimeout(() => {
         const manual = useManualInputRef.current
         const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
@@ -218,31 +366,126 @@ export default function InterviewSessionPage() {
         setAnswerStartTime(Date.now())
         resetTimer(budget)
         startTimer()
+        // Continuous conversation: the mic auto-activates the moment the
+        // interviewer finishes — the candidate never re-enables it manually.
+        if (inputMode === 'deepgram') {
+          void startDgListening()
+        } else if (!useManualInputRef.current && isMicSupported) {
+          // Web Speech mode — start listening immediately so the UI shows
+          // "Listening…" before the candidate says anything (not after).
+          void startListening()
+        }
       }, 500)
-    })
+    }
+
+    if (inputMode === 'deepgram') {
+      // ElevenLabs TTS: follow-up tone wins; else last answer's metadata; else neutral
+      const tone: InterviewerTone =
+        pendingFollowUp?.tone ?? lastVoiceMeta?.tone ?? 'neutral'
+      void elSpeak(intro, tone, onTTSComplete)
+    } else {
+      speakQuestion(intro, onTTSComplete)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentIndex])
+  }, [phase, currentIndex, pendingFollowUp])
 
   // ─── Submit Answer ────────────────────────────────────────
   const handleSubmitAnswer = useCallback(async () => {
-    if (phase !== 'candidate_answering') return
+    if (phaseRef.current !== 'candidate_answering') return
+
+    // Read the merged transcript BEFORE stopping the mic. getMergedTranscript()
+    // reads from refs, so we get whatever the recognizer has produced up to
+    // this microtask — including interim that hasn't been finalized yet.
+    const durationSeconds = Math.round((Date.now() - answerStartTime) / 1000)
+    const submittedText = inputMode === 'deepgram'
+      ? dgTranscript.trim()
+      : useManualInput
+        ? manualAnswer.trim()
+        : getMergedTranscript()
+
+    // Empty-payload guard — block submission with explicit UI feedback rather
+    // than sending "[No answer provided]" silently. The user can keep talking.
+    if (!submittedText) {
+      console.log('[speech] submit_blocked', { reason: 'empty_payload' })
+      setShowEmptyWarning(true)
+      return
+    }
+
+    console.log('[speech] submitted', { payload_length: submittedText.length, durationSeconds, mode: inputMode })
+
     setPhase('submitting')
+    setShowEmptyWarning(false)
     stopTimer()
     stopListening()
     stopSpeaking()
+    elStop()
+    stopDgListening()
 
-    const durationSeconds = Math.round((Date.now() - answerStartTime) / 1000)
-    const finalTranscript = answerText || '[No answer provided]'
+    const finalTranscript = submittedText
     const fillerAnalysis = analyzeFillerWords(finalTranscript, durationSeconds)
 
+    // Only allow one orchestrator-driven follow-up per static question so the
+    // interview length stays bounded (no infinite probe loops).
+    const followUpAllowed = followUpForIndexRef.current !== currentIndex
+
     try {
-      const result = await api.post('/api/interview/answer', {
-        questionId: currentQuestion?.id,
-        answerText: finalTranscript,
-        interviewId,
-        answerMode: useManualInput ? 'text' : 'voice',
-        answerStyle: readAnswerStyle(),
-      })
+      // Run scoring (evaluate + persist) and the orchestrator (the intelligence
+      // authority — drives follow-ups, tone, memory) in parallel. The orchestrator
+      // runs for ALL input modes, not just Deepgram: probing is the core product.
+      const [result, orchestratorResult] = await Promise.all([
+        api.post('/api/interview/answer', {
+          questionId: currentQuestion?.id,
+          answerText: finalTranscript,
+          interviewId,
+          answerMode: inputMode === 'text' ? 'text' : 'voice',
+          answerStyle: readAnswerStyle(),
+          durationSeconds,
+        }),
+        // process-answer returns { type, text, voice_metadata }. Orchestrator
+        // failure is non-fatal — interview falls back to the static next question.
+        currentQuestion && interviewData
+          ? fetch('/api/interview/process-answer', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                interview_id: interviewId,
+                interviewer_id: interviewData.interviewerId,
+                question: currentQuestion.question_text,
+                answer: finalTranscript,
+                context: {
+                  role: interviewData.role,
+                  difficulty: interviewData.difficulty,
+                  focus_areas: [currentQuestion.category ?? 'general'],
+                  interview_style: currentQuestion.category === 'technical' ? 'technical' : 'behavioral',
+                },
+              }),
+            })
+              .then(r => r.ok ? r.json() : null)
+              .catch(() => null)
+          : Promise.resolve(null),
+      ])
+
+      if (orchestratorResult?.voice_metadata) {
+        setLastVoiceMeta(orchestratorResult.voice_metadata as VoiceMetadata)
+      }
+
+      // If the orchestrator decided this answer needs probing, queue its follow-up
+      // as the NEXT interviewer turn (asked in-place on the same question).
+      if (
+        followUpAllowed &&
+        orchestratorResult?.type === 'followup' &&
+        typeof orchestratorResult?.text === 'string' &&
+        orchestratorResult.text.trim()
+      ) {
+        const meta = orchestratorResult.voice_metadata as VoiceMetadata | undefined
+        setPendingFollowUp({
+          text: orchestratorResult.text as string,
+          tone: meta?.tone ?? 'neutral',
+        })
+        followUpForIndexRef.current = currentIndex
+      } else {
+        setPendingFollowUp(null)
+      }
 
       const record: AnswerRecord = {
         questionId: currentQuestion?.id || '',
@@ -257,39 +500,101 @@ export default function InterviewSessionPage() {
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
     } catch {
-      // Still record the answer locally even if API fails
       setLastFeedback('Unable to evaluate this answer. Moving to next question.')
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
     }
   }, [
-    phase,
-    answerText,
+    inputMode,
+    useManualInput,
+    manualAnswer,
+    dgTranscript,
+    getMergedTranscript,
+    currentIndex,
     currentQuestion,
+    interviewData,
     interviewId,
     answerStartTime,
-    useManualInput,
     stopTimer,
     stopListening,
     stopSpeaking,
+    elStop,
+    stopDgListening,
   ])
+
+  // Keep ref current so startDgListening's onFinal callback always calls the
+  // latest version of handleSubmitAnswer (avoids stale closure + forward-ref issue).
+  useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer }, [handleSubmitAnswer])
 
   // ─── Timer runs out → auto submit ─────────────────────────
   useEffect(() => {
     if (timeLeft === 0 && phase === 'candidate_answering') {
-      handleSubmitAnswer()
+      void handleSubmitAnswer()
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, phase])
+
+  // ─── Auto-flow: a pending follow-up advances itself ───────
+  // No button click for follow-ups — after a brief natural pause the
+  // interviewer just asks the probe. Static question→question still uses
+  // the explicit Next button (user keeps control over pacing/review).
+  useEffect(() => {
+    if (phase !== 'feedback' || !pendingFollowUp) return
+    const t = setTimeout(() => {
+      handleNextQuestionRef.current()
+    }, 1500)
+    return () => clearTimeout(t)
+  }, [phase, pendingFollowUp])
+
+  // ─── Empty-submit warning ─────────────────────────────────
+  const [showEmptyWarning, setShowEmptyWarning] = useState(false)
+  // Auto-dismiss once the user starts speaking again
+  useEffect(() => {
+    if (showEmptyWarning && answerText) setShowEmptyWarning(false)
+  }, [showEmptyWarning, answerText])
+
+  // ─── Safety fallback: surface a manual escape if the candidate is in
+  // candidate_answering and no speech has been observed for SILENCE_WINDOW.
+  // Polls hasRecentSpeech (ref-based, no React state lag) every 2s rather
+  // than relying on a single wall-clock timer that misses ongoing speech.
+  const SILENCE_WINDOW_MS = 8000
+  const [showStuckEscape, setShowStuckEscape] = useState(false)
+  useEffect(() => {
+    setShowStuckEscape(false)
+    if (phase !== 'candidate_answering') return
+    if (inputMode === 'deepgram') {
+      // Deepgram has its own VAD — keep the legacy 15s heuristic for that mode
+      const t = setTimeout(() => setShowStuckEscape(true), 15000)
+      return () => clearTimeout(t)
+    }
+    // Web Speech mode: check actual mic activity, not wall-clock
+    const iv = setInterval(() => {
+      if (!hasRecentSpeech(SILENCE_WINDOW_MS) && !answerText) {
+        setShowStuckEscape(true)
+      }
+    }, 2000)
+    return () => clearInterval(iv)
+  }, [phase, currentIndex, pendingFollowUp, answerText, inputMode, hasRecentSpeech])
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
     resetTranscript()
     setManualAnswer('')
+    setDgTranscript('')
+    setDgInterim('')
     setLastFeedback('')
     setLastFillerAnalysis(null)
 
     if (!interviewData) return
+
+    // A follow-up is queued → ask it in-place on the SAME question index.
+    // Re-entering avatar_speaking with pendingFollowUp set makes the speak
+    // effect read the follow-up text instead of advancing the static playlist.
+    if (pendingFollowUp) {
+      setPhase('avatar_speaking')
+      return
+    }
+
     const isLast = currentIndex >= interviewData.questions.length - 1
 
     if (isLast) {
@@ -299,7 +604,10 @@ export default function InterviewSessionPage() {
 
     setCurrentIndex(prev => prev + 1)
     setPhase('avatar_speaking')
-  }, [currentIndex, interviewData, resetTranscript, handleCompleteInterview])
+  }, [currentIndex, interviewData, pendingFollowUp, resetTranscript, handleCompleteInterview])
+
+  // Keep the ref current for the auto-flow effect (forward-reference).
+  useEffect(() => { handleNextQuestionRef.current = handleNextQuestion }, [handleNextQuestion])
 
   // ─── Skip Question ────────────────────────────────────────
   const handleSkip = useCallback(() => {
@@ -307,24 +615,35 @@ export default function InterviewSessionPage() {
     setSkipCount(prev => prev + 1)
     stopTimer()
     stopListening()
+    elStop()
+    stopDgListening()
     resetTranscript()
     setManualAnswer('')
+    setDgTranscript('')
+    setDgInterim('')
     setLastFeedback('')
     setLastFillerAnalysis(null)
+    // Skipping abandons the question — discard any queued follow-up so it
+    // doesn't leak into the next static question.
+    setPendingFollowUp(null)
 
     if (!interviewData) return
     const isLast = currentIndex >= interviewData.questions.length - 1
     if (isLast) { handleCompleteInterview(); return }
     setCurrentIndex(prev => prev + 1)
     setPhase('avatar_speaking')
-  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, resetTranscript, handleCompleteInterview])
+  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, elStop, stopDgListening, resetTranscript, handleCompleteInterview])
 
   // ─── Retry (re-speak current question) ───────────────────
   const handleRetry = useCallback(() => {
     if (phase !== 'candidate_answering') return
     stopListening()
+    elStop()
+    stopDgListening()
     resetTranscript()
     setManualAnswer('')
+    setDgTranscript('')
+    setDgInterim('')
     stopTimer()
     const budget = useManualInputRef.current
       ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER
@@ -332,7 +651,7 @@ export default function InterviewSessionPage() {
     resetTimer(budget)
     setAnswerTimeBudget(budget)
     setPhase('avatar_speaking')
-  }, [phase, stopListening, resetTranscript, stopTimer, resetTimer])
+  }, [phase, stopListening, elStop, stopDgListening, resetTranscript, stopTimer, resetTimer])
 
   // ─── Toggle Mic ───────────────────────────────────────────
   const handleToggleMic = async () => {
@@ -546,10 +865,11 @@ export default function InterviewSessionPage() {
                 ) : (
                   <div className="h-24 w-24 flex items-center justify-center
                                   rounded-full border-2 border-(--bg-tertiary)">
-                    <span className="text-xs text-(--text-muted)">
-                      {phase === 'avatar_speaking' ? 'Listening...'
-                       : phase === 'feedback' ? 'Review'
-                       : phase === 'submitting' ? 'Saving...' : ''}
+                    <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
+                      {phase === 'avatar_speaking' ? 'Preparing…'
+                       : phase === 'submitting' ? 'Scoring…'
+                       : phase === 'feedback' ? 'Done'
+                       : ''}
                     </span>
                   </div>
                 )}
@@ -582,7 +902,64 @@ export default function InterviewSessionPage() {
             {/* Candidate transcript / answer area */}
             <div className="dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-3 p-5">
 
-              {phase === 'candidate_answering' && !useManualInput && (
+              {phase === 'candidate_answering' && inputMode === 'deepgram' && (
+                <div className="w-full min-w-0 space-y-3">
+                  {/* ElevenLabs speaking indicator */}
+                  {elIsPlaying && (
+                    <div className="flex items-center gap-2 rounded-lg bg-(--accent-primary)/10 px-3 py-2">
+                      <Radio size={14} className="animate-pulse text-(--accent-primary)" />
+                      <span className="text-xs font-semibold text-(--accent-primary)">
+                        Interviewer speaking…
+                      </span>
+                    </div>
+                  )}
+                  {/* Deepgram live transcript */}
+                  <div className="min-h-[100px] rounded-xl border border-(--card-border) bg-(--bg-secondary) p-4">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                      {dgIsRecording
+                        ? `Live transcript · ${dgRecordingSeconds}s`
+                        : 'Your answer'}
+                    </p>
+                    {dgTranscript || dgInterim ? (
+                      <p className="text-sm leading-relaxed text-(--text-primary)">
+                        {dgTranscript}
+                        {dgInterim && (
+                          <span className="italic text-(--text-secondary)"> {dgInterim}</span>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-(--text-muted)">
+                        {dgIsRecording ? 'Listening…' : 'Waiting for microphone…'}
+                      </p>
+                    )}
+                  </div>
+                  {dgError && (
+                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dgError}</p>
+                  )}
+                  {/* Tone badge from last answer */}
+                  {lastVoiceMeta && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-(--text-muted)">Interviewer tone:</span>
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                        lastVoiceMeta.tone === 'encouraging'
+                          ? 'bg-green-100 text-green-700'
+                          : lastVoiceMeta.tone === 'challenging'
+                            ? 'bg-orange-100 text-orange-700'
+                            : 'bg-(--bg-tertiary) text-(--text-secondary)'
+                      }`}>
+                        {lastVoiceMeta.tone === 'encouraging' ? 'Warm & Encouraging'
+                          : lastVoiceMeta.tone === 'challenging' ? 'Assertive'
+                          : 'Professional'}
+                      </span>
+                      <span className="text-[10px] text-(--text-muted)">
+                        · Rapport {lastVoiceMeta.rapportLevel}/10
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && (
                 <div className="w-full min-w-0">
                   <CandidateTranscript
                     transcript={transcript}
@@ -624,29 +1001,61 @@ export default function InterviewSessionPage() {
               )}
 
               {phase === 'avatar_speaking' && (
-                <div className="flex-1 flex items-center justify-center
-                                text-center text-(--text-secondary)">
-                  <div className="space-y-2">
-                    <div className="text-3xl">🎙️</div>
-                    <p className="text-sm font-medium">
-                      Listen carefully to the question
-                    </p>
-                    <p className="text-xs text-(--text-muted)">
-                      Timer starts after the question is read
-                    </p>
+                <motion.div
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex-1 flex flex-col gap-4 p-1"
+                >
+                  {/* Live indicator */}
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5 shrink-0">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent-primary)/40" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-(--accent-primary)" />
+                    </span>
+                    <span className="text-xs font-semibold uppercase tracking-widest text-(--text-secondary)">
+                      {interviewerDisplayName} is speaking
+                    </span>
                   </div>
-                </div>
+
+                  {/* Question text preview — read-along while audio plays */}
+                  <div className="rounded-xl border border-(--card-border)/60
+                                  bg-(--bg-secondary)/50 p-4 text-sm leading-relaxed
+                                  text-(--text-primary)/75">
+                    {spokenText || currentQuestion.question_text}
+                  </div>
+
+                  <p className="text-center text-xs text-(--text-muted)">
+                    Your timer starts once the question is read
+                  </p>
+                </motion.div>
               )}
 
               {phase === 'submitting' && (
-                <div className="flex-1 flex items-center justify-center text-center">
-                  <div className="space-y-3">
-                    <div className="mx-auto h-8 w-8 animate-spin rounded-full
-                                    border-2 border-(--accent-primary)
-                                    border-t-transparent" />
-                    <p className="text-sm text-(--text-secondary)">
-                      AI is evaluating your answer...
-                    </p>
+                <div className="flex-1 flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-4">
+                    {/* Waveform bars — audio-analysis feel, not a spinner */}
+                    <div className="flex items-end gap-[3px]" style={{ height: 32 }}>
+                      {THINKING_BAR_HEIGHTS.map((h, i) => (
+                        <span
+                          key={i}
+                          className="w-[4px] rounded-full bg-(--accent-primary)/75 ie-thinking-bar"
+                          style={{ height: `${h * 100}%`, animationDelay: `${i * 80}ms` }}
+                        />
+                      ))}
+                    </div>
+                    {/* Animated message swap — feels like reasoning, not frozen */}
+                    <AnimatePresence mode="wait">
+                      <motion.p
+                        key={thinkingMessage}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -5 }}
+                        transition={{ duration: 0.25 }}
+                        className="text-sm text-(--text-secondary)"
+                      >
+                        {thinkingMessage}
+                      </motion.p>
+                    </AnimatePresence>
                   </div>
                 </div>
               )}
@@ -659,27 +1068,22 @@ export default function InterviewSessionPage() {
                     animate={{ opacity: 1, y: 0 }}
                     className="space-y-4"
                   >
-                    {/* Your answer recap */}
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-widest
-                                    text-(--text-muted) mb-2">
-                        Your Answer
-                      </p>
-                      <p className="text-sm text-(--text-secondary) leading-relaxed
-                                    rounded-xl bg-(--bg-secondary) p-3">
-                        {answers[answers.length - 1]?.transcript || 'No answer recorded'}
-                      </p>
-                    </div>
+                    {/* Your answer — quiet recap, not an exam panel */}
+                    <p className="text-sm italic leading-relaxed text-(--text-muted)">
+                      “{answers[answers.length - 1]?.transcript || 'No answer recorded'}”
+                    </p>
 
-                    {/* AI Feedback */}
+                    {/* The interviewer's reaction — framed as them speaking,
+                        not an automated grading card. */}
                     {lastFeedback && (
-                      <div className="rounded-xl border border-(--accent-success)/25
-                                      bg-(--accent-success)/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-widest
-                                      text-(--accent-success) mb-1">
-                          AI Feedback
-                        </p>
-                        <p className="text-sm text-(--text-primary) leading-relaxed">
+                      <div className="flex gap-3">
+                        <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center
+                                        justify-center rounded-full
+                                        bg-(--accent-primary)/15 text-xs font-bold
+                                        text-(--accent-primary)">
+                          {interviewerDisplayName.charAt(0)}
+                        </div>
+                        <p className="text-sm leading-relaxed text-(--text-primary)">
                           {lastFeedback}
                         </p>
                       </div>
@@ -690,21 +1094,72 @@ export default function InterviewSessionPage() {
                       <FillerWordBadge analysis={lastFillerAnalysis} />
                     )}
 
-                    {/* Next button */}
-                    <button
-                      onClick={handleNextQuestion}
-                      className="w-full rounded-xl bg-(--accent-primary) py-3
-                                 text-sm font-semibold text-white
-                                 hover:bg-(--accent-hover) transition-colors duration-200"
-                    >
-                      {currentIndex >= totalQuestions - 1
-                        ? 'Finish Interview →'
-                        : `Next Question (${currentIndex + 1}/${totalQuestions}) →`}
-                    </button>
+                    {/* Follow-up auto-flows (no click). Static questions keep
+                        the explicit Next button so the user controls pacing. */}
+                    {pendingFollowUp ? (
+                      <div className="flex items-center justify-center gap-2 rounded-xl
+                                      bg-(--accent-primary)/10 py-3 text-sm font-semibold
+                                      text-(--accent-primary)">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full
+                                         bg-(--accent-primary)" />
+                        {interviewerDisplayName} is following up…
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleNextQuestion}
+                        className="w-full rounded-xl bg-(--accent-primary) py-3
+                                   text-sm font-semibold text-white
+                                   hover:bg-(--accent-hover) transition-colors duration-200"
+                      >
+                        {currentIndex >= totalQuestions - 1
+                          ? 'Finish Interview →'
+                          : `Next Question (${currentIndex + 1}/${totalQuestions}) →`}
+                      </button>
+                    )}
                   </motion.div>
                 </AnimatePresence>
               )}
             </div>
+
+            {/* ── Empty-payload warning ── */}
+            {phase === 'candidate_answering' && showEmptyWarning && (
+              <div className="dashboard-premium-card mb-3 w-full min-w-0 border border-amber-300 bg-amber-50/70 p-3">
+                <p className="text-xs font-semibold text-amber-800">
+                  We didn&apos;t catch your answer yet. Please speak (or type) before submitting.
+                </p>
+              </div>
+            )}
+
+            {/* ── Safety escape: auto-flow can never strand the user ── */}
+            {phase === 'candidate_answering' && showStuckEscape && (
+              <div className="dashboard-premium-card mb-3 w-full min-w-0 p-4">
+                <p className="mb-2 text-xs text-(--text-secondary)">
+                  Mic not picking you up? You can submit what you have, or continue.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { void handleSubmitAnswer() }}
+                    className="flex-1 rounded-lg bg-(--accent-primary) py-2 text-xs
+                               font-semibold text-white hover:bg-(--accent-hover)"
+                  >
+                    Submit my answer now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (inputMode === 'deepgram') { void startDgListening() }
+                      setShowStuckEscape(false)
+                    }}
+                    className="rounded-lg border border-(--card-border) bg-(--bg-secondary)
+                               px-3 py-2 text-xs font-semibold text-(--text-secondary)
+                               hover:text-(--text-primary)"
+                  >
+                    Retry mic
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* ── Control Bar ── */}
             <div className="dashboard-premium-card w-full min-w-0 p-4">
@@ -722,9 +1177,13 @@ export default function InterviewSessionPage() {
                   Restart Interview
                 </button>
                 <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
-                  {isListening
-                    ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Listening...</>
-                    : <><MicOff size={12} /> {isMicSupported ? 'Mic Off' : 'Speech unsupported'}</>
+                  {inputMode === 'deepgram'
+                    ? dgIsRecording
+                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Recording · {dgRecordingSeconds}s</>
+                      : <><Radio size={12} /> AI Voice</>
+                    : isListening
+                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Listening…</>
+                      : <><MicOff size={12} /> {isMicSupported ? 'Mic off' : 'Type to answer'}</>
                   }
                 </div>
               </div>
@@ -741,34 +1200,56 @@ export default function InterviewSessionPage() {
               )}
 
               <div className="flex items-center gap-3">
-                {isMicSupported && (
+                {/* Mode cycle: voice → deepgram → text */}
+                <button
+                  type="button"
+                  onClick={() => setInputMode((m) => m === 'voice' ? 'deepgram' : m === 'deepgram' ? 'text' : 'voice')}
+                  className="rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary)"
+                  title="Cycle input mode: Voice → AI Voice → Type"
+                >
+                  {inputMode === 'deepgram' ? 'AI Voice' : inputMode === 'text' ? 'Type' : 'Voice'}
+                </button>
+                {/* Mic toggle — hidden in deepgram mode (auto-managed) */}
+                {inputMode !== 'deepgram' && (
                   <button
-                    type="button"
-                    onClick={() => setInputMode((mode) => (mode === 'voice' ? 'text' : 'voice'))}
-                    className="rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary)"
+                    onClick={() => { void handleToggleMic() }}
+                    disabled={
+                      phase !== 'candidate_answering' ||
+                      !isMicSupported ||
+                      useManualInput ||
+                      permissionState === 'requesting'
+                    }
+                    className={`flex h-12 w-12 items-center justify-center rounded-xl
+                                 border transition-all duration-200
+                                 disabled:opacity-40 disabled:cursor-not-allowed
+                                 ${isListening
+                                   ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
+                                   : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
+                                 }`}
                   >
-                    {useManualInput ? 'Use Voice' : 'Use Text'}
+                    {isListening ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
                   </button>
                 )}
-                {/* Mic toggle */}
-                <button
-                  onClick={() => { void handleToggleMic() }}
-                  disabled={
-                    phase !== 'candidate_answering' ||
-                    !isMicSupported ||
-                    useManualInput ||
-                    permissionState === 'requesting'
-                  }
-                  className={`flex h-12 w-12 items-center justify-center rounded-xl
-                               border transition-all duration-200
-                               disabled:opacity-40 disabled:cursor-not-allowed
-                               ${isListening
-                                 ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
-                                 : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
-                               }`}
-                >
-                  {isListening ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
-                </button>
+                {/* Deepgram: manual mic toggle for when VAD doesn't auto-start */}
+                {inputMode === 'deepgram' && (
+                  <button
+                    onClick={() => {
+                      if (phase !== 'candidate_answering') return
+                      if (dgIsRecording) { stopDgListening() } else { void startDgListening() }
+                    }}
+                    disabled={phase !== 'candidate_answering' || elIsPlaying}
+                    className={`flex h-12 w-12 items-center justify-center rounded-xl
+                                 border transition-all duration-200
+                                 disabled:opacity-40 disabled:cursor-not-allowed
+                                 ${dgIsRecording
+                                   ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
+                                   : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
+                                 }`}
+                    title={dgIsRecording ? 'Stop recording' : 'Start Deepgram recording'}
+                  >
+                    {dgIsRecording ? <Mic size={18} className="animate-pulse" /> : <Mic size={18} />}
+                  </button>
+                )}
 
                 {/* Submit */}
                 <button

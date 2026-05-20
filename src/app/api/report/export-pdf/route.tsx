@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ReportPDF } from '@/components/report/ReportPDF';
-import type { DetailedAnalysis, PlanTier, QuestionCategory, RadarDataPoint, ScoreJustification } from '@/types/app.types';
-import { dimensionDisplayRowsFromRadar } from '@/lib/utils/report-radar-dimensions';
+import type { DetailedAnalysis, DimensionScores, PlanTier, QuestionCategory, RadarDataPoint, ReportSpeechSummary, ReportSummary, ScoreJustification } from '@/types/app.types';
+import { dimensionDisplayRowsFromRadar, radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
 import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
+import { generateInsights } from '@/lib/report/insight-engine';
+import type { PerQuestionInsightData } from '@/lib/report/insight-engine';
 
 export async function GET(request: Request): Promise<NextResponse | Response> {
   try {
@@ -47,7 +49,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
     // ── Fetch report ──────────────────────────────────────────────────────────
     const { data: report } = await serviceClient
       .from('reports')
-      .select('id, overall_score, radar_data, interview_id, generated_at')
+      .select('id, overall_score, radar_data, interview_id, generated_at, summary')
       .eq('id', reportId)
       .maybeSingle();
 
@@ -76,10 +78,23 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
 
     const questionIds = (questions ?? []).map((q) => q.id as string);
 
+    // submitted_at ascending so the LAST entry per question (the post-follow-up
+    // substantive answer) wins when reduced into answerByQuestion below.
     const { data: answers } = await serviceClient
       .from('answers')
-      .select('id, question_id')
-      .in('question_id', questionIds);
+      .select('id, question_id, answer_text, submitted_at')
+      .in('question_id', questionIds)
+      .order('submitted_at', { ascending: true });
+
+    // Most-recent answer per question (a question can have multiple answer rows
+    // once the orchestrator asks an in-place follow-up on the same question).
+    const answerByQuestion = new Map<string, { id: string; answer_text: string }>();
+    for (const a of answers ?? []) {
+      answerByQuestion.set(a.question_id as string, {
+        id: a.id as string,
+        answer_text: (a.answer_text as string) ?? '',
+      });
+    }
 
     const answerIds = (answers ?? []).map((a) => a.id as string);
 
@@ -87,9 +102,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
       answerIds.length > 0
         ? await serviceClient
             .from('evaluations')
-            .select(
-              'answer_id, overall_score, dimension_scores, feedback_text, detailed_analysis'
-            )
+            .select('answer_id, overall_score, dimension_scores, feedback_text, detailed_analysis')
             .in('answer_id', answerIds)
         : { data: [] };
 
@@ -102,7 +115,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
 
     // ── Build question items ──────────────────────────────────────────────────
     const pdfQuestions = (questions ?? []).map((q) => {
-      const answer = (answers ?? []).find((a) => a.question_id === q.id) ?? null;
+      const answer = answerByQuestion.get(q.id as string) ?? null;
       const evaluation = answer
         ? ((evaluations ?? []).find((e) => e.answer_id === answer.id) ?? null)
         : null;
@@ -114,6 +127,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
         orderIndex: q.order_index as number,
         questionText: q.question_text as string,
         category: q.category as QuestionCategory,
+        answerText: answer ? answer.answer_text : null,
         overallScore: evaluation ? (evaluation.overall_score as number) : null,
         feedbackText: evaluation ? (evaluation.feedback_text as string) : null,
         strengths: detail?.strengths ?? [],
@@ -128,6 +142,43 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
       return j && typeof j.why_this_score === 'string' && j.why_this_score.trim() ? [j] : [];
     });
     const scoreJustification = aggregateScoreJustifications(perAnswerJustifications);
+
+    const speechSummary =
+      (report.summary as ReportSummary | null)?.speech as ReportSpeechSummary | null ?? null;
+
+    // Compute AI insights from evaluation data (zero extra API calls)
+    const partialDimAvgs = radarScoresByDimensionKey(radarData);
+    const dimensionAverages: DimensionScores = {
+      communication_clarity: partialDimAvgs.communication_clarity ?? 5,
+      technical_depth:       partialDimAvgs.technical_depth ?? 5,
+      answer_structure:      partialDimAvgs.answer_structure ?? 5,
+      confidence:            partialDimAvgs.confidence ?? 5,
+      relevance:             partialDimAvgs.relevance ?? 5,
+    };
+    const pdfPerQuestions: PerQuestionInsightData[] = (questions ?? []).flatMap((q) => {
+      const answer = answerByQuestion.get(q.id as string) ?? null;
+      const evaluation = answer
+        ? ((evaluations ?? []).find((e) => e.answer_id === answer.id) ?? null)
+        : null;
+      if (!evaluation) return [];
+      const detail = evaluation.detailed_analysis as DetailedAnalysis | null;
+      return [{
+        category: q.category as string,
+        score: evaluation.overall_score as number,
+        feedbackText: (evaluation.feedback_text as string) ?? '',
+        strengths: detail?.strengths ?? [],
+        improvements: detail?.improvements ?? [],
+        dimensionScores: (evaluation.dimension_scores as DimensionScores | null) ?? null,
+      }];
+    });
+    const insights = generateInsights({
+      overallScore:      report.overall_score as number,
+      dimensionAverages,
+      perQuestions:      pdfPerQuestions,
+      speechSummary,
+      role:              interview.role as string,
+      difficulty:        interview.difficulty as string,
+    });
 
     const completedAt = interview.completed_at
       ? new Date(interview.completed_at as string).toLocaleDateString('en-IN', {
@@ -147,6 +198,8 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
         dimensionScores={dimensionScores}
         questions={pdfQuestions}
         scoreJustification={scoreJustification}
+        speechSummary={speechSummary}
+        insights={insights}
       />
     );
 

@@ -121,6 +121,22 @@ code, pre, .font-mono {
   transition: box-shadow 400ms ease;
 }
 
+/* ─── Interview: waveform bars (thinking + listening states) ─── */
+@keyframes ie-bar-bounce {
+  0%, 100% { transform: scaleY(0.25); opacity: 0.45; }
+  50%       { transform: scaleY(1);    opacity: 1;    }
+}
+/* Thinking animation — slower, breathing rhythm */
+.ie-thinking-bar {
+  animation: ie-bar-bounce 1.35s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+/* Listening animation — faster, reactive rhythm */
+.ie-audio-bar {
+  animation: ie-bar-bounce 0.85s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
 /* Landing testimonial marquee — CSS animation (lighter than Framer loop) */
 @keyframes ie-testi-marquee {
   from { transform: translateX(0); }
@@ -553,6 +569,11 @@ html[data-theme="dark"] .ie-card-hover:hover {
     background: var(--accent-primary);
   }
 }
+
+/* Hide number input spinners */
+.input-no-spin::-webkit-inner-spin-button,
+.input-no-spin::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.input-no-spin { -moz-appearance: textfield; appearance: textfield; }
 
 /* Hide scrollbar — used for horizontal carousels */
 .ie-scroll-x {
@@ -1309,8 +1330,22 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   will-change: opacity;
 }
 
+/* Calm idle "breathing" for the avatar poster while the interviewer is
+ * silent (thinking / scoring / listening). Deliberately minimal — a ~2%
+ * scale drift over 6s reads as "alive" without distracting from the UI. */
+@keyframes ie-avatar-breathe-kf {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.018); }
+}
+.ie-avatar-breathe {
+  animation: ie-avatar-breathe-kf 6s ease-in-out infinite;
+  will-change: transform;
+  transform: translateZ(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .ie-live-pulse, .ie-cursor-blink { animation: none !important; }
+  .ie-live-pulse, .ie-cursor-blink, .ie-avatar-breathe,
+  .ie-thinking-bar, .ie-audio-bar { animation: none !important; }
 }
 
 /* ─── iOS / PWA Safe-Area & Scroll Architecture ─────────────────────────── *

@@ -20,7 +20,7 @@ interface OnboardingContextType {
   setGoal: (goal: InterviewGoal) => void
   setRole: (role: string) => void
   setExperienceYears: (years: number) => void
-  setMode: (mode: 'Technical' | 'HR') => void
+  setMode: (mode: 'Technical' | 'HR' | 'Mixed') => void
   setInterviewerId: (id: 'priya' | 'arjun') => void
   setResumeId: (resumeId: string) => void
   setResumeData: (data: {
@@ -42,7 +42,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
   const setGoal = (goal: InterviewGoal) => setData(p => ({ ...p, goal }))
   const setRole = (role: string) => setData(p => ({ ...p, role }))
   const setExperienceYears = (experienceYears: number) => setData(p => ({ ...p, experienceYears }))
-  const setMode = (mode: 'Technical' | 'HR') => setData(p => ({ ...p, mode }))
+  const setMode = (mode: 'Technical' | 'HR' | 'Mixed') => setData(p => ({ ...p, mode }))
   const setInterviewerId = (interviewerId: 'priya' | 'arjun') =>
     setData(p => ({ ...p, interviewerId }))
   const setResumeId = (resumeId: string) => setData(p => ({ ...p, resumeId }))

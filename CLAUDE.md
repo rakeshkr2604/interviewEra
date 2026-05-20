@@ -272,6 +272,17 @@ UPSTASH_REDIS_REST_TOKEN=
 # Mistral AI (evaluation fallback — D3)
 MISTRAL_API_KEY=
 
+# Voice Interview (Phase 3)
+ELEVENLABS_API_KEY=                    # Server-only; used by /api/tts proxy. Never expose as NEXT_PUBLIC_.
+DEEPGRAM_API_KEY=                      # Server-only; Deepgram Nova-3 STT. Vended to clients as short-lived tokens via /api/stt/token. Never expose as NEXT_PUBLIC_.
+DEEPGRAM_PROJECT_ID=                   # Required. /api/stt/token issues ephemeral 120s keys via Deepgram Manage API. No fallback — endpoint returns 503 if unset.
+OPENROUTER_API_KEY=                    # OpenRouter fallback provider for LLM calls.
+
+# Infrastructure (Phase 4+)
+SESSION_SIGNING_SECRET=                # HMAC-SHA256 key for signed session tokens. Min 32 chars. Generate: openssl rand -hex 32
+CRON_SECRET=                           # Bearer token for /api/cron/* routes. Min 32 chars. Generate: openssl rand -hex 32
+ADMIN_EMAILS=                          # Comma-separated admin email list for /api/admin/metrics. E.g. admin@example.com,cto@example.com
+
 # App
 NEXT_PUBLIC_APP_URL=
 # Optional — first-interview question count (integer, clamped 4–10 client-side). Default 6 when unset.

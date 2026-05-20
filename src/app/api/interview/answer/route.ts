@@ -3,6 +3,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { evaluateAnswer } from '@/lib/openai/evaluate-answer';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { interviewAnswerSchema } from '@/lib/validations/schemas';
+import { analyzeFillerWords } from '@/lib/filler-words/analyze';
 import type { QuestionRubric } from '@/types/app.types';
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -47,7 +48,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 400 }
       );
     }
-    const { interviewId, questionId, answerText, answerMode, answerStyle } = validation.data;
+    const { interviewId, questionId, answerText, answerMode, answerStyle, durationSeconds } =
+      validation.data;
 
     const serviceClient = createServiceClient();
 
@@ -91,6 +93,38 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (answerError || !answer) {
       console.error('[interview/answer] Answer insert error:', answerError);
       return NextResponse.json({ error: 'Failed to save answer' }, { status: 500 });
+    }
+
+    // ── Step 4b: Persist speech metrics (non-fatal if column absent in prod) ──
+    if (durationSeconds !== undefined) {
+      try {
+        const speechMetrics = analyzeFillerWords(answerText, durationSeconds);
+        const { error: metricsErr } = await serviceClient
+          .from('answers')
+          .update({
+            duration_seconds: durationSeconds,
+            speech_metrics: speechMetrics,
+          })
+          .eq('id', answer.id);
+
+        if (metricsErr) {
+          // Migration 022 may not yet be applied in this environment — log and
+          // continue so the answer + evaluation are never blocked by this.
+          console.warn(
+            '[interview/answer] speech_metrics persist skipped (migration pending?):',
+            metricsErr.message,
+          );
+        } else {
+          console.info('[interview/answer] speech_metrics persisted', {
+            answerId: answer.id,
+            durationSeconds,
+            fillerCount: speechMetrics.count,
+            severity: speechMetrics.severity,
+          });
+        }
+      } catch (metricsEx) {
+        console.warn('[interview/answer] speech_metrics compute failed (non-fatal):', metricsEx);
+      }
     }
 
     // ── Steps 5–6: Evaluate + store (graceful degradation on AI failure) ──────
