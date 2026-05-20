@@ -3,11 +3,15 @@
   "crons": [
     {
       "path": "/api/cron/health-snapshot",
-      "schedule": "0 * * * *"
+      "schedule": "0 1 * * *"
     },
     {
       "path": "/api/cron/daily-rollup",
       "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/weekly-digest",
+      "schedule": "0 9 * * 1"
     }
   ],
   "functions": {
