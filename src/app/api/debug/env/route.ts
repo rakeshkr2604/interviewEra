@@ -5,6 +5,7 @@ import {
   redactSecretPrefix,
   supabaseJwtProjectRef,
   supabaseProjectRefFromUrl,
+  supabaseServiceKeyFormat,
 } from '@/lib/debug/upload-diagnostics';
 
 export const runtime = 'nodejs';
@@ -34,9 +35,13 @@ export async function GET(): Promise<NextResponse> {
 
   const refFromUrl = supabaseProjectRefFromUrl(url);
   const anonRef = supabaseJwtProjectRef(anon);
-  const serviceRef = supabaseJwtProjectRef(service);
+  const serviceKeyFmt = supabaseServiceKeyFormat(service);
+  // JWT ref cross-validation only applies to legacy eyJ keys; sb_secret_ keys are opaque.
+  const serviceRef = serviceKeyFmt === 'jwt' ? supabaseJwtProjectRef(service) : null;
   const keysMatchProjectUrl =
-    refFromUrl != null && anonRef === refFromUrl && serviceRef === refFromUrl;
+    refFromUrl != null &&
+    anonRef === refFromUrl &&
+    (serviceKeyFmt === 'secret' || serviceRef === refFromUrl);
 
   return NextResponse.json({
     ok: true,
@@ -52,6 +57,7 @@ export async function GET(): Promise<NextResponse> {
     anonKeyPrefix: redactSecretPrefix(anon, 15),
     anonJwtRef: anonRef,
     serviceRoleKey: service ? 'present' : 'missing',
+    serviceKeyFormat: serviceKeyFmt,
     serviceKeyPrefix: redactSecretPrefix(service, 15),
     serviceJwtRef: serviceRef,
     jwtRefMatchesUrl: keysMatchProjectUrl,

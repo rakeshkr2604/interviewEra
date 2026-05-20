@@ -30,6 +30,22 @@ export function shouldBypassResumeParsePipeline(): boolean {
   return process.env.IE_UPLOAD_BYPASS_PARSE === '1';
 }
 
+/**
+ * Returns the format of a Supabase service-role key without leaking its value.
+ * - 'jwt'     → legacy format, starts with "eyJ"
+ * - 'secret'  → new format, starts with "sb_secret_"
+ * - 'invalid' → empty, too short, or unrecognised prefix
+ */
+export function supabaseServiceKeyFormat(
+  key: string | undefined,
+): 'jwt' | 'secret' | 'invalid' {
+  const k = key?.trim();
+  if (!k || k.length <= 20) return 'invalid';
+  if (k.startsWith('eyJ')) return 'jwt';
+  if (k.startsWith('sb_secret_')) return 'secret';
+  return 'invalid';
+}
+
 /** Supabase JWT `ref` claim — compare anon vs service keys for same project. */
 export function supabaseJwtProjectRef(jwt: string | undefined): string | null {
   if (!jwt?.includes('.')) return null;
