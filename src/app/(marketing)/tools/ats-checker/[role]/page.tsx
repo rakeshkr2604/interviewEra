@@ -15,7 +15,6 @@ import {
   getRoleBySlug,
   allAtsRoleParams,
   roleQuestionsPath,
-  toolAtsRolePath,
   skillQuestionsPath,
   getSkillBySlug,
 } from '@/lib/seo/programmatic'

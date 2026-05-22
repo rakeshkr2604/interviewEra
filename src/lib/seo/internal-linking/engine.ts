@@ -79,7 +79,6 @@ import {
   ROLES,
   COMPANIES,
   SKILLS,
-  STAR_TOPICS,
   roleQuestionsPath,
   companyQuestionsPath,
   skillQuestionsPath,

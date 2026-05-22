@@ -10,7 +10,6 @@ import {
   getSkillBySlug,
   getRoleBySlug,
   allSkillParams,
-  skillQuestionsPath,
   roleQuestionsPath,
   questionsHubPath,
 } from '@/lib/seo/programmatic'

@@ -4,6 +4,7 @@
  * Zero client JS — pure HTML for maximum crawlability.
  */
 
+import Link from 'next/link'
 import type { SeoQuestion } from '@/lib/seo/programmatic/types'
 
 const CATEGORY_LABELS: Record<SeoQuestion['category'], string> = {
@@ -38,13 +39,13 @@ export function QuestionsList({ questions, heading = 'Interview Questions' }: Qu
         </h2>
         <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Questions for this page are being curated. Check back soon — or{' '}
-          <a
+          <Link
             href="/tools/question-generator"
             className="font-medium underline-offset-4 hover:underline"
             style={{ color: 'var(--accent-primary)' }}
           >
             generate questions instantly
-          </a>{' '}
+          </Link>{' '}
           with our free tool.
         </p>
       </section>

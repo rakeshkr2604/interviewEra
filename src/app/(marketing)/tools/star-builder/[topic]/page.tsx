@@ -21,7 +21,6 @@ import {
 } from '@/lib/seo/programmatic/metadata'
 import { LANDING_PAGE_CONTAINER, LANDING_SECTION } from '@/lib/landing/container'
 import { buildToolStarTopicLinks } from '@/lib/seo/internal-linking'
-import type { StarTopicSlug } from '@/lib/seo/programmatic'
 
 export function generateStaticParams() {
   return allStarTopicParams()
