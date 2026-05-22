@@ -188,9 +188,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated user on a pure auth route → send to dashboard
+  // Authenticated user on a pure auth route → honour ?next if valid, else dashboard.
+  // Preserving ?next is required so router.refresh() on the login page (after email
+  // sign-in) doesn't lose the intended post-login destination.
   if (user && AUTH_ROUTES.has(pathname)) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    const rawNext = request.nextUrl.searchParams.get('next');
+    const dest =
+      rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
+        ? rawNext
+        : '/dashboard';
+    return NextResponse.redirect(new URL(dest, request.url));
   }
 
   return response;

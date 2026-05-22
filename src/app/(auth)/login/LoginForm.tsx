@@ -61,7 +61,7 @@ export function LoginForm({ next }: LoginFormProps) {
 
     try {
       const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -71,6 +71,10 @@ export function LoginForm({ next }: LoginFormProps) {
         return;
       }
 
+      // Invalidate RSC cache so shared layouts (navbar, root) re-render with the
+      // new authenticated state. Without this, server components see stale cookies.
+      router.refresh();
+
       // If an explicit next param is provided, always honour it (e.g. invite accept flow).
       if (next) {
         router.push(next);
@@ -78,7 +82,8 @@ export function LoginForm({ next }: LoginFormProps) {
       }
 
       // Role-based default redirect: campus admins go to their T&P dashboard.
-      const { data: { user: loggedInUser } } = await supabase.auth.getUser();
+      // Use the user from signInWithPassword response — avoids a redundant getUser() round-trip.
+      const loggedInUser = signInData.user;
       let destination = '/dashboard';
       if (loggedInUser) {
         const { data: profile } = await supabase
