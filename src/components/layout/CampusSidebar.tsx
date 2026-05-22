@@ -129,12 +129,19 @@ export function CampusSidebar({
 }: CampusSidebarProps) {
   const router = useRouter()
   const [logoutHovered, setLogoutHovered] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/login')
+      router.refresh()
+    } catch {
+      setLoggingOut(false)
+    }
   }
 
   const seatsRemaining = seatCount - seatsUsed
@@ -260,10 +267,11 @@ export function CampusSidebar({
         {/* Logout */}
         <button
           type="button"
-          onClick={handleLogout}
-          onMouseEnter={() => setLogoutHovered(true)}
+          onClick={() => void handleLogout()}
+          disabled={loggingOut}
+          onMouseEnter={() => !loggingOut && setLogoutHovered(true)}
           onMouseLeave={() => setLogoutHovered(false)}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none"
+          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none disabled:pointer-events-none disabled:opacity-50"
           style={{
             background: logoutHovered
               ? 'color-mix(in srgb, var(--accent-danger) 12%, transparent)'
@@ -272,7 +280,7 @@ export function CampusSidebar({
           }}
         >
           <LogOut size={16} strokeWidth={2} />
-          Log out
+          {loggingOut ? 'Logging out…' : 'Log out'}
         </button>
       </div>
     </aside>

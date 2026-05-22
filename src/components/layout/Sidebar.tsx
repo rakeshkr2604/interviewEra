@@ -63,6 +63,7 @@ export function Sidebar({
   const pathname = usePathname()
   const router = useRouter()
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -124,10 +125,16 @@ export function Sidebar({
   )
 
   const handleLogout = async () => {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+      router.push('/login')
+      router.refresh()
+    } catch {
+      setLoggingOut(false)
+    }
   }
 
   return (
@@ -250,11 +257,13 @@ export function Sidebar({
 
         <button
           type="button"
-          onClick={handleLogout}
+          onClick={() => void handleLogout()}
+          disabled={loggingOut}
           className="flex w-full items-center gap-2.5 rounded-lg px-2 py-2
-                     text-sm font-medium transition-none"
+                     text-sm font-medium transition-none disabled:pointer-events-none disabled:opacity-50"
           style={{ color: 'var(--text-secondary)' }}
           onMouseEnter={(e) => {
+            if (loggingOut) return
             e.currentTarget.style.background = 'var(--accent-danger)15'
             e.currentTarget.style.color = 'var(--accent-danger)'
           }}
@@ -271,7 +280,7 @@ export function Sidebar({
             alt=""
             aria-hidden
           />
-          Log out
+          {loggingOut ? 'Logging out…' : 'Log out'}
         </button>
       </div>
     </aside>
