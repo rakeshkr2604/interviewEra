@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" fill="none">
+  
+  <rect width="80" height="80" rx="18" fill="#6366F1"></rect>
+  <path d="M16 22C16 18.7 18.7 16 22 16H58C61.3 16 64 18.7 64 22V46C64 49.3 61.3 52 58 52H44L34 64V52H22C18.7 52 16 49.3 16 46V22Z" fill="white" fill-opacity="0.15"></path>
+  <text x="40" y="40" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Inter&#39;,sans-serif" font-size="20" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-0.5">IE</text>
+  <path d="M49 28L56 34.5L49 41" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+  
+  <text x="96" y="37" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Inter&#39;,sans-serif" font-size="22" font-weight="500" fill="#0F172A" letter-spacing="-0.3">Interview</text>
+  <text x="96" y="62" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Inter&#39;,sans-serif" font-size="22" font-weight="700" fill="#6366F1" letter-spacing="-0.3">Era</text>
+</svg>

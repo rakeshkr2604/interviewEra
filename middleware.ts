@@ -136,12 +136,15 @@ export async function middleware(request: NextRequest) {
     pathname === '/sitemap.xml' ||
     pathname === '/pages-sitemap.xml' ||
     pathname === '/blog-sitemap.xml' ||
-    pathname === '/tools-sitemap.xml';
+    pathname === '/tools-sitemap.xml' ||
+    pathname === '/questions-sitemap.xml';
 
   const isPublic =
     PUBLIC_ROUTES.has(pathname) ||
     pathname.startsWith('/tools/') ||
     pathname.startsWith('/blog') ||
+    pathname.startsWith('/interview-questions') ||
+    pathname === '/help' ||
     pathname.startsWith('/open/badges') ||
     isSeoSitemapPath;
   const needsAuthResolution =

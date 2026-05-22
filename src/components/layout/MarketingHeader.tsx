@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu } from 'lucide-react';
+import { ChevronDown, Menu } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -17,22 +17,52 @@ import {
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
-const NAV_LINKS = [
-  { href: '/campus', label: 'For Colleges' },
-  { href: '/tools/question-generator', label: 'Free tools' },
-  { href: '/blog', label: 'Blog' },
-  { href: '/about', label: 'About' },
+type DropdownKey = 'tools' | 'questions' | 'resources';
+
+const NAV_DROPDOWNS = [
+  {
+    key: 'tools' as DropdownKey,
+    label: 'Tools',
+    items: [
+      { href: '/tools/question-generator', label: 'Question Generator' },
+      { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
+      { href: '/tools/star-builder', label: 'STAR Answer Builder' },
+    ],
+  },
+  {
+    key: 'questions' as DropdownKey,
+    label: 'Interview Questions',
+    items: [
+      { href: '/interview-questions', label: 'By Role' },
+      { href: '/interview-questions/companies/tcs', label: 'By Company' },
+      { href: '/interview-questions/topics/react', label: 'By Topic' },
+    ],
+  },
+  {
+    key: 'resources' as DropdownKey,
+    label: 'Resources',
+    items: [
+      { href: '/blog', label: 'Blog' },
+      { href: '/help', label: 'Help Center' },
+      { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Interview Guides' },
+    ],
+  },
 ] as const;
+
+const LINK_STYLE = {
+  color: 'var(--text-secondary)',
+} as const;
 
 export function MarketingHeader() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<DropdownKey | null>(null);
+  const [mobileExpanded, setMobileExpanded] = useState<DropdownKey | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     let unsubscribe: (() => void) | undefined;
 
-    /** Defer @supabase/ssr off the marketing-header initial chunk. */
     const work = async () => {
       try {
         const { createClient } = await import('@/lib/supabase/client');
@@ -76,6 +106,20 @@ export function MarketingHeader() {
     };
   }, []);
 
+  function closeDropdown() {
+    setOpenDropdown(null);
+  }
+
+  function toggleDropdown(key: DropdownKey) {
+    setOpenDropdown((prev) => (prev === key ? null : key));
+  }
+
+  const ctaStyle = {
+    background: 'var(--accent-primary)',
+    boxShadow:
+      'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
+  } as const;
+
   return (
     <header
       className="sticky top-0 z-50 border-b backdrop-blur-md"
@@ -87,39 +131,100 @@ export function MarketingHeader() {
       <nav
         className={cn(
           LANDING_PAGE_CONTAINER,
-          'flex items-center gap-6 px-4 py-3 sm:gap-8 sm:px-5',
+          'flex items-center gap-4 px-4 py-3 sm:px-5',
         )}
       >
         <BrandHomeLink variant="navbar" className="shrink-0" />
 
-        <div
-          className="hidden items-center gap-5 md:flex"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {NAV_LINKS.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className="text-sm font-medium transition-opacity hover:opacity-80"
-              style={{ color: 'var(--text-secondary)' }}
+        {/* ── Desktop nav ─────────────────────────────────────────────── */}
+        <div className="hidden items-center md:flex" style={LINK_STYLE}>
+          {/* Product — simple link */}
+          <Link
+            href="/"
+            className="whitespace-nowrap px-3 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+            style={LINK_STYLE}
+          >
+            Product
+          </Link>
+
+          {/* Dropdown groups */}
+          {NAV_DROPDOWNS.map((dropdown) => (
+            <div
+              key={dropdown.key}
+              className="relative"
+              onMouseEnter={() => setOpenDropdown(dropdown.key)}
+              onMouseLeave={closeDropdown}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) closeDropdown();
+              }}
             >
-              {label}
-            </Link>
+              <button
+                type="button"
+                aria-expanded={openDropdown === dropdown.key}
+                aria-haspopup="menu"
+                className="flex cursor-pointer items-center gap-1 whitespace-nowrap px-3 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+                style={LINK_STYLE}
+                onClick={() => toggleDropdown(dropdown.key)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') closeDropdown();
+                }}
+              >
+                {dropdown.label}
+                <ChevronDown
+                  className={cn(
+                    'size-3.5 transition-transform duration-150',
+                    openDropdown === dropdown.key && 'rotate-180',
+                  )}
+                />
+              </button>
+
+              {openDropdown === dropdown.key && (
+                <div
+                  role="menu"
+                  className="absolute left-0 top-full z-50 mt-0.5 min-w-[200px] rounded-xl border py-1.5 shadow-lg"
+                  style={{
+                    background: 'var(--card-bg)',
+                    borderColor: 'var(--card-border)',
+                  }}
+                >
+                  {dropdown.items.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      role="menuitem"
+                      className="block px-4 py-2 text-sm transition-colors hover:opacity-80"
+                      style={LINK_STYLE}
+                      onClick={closeDropdown}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
+
+          {/* Pricing — simple link */}
+          <Link
+            href="/pricing"
+            className="whitespace-nowrap px-3 py-2 text-sm font-medium transition-opacity hover:opacity-80"
+            style={LINK_STYLE}
+          >
+            Pricing
+          </Link>
         </div>
 
+        {/* ── Right side ──────────────────────────────────────────────── */}
         <div className="ml-auto flex items-center gap-1.5 sm:gap-2.5">
           <ThemeToggle />
+
+          {/* Desktop auth */}
           <div className="hidden min-h-9 items-center justify-end gap-2.5 md:flex md:min-w-[220px]">
             {user ? (
               <Link
                 href="/dashboard"
                 className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                style={{
-                  background: 'var(--accent-primary)',
-                  boxShadow:
-                    'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                }}
+                style={ctaStyle}
               >
                 Dashboard
               </Link>
@@ -128,24 +233,22 @@ export function MarketingHeader() {
                 <Link
                   href="/login"
                   className="text-sm font-medium transition-opacity hover:opacity-80"
-                  style={{ color: 'var(--text-secondary)' }}
+                  style={LINK_STYLE}
                 >
                   Login
                 </Link>
                 <Link
                   href="/signup"
                   className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-                  style={{
-                    background: 'var(--accent-primary)',
-                    boxShadow:
-                      'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                  }}
+                  style={ctaStyle}
                 >
                   Sign up free
                 </Link>
               </div>
             )}
           </div>
+
+          {/* ── Mobile menu ─────────────────────────────────────────── */}
           <div className="flex md:hidden">
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
               <SheetTrigger
@@ -169,31 +272,77 @@ export function MarketingHeader() {
                   <SheetTitle className="sr-only">Navigation menu</SheetTitle>
                   <BrandHomeLink variant="navbar" compact wordmarkClassName="text-base" />
                 </SheetHeader>
+
                 <nav className="flex flex-col p-2">
-                  {NAV_LINKS.map(({ href, label }) => (
-                    <Link
-                      key={href}
-                      href={href}
-                      onClick={() => setMobileOpen(false)}
-                      className={cn(
-                        'rounded-xl px-4 py-3.5 text-base font-medium text-foreground transition-colors',
-                        'active:bg-accent',
+                  {/* Product */}
+                  <Link
+                    href="/"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-xl px-4 py-3.5 text-base font-medium text-foreground transition-colors active:bg-accent"
+                  >
+                    Product
+                  </Link>
+
+                  {/* Dropdown groups */}
+                  {NAV_DROPDOWNS.map((dropdown) => (
+                    <div key={dropdown.key}>
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between rounded-xl px-4 py-3.5 text-base font-medium text-foreground transition-colors active:bg-accent"
+                        aria-expanded={mobileExpanded === dropdown.key}
+                        onClick={() =>
+                          setMobileExpanded((prev) =>
+                            prev === dropdown.key ? null : dropdown.key,
+                          )
+                        }
+                      >
+                        {dropdown.label}
+                        <ChevronDown
+                          className={cn(
+                            'size-4 shrink-0 transition-transform duration-150',
+                            mobileExpanded === dropdown.key && 'rotate-180',
+                          )}
+                        />
+                      </button>
+
+                      {mobileExpanded === dropdown.key && (
+                        <div className="ml-3 border-l border-border pl-3 pb-1">
+                          {dropdown.items.map((item) => (
+                            <Link
+                              key={item.href}
+                              href={item.href}
+                              onClick={() => {
+                                setMobileOpen(false);
+                                setMobileExpanded(null);
+                              }}
+                              className="block rounded-lg px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors active:bg-accent"
+                            >
+                              {item.label}
+                            </Link>
+                          ))}
+                        </div>
                       )}
-                    >
-                      {label}
-                    </Link>
+                    </div>
                   ))}
+
+                  {/* Pricing */}
+                  <Link
+                    href="/pricing"
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-xl px-4 py-3.5 text-base font-medium text-foreground transition-colors active:bg-accent"
+                  >
+                    Pricing
+                  </Link>
+
                   <div className="mx-2 my-2 border-t border-border" aria-hidden />
+
+                  {/* Auth */}
                   {user ? (
                     <Link
                       href="/dashboard"
                       onClick={() => setMobileOpen(false)}
                       className="mx-2 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
-                      style={{
-                        background: 'var(--accent-primary)',
-                        boxShadow:
-                          'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                      }}
+                      style={ctaStyle}
                     >
                       Dashboard
                     </Link>
@@ -210,11 +359,7 @@ export function MarketingHeader() {
                         href="/signup"
                         onClick={() => setMobileOpen(false)}
                         className="mx-2 mt-1 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
-                        style={{
-                          background: 'var(--accent-primary)',
-                          boxShadow:
-                            'inset 0 1px 0 rgba(255,255,255,0.14), 0 6px 18px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                        }}
+                        style={ctaStyle}
                       >
                         Sign up free
                       </Link>

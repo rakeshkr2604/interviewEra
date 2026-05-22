@@ -2,6 +2,7 @@
  * JSON-LD builders — return plain objects for `JSON.stringify` in `<script type="application/ld+json">`.
  * Keep `@id` / `url` aligned with `canonicalUrl()` + `siteConfig.url`.
  */
+import { isValidSeoPath } from '@/lib/seo/url-safety';
 
 export interface BreadcrumbItemInput {
   name: string;
@@ -9,12 +10,20 @@ export interface BreadcrumbItemInput {
 }
 
 export function breadcrumbListJsonLd(items: BreadcrumbItemInput[], origin: string): Record<string, unknown> {
-  const listElements = items.map((item, index) => ({
-    '@type': 'ListItem' as const,
-    position: index + 1,
-    name: item.name,
-    item: `${origin.replace(/\/$/, '')}${item.path.startsWith('/') ? item.path : `/${item.path}`}`,
-  }));
+  const base = origin.replace(/\/$/, '');
+  let position = 0;
+  const listElements = items
+    .filter((item) => isValidSeoPath(item.path.startsWith('/') ? item.path : `/${item.path}`))
+    .map((item) => {
+      position += 1;
+      const path = item.path.startsWith('/') ? item.path : `/${item.path}`;
+      return {
+        '@type': 'ListItem' as const,
+        position,
+        name: item.name,
+        item: `${base}${path}`,
+      };
+    });
 
   return {
     '@context': 'https://schema.org',
@@ -96,5 +105,29 @@ export function webApplicationJsonLd(input: WebApplicationJsonLdInput): Record<s
       priceCurrency: input.priceCurrency ?? 'INR',
     },
     provider: { '@id': input.providerId },
+  };
+}
+
+export interface HowToStep {
+  name: string;
+  text: string;
+}
+
+export function howToJsonLd(
+  name: string,
+  description: string,
+  steps: HowToStep[],
+): Record<string, unknown> {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name,
+    description,
+    step: steps.map((s, i) => ({
+      '@type': 'HowToStep',
+      position: i + 1,
+      name: s.name,
+      text: s.text,
+    })),
   };
 }

@@ -1,25 +1,50 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Clock, Lock, Mail } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
-const PRODUCT_LINKS = [
-  { href: '/', label: 'Home' },
+// ── Link data ──────────────────────────────────────────────────────────────────
+
+const TOOLS_LINKS = [
+  { href: '/tools/question-generator', label: 'Question Generator' },
+  { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
+  { href: '/tools/star-builder', label: 'STAR Builder' },
+] as const;
+
+const QUESTIONS_LINKS = [
+  { href: '/interview-questions/software-engineer', label: 'Software Engineer Questions' },
+  { href: '/interview-questions/companies/tcs', label: 'TCS Interview Questions' },
+  { href: '/interview-questions/topics/react', label: 'React Interview Questions' },
+] as const;
+
+const RESOURCES_LINKS = [
+  { href: '/blog', label: 'Blog' },
+  { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
+  { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },
+] as const;
+
+const COMPANY_LINKS = [
   { href: '/about', label: 'About' },
   { href: '/pricing', label: 'Pricing' },
-  { href: '/campus', label: 'For Colleges' },
-  { href: '/tools/question-generator', label: 'Question generator' },
-  { href: '/tools/ats-checker', label: 'ATS resume checker' },
-  { href: '/tools/star-builder', label: 'STAR answer builder' },
+  { href: 'mailto:support@interviewera.com', label: 'Contact' },
 ] as const;
 
 const LEGAL_LINKS = [
   { href: '/privacy', label: 'Privacy Policy' },
-  { href: '/terms', label: 'Terms & Conditions' },
-  { href: '/refund', label: 'Refund Policy' },
+  { href: '/terms', label: 'Terms' },
+  { href: '/refund', label: 'Refund' },
 ] as const;
+
+const LINK_SECTIONS = [
+  { heading: 'Tools', links: TOOLS_LINKS },
+  { heading: 'Interview Questions', links: QUESTIONS_LINKS },
+  { heading: 'Resources', links: RESOURCES_LINKS },
+  { heading: 'Company', links: COMPANY_LINKS },
+] as const;
+
+// ── Social icons ───────────────────────────────────────────────────────────────
 
 function LinkedInIcon({ className }: { className?: string }) {
   return (
@@ -51,6 +76,8 @@ const SOCIAL_LINKS = [
   { href: 'https://twitter.com/interviewera', label: 'Twitter / X', Icon: XIcon },
 ] as const;
 
+// ── Component ──────────────────────────────────────────────────────────────────
+
 const LINK_CLS =
   'text-sm transition-all duration-200 hover:opacity-100 hover:translate-x-0.5 inline-block';
 
@@ -70,14 +97,15 @@ export function MarketingFooter() {
       <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 py-14 sm:px-5 md:py-16')}>
         <div className="grid gap-10 md:grid-cols-12 md:gap-8">
 
-          {/* Brand */}
-          <div className="md:col-span-4 lg:col-span-5">
+          {/* Brand column */}
+          <div className="md:col-span-4">
             <BrandHomeLink variant="footer" />
             <p
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              AI-powered mock interviews and resume-aware scoring — built for Indian campus and early-career hiring. Now in private beta.
+              AI-powered mock interviews and resume-aware scoring — built for Indian campus and
+              early-career hiring. Now in private beta.
             </p>
 
             {/* CTA */}
@@ -92,8 +120,23 @@ export function MarketingFooter() {
               Start Mock Interview
             </Link>
 
+            {/* Trust badge */}
+            <div className="mt-4">
+              <div
+                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-success) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--accent-success) 22%, transparent)',
+                  color: 'var(--accent-success)',
+                }}
+              >
+                <Lock className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
+                Secure payments via Razorpay
+              </div>
+            </div>
+
             {/* Social icons */}
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-5 flex items-center gap-3">
               {SOCIAL_LINKS.map(({ href, label, Icon }) => (
                 <a
                   key={label}
@@ -114,112 +157,42 @@ export function MarketingFooter() {
             </div>
           </div>
 
-          {/* Links columns */}
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 md:col-span-8 lg:col-span-7">
-
-            {/* Quick Links */}
-            <div>
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Product
-              </p>
-              <ul className="mt-4 space-y-2.5" role="list">
-                {PRODUCT_LINKS.map(({ href, label }) => (
-                  <li key={label}>
-                    <Link
-                      href={href}
-                      className={LINK_CLS}
-                      style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Legal */}
-            <div>
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Legal
-              </p>
-              <ul className="mt-4 space-y-2.5" role="list">
-                {LEGAL_LINKS.map(({ href, label }) => (
-                  <li key={label}>
-                    <Link
-                      href={href}
-                      className={LINK_CLS}
-                      style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            {/* Contact */}
-            <div className="col-span-2 sm:col-span-1">
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Contact
-              </p>
-              <ul className="mt-4 space-y-1" role="list">
-                <li>
-                  <a
-                    href="mailto:support@interviewera.com"
-                    className={cn(LINK_CLS, 'flex items-center gap-1.5')}
-                    style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
-                  >
-                    <Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} />
-                    support@interviewera.com
-                  </a>
-                </li>
-                <li
-                  className="flex items-center gap-1.5 text-xs"
+          {/* Link columns — 2×2 on md, 4×1 on lg */}
+          <div className="grid grid-cols-2 gap-8 md:col-span-8 lg:grid-cols-4">
+            {LINK_SECTIONS.map(({ heading, links }) => (
+              <div key={heading}>
+                <p
+                  className="text-xs font-semibold uppercase tracking-widest"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  <Clock className="h-3 w-3 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-                  Typically responds within 24 hours
-                </li>
-              </ul>
-
-              {/* Trust badges */}
-              <div className="mt-5 space-y-2">
-                <div
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-                  style={{
-                    background: 'color-mix(in srgb, var(--accent-success) 10%, transparent)',
-                    border: '1px solid color-mix(in srgb, var(--accent-success) 22%, transparent)',
-                    color: 'var(--accent-success)',
-                  }}
-                >
-                  <Lock className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
-                  Secure payments via Razorpay
-                </div>
+                  {heading}
+                </p>
+                <ul className="mt-4 space-y-2.5" role="list">
+                  {links.map(({ href, label }) => (
+                    <li key={label}>
+                      <Link
+                        href={href}
+                        className={LINK_CLS}
+                        style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
+                      >
+                        {label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            </div>
-
+            ))}
           </div>
+
         </div>
       </div>
 
       {/* Bottom bar */}
-      <div
-        className="border-t"
-        style={{ borderColor: 'var(--card-border)' }}
-      >
+      <div className="border-t" style={{ borderColor: 'var(--card-border)' }}>
         <div
           className={cn(
             LANDING_PAGE_CONTAINER,
-            'flex flex-col items-center justify-between gap-2 px-4 py-5 text-xs sm:flex-row sm:px-5',
+            'flex flex-col gap-2 px-4 py-5 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5',
           )}
           style={{ color: 'var(--text-muted)' }}
         >
@@ -234,7 +207,18 @@ export function MarketingFooter() {
             />
             <span>© 2026 InterviewEra.com. All rights reserved.</span>
           </p>
-          <p className="opacity-60">Ranchi, Jharkhand, India</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 opacity-70">
+            {LEGAL_LINKS.map(({ href, label }) => (
+              <Link
+                key={label}
+                href={href}
+                className="transition-opacity hover:opacity-100"
+              >
+                {label}
+              </Link>
+            ))}
+            <span>Ranchi, Jharkhand, India</span>
+          </div>
         </div>
       </div>
     </footer>

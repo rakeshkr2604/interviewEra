@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { isValidAbsoluteUrl } from '@/lib/seo/url-safety';
 
 function escapeXml(s: string): string {
   return s
@@ -24,6 +25,7 @@ export function serializeUrlset(entries: MetadataRoute.Sitemap): string {
   ];
 
   for (const entry of entries) {
+    if (!isValidAbsoluteUrl(entry.url)) continue;
     const loc = escapeXml(entry.url);
     const lastmod = formatLastMod(entry.lastModified);
     const cf = entry.changeFrequency ? escapeXml(entry.changeFrequency) : undefined;
@@ -57,6 +59,7 @@ export function serializeSitemapIndex(children: SitemapIndexLoc[]): string {
   ];
 
   for (const child of children) {
+    if (!isValidAbsoluteUrl(child.loc)) continue;
     const loc = escapeXml(child.loc);
     const lastmod = formatLastMod(child.lastmod);
     lines.push('  <sitemap>');

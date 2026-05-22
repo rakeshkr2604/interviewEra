@@ -7,8 +7,10 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   Award,
   BarChart2,
+  BookOpen,
   Building2,
   ChevronDown,
+  Code2,
   CreditCard,
   Download,
   GraduationCap,
@@ -19,9 +21,11 @@ import {
   LogOut,
   Menu,
   Mic2,
+  Monitor,
   Play,
   Settings,
   Shield,
+  Sparkles,
   TrendingUp,
   Users,
 } from 'lucide-react';
@@ -68,43 +72,88 @@ const PRODUCT_ITEMS = [
     icon: Mic2,
     label: 'AI Mock Interviews',
     href: '/#how-it-works',
-    desc: 'Resume-native, multi-question sessions',
-  },
-  {
-    icon: Layers,
-    label: 'Tier System',
-    href: '/pricing',
-    desc: 'Free, Starter, Pro — compare plans',
+    desc: 'Resume-native, scored mock sessions',
   },
   {
     icon: Building2,
-    label: 'For Colleges',
+    label: 'Campus Placements',
     href: '/campus',
-    desc: 'Batch-level training + cohort analytics',
+    desc: 'Batch training + T&P analytics',
+  },
+  {
+    icon: TrendingUp,
+    label: 'Resume-aware Scoring',
+    href: '/about',
+    desc: 'CV-native questions + 5-dimension feedback',
   },
 ] as const;
 
-const SOLUTIONS_ITEMS = [
+const INTERVIEW_QUESTIONS_ITEMS = [
   {
-    icon: GraduationCap,
-    label: 'For Students',
-    href: '/',
-    desc: 'Campus + off-campus placement prep',
+    icon: Code2,
+    label: 'Software Engineer',
+    href: '/interview-questions/software-engineer',
+    desc: 'DSA, system design, OOP rounds',
+  },
+  {
+    icon: Monitor,
+    label: 'Frontend Developer',
+    href: '/interview-questions/frontend-developer',
+    desc: 'React, HTML/CSS, JavaScript interviews',
   },
   {
     icon: Building2,
-    label: 'For Colleges',
-    href: '/campus',
-    desc: 'Batch training + T&P dashboard',
+    label: 'TCS Interview Questions',
+    href: '/interview-questions/companies/tcs',
+    desc: 'NQT + technical + HR rounds',
+  },
+  {
+    icon: Layers,
+    label: 'React Interview Questions',
+    href: '/interview-questions/topics/react',
+    desc: 'Hooks, state, performance topics',
+  },
+] as const;
+
+const TOOLS_ITEMS = [
+  {
+    icon: Sparkles,
+    label: 'Question Generator',
+    href: '/tools/question-generator',
+    desc: 'Role-specific questions in seconds',
+  },
+  {
+    icon: Shield,
+    label: 'ATS Resume Checker',
+    href: '/tools/ats-checker',
+    desc: 'Score your resume against job roles',
+  },
+  {
+    icon: Award,
+    label: 'STAR Answer Builder',
+    href: '/tools/star-builder',
+    desc: 'Structure behavioral answers clearly',
   },
 ] as const;
 
 const RESOURCES_ITEMS = [
   {
-    icon: CreditCard,
-    label: 'Pricing',
-    href: '/pricing',
-    desc: 'Plans for students and colleges',
+    icon: BookOpen,
+    label: 'Blog',
+    href: '/blog',
+    desc: 'Interview prep articles and guides',
+  },
+  {
+    icon: GraduationCap,
+    label: 'Placement Guide',
+    href: '/blog/how-to-prepare-for-placement-interviews',
+    desc: 'Step-by-step campus prep playbook',
+  },
+  {
+    icon: Award,
+    label: 'STAR Method Guide',
+    href: '/blog/what-is-star-method-with-examples',
+    desc: 'Master behavioral answers',
   },
   {
     icon: HelpCircle,
@@ -481,8 +530,8 @@ function AnonymousNav() {
 
   const MOBILE_LINKS = [
     { href: '/#how-it-works', label: 'AI Mock Interviews' },
-    { href: '/campus', label: 'For Colleges' },
-    { href: '/tools/question-generator', label: 'Free Tools' },
+    { href: '/interview-questions', label: 'Interview Questions' },
+    { href: '/tools/question-generator', label: 'Tools' },
     { href: '/blog', label: 'Blog' },
     { href: '/pricing', label: 'Pricing' },
   ] as const;
@@ -492,10 +541,11 @@ function AnonymousNav() {
       {/* Logo */}
       <BrandHomeLink variant="navbar" className="mr-2 shrink-0" />
 
-      {/* Desktop: Product / Solutions / Resources / Pricing */}
+      {/* Desktop: Product / Interview Questions / Tools / Resources / Pricing */}
       <div className="hidden items-center gap-0.5 md:flex">
         <NavHoverMenu label="Product" items={PRODUCT_ITEMS} />
-        <NavHoverMenu label="Solutions" items={SOLUTIONS_ITEMS} />
+        <NavHoverMenu label="Interview Questions" items={INTERVIEW_QUESTIONS_ITEMS} />
+        <NavHoverMenu label="Tools" items={TOOLS_ITEMS} />
         <NavHoverMenu label="Resources" items={RESOURCES_ITEMS} />
         <Link
           href="/pricing"

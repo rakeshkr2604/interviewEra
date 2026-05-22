@@ -7,3 +7,6 @@ export const LANDING_PAGE_CONTAINER =
 
 /** Sections on the same page canvas — tighter vertical rhythm (no dividers) */
 export const LANDING_SECTION = 'px-4 py-14 sm:px-5 md:py-20';
+
+/** Content-dense SEO pages (programmatic Q&A, blog posts) — tighter rhythm. */
+export const CONTENT_SECTION = 'py-8 md:py-12';

@@ -21,6 +21,7 @@ export async function GET(): Promise<NextResponse> {
     { loc: CHILD_SITEMAP_LOCS.pages, lastmod: now },
     { loc: CHILD_SITEMAP_LOCS.blog, lastmod: now },
     { loc: CHILD_SITEMAP_LOCS.tools, lastmod: now },
+    { loc: CHILD_SITEMAP_LOCS.questions, lastmod: now },
   ]);
 
   return new NextResponse(xml, {

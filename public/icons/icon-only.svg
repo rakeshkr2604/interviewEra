@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" rx="22" fill="#6366F1"></rect>
+  <path d="M22 28C22 23.6 25.6 20 30 20H70C74.4 20 78 23.6 78 28V58C78 62.4 74.4 66 70 66H54L42 80V66H30C25.6 66 22 62.4 22 58V28Z" fill="white" fill-opacity="0.16"></path>
+  <text x="50" y="51" font-family="&#39;Plus Jakarta Sans&#39;,&#39;Inter&#39;,sans-serif" font-size="24" font-weight="700" fill="white" text-anchor="middle" letter-spacing="-1">IE</text>
+</svg>

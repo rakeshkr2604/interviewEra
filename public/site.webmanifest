@@ -1,7 +1,7 @@
 {
   "name": "InterviewEra",
   "short_name": "InterviewEra",
-  "description": "AI-powered mock interview platform. Know your score before the company decides for you.",
+  "description": "Free AI-powered mock interview platform. Know your score before the company decides for you.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F172A",
