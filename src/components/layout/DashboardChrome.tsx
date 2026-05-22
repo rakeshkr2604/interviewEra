@@ -11,9 +11,8 @@ import { cn } from '@/lib/utils'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
 export function DashboardChrome({ children }: { children: React.ReactNode }) {
-  // Track authenticated user presence for admin analytics.
-  // Fires every 30s when the tab is visible; silently no-ops if the user is not logged in.
-  useHeartbeat();
+  // TODO: re-enable once heartbeat endpoint auth is fixed (currently returns 401)
+  useHeartbeat(false);
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')

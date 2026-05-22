@@ -129,7 +129,9 @@ export function Sidebar({
     setLoggingOut(true)
     try {
       const supabase = createClient()
-      await supabase.auth.signOut()
+      // scope:'local' clears the session from the browser immediately —
+      // no server round-trip needed. Fast logout every time.
+      await supabase.auth.signOut({ scope: 'local' })
       router.push('/login')
       router.refresh()
     } catch {
