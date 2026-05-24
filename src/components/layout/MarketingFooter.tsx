@@ -20,6 +20,7 @@ const QUESTIONS_LINKS = [
 ] as const;
 
 const RESOURCES_LINKS = [
+  { href: '/how-it-works', label: 'How It Works' },
   { href: '/blog', label: 'Blog' },
   { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
   { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },

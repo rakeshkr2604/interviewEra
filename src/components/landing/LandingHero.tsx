@@ -100,7 +100,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
                 {[
                   { n: '1', label: 'Upload resume' },
-                  { n: '2', label: 'Answer AI questions' },
+                  { n: '2', label: 'Adaptive interview' },
                   { n: '3', label: 'Get scored' },
                 ].map((step, i) => (
                   <span key={step.n} style={{ display: 'contents' }}>
@@ -152,9 +152,9 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                 }}
               >
                 <strong style={{ color: T.text, fontWeight: 700 }}>InterviewEra</strong> is an AI-powered mock
-                interview platform for Indian campus hiring. Upload your resume, get questioned on what you actually
-                wrote, and score every answer across five rubric-aligned dimensions — clearer feedback instead of
-                vibes-only prep.
+                interview platform for Indian campus hiring. Upload your resume and sit a realistic, voice-based
+                interview that asks adaptive follow-up questions, shows live captions, and scores every answer
+                across five dimensions.
               </p>
 
               <LandingHeroCtaIsland />

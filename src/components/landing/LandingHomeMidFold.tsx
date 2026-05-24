@@ -16,11 +16,11 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
       body: "InterviewEra indexes your projects, skills, and experience. Every question that follows is sourced from what you actually wrote — not a generic bank someone else practiced from.",
     },
     {
-      num: '02 / ANSWER',
+      num: '02 / INTERVIEW',
       icon: '🎙',
       iconBg: 'var(--v3-pur-dim, rgba(167,139,250,0.08))',
-      title: 'Answer panel-style questions',
-      body: "A structured session — technical depth, behavioural scenarios, pressure follow-ups. Sequenced the way real campus panels run. Answer like you're in the room.",
+      title: 'Sit an adaptive interview',
+      body: "Answer out loud in a voice-first session. It asks intelligent follow-ups, probes vague answers, and understands Hinglish when nerves hit — with live captions to keep you steady.",
     },
     {
       num: '03 / IMPROVE',
@@ -47,7 +47,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
                 marginBottom: '14px',
               }}
             >
-              The scoring system
+              How it works
             </span>
             <h2
               style={{
@@ -60,11 +60,11 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
                 lineHeight: 1.06,
               }}
             >
-              Resume in. Score out. Three steps.
+              Resume in. Real interview. Score out.
             </h2>
             <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto' }}>
-              Everything you need to know if you&apos;re ready — before the company tests you. Upload your CV once, get a
-              session built from your background, and walk away with a number.
+              Upload your CV once, sit a realistic adaptive interview built from your background, and walk away with a
+              number you can act on — not a vague &ldquo;you did fine.&rdquo;
             </p>
           </div>
         </Reveal>
@@ -197,6 +197,19 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
             <p style={{ fontSize: '13.5px', color: T.text2, marginTop: '12px' }}>
               No credit card required · under 60 seconds to your first score
             </p>
+            <Link
+              href="/how-it-works"
+              style={{
+                display: 'inline-block',
+                marginTop: '14px',
+                fontSize: '13.5px',
+                fontWeight: 600,
+                color: T.acc2,
+                textDecoration: 'none',
+              }}
+            >
+              See the full interview journey →
+            </Link>
           </div>
         </Reveal>
       </div>

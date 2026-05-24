@@ -76,9 +76,9 @@ const PRODUCT_ITEMS = [
   },
   {
     icon: Mic2,
-    label: 'AI Mock Interviews',
-    href: '/#how-it-works',
-    desc: 'Resume-native, scored mock sessions',
+    label: 'How It Works',
+    href: '/how-it-works',
+    desc: 'Adaptive interview, live captions, scoring',
   },
   {
     icon: Building2,
@@ -535,7 +535,7 @@ function AnonymousNav() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const MOBILE_LINKS = [
-    { href: '/#how-it-works', label: 'AI Mock Interviews' },
+    { href: '/how-it-works', label: 'How It Works' },
     { href: '/interview-questions', label: 'Interview Questions' },
     { href: '/tools/question-generator', label: 'Tools' },
     { href: '/blog', label: 'Blog' },

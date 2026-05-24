@@ -83,7 +83,7 @@ export default function LandingHeroCtaIsland() {
         Start a scored interview — free →
       </Link>
       <Link
-        href="#how"
+        href="/how-it-works"
         className="v3-btn-secondary"
         style={{
           display: 'inline-flex',
@@ -101,7 +101,7 @@ export default function LandingHeroCtaIsland() {
           whiteSpace: 'nowrap',
         }}
       >
-        See how scoring works
+        See how it works
       </Link>
     </div>
   );
