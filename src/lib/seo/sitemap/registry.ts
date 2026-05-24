@@ -200,6 +200,20 @@ export function buildPagesSitemapEntries(now: Date): MetadataRoute.Sitemap {
   return STATIC_MARKETING_ROUTES.map((e) => toAbsolute(e, now));
 }
 
+/**
+ * Every indexable absolute URL across all child sitemaps — single source of truth for
+ * IndexNow submissions (`npm run submit:indexnow` + `/api/indexnow/submit`).
+ */
+export function buildAllIndexableUrls(now: Date = new Date()): string[] {
+  const all = [
+    ...buildPagesSitemapEntries(now),
+    ...buildBlogSitemapEntries(now),
+    ...buildToolsSitemapEntries(now),
+    ...buildQuestionsSitemapEntries(now),
+  ];
+  return Array.from(new Set(all.map((e) => e.url)));
+}
+
 export function buildBlogSitemapEntries(now: Date): MetadataRoute.Sitemap {
   return BLOG_POST_ROUTES.map((e) => toAbsolute(e, now));
 }

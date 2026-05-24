@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = new Set([
   '/reset-password',
   '/pricing',
   '/about',
+  '/interviewera',   // brand entity page (public, crawlable)
   '/campus',
   '/college',        // college marketing/landing page
   '/college/signup', // T&P officer signup form
@@ -208,8 +209,10 @@ export const config = {
     /*
      * Skip middleware entirely for static chunks, image optimizer, RSC data, Vercel internals,
      * well-known files, and common asset extensions (reduces edge work + avoids bot/thumbnail 403s).
+     * The `txt|xml` extensions cover robots.txt, every *-sitemap.xml (incl. questions-sitemap.xml),
+     * and the IndexNow key file (<key>.txt) so crawlers fetch them with zero middleware overhead.
      * HTML document routes (/, /about, /pricing, …) still match so www→apex runs for real browsers.
      */
-    '/((?!_next/static|_next/image|_next/data|_vercel/|favicon\\.ico|robots\\.txt|sitemap\\.xml|pages-sitemap\\.xml|blog-sitemap\\.xml|tools-sitemap\\.xml|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|woff2?|ttf|otf|eot)$).*)',
+    '/((?!_next/static|_next/image|_next/data|_vercel/|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|txt|xml|woff2?|ttf|otf|eot)$).*)',
   ],
 };

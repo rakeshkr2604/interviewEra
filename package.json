@@ -22,6 +22,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "verify:pdf": "tsx scripts/verify-pdf-extract.ts",
+    "submit:indexnow": "tsx scripts/submit-indexnow.ts",
     "generate:pdf-fixtures": "tsx scripts/generate-pdf-fixtures.tsx",
     "generate:favicon-ico": "node scripts/generate-favicon-ico.mjs"
   },
