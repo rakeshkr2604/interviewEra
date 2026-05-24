@@ -26,8 +26,10 @@ const RESOURCES_LINKS = [
 ] as const;
 
 const COMPANY_LINKS = [
-  { href: '/about', label: 'About' },
+  { href: '/interviewera', label: 'What is InterviewEra' },
+  { href: '/about', label: 'About InterviewEra' },
   { href: '/pricing', label: 'Pricing' },
+  { href: 'https://www.linkedin.com/company/interviewera/', label: 'InterviewEra on LinkedIn' },
   { href: 'mailto:support@interviewera.com', label: 'Contact' },
 ] as const;
 
@@ -71,9 +73,9 @@ function XIcon({ className }: { className?: string }) {
 }
 
 const SOCIAL_LINKS = [
-  { href: 'https://linkedin.com/company/interviewera', label: 'LinkedIn', Icon: LinkedInIcon },
-  { href: 'https://github.com/interviewera', label: 'GitHub', Icon: GitHubIcon },
-  { href: 'https://twitter.com/interviewera', label: 'Twitter / X', Icon: XIcon },
+  { href: 'https://www.linkedin.com/company/interviewera/', label: 'InterviewEra on LinkedIn', Icon: LinkedInIcon },
+  { href: 'https://x.com/InterviewEra', label: 'InterviewEra on X', Icon: XIcon },
+  { href: 'https://github.com/InterviewEraHQ', label: 'InterviewEra on GitHub', Icon: GitHubIcon },
 ] as const;
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -104,8 +106,9 @@ export function MarketingFooter() {
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              AI-powered mock interviews and resume-aware scoring — built for Indian campus and
-              early-career hiring. Now in private beta.
+              <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong> is an AI-powered mock
+              interview platform — resume-aware scoring built for Indian campus and early-career hiring.
+              Now in private beta.
             </p>
 
             {/* CTA */}

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { CalendarCheck, ExternalLink, FileSearch, Sparkles, Target, TrendingUp } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { FreeToolCtaBlock, FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import { BrandWebProfiles } from '@/components/seo/BrandWebProfiles';
 import { generateMetadata, schemaIds, siteConfig, siteOrganizationStructured } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
@@ -324,6 +325,9 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      {/* ── OFFICIAL PROFILES ── */}
+      <BrandWebProfiles className="mt-14 sm:mt-16 lg:mt-20" />
 
       {/* ── CTA ── */}
       <div className="mt-14 sm:mt-16 lg:mt-20">

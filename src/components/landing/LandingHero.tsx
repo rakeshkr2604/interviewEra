@@ -151,8 +151,10 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                   marginBottom: '32px',
                 }}
               >
-                Upload your resume. Get questioned on what you actually wrote. Every answer is scored on five rubric-aligned
-                dimensions inside InterviewEra — so you practise with clearer feedback instead of vibes-only prep.
+                <strong style={{ color: T.text, fontWeight: 700 }}>InterviewEra</strong> is an AI-powered mock
+                interview platform for Indian campus hiring. Upload your resume, get questioned on what you actually
+                wrote, and score every answer across five rubric-aligned dimensions — clearer feedback instead of
+                vibes-only prep.
               </p>
 
               <LandingHeroCtaIsland />

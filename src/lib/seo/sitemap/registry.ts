@@ -44,6 +44,7 @@ function toAbsolute(entry: SitemapSourceEntry, fallbackDate: Date): MetadataRout
 /** Marketing / legal / campus — indexable HTML. */
 export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
   { path: '/', changeFrequency: 'weekly', priority: 1.0 },
+  { path: '/interviewera', changeFrequency: 'monthly', priority: 0.9 },
   { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/campus', changeFrequency: 'monthly', priority: 0.78 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.65 },

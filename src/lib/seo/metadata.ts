@@ -9,9 +9,19 @@ export const BRAND_ICON_192_PATH = '/favicon/android-chrome-192x192.png' as cons
 
 export const siteConfig = {
   name: BRAND,
+  /**
+   * Spelling variants that resolve to the same brand entity. "Interview Era" (two words)
+   * is the key disambiguation signal: it tells search engines the brand parses as
+   * Interview + Era — not a misspelling of "interviewer".
+   */
+  alternateNames: ['Interview Era', 'InterviewEra.com', 'Interview-Era'],
   url: BASE_URL,
   /** After brand in root/default Open Graph & Twitter titles: `InterviewEra | …` */
   socialDefaultHeadline: 'AI mock interviews',
+  /** One-line entity definition reused across schema + visible copy for consistency. */
+  entityDefinition:
+    'InterviewEra is an AI-powered mock interview platform for Indian campus hiring and early-career preparation.',
+  slogan: 'Know your interview score before the company decides.',
   defaultDescription:
     'Structured mock interviews from your CV — STAR-aligned flow, five-dimension scoring, and progress built for Indian campus hiring. Start free, no card.',
   ogImage: `${BASE_URL}/og/default.png`,
@@ -25,18 +35,41 @@ export const schemaIds = {
   logo: `${siteConfig.url}#logo`,
 } as const
 
+/** Canonical, externally-linkable brand profiles — keep identical in schema + visible anchors. */
+export const BRAND_LINKEDIN_URL = 'https://www.linkedin.com/company/interviewera/' as const
+export const BRAND_X_URL = 'https://x.com/InterviewEra' as const
+export const BRAND_GITHUB_URL = 'https://github.com/InterviewEraHQ' as const
+export const FOUNDER_LINKEDIN_URL = 'https://www.linkedin.com/in/rakeshkumar2604/' as const
+export const FOUNDER_GITHUB_URL = 'https://github.com/rakesh2604' as const
+
 /**
  * Organization `sameAs` + founder — keep in sync with marketing footer / about page.
+ *
+ * `sameAs` should only list profiles that actually exist and link back; mismatched
+ * profiles weaken entity trust. These are the verified, reciprocal references for the
+ * InterviewEra entity: company LinkedIn, official X, and the GitHub organization.
  */
 export const siteOrganizationStructured = {
-  sameAs: [
-    'https://www.linkedin.com/company/interviewera',
-    'https://twitter.com/interviewera',
+  sameAs: [BRAND_LINKEDIN_URL, BRAND_X_URL, BRAND_GITHUB_URL],
+  /** Topics the entity is an authority on — anchors InterviewEra to its real subject area. */
+  knowsAbout: [
+    'AI mock interviews',
+    'Campus placement preparation',
+    'Resume-aware interview practice',
+    'Interview scoring rubrics',
+    'STAR method coaching',
+    'Technical interview preparation',
   ],
+  areaServed: 'India',
+  address: {
+    locality: 'Ranchi',
+    region: 'Jharkhand',
+    country: 'IN',
+  },
   founder: {
     name: 'Rakesh Kumar',
     jobTitle: 'Founder & CEO',
-    sameAs: ['https://www.linkedin.com/in/rakeshkumar2604/'],
+    sameAs: [FOUNDER_LINKEDIN_URL, FOUNDER_GITHUB_URL],
   },
 } as const
 
@@ -138,10 +171,11 @@ export function authPageMetadata(input: Omit<PageSeoParams, 'noIndex' | 'noIndex
 export const PAGE_SEO = {
   home: generateMetadata({
     title: 'AI Mock Interviews',
-    documentTitleAbsolute: BRAND,
-    socialTitle: brandPageTitle('AI Mock Interviews'),
+    // Pair the brand with its category so search engines learn the entity, not just the word.
+    documentTitleAbsolute: `${BRAND} — AI Mock Interview Platform for Campus Placements`,
+    socialTitle: brandPageTitle('AI Mock Interview Platform for Campus Placements'),
     description:
-      'Practice AI-powered mock interviews with real-time feedback. Upload your resume, get personalized questions, and track your improvement. Free to start.',
+      'InterviewEra is an AI-powered mock interview platform for Indian campus placements. Upload your resume, get rubric-scored feedback across five dimensions, and track your improvement. Free to start.',
     path: '/',
   }),
   dashboard: generateMetadata({

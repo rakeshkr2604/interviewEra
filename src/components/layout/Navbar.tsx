@@ -69,6 +69,12 @@ type AuthVariant = 'loading' | 'anon' | 'student' | 'admin';
 // Only links to pages that exist. Add more as new pages ship.
 const PRODUCT_ITEMS = [
   {
+    icon: Sparkles,
+    label: 'What is InterviewEra',
+    href: '/interviewera',
+    desc: 'The platform, founder, and mission',
+  },
+  {
     icon: Mic2,
     label: 'AI Mock Interviews',
     href: '/#how-it-works',
