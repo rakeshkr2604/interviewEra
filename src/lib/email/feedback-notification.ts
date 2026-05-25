@@ -238,7 +238,7 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
 }
 
 /** Plain-text fallback for clients that don't render HTML. */
-function buildFeedbackEmailText(p: FeedbackPayload): string {
+export function buildFeedbackEmailText(p: FeedbackPayload): string {
   const { label, severity } = assessFeedback(p);
   const yn = p.wouldUseAgain === null ? 'not provided' : p.wouldUseAgain ? 'Yes' : 'No';
   return [
