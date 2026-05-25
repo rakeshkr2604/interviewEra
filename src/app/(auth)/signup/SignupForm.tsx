@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronDown } from 'lucide-react';
+import { Check, ChevronDown } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
@@ -15,6 +15,19 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ] as const;
 const YEARS = [2024, 2025, 2026, 2027, 2028] as const;
+
+/**
+ * Password requirements — kept in sync with the Supabase auth password policy so the
+ * UI validates before submit and the verbose server-side error (which lists the full
+ * character set) never reaches the user.
+ */
+const PASSWORD_RULES = [
+  { id: 'length', label: '8 characters', test: (p: string) => p.length >= 8 },
+  { id: 'upper', label: '1 uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
+  { id: 'lower', label: '1 lowercase letter', test: (p: string) => /[a-z]/.test(p) },
+  { id: 'number', label: '1 number', test: (p: string) => /[0-9]/.test(p) },
+  { id: 'special', label: '1 special character', test: (p: string) => /[^A-Za-z0-9\s]/.test(p) },
+] as const;
 
 const inputClass = cn(
   'w-full rounded-xl border-2 px-4 py-2.5 text-sm shadow-none transition-[color,box-shadow]',
@@ -65,11 +78,17 @@ export function SignupForm({ next }: SignupFormProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordFocused, setPasswordFocused] = useState(false);
+  const [submitAttempted, setSubmitAttempted] = useState(false);
   const [placementMonth, setPlacementMonth] = useState('');
   const [placementYear, setPlacementYear] = useState('');
   const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  const passwordChecks = PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) }));
+  const passwordValid = passwordChecks.every((c) => c.met);
+  const showPasswordChecklist = passwordFocused || password.length > 0;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,6 +105,13 @@ export function SignupForm({ next }: SignupFormProps) {
         return;
       }
       const safeName = nameCheck.data;
+
+      if (!passwordValid) {
+        setSubmitAttempted(true);
+        setFeedback({ kind: 'error', text: 'Your password doesn’t meet all the requirements yet.' });
+        document.getElementById('password')?.focus();
+        return;
+      }
 
       const supabase = createClient();
 
@@ -186,15 +212,70 @@ export function SignupForm({ next }: SignupFormProps) {
             id="password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Minimum 8 characters"
+            onChange={(e) => {
+              setPassword(e.target.value);
+              if (feedback?.kind === 'error') setFeedback(null);
+            }}
+            onFocus={() => setPasswordFocused(true)}
+            onBlur={() => setPasswordFocused(false)}
+            placeholder="Create a password"
             minLength={8}
             required
             aria-required="true"
+            aria-describedby="password-requirements"
+            aria-invalid={submitAttempted && !passwordValid}
             autoComplete="new-password"
             className={inputClass}
             style={fieldSurface}
           />
+
+          {showPasswordChecklist ? (
+            <div
+              id="password-requirements"
+              className="rounded-lg border px-3 py-2.5"
+              style={{
+                borderColor:
+                  submitAttempted && !passwordValid
+                    ? 'color-mix(in srgb, var(--accent-danger) 35%, var(--card-border))'
+                    : 'var(--card-border)',
+                background:
+                  submitAttempted && !passwordValid
+                    ? 'color-mix(in srgb, var(--accent-danger) 6%, transparent)'
+                    : 'color-mix(in srgb, var(--card-bg) 45%, transparent)',
+              }}
+            >
+              <p className="mb-1.5 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Password must include at least:
+              </p>
+              <ul className="grid gap-1.5">
+                {passwordChecks.map((c) => {
+                  const errored = submitAttempted && !c.met;
+                  const textColor = c.met
+                    ? 'var(--accent-success)'
+                    : errored
+                      ? 'var(--accent-danger)'
+                      : 'var(--text-secondary)';
+                  return (
+                    <li key={c.id} className="flex items-center gap-2 text-xs" style={{ color: textColor }}>
+                      <span
+                        aria-hidden="true"
+                        className="grid size-4 shrink-0 place-items-center rounded-full"
+                        style={
+                          c.met
+                            ? { background: 'color-mix(in srgb, var(--accent-success) 18%, transparent)' }
+                            : { border: `1.5px solid ${errored ? 'var(--accent-danger)' : 'var(--text-muted)'}` }
+                        }
+                      >
+                        {c.met ? <Check className="size-2.5" strokeWidth={3.5} /> : null}
+                      </span>
+                      <span>{c.label}</span>
+                      <span className="sr-only">{c.met ? '— met' : '— not met'}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
         </div>
 
         <div className="space-y-2" role="group" aria-label="Expected placement date, optional">
