@@ -486,6 +486,15 @@ html[data-theme="dark"] .ie-card-hover:hover {
   .ie-badge-pulse { animation: none; }
 }
 
+/* Indeterminate upload progress bar (feedback screenshot uploader) */
+@keyframes fb-indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-\[fb-indeterminate_1\.1s_ease-in-out_infinite\] { animation: none; }
+}
+
 /* Branded scrollbar (desktop only) — slim, accent-tinted */
 @media (pointer: fine) {
   .ie-landing-premium ::-webkit-scrollbar { width: 10px; height: 10px; }

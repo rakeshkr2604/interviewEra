@@ -177,6 +177,13 @@ export const feedbackSubmitSchema = z.object({
   browserInfo: z
     .preprocess((v) => (typeof v === 'string' ? v : ''), z.string().max(1024))
     .transform((s) => safeText(s, 512)),
+  // Storage object path of an already-uploaded screenshot (feedback/{userId}/...).
+  // Ownership is re-verified server-side against the session before use.
+  screenshotPath: z
+    .string()
+    .max(512)
+    .regex(/^feedback\/[^/]+\/[^/]+$/, 'Invalid screenshot reference.')
+    .optional(),
 })
 
 export type FeedbackSubmitInput = z.infer<typeof feedbackSubmitSchema>;

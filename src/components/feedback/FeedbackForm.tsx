@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { ScreenshotUploader } from '@/components/feedback/ScreenshotUploader'
 import { cn } from '@/lib/utils'
 
 const MAX_TEXT = 2000
@@ -80,6 +81,10 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   const [confusion, setConfusion] = useState('')
   const [bugs, setBugs] = useState('')
   const [wouldUse, setWouldUse] = useState<WouldUse>(null)
+  const [screenshotPath, setScreenshotPath] = useState<string | null>(null)
+  const [screenshotUploading, setScreenshotUploading] = useState(false)
+  // Bumping this key remounts the uploader, clearing its internal state on reset.
+  const [uploaderKey, setUploaderKey] = useState(0)
 
   function reset() {
     setName(defaultName)
@@ -88,18 +93,25 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     setConfusion('')
     setBugs('')
     setWouldUse(null)
+    setScreenshotPath(null)
+    setScreenshotUploading(false)
+    setUploaderKey((k) => k + 1)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (submitting) return // guard against double submission
 
+    if (screenshotUploading) {
+      toast.error('Hang on — your screenshot is still uploading.')
+      return
+    }
     if (rating < 1) {
       toast.error('Please pick a star rating first.')
       return
     }
-    if (!liked.trim() && !confusion.trim() && !bugs.trim()) {
-      toast.error('Add at least one note so we know what to improve.')
+    if (!liked.trim() && !confusion.trim() && !bugs.trim() && !screenshotPath) {
+      toast.error('Add at least one note or a screenshot so we know what to improve.')
       return
     }
 
@@ -117,6 +129,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
           wouldUseAgain: wouldUse,
           pageUrl: typeof window !== 'undefined' ? window.location.href : '',
           browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+          ...(screenshotPath ? { screenshotPath } : {}),
         }),
       })
 
@@ -261,6 +274,15 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
                 })}
               </div>
             </div>
+
+            {/* Screenshot */}
+            <ScreenshotUploader
+              key={uploaderKey}
+              disabled={submitting}
+              onUploadingChange={setScreenshotUploading}
+              onUploaded={setScreenshotPath}
+              onCleared={() => setScreenshotPath(null)}
+            />
           </div>
 
           <div
@@ -278,7 +300,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
             </Button>
             <Button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || screenshotUploading}
               className="landing-cta-lift h-auto rounded-[14px] px-5 py-2.5 text-sm font-semibold text-white"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
@@ -290,6 +312,8 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
                   <Loader2 className="size-4 animate-spin" aria-hidden />
                   Sending…
                 </>
+              ) : screenshotUploading ? (
+                'Waiting for upload…'
               ) : (
                 'Send feedback'
               )}
