@@ -32,7 +32,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   ];
 
   return (
-    <section id="how" style={{ padding: '80px 0', background: T.bg2 }}>
+    <section id="how" style={{ padding: '80px 0', background: 'transparent' }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
         <Reveal instant>
           <div style={{ textAlign: 'center' }}>
@@ -261,7 +261,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
   ];
 
   return (
-    <section style={{ padding: '88px 0', background: T.bg }}>
+    <section style={{ padding: '88px 0', background: 'transparent' }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
         <Reveal instant>
           <div style={{ textAlign: 'center' }}>

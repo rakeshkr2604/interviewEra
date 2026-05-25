@@ -4,11 +4,11 @@ import { generateMetadata } from '@/lib/seo/metadata';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 
 export const metadata: Metadata = generateMetadata({
-  title: 'Help Center',
+  title: 'Frequently Asked Questions',
   description:
     'Answers to common questions about InterviewEra — credits, interview sessions, scoring, plans, and your account.',
   path: '/help',
-  keywords: ['InterviewEra help', 'mock interview FAQ', 'interview credits', 'how it works'],
+  keywords: ['InterviewEra FAQ', 'mock interview FAQ', 'interview credits', 'how it works'],
 });
 
 // ─── FAQ data ──────────────────────────────────────────────────────────────────
@@ -190,16 +190,20 @@ export default function HelpPage() {
           className="font-bricolage text-3xl font-bold leading-tight tracking-tight sm:text-4xl"
           style={{ color: 'var(--text-primary)' }}
         >
-          Help Center
+          Frequently Asked Questions
         </h1>
         <p className="mt-3 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          Quick answers to the most common questions. Can't find what you need?{' '}
+          Quick answers to the most common questions. Browse the full{' '}
+          <Link href="/help-center" className="font-medium underline underline-offset-2" style={{ color: 'var(--accent-primary)' }}>
+            Help Center
+          </Link>{' '}
+          or{' '}
           <a
             href="mailto:support@interviewera.in"
             className="font-medium underline underline-offset-2"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Email us
+            email us
           </a>
           .
         </p>

@@ -147,6 +147,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/blog') ||
     pathname.startsWith('/interview-questions') ||
     pathname === '/help' ||
+    pathname === '/help-center' ||
     pathname.startsWith('/open/badges') ||
     isSeoSitemapPath;
   const needsAuthResolution =

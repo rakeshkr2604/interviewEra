@@ -1,38 +1,14 @@
 import type { ReactNode } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
+import { AmbientLayer } from '@/components/landing/AmbientLayer';
 import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
-import LandingHeroScorecardSlot from '@/components/landing/LandingHeroScorecardSlot';
+import LandingHeroSimulator from '@/components/landing/LandingHeroSimulator';
 
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
   return (
     <>
-      {/* Pain bar */}
-      <div
-        style={{
-          background: T.painBg,
-          borderBottom: `1px solid ${T.painBrd}`,
-          padding: '10px 0',
-          textAlign: 'center',
-        }}
-      >
-        <p
-          style={{
-            fontSize: '13px',
-            fontWeight: 500,
-            color: T.painText,
-            maxWidth: '640px',
-            margin: '0 auto',
-            padding: '0 24px',
-          }}
-        >
-          Most candidates don&apos;t fail because of what they know — they fail because they{' '}
-          <strong style={{ color: T.err, fontWeight: 700 }}>can&apos;t structure answers under pressure</strong>. You
-          can&apos;t fix what you can&apos;t measure.
-        </p>
-      </div>
-
-      <section style={{ position: 'relative', overflow: 'hidden', padding: '80px 0 96px' }}>
+      <section style={{ position: 'relative', overflow: 'hidden', padding: '72px 0 88px' }}>
         <div
           aria-hidden
           style={{
@@ -46,9 +22,11 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
           }}
         />
 
-        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative' }}>
-          <div className="hero-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'clamp(300px,52%,600px) 1fr', gap: '64px', alignItems: 'start' }}>
-            <div>
+        <AmbientLayer variant="hero" />
+
+        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative', zIndex: 1 }}>
+          <div className="hero-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'clamp(300px,46%,500px) 1fr', gap: '48px', alignItems: 'center' }}>
+            <div style={{ minWidth: 0 }}>
               <div
                 style={{
                   display: 'inline-flex',
@@ -88,62 +66,16 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                   color: T.text,
                 }}
               >
-                Know your score
-                <br />
-                before the company
+                Practice the interview
                 <br />
                 <em className="v3-hero-gradient-text" style={{ fontStyle: 'normal' }}>
-                  decides for you
+                  that pushes back.
                 </em>
               </h1>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
-                {[
-                  { n: '1', label: 'Upload resume' },
-                  { n: '2', label: 'Adaptive interview' },
-                  { n: '3', label: 'Get scored' },
-                ].map((step, i) => (
-                  <span key={step.n} style={{ display: 'contents' }}>
-                    {i > 0 && <span style={{ color: T.text3, fontSize: '14px' }}>→</span>}
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: T.bg3,
-                        border: `1px solid ${T.bord2}`,
-                        borderRadius: '8px',
-                        padding: '5px 12px',
-                        fontSize: '13px',
-                        fontWeight: 600,
-                        color: T.text2,
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: '18px',
-                          height: '18px',
-                          borderRadius: '5px',
-                          background: T.acc,
-                          color: '#fff',
-                          fontSize: '10px',
-                          fontWeight: 800,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          flexShrink: 0,
-                        }}
-                      >
-                        {step.n}
-                      </span>
-                      {step.label}
-                    </div>
-                  </span>
-                ))}
-              </div>
-
               <p
                 style={{
+                  marginTop: '20px',
                   fontSize: '16px',
                   lineHeight: 1.8,
                   color: T.text2,
@@ -181,7 +113,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               </div>
             </div>
 
-            <LandingHeroScorecardSlot />
+            <LandingHeroSimulator />
           </div>
         </div>
       </section>

@@ -15,8 +15,10 @@ import {
   Target,
   TrendingUp,
 } from 'lucide-react';
+import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection';
 import { howToJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld';
 import { generateMetadata, schemaIds, siteConfig } from '@/lib/seo/metadata';
+import type { SeoTextLink } from '@/lib/seo/internal-links';
 
 const PAGE_PATH = '/how-it-works';
 const PAGE_DESCRIPTION =
@@ -96,6 +98,16 @@ const LOOP = [
   { icon: RefreshCw, title: 'Retry', body: 'Re-answer with the structure you were missing.' },
   { icon: Target, title: 'Improve', body: 'Watch the number move — measurable, not vibes.' },
 ] as const;
+
+const EXPLORE_LINKS: SeoTextLink[] = [
+  { href: '/interview-questions', label: 'Interview questions by role' },
+  { href: '/tools/question-generator', label: 'Free question generator' },
+  { href: '/tools/ats-checker', label: 'ATS resume checker' },
+  { href: '/tools/star-builder', label: 'STAR answer builder' },
+  { href: '/campus', label: 'For campus placement cells' },
+  { href: '/interviewera', label: 'What is InterviewEra' },
+  { href: '/pricing', label: 'Pricing' },
+];
 
 const FAQS = [
   { question: 'Is InterviewEra a real interview simulation or a chatbot?', answer: 'It is a structured interview simulation. Questions are generated from your resume and sequenced like a real panel, and the interviewer asks adaptive follow-up questions that react to your answers — it does not just trade messages like an open-ended chatbot.' },
@@ -231,7 +243,7 @@ export default function HowItWorksPage() {
           {/* vertical rail */}
           <span
             aria-hidden
-            className="absolute left-[27px] top-2 bottom-2 hidden w-px sm:block"
+            className="absolute left-6.75 top-2 bottom-2 hidden w-px sm:block"
             style={{ background: 'linear-gradient(var(--accent-primary), transparent)' }}
           />
           {JOURNEY_STEPS.map(({ tag, icon: Icon, title, body }, i) => (
@@ -505,6 +517,8 @@ export default function HowItWorksPage() {
           </div>
         </div>
       </section>
+
+      <SeoCrossLinksSection heading="Explore InterviewEra" links={EXPLORE_LINKS} />
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(howToLd) }} />

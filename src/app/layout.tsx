@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 import Script from "next/script";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
@@ -44,6 +44,20 @@ const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "600", "700"],
+  preload: false,
+  adjustFontFallback: true,
+});
+
+/**
+ * Editorial serif — used sparingly for emphasis (hero simulator score total).
+ * Single weight, italic; not LCP-critical so no preload.
+ */
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  subsets: ["latin"],
+  display: "swap",
+  weight: ["400"],
+  style: ["normal", "italic"],
   preload: false,
   adjustFontFallback: true,
 });
@@ -126,7 +140,7 @@ export default function RootLayout({
       suppressHydrationWarning
       data-theme="dark"
       data-scroll-behavior="smooth"
-      className={`${bricolage.variable} ${dmSans.variable} ${jetbrains.variable} dark h-full antialiased`}
+      className={`${bricolage.variable} ${dmSans.variable} ${jetbrains.variable} ${instrumentSerif.variable} dark h-full antialiased`}
     >
       <head>
         <StructuredData />

@@ -49,6 +49,7 @@ export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
   { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
   { path: '/campus', changeFrequency: 'monthly', priority: 0.78 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.65 },
+  { path: '/help-center', changeFrequency: 'monthly', priority: 0.62 },
   { path: '/help', changeFrequency: 'monthly', priority: 0.6 },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.35 },
   { path: '/terms', changeFrequency: 'yearly', priority: 0.35 },

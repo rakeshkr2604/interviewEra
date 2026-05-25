@@ -8,7 +8,7 @@ export const BRAND_MARK_PATH = '/brand/logos/icon-only.svg';
 export type BrandHomeLinkVariant = 'navbar' | 'footer';
 
 type BrandHomeLinkProps = {
-  /** `navbar`: Interview + Era accent, no .com. `footer`: InterviewEra + .com accent. */
+  /** Both variants render the Interview + Era wordmark (no .com); they differ only in size/weight. */
   variant?: BrandHomeLinkVariant;
   /** Smaller navbar mark (e.g. mobile drawer). */
   compact?: boolean;
@@ -18,7 +18,7 @@ type BrandHomeLinkProps = {
   gapClassName?: string;
 };
 
-/** Marketing logo: IE tile + wordmark. Navbar uses Interview + Era (no .com). */
+/** Marketing logo: IE tile + Interview + Era wordmark (no .com), used in navbar and footer. */
 export function BrandHomeLink({
   variant = 'footer',
   compact = false,
@@ -60,17 +60,14 @@ export function BrandHomeLink({
           )}
         />
       ) : (
-        <span
+        <BrandWordmarkSplit
+          interviewClassName="font-semibold"
+          eraClassName="font-semibold"
           className={cn(
-            'inline-flex min-w-0 items-baseline gap-0 leading-none tracking-[-0.03em] transition-opacity duration-200 group-hover:opacity-90',
+            'min-w-0 tracking-[-0.03em] transition-opacity duration-200 group-hover:opacity-90',
             wordmarkClassName ?? 'text-lg',
           )}
-        >
-          <BrandWordmarkSplit interviewClassName="font-semibold" eraClassName="font-semibold" />
-          <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-            .com
-          </span>
-        </span>
+        />
       )}
     </Link>
   );

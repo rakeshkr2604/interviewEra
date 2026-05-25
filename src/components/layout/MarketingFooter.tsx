@@ -1,36 +1,44 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Lock } from 'lucide-react';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
 // ── Link data ──────────────────────────────────────────────────────────────────
 
+const PRODUCT_LINKS = [
+  { href: '/how-it-works', label: 'How It Works' },
+  { href: '/signup', label: 'Start Mock Interview' },
+  { href: '/campus', label: 'Campus Hiring' },
+  { href: '/help-center', label: 'Help Center' },
+] as const;
+
 const TOOLS_LINKS = [
   { href: '/tools/question-generator', label: 'Question Generator' },
   { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
-  { href: '/tools/star-builder', label: 'STAR Builder' },
+  { href: '/tools/star-builder', label: 'STAR Answer Builder' },
 ] as const;
 
 const QUESTIONS_LINKS = [
-  { href: '/interview-questions/software-engineer', label: 'Software Engineer Questions' },
-  { href: '/interview-questions/companies/tcs', label: 'TCS Interview Questions' },
-  { href: '/interview-questions/topics/react', label: 'React Interview Questions' },
+  { href: '/interview-questions', label: 'Browse All Questions' },
+  { href: '/interview-questions/software-engineer', label: 'Software Engineer' },
+  { href: '/interview-questions/companies/tcs', label: 'TCS Questions' },
+  { href: '/interview-questions/topics/react', label: 'React Questions' },
 ] as const;
 
 const RESOURCES_LINKS = [
-  { href: '/how-it-works', label: 'How It Works' },
   { href: '/blog', label: 'Blog' },
   { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
   { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },
+  { href: '/blog/top-10-interview-questions-freshers-india-2026', label: 'Fresher Interview Tips' },
+  { href: '/help', label: 'FAQ' },
 ] as const;
 
+/** Company column — rendered separately so the Razorpay trust chip can sit inline under Pricing. */
 const COMPANY_LINKS = [
   { href: '/interviewera', label: 'What is InterviewEra' },
-  { href: '/about', label: 'About InterviewEra' },
+  { href: '/about', label: 'About Us' },
   { href: '/pricing', label: 'Pricing' },
-  { href: 'https://www.linkedin.com/company/interviewera/', label: 'InterviewEra on LinkedIn' },
   { href: 'mailto:support@interviewera.com', label: 'Contact' },
 ] as const;
 
@@ -40,11 +48,12 @@ const LEGAL_LINKS = [
   { href: '/refund', label: 'Refund' },
 ] as const;
 
+/** First 4 columns rendered generically — Company is rendered separately. */
 const LINK_SECTIONS = [
-  { heading: 'Tools', links: TOOLS_LINKS },
+  { heading: 'Mock Interview', links: PRODUCT_LINKS },
+  { heading: 'Free Tools', links: TOOLS_LINKS },
   { heading: 'Interview Questions', links: QUESTIONS_LINKS },
   { heading: 'Resources', links: RESOURCES_LINKS },
-  { heading: 'Company', links: COMPANY_LINKS },
 ] as const;
 
 // ── Social icons ───────────────────────────────────────────────────────────────
@@ -79,10 +88,14 @@ const SOCIAL_LINKS = [
   { href: 'https://github.com/InterviewEraHQ', label: 'InterviewEra on GitHub', Icon: GitHubIcon },
 ] as const;
 
-// ── Component ──────────────────────────────────────────────────────────────────
+// ── Shared styles ──────────────────────────────────────────────────────────────
 
 const LINK_CLS =
   'text-sm transition-all duration-200 hover:opacity-100 hover:translate-x-0.5 inline-block';
+
+const COL_HEADING_CLS = 'text-xs font-semibold uppercase tracking-widest';
+
+// ── Component ──────────────────────────────────────────────────────────────────
 
 export function MarketingFooter() {
   return (
@@ -96,20 +109,20 @@ export function MarketingFooter() {
       }}
       aria-label="Site footer"
     >
-      {/* Main grid */}
+      {/* Main grid — brand (3 cols) + 5 link columns (9 cols) */}
       <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 py-14 sm:px-5 md:py-16')}>
         <div className="grid gap-10 md:grid-cols-12 md:gap-8">
 
-          {/* Brand column */}
-          <div className="md:col-span-4">
+          {/* ── Brand column ───────────────────────────────────────────── */}
+          <div className="md:col-span-3">
             <BrandHomeLink variant="footer" />
             <p
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong> is an AI-powered mock
-              interview platform — resume-aware scoring built for Indian campus and early-career hiring.
-              Now in private beta.
+              <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong> is an AI-powered
+              mock interview platform — adaptive follow-ups, resume-aware scoring, built for Indian campus
+              and early-career hiring.
             </p>
 
             {/* CTA */}
@@ -123,21 +136,6 @@ export function MarketingFooter() {
             >
               Start Mock Interview
             </Link>
-
-            {/* Trust badge */}
-            <div className="mt-4">
-              <div
-                className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-                style={{
-                  background: 'color-mix(in srgb, var(--accent-success) 10%, transparent)',
-                  border: '1px solid color-mix(in srgb, var(--accent-success) 22%, transparent)',
-                  color: 'var(--accent-success)',
-                }}
-              >
-                <Lock className="h-3 w-3 shrink-0" strokeWidth={2} aria-hidden="true" />
-                Secure payments via Razorpay
-              </div>
-            </div>
 
             {/* Social icons */}
             <div className="mt-5 flex items-center gap-3">
@@ -161,12 +159,14 @@ export function MarketingFooter() {
             </div>
           </div>
 
-          {/* Link columns — 2×2 on md, 4×1 on lg */}
-          <div className="grid grid-cols-2 gap-8 md:col-span-8 lg:grid-cols-4">
+          {/* ── Link columns — 2×2 on sm/md, 5×1 on lg ────────────────── */}
+          <div className="grid grid-cols-2 gap-8 md:col-span-9 lg:grid-cols-5">
+
+            {/* Generic columns */}
             {LINK_SECTIONS.map(({ heading, links }) => (
               <div key={heading}>
                 <p
-                  className="text-xs font-semibold uppercase tracking-widest"
+                  className={COL_HEADING_CLS}
                   style={{ color: 'var(--text-muted)' }}
                 >
                   {heading}
@@ -186,8 +186,31 @@ export function MarketingFooter() {
                 </ul>
               </div>
             ))}
-          </div>
 
+            {/* Company column — rendered separately for Razorpay badge */}
+            <div>
+              <p
+                className={COL_HEADING_CLS}
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Company
+              </p>
+              <ul className="mt-4 space-y-2.5" role="list">
+                {COMPANY_LINKS.map(({ href, label }) => (
+                  <li key={label}>
+                    <Link
+                      href={href}
+                      className={LINK_CLS}
+                      style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
+                    >
+                      {label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+          </div>
         </div>
       </div>
 
@@ -209,7 +232,7 @@ export function MarketingFooter() {
               alt=""
               aria-hidden
             />
-            <span>© 2026 InterviewEra.com. All rights reserved.</span>
+            <span>© 2026 InterviewEra. All rights reserved.</span>
           </p>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 opacity-70">
             {LEGAL_LINKS.map(({ href, label }) => (

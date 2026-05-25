@@ -4,11 +4,12 @@ import React from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
+import { AmbientLayer } from '@/components/landing/AmbientLayer';
 
 /* ─── 5. SCORING ENGINE ─── */
 function ScoringEngineSection() {
   return (
-    <section style={{ padding: '88px 0', background: T.bg2 }}>
+    <section style={{ padding: '88px 0', background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}>
       <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
         <Reveal>
           <div style={{ textAlign: 'center' }}>
@@ -19,164 +20,15 @@ function ScoringEngineSection() {
               How your interview is evaluated
             </h2>
             <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto' }}>
-              Three layers running in sequence — personalised questions from your resume, a structured answer framework, and a 5-dimension scoring rubric that gives you a single actionable number.
+              The same five-dimension rubric runs on every answer — a structured framework built on the
+              metrics a panel actually weighs — so your score stays consistent and shows you what to fix.
             </p>
           </div>
         </Reveal>
 
-        {/* Layer 1: Resume → Questions pipeline */}
-        <Reveal delay={0.1}>
-          <div className="pipeline-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 48px 1fr 48px 1fr', alignItems: 'center', gap: 0, marginTop: '52px' }}>
-
-            <div style={{ background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '16px', padding: '24px' }}>
-              <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T.text3, marginBottom: '10px' }}>Input</div>
-              <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '15px', fontWeight: 700, marginBottom: '6px', color: T.text }}>Your resume</h3>
-              <p style={{ fontSize: '13px', color: T.text2, lineHeight: 1.65 }}>Parsed once on upload. Skills, projects, work experience, and education are all indexed.</p>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', background: T.bg3, border: `1px solid ${T.bord2}`, borderRadius: '8px', padding: '6px 11px', fontSize: '12.5px', fontWeight: 600, color: T.text2, marginTop: '14px', marginBottom: '8px' }}>
-                📄 Sample_resume_demo.pdf
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px' }}>
-                {[{ tag: 'React + TS', dim: true }, { tag: 'Payment APIs', dim: true }, { tag: 'NIT Trichy', dim: false }].map(({ tag, dim }) => (
-                  <span key={tag} style={{ display: 'inline-flex', alignItems: 'center', padding: '3px 9px', borderRadius: '99px', fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', background: dim ? T.accdim : T.okdim, color: dim ? T.acc2 : T.ok }}>
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-
-            <div className="pipe-arrow-hide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text3, fontSize: '18px' }}>→</div>
-
-            <div style={{ background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '16px', padding: '24px' }}>
-              <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T.text3, marginBottom: '10px' }}>Generated</div>
-              <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '15px', fontWeight: 700, marginBottom: '6px', color: T.text }}>Your questions</h3>
-              <p style={{ fontSize: '13px', color: T.text2, lineHeight: 1.65 }}>Questions are built from what you actually wrote — not from a generic bank.</p>
-              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                {['"Walk me through the payment API failure you handled."', '"Tell me about the React + TS project you built."'].map((q) => (
-                  <div key={q} style={{ background: T.bg2, border: `1px solid ${T.bord}`, borderRadius: '7px', padding: '6px 10px', fontSize: '12.5px', color: T.text2, lineHeight: 1.4 }}>{q}</div>
-                ))}
-              </div>
-            </div>
-
-            <div className="pipe-arrow-hide" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text3, fontSize: '18px' }}>→</div>
-
-            <div style={{ background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '16px', padding: '24px' }}>
-              <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: T.text3, marginBottom: '10px' }}>Output</div>
-              <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '15px', fontWeight: 700, marginBottom: '6px', color: T.text }}>Scored answers</h3>
-              <p style={{ fontSize: '13px', color: T.text2, lineHeight: 1.65 }}>Every answer is evaluated on 5 weighted dimensions. You see a number after each response.</p>
-              <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                {[{ label: 'STAR structure', val: '8.4', color: T.ok, pct: 84 }, { label: 'Technical depth', val: '6.4', color: T.warn, pct: 64 }].map((bar) => (
-                  <div key={bar.label}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12.5px', color: T.text2, marginBottom: '3px' }}>
-                      <span>{bar.label}</span>
-                      <span style={{ fontFamily: "'JetBrains Mono', monospace", color: bar.color, fontWeight: 700 }}>{bar.val} / 10</span>
-                    </div>
-                    <div style={{ height: '4px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-                      <motion.div
-                        className="v3-bar-fill-solid"
-                        style={{ height: '100%', background: bar.color, borderRadius: '99px' }}
-                        initial={{ width: 0 }}
-                        whileInView={{ width: `${bar.pct}%` }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: 'easeOut' }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Layer 2: Before / After */}
+        {/* Score engine breakdown */}
         <Reveal delay={0.12}>
-          <div style={{ marginTop: '40px', paddingTop: '40px', borderTop: `1px solid ${T.bord}` }}>
-            <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-              <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
-                The exact difference
-              </span>
-              <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(22px,2.8vw,34px)', fontWeight: 800, marginBottom: '10px', color: T.text, letterSpacing: '-0.028em' }}>
-                Structured vs unstructured — illustrative scores only.
-              </h3>
-              <p style={{ fontSize: '14.5px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto' }}>
-                Same question. The only difference shown here is structure — numbers are demo values, not a guarantee of outcomes.
-              </p>
-            </div>
-
-            <div style={{ height: '1px', background: `linear-gradient(90deg, transparent, color-mix(in srgb, ${T.acc} 30%, transparent), transparent)`, margin: '0 auto 36px auto', width: '75%' }} />
-
-            <div className="transf-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-              {/* Bad panel */}
-              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px solid ${T.painBrd}`, boxShadow: `0 8px 32px -16px color-mix(in srgb, ${T.err} 40%, transparent)` }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '20px', fontWeight: 700, background: `color-mix(in srgb, ${T.err} 12%, transparent)`, color: T.err, border: `1px solid color-mix(in srgb, ${T.err} 25%, transparent)`, marginBottom: '16px' }}>
-                  <span><CountUp to={3.8} decimals={1} duration={0.9} /></span><span style={{ fontSize: '12px' }}>/10</span>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Score</span>
-                </div>
-                <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px', color: T.err }}>
-                  ❌ Unstructured — panels can&apos;t score this
-                </div>
-                <div style={{ fontSize: '12.5px', color: T.text3, fontStyle: 'italic', marginBottom: '14px', paddingBottom: '12px', borderBottom: `1px solid ${T.painBrd}` }}>
-                  &ldquo;Tell me about a time you solved a hard technical problem under a deadline.&rdquo;
-                </div>
-                <p style={{ fontSize: '14px', lineHeight: 1.8, color: T.text2, fontStyle: 'italic' }}>
-                  &ldquo;<mark style={{ background: T.badHi, borderRadius: '3px', padding: '1px 2px', color: 'inherit' }}>Yeah so basically in my project we had some issues</mark> and I worked with my team.{' '}
-                  <mark style={{ background: T.badHi, borderRadius: '3px', padding: '1px 2px', color: 'inherit' }}>We used different things and I did my best.</mark>{' '}
-                  It was tough but we managed to finish it. I learned a lot and I&apos;m a quick learner.&rdquo;
-                </p>
-                <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: `1px solid ${T.painBrd}`, display: 'flex', flexDirection: 'column', gap: '7px' }}>
-                  {["✕ No ownership — could be anyone's story", '✕ No measurable outcome — panel defaults low', '✕ Unscoreable → lowest band by default'].map((pt) => (
-                    <div key={pt} style={{ fontSize: '13px', fontWeight: 500, color: T.err, display: 'flex', alignItems: 'flex-start', gap: '7px' }}>{pt}</div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Good panel */}
-              <div style={{ borderRadius: '18px', padding: '26px', background: T.card, border: `1.5px solid ${T.okbrd}`, boxShadow: `0 8px 32px -16px color-mix(in srgb, ${T.ok} 40%, transparent)` }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '6px 14px', borderRadius: '10px', fontFamily: "'JetBrains Mono', monospace", fontSize: '20px', fontWeight: 700, background: T.okdim, color: T.ok, border: `1px solid ${T.okbrd}`, marginBottom: '16px' }}>
-                  <span><CountUp to={8.4} decimals={1} duration={0.9} delay={0.15} /></span><span style={{ fontSize: '12px' }}>/10</span>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '11px', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.7 }}>Score</span>
-                </div>
-                <div style={{ fontSize: '10.5px', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: '12px', color: T.ok }}>
-                  ✅ STAR-structured — fully scoreable
-                </div>
-                <div style={{ fontSize: '12.5px', color: T.text3, fontStyle: 'italic', marginBottom: '14px', paddingBottom: '12px', borderBottom: `1px solid ${T.okbrd}` }}>
-                  &ldquo;Tell me about a time you solved a hard technical problem under a deadline.&rdquo;
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {[
-                    { tag: 'Situation', text: 'Payment API failing on 8% of transactions — two days before the demo, team of four.' },
-                    { tag: 'Task',      text: 'I owned the backend debug without breaking the existing checkout flow.' },
-                    { tag: 'Action',    text: 'Traced a race condition in the retry worker, added idempotent keys + exponential backoff.' },
-                    { tag: 'Result',    text: 'Zero failed demos. Professor used it as the class example for error handling.' },
-                  ].map((row) => (
-                    <div key={row.tag}>
-                      <span style={{ display: 'inline-block', background: T.okdim, color: T.ok, fontSize: '10px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: '5px', marginBottom: '3px' }}>
-                        {row.tag}
-                      </span>
-                      <p style={{ fontSize: '13.5px', color: T.text2, lineHeight: 1.65 }}>{row.text}</p>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginTop: '14px', paddingTop: '14px', borderTop: `1px solid ${T.okbrd}` }}>
-                  {['✓ Ownership clear', '✓ Metric in result', '✓ Fully scoreable'].map((tag) => (
-                    <span key={tag} style={{ background: T.okdim, color: T.ok, fontSize: '11px', fontWeight: 600, padding: '3px 10px', borderRadius: '99px' }}>{tag}</span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Why STAR */}
-            <div style={{ marginTop: '28px', background: T.bg3, border: `1px solid ${T.bord2}`, borderRadius: '14px', padding: '18px 22px', display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
-              <span style={{ fontSize: '20px', flexShrink: 0, marginTop: '2px' }}>💡</span>
-              <p style={{ fontSize: '13.5px', color: T.text2, lineHeight: 1.7 }}>
-                <strong style={{ color: T.text }}>Why structured answers score higher:</strong> Panels can only evaluate what they can measure. A STAR answer has a clear situation, ownership, action, and result — each one maps to a scoring dimension. A rambling answer gives panellists nothing to anchor to, so it defaults to the lowest band — even when the underlying work was strong.
-              </p>
-            </div>
-          </div>
-        </Reveal>
-
-        {/* Layer 3: Score engine breakdown */}
-        <Reveal delay={0.15}>
-          <div style={{ marginTop: '40px', background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '20px', overflow: 'hidden' }}>
+          <div style={{ marginTop: '52px', background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '20px', overflow: 'hidden' }}>
             <div style={{ padding: '20px 28px', borderBottom: `1px solid ${T.bord}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
               <div>
                 <div style={{ fontSize: '15px', fontWeight: 700, color: T.text }}>Interview Scoring Engine — 5 Dimensions</div>
@@ -263,19 +115,20 @@ function ScoringEngineSection() {
 /* ─── 6. EARLY ACCESS ─── */
 function SocialProofSection() {
   return (
-    <section style={{ padding: '88px 0 96px', background: T.bg2 }}>
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
+    <section style={{ padding: '88px 0 96px', background: 'transparent', position: 'relative', overflow: 'hidden' }}>
+      <AmbientLayer variant="early-access" />
+      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative', zIndex: 1 }}>
         <Reveal>
           <div style={{ textAlign: 'center' }}>
             <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
               Early access
             </span>
             <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(26px,3.4vw,42px)', fontWeight: 800, marginBottom: '18px', color: T.text, letterSpacing: '-0.028em', lineHeight: 1.06 }}>
-              Beta launching May 2026. Join early access for free Pro features.
+              Now in early access — join free while we onboard the first cohort.
             </h2>
             <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto 28px' }}>
-              We&apos;re inviting a small cohort first — structured mocks, resume-native questions, and rubric scoring. No paid
-              actor testimonials; product proof only.
+              Structured mocks, resume-aware questions, and rubric scoring. No paid testimonials and no
+              borrowed company logos — product proof only.
             </p>
             <Link
               href="/signup"
@@ -315,7 +168,7 @@ function SocialProofSection() {
           >
             {[
               {
-                label: 'Illustrative score jump shown in demos (not an aggregate cohort metric)',
+                label: 'Example score lift across a structured practice loop (illustrative)',
                 render: (
                   <>
                     <CountUp to={4.6} decimals={1} duration={0.8} />
@@ -325,11 +178,11 @@ function SocialProofSection() {
                 ),
               },
               {
-                label: 'Now in private beta — join the waitlist',
-                render: <span style={{ fontSize: 'clamp(22px,3vw,34px)', letterSpacing: '-0.02em' }}>Waitlist</span>,
+                label: 'Five weighted dimensions scored on every answer',
+                render: <span style={{ fontSize: 'clamp(26px,3.4vw,38px)', letterSpacing: '-0.02em' }}>5</span>,
               },
               {
-                label: 'Typical time from signup flow to first scored prompt (depends on resume parse)',
+                label: 'From signup to your first scored answer',
                 render: (
                   <>
                     <CountUp to={60} duration={0.9} />

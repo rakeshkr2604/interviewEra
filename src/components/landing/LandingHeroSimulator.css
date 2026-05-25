@@ -1,0 +1,488 @@
+/* ============================================================
+ * Hero Interview Simulator — scoped, theme-aware styles.
+ *
+ * Everything is scoped under `.sim-host` so generic names (.block) don't leak.
+ * All colors map to the landing design tokens (--accent-primary, --card-bg, …)
+ * which are redefined per theme under html[data-theme] .ie-landing-premium,
+ * so the simulator adapts to light/dark with zero hardcoded #fff / #000 surfaces.
+ *
+ * Over-video chips intentionally use a translucent token surface; the bottom
+ * name scrim is the one deliberate fixed-dark layer (white text legibility over
+ * the talking-head video in both themes).
+ * ============================================================ */
+
+.sim-host {
+  /* fonts — self-hosted via next/font (JetBrains Mono + Instrument Serif), system fallbacks */
+  --sim-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
+  --sim-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sim-serif: var(--font-instrument-serif), Georgia, 'Times New Roman', serif;
+
+  /* surfaces */
+  --sim-card: var(--card-bg);
+  --sim-chrome: color-mix(in srgb, var(--bg-secondary) 70%, var(--card-bg));
+  --sim-soft: var(--bg-secondary);
+  --sim-lavender: color-mix(in srgb, var(--accent-primary) 9%, var(--card-bg));
+
+  /* borders */
+  --sim-border: var(--card-border);
+  --sim-border-soft: color-mix(in srgb, var(--card-border) 70%, transparent);
+
+  /* ink */
+  --sim-ink: var(--text-primary);
+  --sim-ink-2: var(--text-secondary);
+  --sim-ink-3: var(--text-muted);
+
+  /* accents */
+  --sim-accent: var(--accent-primary);
+  --sim-accent-2: var(--accent-hover);
+  --sim-green: var(--accent-success);
+  --sim-orange: var(--accent-warning);
+  --sim-red: var(--accent-danger);
+
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  font-family: var(--sim-sans);
+  color: var(--sim-ink);
+  -webkit-font-smoothing: antialiased;
+  letter-spacing: -0.005em;
+}
+.sim-host * { box-sizing: border-box; }
+/* Kill the stray Tailwind ring (box-shadow 0 0 0 1px) that leaks a square onto SVGs. */
+.sim-host svg { box-shadow: none; outline: none; }
+
+/* ---- Card ---- */
+.sim-host .sim {
+  position: relative;
+  width: 100%;
+  max-width: min(560px, 100%);
+  margin: 0 auto;
+  /* faint top-down ambient tint for subtle depth (barely visible) */
+  background: linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 3%, var(--card-bg)) 0%, var(--card-bg) 55%);
+  border: 1px solid var(--sim-border);
+  border-radius: 16px;
+  overflow: hidden;
+  /* layered, premium shadow: hairline + contact + ambient + deep accent bloom */
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--card-border) 55%, transparent),
+    0 2px 4px -2px color-mix(in srgb, var(--text-primary) 8%, transparent),
+    0 16px 38px -22px color-mix(in srgb, var(--accent-primary) 26%, transparent),
+    0 44px 80px -52px color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+
+/* ---- Chrome ---- */
+.sim-host .sim-chrome {
+  height: 32px;
+  background: color-mix(in srgb, var(--bg-secondary) 50%, var(--card-bg));
+  border-bottom: 1px solid var(--sim-border-soft);
+  display: flex; align-items: center; padding: 0 14px; gap: 10px;
+  opacity: 0.85;
+}
+.sim-host .sim-dots { display: flex; gap: 6px; }
+.sim-host .sim-dots span { width: 9px; height: 9px; border-radius: 50%; }
+.sim-host .sim-dots span:nth-child(1) { background: color-mix(in srgb, var(--accent-danger) 60%, transparent); }
+.sim-host .sim-dots span:nth-child(2) { background: color-mix(in srgb, var(--accent-warning) 65%, transparent); }
+.sim-host .sim-dots span:nth-child(3) { background: color-mix(in srgb, var(--accent-success) 60%, transparent); }
+.sim-host .sim-url {
+  flex: 1; text-align: center;
+  font-family: var(--sim-mono); font-size: 11px;
+  color: var(--sim-ink-3);
+  background: var(--sim-card); border: 1px solid var(--sim-border);
+  border-radius: 7px; padding: 3px 12px;
+  max-width: 280px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sim-host .sim-chrome-right {
+  width: 40px; text-align: right;
+  font-family: var(--sim-mono); font-size: 10px;
+  color: var(--sim-ink-3);
+}
+
+/* ---- Header ---- */
+.sim-host .sim-header {
+  padding: 12px 18px 11px;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--sim-border-soft);
+  gap: 12px;
+}
+.sim-host .sim-title { font-family: var(--sim-mono); font-size: 9px; letter-spacing: 0.14em; color: var(--sim-ink-3); text-transform: uppercase; }
+.sim-host .sim-title-main { font-size: 13.5px; font-weight: 600; color: var(--sim-ink-2); margin-top: 2px; letter-spacing: -0.01em; }
+.sim-host .sim-title-main .mode { color: var(--sim-ink-3); font-weight: 400; }
+.sim-host .sim-meta { text-align: right; display: flex; align-items: center; gap: 16px; }
+.sim-host .sim-meta-block { text-align: right; }
+.sim-host .sim-meta-label { font-family: var(--sim-mono); font-size: 9px; letter-spacing: 0.12em; color: var(--sim-ink-3); text-transform: uppercase; }
+.sim-host .sim-meta-val { font-family: var(--sim-mono); font-size: 12.5px; color: var(--sim-ink); font-weight: 500; margin-top: 2px; }
+.sim-host .sim-meta-val.accent { color: var(--sim-accent); }
+.sim-host .sim-exit-btn {
+  padding: 6px 11px; border-radius: 8px;
+  background: var(--sim-card); border: 1px solid var(--sim-border);
+  font-family: var(--sim-sans); font-size: 11.5px; color: var(--sim-ink-2);
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+}
+
+/* ---- Stage ---- */
+.sim-host .sim-stage {
+  display: grid; grid-template-columns: 144px 1fr;
+  gap: 18px; padding: 16px 18px 14px;
+}
+
+/* Video tile */
+.sim-host .sim-video-tile {
+  position: relative;
+  width: 100%;            /* never collapse — keeps the avatar permanently visible */
+  aspect-ratio: 3 / 4;
+  border-radius: 12px;
+  overflow: hidden;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 18%, var(--card-bg)), color-mix(in srgb, var(--accent-hover) 12%, var(--card-bg)));
+  border: 1px solid var(--sim-border);
+  flex-shrink: 0;
+  box-shadow: 0 8px 24px -16px color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  transition: box-shadow 0.55s ease;
+}
+/* soft live-state glow — calm/enterprise, not neon */
+.sim-host .sim-video-tile.speaking {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-success) 22%, transparent), 0 10px 28px -16px color-mix(in srgb, var(--accent-success) 30%, transparent);
+}
+.sim-host .sim-video-tile.listening {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 22%, transparent), 0 10px 28px -16px color-mix(in srgb, var(--accent-danger) 28%, transparent);
+}
+.sim-host .sim-video-tile video,
+.sim-host .sim-video-tile .sim-poster img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.sim-host .sim-video-tile .sim-poster img { z-index: 0; }
+.sim-host .sim-video-tile video { z-index: 1; background: transparent; }
+/* Component 1 — avatar live-state, shown as a waveform (Speaking / Listening / Analyzing) */
+.sim-host .sim-state {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 14px;
+}
+.sim-host .sim-wave {
+  display: flex; align-items: center; gap: 2px;
+  height: 20px; flex: 1; min-width: 0;
+}
+.sim-host .sim-wave i {
+  flex: 1 1 0; min-width: 2px; max-width: 3.5px;
+  height: 100%; border-radius: 2px;
+  background: var(--sim-accent);
+  transform: scaleY(0.26); transform-origin: center;
+  animation: sim-wave-kf 0.9s ease-in-out infinite;
+}
+.sim-host .sim-state.speak .sim-wave i { background: var(--sim-green); }
+.sim-host .sim-state.listen .sim-wave i { background: var(--sim-red); }
+.sim-host .sim-state.analyze .sim-wave i { background: var(--sim-accent); animation-duration: 1.5s; }
+@keyframes sim-wave-kf { 0%, 100% { transform: scaleY(0.26); } 50% { transform: scaleY(1); } }
+
+/* Component 2 — overall interview progress (separate concern) */
+.sim-host .sim-progress { margin-top: 14px; }
+.sim-host .sim-progress-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin-bottom: 7px;
+}
+.sim-host .sim-progress-label {
+  font-family: var(--sim-mono); font-size: 9px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--sim-ink-3);
+}
+.sim-host .sim-status-track {
+  margin-top: 9px; height: 4px; border-radius: 3px; overflow: hidden;
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+}
+.sim-host .sim-status-fill {
+  height: 100%; width: 0%; border-radius: 3px;
+  background: var(--sim-accent);
+  transition: width 0.5s cubic-bezier(.4, 0, .2, 1);
+}
+.sim-host .sim-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 0;
+  font-family: var(--sim-mono); font-size: 10px;
+  color: var(--sim-accent);
+  letter-spacing: 0.07em; text-transform: uppercase;
+}
+.sim-host .sim-chip .ic { width: 5px; height: 5px; border-radius: 50%; background: var(--sim-accent); }
+.sim-host .sim-chip.speak { color: var(--sim-green); }
+.sim-host .sim-chip.speak .ic { background: var(--sim-green); animation: sim-pulse 1.2s infinite; }
+.sim-host .sim-chip.listen { color: var(--sim-red); }
+.sim-host .sim-chip.listen .ic { background: var(--sim-red); animation: sim-pulse 1s infinite; }
+.sim-host .sim-chip.analyze { color: var(--sim-accent); }
+.sim-host .sim-chip.analyze .ic { background: var(--sim-accent); animation: sim-pulse 0.85s infinite; }
+
+.sim-host .sim-tile-progress {
+  font-family: var(--sim-mono); font-size: 11px; font-weight: 600; color: var(--sim-accent);
+}
+.sim-host .sim-tile-name {
+  position: absolute; bottom: 9px; left: 9px; right: 9px;
+  display: flex; justify-content: space-between; align-items: center;
+  pointer-events: none;
+}
+.sim-host .sim-tile-name .name {
+  font-family: var(--sim-mono); font-size: 9px;
+  color: #fff; background: rgba(18, 14, 34, 0.6); backdrop-filter: blur(4px);
+  padding: 3px 7px; border-radius: 6px;
+}
+.sim-host .sim-tile-bars {
+  display: inline-flex; gap: 2px; align-items: end; height: 12px;
+  padding: 3px 6px; border-radius: 999px;
+  background: rgba(18, 14, 34, 0.6); backdrop-filter: blur(4px);
+}
+.sim-host .sim-tile-bars i {
+  width: 2px; background: var(--sim-green); border-radius: 1px;
+  height: 4px;
+}
+.sim-host .sim-tile-bars.active i { animation: sim-bars 0.75s infinite; }
+.sim-host .sim-tile-bars i:nth-child(2) { animation-delay: 0.08s; }
+.sim-host .sim-tile-bars i:nth-child(3) { animation-delay: 0.16s; }
+.sim-host .sim-tile-bars i:nth-child(4) { animation-delay: 0.24s; }
+
+/* listening overlay */
+.sim-host .sim-listen-overlay {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--accent-danger) 22%, transparent), transparent 60%);
+  pointer-events: none; opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.sim-host .sim-listen-overlay.on { opacity: 1; }
+
+/* left column: presenter top, timer anchored to the bottom (balances the tall convo) */
+.sim-host .sim-left { display: flex; flex-direction: column; }
+
+/* circular live timer — green ring with the value centered inside */
+.sim-host .sim-tile-timer {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex; justify-content: center;
+}
+.sim-host .sim-ring-wrap { position: relative; width: 86px; height: 86px; }
+.sim-host .sim-ring-wrap .ring { width: 100%; height: 100%; display: block; }
+.sim-host .sim-tile-timer .ring-bg { stroke: color-mix(in srgb, var(--text-muted) 26%, transparent); }
+.sim-host .sim-tile-timer .ring-fg { stroke: var(--sim-green); transition: stroke-dashoffset 0.45s linear; }
+.sim-host .sim-ring-label {
+  position: absolute; inset: 0;
+  font-family: var(--sim-sans);
+  color: var(--sim-green);
+}
+/* number perfectly centered in the circle */
+.sim-host .sim-ring-label .num {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; font-weight: 700; line-height: 1; letter-spacing: -0.015em;
+}
+/* full "Seconds" unit label, sitting in the lower part of the ring */
+.sim-host .sim-ring-label .u {
+  position: absolute; left: 0; right: 0; bottom: 25%;
+  text-align: center; font-size: 8px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7;
+}
+
+/* ---- Conversation ---- */
+/* FIXED height transcript viewport → the card never grows/shrinks while text streams
+   or blocks reveal. Content scrolls internally (auto-pinned to the active line in JS),
+   so there is zero page reflow below the hero. Scrollbar hidden for a clean look. */
+.sim-host .sim-conv {
+  display: flex; flex-direction: column; gap: 8px;
+  min-width: 0;
+  height: 372px;
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+.sim-host .sim-conv::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+.sim-host .block {
+  border-radius: 11px;
+  padding: 10px 12px;
+  border: 1px solid var(--sim-border-soft);
+  background: var(--sim-card);
+  position: relative;
+  opacity: 0;
+  transform: translateY(5px);
+  transition: opacity 0.45s cubic-bezier(.22,.61,.36,1), transform 0.45s cubic-bezier(.22,.61,.36,1);
+}
+.sim-host .block.show { opacity: 1; transform: translateY(0); }
+.sim-host .block-eyebrow {
+  font-family: var(--sim-mono); font-size: 9px;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--sim-ink-3); margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.sim-host .block-eyebrow .left { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.sim-host .block-eyebrow .left .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.sim-host .block-eyebrow .timer { color: var(--sim-ink-2); flex-shrink: 0; }
+.sim-host .block-body {
+  font-size: 12.5px; line-height: 1.5; color: var(--sim-ink-2);
+  min-height: 16px;
+}
+
+/* question block — the dominant element: larger, bolder, full-contrast, accent ring */
+.sim-host .block.q {
+  background: var(--sim-lavender);
+  border-color: color-mix(in srgb, var(--accent-primary) 24%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--accent-primary) 6%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--accent-primary) 5%, transparent);
+}
+.sim-host .block.q .block-eyebrow { color: var(--sim-accent); }
+.sim-host .block.q .block-eyebrow .dot { background: var(--sim-accent); }
+.sim-host .block.q .block-body { font-size: 14.5px; line-height: 1.45; font-weight: 600; color: var(--sim-ink); letter-spacing: -0.01em; }
+.sim-host .block.q .caret {
+  display: inline-block; width: 2px; height: 14px; border-radius: 1px;
+  background: var(--sim-accent); vertical-align: -2px; margin-left: 2px;
+  animation: sim-caret 1.1s ease-in-out infinite; opacity: 0;
+}
+.sim-host .block.q.typing .caret { opacity: 1; }
+
+/* answer block */
+.sim-host .block.a, .sim-host .block.a2 { background: var(--sim-soft); }
+.sim-host .block.a .block-eyebrow .dot { background: var(--sim-red); animation: sim-pulse 1.2s infinite; }
+.sim-host .block.a .block-eyebrow .wave, .sim-host .block.a2 .block-eyebrow .wave { display: inline-flex; gap: 2px; align-items: end; height: 9px; }
+.sim-host .block.a .block-eyebrow .wave i, .sim-host .block.a2 .block-eyebrow .wave i { width: 2px; background: var(--sim-red); border-radius: 1px; height: 3px; }
+.sim-host .block.a .block-eyebrow .wave.active i, .sim-host .block.a2 .block-eyebrow .wave.active i { animation: sim-bars 0.9s infinite; }
+.sim-host .block-eyebrow .wave i:nth-child(2) { animation-delay: 0.1s; }
+.sim-host .block-eyebrow .wave i:nth-child(3) { animation-delay: 0.2s; }
+.sim-host .block-eyebrow .wave i:nth-child(4) { animation-delay: 0.3s; }
+.sim-host .block-body .word { opacity: 0; transition: opacity 0.26s cubic-bezier(.22,.61,.36,1); }
+.sim-host .block-body .word.in { opacity: 1; }
+
+/* follow-up — the "gotcha" beat: full contrast + soft amber glow when revealed */
+.sim-host .block.fu {
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent-warning) 13%, transparent), color-mix(in srgb, var(--accent-warning) 4%, transparent));
+  border: 1px dashed color-mix(in srgb, var(--accent-warning) 58%, transparent);
+}
+.sim-host .block.fu.show { box-shadow: 0 6px 20px -10px color-mix(in srgb, var(--accent-warning) 45%, transparent); }
+.sim-host .block.fu .block-eyebrow { color: var(--sim-orange); }
+.sim-host .block.fu .block-eyebrow .dot { background: var(--sim-orange); animation: sim-pulse 1.2s infinite; }
+.sim-host .block.fu .pill {
+  background: var(--sim-orange); color: #fff;
+  font-family: var(--sim-mono); font-size: 8.5px;
+  padding: 3px 6px; border-radius: 5px;
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+.sim-host .block.fu .block-body { font-weight: 500; font-size: 13px; color: var(--sim-ink); }
+
+/* 5-dim feedback */
+.sim-host .block.fb {
+  padding: 13px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--accent-primary) 7%, transparent), color-mix(in srgb, var(--accent-primary) 2%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 18%, transparent);
+}
+.sim-host .block.fb .block-eyebrow .dot { background: var(--sim-accent); }
+.sim-host .fb-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; }
+.sim-host .fb-title { font-size: 12px; font-weight: 600; color: var(--sim-ink); }
+.sim-host .fb-total { font-family: var(--sim-serif); font-style: italic; font-size: 30px; color: var(--sim-accent); line-height: 0.9; letter-spacing: -0.01em; }
+.sim-host .fb-total small { font-size: 11px; color: var(--sim-ink-3); font-style: normal; font-family: var(--sim-sans); letter-spacing: 0; }
+/* score block reveal: a touch more lift to feel like a payoff */
+.sim-host .block.fb { transform: translateY(7px); }
+.sim-host .block.fb.show { transform: translateY(0); }
+.sim-host .fb-bars { display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; }
+.sim-host .fb-bar { display: grid; grid-template-columns: 1fr 28px; gap: 6px; align-items: center; }
+.sim-host .fb-bar-label { font-family: var(--sim-mono); font-size: 9.5px; color: var(--sim-ink-2); }
+.sim-host .fb-bar-val { font-family: var(--sim-mono); font-size: 10.5px; color: var(--sim-ink); text-align: right; font-weight: 500; }
+.sim-host .fb-bar-track { grid-column: 1 / -1; height: 5px; background: color-mix(in srgb, var(--accent-primary) 12%, transparent); border-radius: 3px; overflow: hidden; margin-top: 2px; }
+.sim-host .fb-bar-fill { height: 100%; background: var(--sim-accent); border-radius: 3px; width: 0%; transition: width 0.7s cubic-bezier(.4,0,.2,1); }
+.sim-host .fb-bar-fill.orange { background: var(--sim-orange); }
+.sim-host .fb-bar-fill.red { background: var(--sim-red); }
+
+/* ---- Foot ---- */
+.sim-host .sim-foot {
+  padding: 12px 18px;
+  border-top: 1px solid var(--sim-border-soft);
+  background: var(--sim-soft);
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+}
+.sim-host .sim-foot-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.sim-host .sim-mic {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: var(--sim-card); border: 1px solid var(--sim-border);
+  display: grid; place-items: center; color: var(--sim-ink-2);
+  transition: all 0.3s ease;
+}
+.sim-host .sim-mic.active {
+  background: var(--sim-red); color: #fff; border-color: var(--sim-red);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-danger) 16%, transparent);
+}
+.sim-host .sim-mic.muted { color: var(--sim-ink-3); }
+.sim-host .sim-foot-status {
+  font-family: var(--sim-mono); font-size: 11px; color: var(--sim-ink-2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sim-host .sim-foot-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.sim-host .sim-prev-btn, .sim-host .sim-next-btn {
+  padding: 8px 14px; border-radius: 9px;
+  font-family: var(--sim-sans); font-size: 12.5px; font-weight: 500;
+  border: 1px solid var(--sim-border); background: var(--sim-card); color: var(--sim-ink-2);
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.sim-host .sim-next-btn.primary {
+  background: var(--sim-accent); color: #fff; border-color: var(--sim-accent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+.sim-host .sim-next-btn.disabled, .sim-host .sim-next-btn.primary.disabled {
+  background: color-mix(in srgb, var(--accent-primary) 18%, var(--bg-tertiary));
+  color: var(--sim-ink-3); border-color: var(--sim-border);
+  box-shadow: none; pointer-events: none;
+}
+.sim-host .sim-next-btn.pulse { animation: sim-btnpulse 1.3s ease-in-out infinite; }
+.sim-host .sim-next-btn .arrow { transition: transform 0.2s ease; }
+.sim-host .sim-next-btn:hover .arrow { transform: translateX(2px); }
+
+/* simulated cursor */
+.sim-host .sim-cursor {
+  position: absolute; pointer-events: none; z-index: 50;
+  width: 20px; height: 20px; opacity: 0;
+  transition: all 0.7s cubic-bezier(.4,0,.2,1);
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));
+}
+.sim-host .sim-cursor.show { opacity: 1; }
+.sim-host .sim-cursor.click { transform: scale(0.85); }
+
+/* analyzing shimmer */
+.sim-host .analyzing-shimmer {
+  background-image: linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--accent-primary) 22%, transparent) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: sim-shimmer 1.9s linear infinite;
+}
+
+/* ---- keyframes (calmer than standalone) ---- */
+@keyframes sim-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.62; transform: scale(1.18); } }
+@keyframes sim-caret { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.2; } }
+@keyframes sim-bars { 0%, 100% { height: 3px; } 50% { height: 8px; } }
+@keyframes sim-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes sim-btnpulse {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px color-mix(in srgb, var(--accent-primary) 35%, transparent), 0 0 0 0 color-mix(in srgb, var(--accent-primary) 40%, transparent); }
+  50%      { box-shadow: inset 0 1px 0 rgba(255,255,255,0.18), 0 1px 2px color-mix(in srgb, var(--accent-primary) 35%, transparent), 0 0 0 5px transparent; }
+}
+
+/* tablet / stacked hero (≤860px): centered, capped so it never feels oversized */
+@media (max-width: 860px) {
+  .sim-host .sim { max-width: min(520px, 100%); }
+}
+
+/* ---- responsive: stack inside narrow hero / mobile ---- */
+@media (max-width: 560px) {
+  .sim-host .sim-stage { grid-template-columns: 1fr; }
+  .sim-host .sim-left { gap: 10px; }
+  .sim-host .sim-video-tile { aspect-ratio: 16 / 10; }
+  .sim-host .sim-state { margin-top: 0; }
+  .sim-host .sim-progress { margin-top: 0; }
+  .sim-host .sim-tile-timer { margin-top: 2px; padding-top: 0; }
+  .sim-host .sim-ring-wrap { width: 72px; height: 72px; }
+  .sim-host .sim-ring-label .num { font-size: 18px; }
+  .sim-host .sim-ring-label .u { font-size: 7px; bottom: 24%; }
+  .sim-host .sim-conv { height: 320px; }
+  .sim-host .fb-bars { grid-template-columns: 1fr; }
+  .sim-host .sim-meta-block { display: none; }
+  .sim-host .sim-header { padding: 12px 14px; }
+  .sim-host .sim-stage { padding: 14px; }
+}
+
+/* ---- reduced motion: freeze everything, show final state ---- */
+@media (prefers-reduced-motion: reduce) {
+  .sim-host *, .sim-host *::before, .sim-host *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .sim-host .block { opacity: 1 !important; transform: none !important; }
+  .sim-host .block-body .word { opacity: 1 !important; }
+  .sim-host .sim-cursor { display: none !important; }
+}

@@ -164,8 +164,8 @@ const RESOURCES_ITEMS = [
   {
     icon: HelpCircle,
     label: 'Help Center',
-    href: '/help',
-    desc: 'FAQs and platform how-tos',
+    href: '/help-center',
+    desc: 'Guides, FAQs, and support',
   },
 ] as const;
 
@@ -474,7 +474,7 @@ function AvatarMenu({
           Billing
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => router.push('/help')}
+          onClick={() => router.push('/help-center')}
           className="flex cursor-pointer items-center gap-2"
         >
           <HelpCircle className="size-4" aria-hidden />
@@ -539,6 +539,7 @@ function AnonymousNav() {
     { href: '/interview-questions', label: 'Interview Questions' },
     { href: '/tools/question-generator', label: 'Tools' },
     { href: '/blog', label: 'Blog' },
+    { href: '/help-center', label: 'Help Center' },
     { href: '/pricing', label: 'Pricing' },
   ] as const;
 
