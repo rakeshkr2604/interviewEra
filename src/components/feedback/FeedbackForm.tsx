@@ -1,0 +1,343 @@
+'use client'
+
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { Star, Loader2, MessageSquarePlus } from 'lucide-react'
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { cn } from '@/lib/utils'
+
+const MAX_TEXT = 2000
+
+type WouldUse = boolean | null
+
+function RatingPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number
+  onChange: (v: number) => void
+  disabled?: boolean
+}) {
+  const [hover, setHover] = useState(0)
+  const active = hover || value
+  return (
+    <div
+      className="flex items-center gap-1.5"
+      role="radiogroup"
+      aria-label="Overall rating, 1 to 5"
+      onMouseLeave={() => setHover(0)}
+    >
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          role="radio"
+          aria-checked={value === n}
+          aria-label={`${n} star${n > 1 ? 's' : ''}`}
+          disabled={disabled}
+          onMouseEnter={() => setHover(n)}
+          onFocus={() => setHover(n)}
+          onClick={() => onChange(n)}
+          className="rounded-md p-1 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Star
+            className={cn('size-7 transition-colors', n <= active ? 'fill-amber-400' : 'fill-transparent')}
+            style={{ color: n <= active ? '#f59e0b' : 'var(--text-muted)' }}
+            strokeWidth={1.75}
+          />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+  return (
+    <Label htmlFor={htmlFor} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+      {children}
+    </Label>
+  )
+}
+
+export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
+  const [open, setOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const [name, setName] = useState(defaultName)
+  const [rating, setRating] = useState(0)
+  const [liked, setLiked] = useState('')
+  const [confusion, setConfusion] = useState('')
+  const [bugs, setBugs] = useState('')
+  const [wouldUse, setWouldUse] = useState<WouldUse>(null)
+
+  function reset() {
+    setName(defaultName)
+    setRating(0)
+    setLiked('')
+    setConfusion('')
+    setBugs('')
+    setWouldUse(null)
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (submitting) return // guard against double submission
+
+    if (rating < 1) {
+      toast.error('Please pick a star rating first.')
+      return
+    }
+    if (!liked.trim() && !confusion.trim() && !bugs.trim()) {
+      toast.error('Add at least one note so we know what to improve.')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim() || defaultName,
+          rating,
+          likedText: liked,
+          confusionText: confusion,
+          bugsText: bugs,
+          wouldUseAgain: wouldUse,
+          pageUrl: typeof window !== 'undefined' ? window.location.href : '',
+          browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        }),
+      })
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null
+        toast.error(data?.error || 'Something went wrong. Please try again.')
+        return
+      }
+
+      toast.success('Thanks for your feedback. We review every submission.')
+      reset()
+      setOpen(false)
+    } catch {
+      toast.error('Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Don't allow closing mid-submit so the request isn't visually abandoned.
+        if (submitting && !next) return
+        setOpen(next)
+      }}
+    >
+      <DialogTrigger
+        render={
+          <Button
+            className="landing-cta-lift h-auto rounded-[14px] px-4 py-2.5 text-sm font-semibold text-white"
+            style={{
+              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
+              boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
+            }}
+          />
+        }
+      >
+        <MessageSquarePlus className="size-4" aria-hidden />
+        Share feedback
+      </DialogTrigger>
+
+      <DialogContent
+        showCloseButton={!submitting}
+        className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto p-0 sm:max-w-lg"
+        style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
+      >
+        <form onSubmit={handleSubmit}>
+          <DialogHeader className="gap-1.5 border-b p-5 sm:p-6" style={{ borderColor: 'var(--card-border)' }}>
+            <DialogTitle className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              Share your feedback
+            </DialogTitle>
+            <DialogDescription className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              It goes straight to the founder. We read every submission.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-5 p-5 sm:p-6">
+            {/* Rating */}
+            <div className="space-y-2">
+              <FieldLabel htmlFor="fb-rating">Overall rating</FieldLabel>
+              <RatingPicker value={rating} onChange={setRating} disabled={submitting} />
+            </div>
+
+            {/* Name */}
+            <div className="space-y-2">
+              <FieldLabel htmlFor="fb-name">Your name</FieldLabel>
+              <input
+                id="fb-name"
+                type="text"
+                value={name}
+                maxLength={80}
+                disabled={submitting}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="How should we address you?"
+                className="flex h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 disabled:opacity-60"
+                style={{
+                  background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+            </div>
+
+            <FeedbackTextarea
+              id="fb-liked"
+              label="What did you like?"
+              value={liked}
+              onChange={setLiked}
+              disabled={submitting}
+              placeholder="The part that worked well for you…"
+            />
+            <FeedbackTextarea
+              id="fb-confusion"
+              label="What confused you?"
+              value={confusion}
+              onChange={setConfusion}
+              disabled={submitting}
+              placeholder="Anything unclear or harder than it should be…"
+            />
+            <FeedbackTextarea
+              id="fb-bugs"
+              label="Bugs or issues?"
+              value={bugs}
+              onChange={setBugs}
+              disabled={submitting}
+              placeholder="What broke, and what were you doing at the time…"
+            />
+
+            {/* Would use again */}
+            <div className="space-y-2">
+              <FieldLabel htmlFor="fb-woulduse">Would you use InterviewEra again?</FieldLabel>
+              <div className="flex gap-2" role="radiogroup" aria-label="Would you use it again">
+                {(
+                  [
+                    { v: true, label: 'Yes' },
+                    { v: false, label: 'No' },
+                  ] as const
+                ).map(({ v, label }) => {
+                  const selected = wouldUse === v
+                  return (
+                    <button
+                      key={label}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={submitting}
+                      onClick={() => setWouldUse(selected ? null : v)}
+                      className="rounded-full border-2 px-5 py-1.5 text-sm font-semibold transition-colors disabled:opacity-60"
+                      style={{
+                        borderColor: selected ? 'var(--accent-primary)' : 'var(--card-border)',
+                        background: selected
+                          ? 'color-mix(in srgb, var(--accent-primary) 14%, transparent)'
+                          : 'transparent',
+                        color: selected ? 'var(--accent-primary)' : 'var(--text-secondary)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end sm:p-6"
+            style={{ borderColor: 'var(--card-border)' }}
+          >
+            <Button
+              type="button"
+              variant="outline"
+              disabled={submitting}
+              onClick={() => setOpen(false)}
+              className="h-auto rounded-[14px] px-4 py-2.5"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={submitting}
+              className="landing-cta-lift h-auto rounded-[14px] px-5 py-2.5 text-sm font-semibold text-white"
+              style={{
+                background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
+                boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
+              }}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  Sending…
+                </>
+              ) : (
+                'Send feedback'
+              )}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function FeedbackTextarea({
+  id,
+  label,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  placeholder?: string
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+          {value.length}/{MAX_TEXT}
+        </span>
+      </div>
+      <Textarea
+        id={id}
+        value={value}
+        maxLength={MAX_TEXT}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        className="min-h-20 resize-y"
+        style={{
+          background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
+          borderColor: 'var(--card-border)',
+          color: 'var(--text-primary)',
+        }}
+      />
+    </div>
+  )
+}

@@ -142,4 +142,41 @@ export const referralApplySchema = z.object({
 
 export const profileNamePatchSchema = z.object({
   name: displayNameSchema,
-});
+})
+
+/**
+ * In-app feedback submission. user_id/email come from the authenticated session
+ * server-side; `name` is editable in the form (prefilled from the profile).
+ * All free-text is HTML-stripped + length-clamped here so the DB and email never
+ * see raw markup — never trust the frontend's own limits.
+ */
+const feedbackText = (max: number) =>
+  z.preprocess(
+    (v) => (typeof v === 'string' ? v : ''),
+    z
+      .string()
+      .max(max * 2) // generous pre-sanitize ceiling; safeText does the real clamp
+      .transform((s) => safeText(s, max)),
+  )
+
+export const feedbackSubmitSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Name is required.')
+    .max(160)
+    .transform((s) => safeText(s, 80))
+    .refine((s) => s.length >= 1, 'Name is required.'),
+  rating: z.coerce.number().int().min(1, 'Pick a rating.').max(5),
+  likedText: feedbackText(2000),
+  confusionText: feedbackText(2000),
+  bugsText: feedbackText(2000),
+  wouldUseAgain: z.boolean().nullable().optional().default(null),
+  pageUrl: z
+    .preprocess((v) => (typeof v === 'string' ? v : ''), z.string().max(2048))
+    .transform((s) => safeText(s, 2048)),
+  browserInfo: z
+    .preprocess((v) => (typeof v === 'string' ? v : ''), z.string().max(1024))
+    .transform((s) => safeText(s, 512)),
+})
+
+export type FeedbackSubmitInput = z.infer<typeof feedbackSubmitSchema>;
