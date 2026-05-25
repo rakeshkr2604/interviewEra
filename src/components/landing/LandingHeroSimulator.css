@@ -256,7 +256,10 @@
 .sim-host .sim-ring-wrap { position: relative; width: 86px; height: 86px; }
 .sim-host .sim-ring-wrap .ring { width: 100%; height: 100%; display: block; }
 .sim-host .sim-tile-timer .ring-bg { stroke: color-mix(in srgb, var(--text-muted) 26%, transparent); }
-.sim-host .sim-tile-timer .ring-fg { stroke: var(--sim-green); transition: stroke-dashoffset 0.45s linear; }
+.sim-host .sim-tile-timer .ring-fg { stroke: var(--sim-green); }
+/* Countdown ring drains via a single CSS animation (no per-tick JS / SVG writes). */
+.sim-host .ring-fg.draining { animation: sim-ring-drain var(--drain-dur, 90s) linear forwards; }
+@keyframes sim-ring-drain { from { stroke-dashoffset: 0; } to { stroke-dashoffset: 263.894; } }
 .sim-host .sim-ring-label {
   position: absolute; inset: 0;
   font-family: var(--sim-sans);
@@ -280,6 +283,7 @@
    or blocks reveal. Content scrolls internally (auto-pinned to the active line in JS),
    so there is zero page reflow below the hero. Scrollbar hidden for a clean look. */
 .sim-host .sim-conv {
+  position: relative;
   display: flex; flex-direction: column; gap: 8px;
   min-width: 0;
   height: 372px;
@@ -378,9 +382,21 @@
 .sim-host .fb-bar-label { font-family: var(--sim-mono); font-size: 9.5px; color: var(--sim-ink-2); }
 .sim-host .fb-bar-val { font-family: var(--sim-mono); font-size: 10.5px; color: var(--sim-ink); text-align: right; font-weight: 500; }
 .sim-host .fb-bar-track { grid-column: 1 / -1; height: 5px; background: color-mix(in srgb, var(--accent-primary) 12%, transparent); border-radius: 3px; overflow: hidden; margin-top: 2px; }
-.sim-host .fb-bar-fill { height: 100%; background: var(--sim-accent); border-radius: 3px; width: 0%; transition: width 0.7s cubic-bezier(.4,0,.2,1); }
+/* Score-bar fill — width is set statically; the reveal is a GPU transform (scaleX),
+   not a per-frame JS width animation. Staggered via animation-delay (compositor). */
+.sim-host .fb-bar-fill {
+  height: 100%; background: var(--sim-accent); border-radius: 3px;
+  transform: scaleX(0); transform-origin: left center;
+}
 .sim-host .fb-bar-fill.orange { background: var(--sim-orange); }
 .sim-host .fb-bar-fill.red { background: var(--sim-red); }
+.sim-host .block.fb.show .fb-bar-fill { animation: sim-fb-grow 0.75s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.sim-host .block.fb.show .fb-bar:nth-child(1) .fb-bar-fill { animation-delay: 0.05s; }
+.sim-host .block.fb.show .fb-bar:nth-child(2) .fb-bar-fill { animation-delay: 0.13s; }
+.sim-host .block.fb.show .fb-bar:nth-child(3) .fb-bar-fill { animation-delay: 0.21s; }
+.sim-host .block.fb.show .fb-bar:nth-child(4) .fb-bar-fill { animation-delay: 0.29s; }
+.sim-host .block.fb.show .fb-bar:nth-child(5) .fb-bar-fill { animation-delay: 0.37s; }
+@keyframes sim-fb-grow { to { transform: scaleX(1); } }
 
 /* ---- Foot ---- */
 .sim-host .sim-foot {
@@ -484,5 +500,6 @@
   }
   .sim-host .block { opacity: 1 !important; transform: none !important; }
   .sim-host .block-body .word { opacity: 1 !important; }
+  .sim-host .fb-bar-fill { transform: scaleX(1) !important; }
   .sim-host .sim-cursor { display: none !important; }
 }

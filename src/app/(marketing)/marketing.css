@@ -1,0 +1,146 @@
+/* Premium landing v3 decorative styles — route-scoped to marketing routes + homepage
+   (imported by the marketing layout). NOT loaded on auth/dashboard/app routes.
+   Shared pieces (premium tokens, aurora ambient layers, .ie-card-premium,
+   .landing-cta-lift) intentionally remain in globals.css. */
+
+/* ─── Hero gradient text — background-clip:text must not participate in the
+       universal background/color transition or the clip breaks in light mode ─── */
+/* Static gradient — animating background-position is non-composited and
+   hurts CLS / LCP; the visual is still strong without the shimmer. */
+.v3-hero-gradient-text {
+  display: inline-block;
+  background: linear-gradient(110deg, #6366f1 0%, #8b5cf6 35%, #d946ef 65%, #6366f1 100%);
+  background-size: 100% 100%;
+  -webkit-background-clip: text !important;
+  background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  color: transparent !important;
+  transition: none !important;
+}
+
+/* ─── Progress bar fills — background must never participate in any transition.
+       Framer Motion overwrites inline transition: none via its own CSS property,
+       so only !important in a class reliably prevents the 200ms background fade. ─── */
+.v3-bar-fill-accent {
+  background: linear-gradient(90deg, var(--accent-primary), var(--v3-pur)) !important;
+  transition: none !important;
+}
+/* Score-bar fill — transform-only grow (no layout/width animation, no JS). */
+.v3-bar-fill-solid {
+  transform-origin: left center;
+  animation: v3-bar-grow 0.9s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes v3-bar-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .v3-bar-fill-solid { animation: none; }
+}
+
+/* ─── Landing v3 button states — premium depth + shimmer ─── */
+.v3-btn-primary {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent-primary) 96%, white 4%) 0%,
+    var(--accent-primary) 100%) !important;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.18) inset,
+    0 1px 2px rgba(79, 70, 229, 0.28),
+    0 8px 18px -4px rgba(79, 70, 229, 0.32);
+  transition:
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.2s ease !important;
+}
+.v3-btn-primary::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(110deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.22) 50%,
+    transparent 70%);
+  transform: translateX(-110%);
+  transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.v3-btn-primary > * { position: relative; z-index: 2; }
+.v3-btn-primary:hover {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent-hover) 96%, white 4%) 0%,
+    var(--accent-hover) 100%) !important;
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.22) inset,
+    0 2px 4px rgba(79, 70, 229, 0.3),
+    0 16px 32px -8px rgba(79, 70, 229, 0.45);
+}
+.v3-btn-primary:hover::after { transform: translateX(110%); }
+.v3-btn-primary:active {
+  transform: translateY(0);
+  transition-duration: 0.08s;
+}
+.v3-btn-primary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 60%, transparent);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-btn-primary, .v3-btn-primary::after { transition: none !important; }
+  .v3-btn-primary:hover { transform: none; }
+}
+
+.v3-btn-secondary {
+  transition:
+    border-color 200ms ease,
+    transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.v3-btn-secondary:hover {
+  border-color: var(--text-secondary) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent-primary) 25%, transparent);
+}
+.v3-btn-secondary:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-primary) 50%, transparent);
+  outline-offset: 3px;
+}
+
+/* ─── Landing v3 responsive overrides ─── */
+@media (max-width: 860px) {
+  .hero-grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .flow-steps-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .flow-arrow-hide {
+    display: none !important;
+  }
+  .entry-grid-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .pipeline-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .pipe-arrow-hide {
+    display: none !important;
+  }
+  .transf-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .engine-body-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .strip-responsive {
+    grid-template-columns: 1fr !important;
+  }
+  .testi-responsive {
+    grid-template-columns: 1fr !important;
+  }
+}
+

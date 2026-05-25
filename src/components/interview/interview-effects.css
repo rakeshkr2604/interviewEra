@@ -1,0 +1,22 @@
+/* Interview transcript waveform / thinking-bar effects — route-scoped (loads only
+   on the interview session route via CandidateTranscript, not in the global bundle). */
+
+/* ─── Interview: waveform bars (thinking + listening states) ─── */
+@keyframes ie-bar-bounce {
+  0%, 100% { transform: scaleY(0.25); opacity: 0.45; }
+  50%       { transform: scaleY(1);    opacity: 1;    }
+}
+/* Thinking animation — slower, breathing rhythm */
+.ie-thinking-bar {
+  animation: ie-bar-bounce 1.35s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+/* Listening animation — faster, reactive rhythm */
+.ie-audio-bar {
+  animation: ie-bar-bounce 0.85s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-thinking-bar, .ie-audio-bar { animation: none !important; }
+}

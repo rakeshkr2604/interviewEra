@@ -2,7 +2,6 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { motion } from 'motion/react';
 import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
 import { AmbientLayer } from '@/components/landing/AmbientLayer';
 
@@ -64,13 +63,9 @@ function ScoringEngineSection() {
                         </span>
                       </div>
                       <div style={{ height: '6px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-                        <motion.div
+                        <div
                           className="v3-bar-fill-solid"
-                          style={{ height: '100%', borderRadius: '99px', background: barColor }}
-                          initial={{ width: 0 }}
-                          whileInView={{ width: `${bar.pct}%` }}
-                          viewport={{ once: true }}
-                          transition={{ duration: 0.9, delay: 0.2, ease: 'easeOut' }}
+                          style={{ height: '100%', width: `${bar.pct}%`, borderRadius: '99px', background: barColor }}
                         />
                       </div>
                     </div>

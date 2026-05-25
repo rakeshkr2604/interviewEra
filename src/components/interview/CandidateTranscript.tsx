@@ -1,6 +1,8 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { Mic, MicOff } from 'lucide-react'
+// Route-scoped: waveform / thinking-bar styles load only with the interview session.
+import './interview-effects.css'
 
 interface CandidateTranscriptProps {
   transcript: string

@@ -18,7 +18,6 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 
 const STORAGE_KEY = 'auth_redirect';
 
@@ -26,24 +25,35 @@ export function PostAuthRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    const supabase = createClient();
+    // Perf: only the post-OAuth return navigation has a pending redirect. On every
+    // other visit (the vast majority) we skip importing/initialising Supabase entirely,
+    // keeping it out of the bundle and off the hydration path.
+    if (typeof window === 'undefined' || !sessionStorage.getItem(STORAGE_KEY)) return;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== 'SIGNED_IN') return;
+    let cancelled = false;
+    let unsubscribe: (() => void) | undefined;
 
-      const pending = sessionStorage.getItem(STORAGE_KEY);
-      if (!pending) return;
-
-      // Validate: only same-origin paths, no open redirect
-      if (pending.startsWith('/') && !pending.startsWith('//')) {
+    void (async () => {
+      const { createClient } = await import('@/lib/supabase/client');
+      if (cancelled) return;
+      const supabase = createClient();
+      const {
+        data: { subscription },
+      } = supabase.auth.onAuthStateChange((event) => {
+        if (event !== 'SIGNED_IN') return;
+        const pending = sessionStorage.getItem(STORAGE_KEY);
+        if (!pending) return;
         sessionStorage.removeItem(STORAGE_KEY);
-        router.push(pending);
-      } else {
-        sessionStorage.removeItem(STORAGE_KEY);
-      }
-    });
+        // Validate: only same-origin paths, no open redirect
+        if (pending.startsWith('/') && !pending.startsWith('//')) router.push(pending);
+      });
+      unsubscribe = () => subscription.unsubscribe();
+    })();
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      unsubscribe?.();
+    };
   }, [router]);
 
   return null;

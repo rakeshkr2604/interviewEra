@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { BlogRelatedToolsStrip } from '@/components/seo/BlogRelatedToolsStrip';
 
 import { siteConfig } from '@/lib/seo/metadata';
+// Route-scoped: blog article typography loads only on /blog/* (not in the global bundle).
+import './blog.css';
 
 /**
  * Browser tab titles for posts: `{post title} | InterviewEra` (brand-last for scanning on index pages).

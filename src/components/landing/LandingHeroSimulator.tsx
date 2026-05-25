@@ -127,12 +127,13 @@ export default function LandingHeroSimulator() {
     const video = q<HTMLVideoElement>('.sim-video-tile video');
 
     // keep the active block in view inside the fixed-height transcript (no page reflow)
+    // Offset-based (no getBoundingClientRect) so it doesn't force a full sync layout
+    // on every call. conv is position:relative so block offsetTop is relative to it.
     const pin = (el: Element | null) => {
       if (!conv || !el) return;
-      const cr = conv.getBoundingClientRect();
-      const er = el.getBoundingClientRect();
-      const delta = er.bottom - cr.bottom + 14;
-      if (delta > 0) conv.scrollTop += delta;
+      const node = el as HTMLElement;
+      const target = node.offsetTop + node.offsetHeight - conv.clientHeight + 14;
+      if (target > conv.scrollTop) conv.scrollTop = target;
     };
 
     const progressFill = q<HTMLElement>('[data-sim="progressFill"]');
@@ -170,13 +171,6 @@ export default function LandingHeroSimulator() {
       rafs.add(id);
     };
 
-    const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
-    // gentle overshoot-then-settle (easeOutBack, low tension) — bar width only
-    const easeBack = (t: number) => {
-      const c = 0.7;
-      const p = t - 1;
-      return 1 + (c + 1) * p * p * p + c * p * p;
-    };
     // slight humanising jitter so streamed text isn't metronomic
     const jitter = (base: number) => base * (0.8 + Math.random() * 0.4);
 
@@ -272,18 +266,20 @@ export default function LandingHeroSimulator() {
       for (let i = 0; i < str.length; i++) {
         if (cancelled) return;
         el.insertBefore(document.createTextNode(str[i]), keepCaret ? caret : null);
-        pin(el.closest('.block'));
         // brief natural pause after sentence punctuation
         const extra = /[.?!,]/.test(str[i]) ? perCharMs * 4 : 0;
         await sleep(jitter(perCharMs) + extra);
       }
       parent?.classList.remove('typing');
       if (keepCaret) caret.remove();
+      pin(parent); // scroll once after typing, not per character
     };
 
     const streamWords = async (el: HTMLElement, str: string, perWordMs: number) => {
       const words = str.split(' ');
+      const blk = el.closest('.block');
       el.innerHTML = '';
+      let wi = 0;
       for (const w of words) {
         if (cancelled) return;
         const s = document.createElement('span');
@@ -291,7 +287,7 @@ export default function LandingHeroSimulator() {
         s.textContent = w + ' ';
         el.appendChild(s);
         raf(() => s.classList.add('in'));
-        pin(el.closest('.block'));
+        if (++wi % 3 === 0) pin(blk); // scroll occasionally, not every word
         // natural cadence: short words quicker, long words slower, pause after punctuation
         let d = perWordMs;
         if (w.length <= 3) d *= 0.72;
@@ -299,6 +295,7 @@ export default function LandingHeroSimulator() {
         if (/[.,!?…]$/.test(w)) d += perWordMs * 1.6;
         await sleep(jitter(d));
       }
+      pin(blk);
     };
 
     const resetFbBars = () => {
@@ -314,78 +311,64 @@ export default function LandingHeroSimulator() {
       if (fbTotal) fbTotal.innerHTML = '—<small>/10</small>';
     };
 
-    // staggered bar fill — each dimension settles a beat after the previous (rewarding payoff)
-    const fillFbBars = (turn: Turn) =>
-      new Promise<void>((resolve) => {
-        const stagger = 120; // ms between successive bars
-        const barDur = 820; // ms per bar
-        const totalDur = stagger * (SCORE_KEYS.length - 1) + barDur;
-        const start = performance.now();
-        const animate = (now: number) => {
-          if (cancelled) return resolve();
-          const elapsed = now - start;
-          SCORE_KEYS.forEach((k, i) => {
-            const fill = fbFill(k);
-            const val = fbVal(k);
-            if (!fill || !val) return;
-            const local = Math.min(1, Math.max(0, (elapsed - i * stagger) / barDur));
-            const score = turn.scores[k];
-            // width overshoots a hair then settles; the number eases cleanly to target
-            fill.style.width = score * 10 * easeBack(local) + '%';
-            val.textContent = (score * easeInOut(local)).toFixed(1);
-            if (turn.barColors[k]) fill.classList.add(turn.barColors[k]);
-          });
-          const totalE = easeInOut(Math.min(1, elapsed / totalDur));
-          if (fbTotal) fbTotal.innerHTML = (turn.total * totalE).toFixed(1) + '<small>/10</small>';
-          if (elapsed < totalDur) raf(animate);
-          else {
-            // settle to exact final values
-            SCORE_KEYS.forEach((k) => {
-              const fill = fbFill(k);
-              const val = fbVal(k);
-              if (fill) fill.style.width = turn.scores[k] * 10 + '%';
-              if (val) val.textContent = turn.scores[k].toFixed(1);
-            });
-            if (fbTotal) fbTotal.innerHTML = turn.total.toFixed(1) + '<small>/10</small>';
-            resolve();
-          }
-        };
-        raf(animate);
+    // Score bars: set final widths/colors/numbers in one synchronous pass. The grow
+    // is a pure-CSS scaleX (staggered) keyed off `.block.fb.show` — no rAF, no layout
+    // thrash, no long tasks.
+    const paintFbBars = (turn: Turn) => {
+      SCORE_KEYS.forEach((k) => {
+        const fill = fbFill(k);
+        const val = fbVal(k);
+        if (fill) {
+          fill.className = 'fb-bar-fill';
+          fill.style.width = turn.scores[k] * 10 + '%';
+          if (turn.barColors[k]) fill.classList.add(turn.barColors[k]);
+        }
+        if (val) val.textContent = turn.scores[k].toFixed(1);
       });
+      if (fbTotal) fbTotal.innerHTML = turn.total.toFixed(1) + '<small>/10</small>';
+    };
 
     // ---- per-question timer ----
-    // ring shows seconds remaining ("90s" → "43s"); header/eyebrow stay mm:ss
-    const ringHtml = (s: number) =>
-      `<span class="num">${Math.max(0, Math.ceil(s))}</span><span class="u">Seconds</span>`;
+    // The ring drains via CSS (off the JS thread). A 1s interval updates only the
+    // number text node (cheap) and the urgency colour — no per-tick SVG writes.
     const startTimer = () => {
       const timerStart = performance.now();
       const initial = fmtTime(QUESTION_SECONDS);
-      if (qTimer) qTimer.textContent = initial;
-      if (ringTimer) ringTimer.innerHTML = ringHtml(QUESTION_SECONDS);
-      ringFg?.setAttribute('stroke-dashoffset', '0');
+      const ringNum = ringTimer?.querySelector('.num') as HTMLElement | null;
+      if (qTimer) {
+        qTimer.textContent = initial;
+        (qTimer as HTMLElement).style.color = '';
+      }
+      if (ringNum) ringNum.textContent = String(QUESTION_SECONDS);
+      if (ringTimer) (ringTimer as HTMLElement).style.color = '';
       if (qBlockTimer) qBlockTimer.textContent = 'Time left · ' + initial;
+      if (ringFg) {
+        ringFg.classList.remove('draining');
+        (ringFg as SVGElement & { style: CSSStyleDeclaration }).style.stroke = '';
+        void ringFg.getBoundingClientRect(); // reflow to restart the CSS drain
+        (ringFg as SVGElement & { style: CSSStyleDeclaration }).style.setProperty(
+          '--drain-dur',
+          QUESTION_SECONDS + 's',
+        );
+        ringFg.classList.add('draining');
+      }
       if (interval) clearInterval(interval);
       interval = window.setInterval(() => {
         if (cancelled) return;
-        const elapsed = (performance.now() - timerStart) / 1000;
-        const remaining = Math.max(0, QUESTION_SECONDS - elapsed);
+        const remaining = Math.max(0, QUESTION_SECONDS - (performance.now() - timerStart) / 1000);
         const display = fmtTime(remaining);
         if (qTimer) qTimer.textContent = display;
-        if (ringTimer) ringTimer.innerHTML = ringHtml(remaining);
         if (qBlockTimer) qBlockTimer.textContent = 'Time left · ' + display;
-        const pct = Math.min(1, elapsed / QUESTION_SECONDS);
-        ringFg?.setAttribute('stroke-dashoffset', String(RING_CIRC * pct));
+        if (ringNum) ringNum.textContent = String(Math.max(0, Math.ceil(remaining)));
         const red = remaining <= 15;
-        // resting color comes from CSS (muted); only override to red for urgency
-        if (red) ringFg?.setAttribute('stroke', 'var(--accent-danger)');
-        else ringFg?.removeAttribute('stroke');
+        if (ringFg) (ringFg as SVGElement & { style: CSSStyleDeclaration }).style.stroke = red ? 'var(--accent-danger)' : '';
         if (ringTimer) (ringTimer as HTMLElement).style.color = red ? 'var(--accent-danger)' : '';
         if (qTimer) (qTimer as HTMLElement).style.color = red ? 'var(--accent-danger)' : '';
         if (remaining <= 0 && interval) {
           clearInterval(interval);
           interval = null;
         }
-      }, 250);
+      }, 1000);
     };
 
     const simulateNextClick = async () => {
@@ -490,16 +473,14 @@ export default function LandingHeroSimulator() {
       if (cancelled) return;
       setProgress(85);
 
-      // Phase 6 — 5-dimensional feedback
+      // Phase 6 — 5-dimensional feedback (widths/numbers set once; CSS animates the grow)
       setChip('analyze');
       setMic('muted');
       if (footStatus) footStatus.textContent = 'Scoring across 5 dimensions…';
+      paintFbBars(turn);
       blockFb?.classList.add('show');
       pin(blockFb);
-      await sleep(420);
-      if (cancelled) return;
-      pin(blockFb);
-      await fillFbBars(turn);
+      await sleep(1100);
       if (cancelled) return;
       setProgress(Math.round(turn.total * 10));
 
@@ -521,30 +502,46 @@ export default function LandingHeroSimulator() {
       runTurn();
     };
 
-    // ---- deferred video: play only while in view ----
-    if (video) {
-      video.muted = true;
-      if ('IntersectionObserver' in window) {
-        io = new IntersectionObserver(
-          (entries) => {
-            entries.forEach((entry) => {
-              if (entry.isIntersecting) video.play().catch(() => {});
-              else video.pause();
-            });
-          },
-          { threshold: 0.15 },
-        );
-        io.observe(video);
-      } else {
-        video.play().catch(() => {});
-      }
-    }
+    // Defer ALL active work (video playback + animation loop) until the browser is
+    // idle, so the simulator never competes with hydration/initial paint → lower TBT.
+    // The static shell is already server-rendered, so the card is visible & stable first.
+    type IdleW = Window & {
+      requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number;
+      cancelIdleCallback?: (h: number) => void;
+    };
+    const iw = window as IdleW;
+    const usedIdle = typeof iw.requestIdleCallback === 'function';
 
-    const startId = window.setTimeout(runTurn, 500);
-    timeouts.add(startId);
+    const beginActive = () => {
+      if (cancelled) return;
+      if (video) {
+        video.muted = true;
+        if ('IntersectionObserver' in window) {
+          io = new IntersectionObserver(
+            (entries) => {
+              entries.forEach((entry) => {
+                if (entry.isIntersecting) video.play().catch(() => {});
+                else video.pause();
+              });
+            },
+            { threshold: 0.15 },
+          );
+          io.observe(video);
+        } else {
+          video.play().catch(() => {});
+        }
+      }
+      runTurn();
+    };
+
+    const idleHandle: number = usedIdle
+      ? iw.requestIdleCallback!(beginActive, { timeout: 1800 })
+      : (window.setTimeout(beginActive, 300) as unknown as number);
 
     return () => {
       cancelled = true;
+      if (usedIdle) iw.cancelIdleCallback?.(idleHandle);
+      else clearTimeout(idleHandle);
       timeouts.forEach((id) => clearTimeout(id));
       rafs.forEach((id) => cancelAnimationFrame(id));
       pendingResolvers.forEach((fn) => fn());
