@@ -17,26 +17,87 @@ export interface FeedbackPayload {
   wouldUseAgain: boolean | null;
   pageUrl: string;
   browserInfo: string;
+  /** Long-lived signed URL to the attached screenshot, or null if none. */
+  screenshotUrl: string | null;
   createdAt: Date;
 }
 
-// ─── Derived metadata ─────────────────────────────────────────────────────────
+// ─── Severity scoring ─────────────────────────────────────────────────────────
 
-/** Short category used in the subject line + priority badge. */
-export function categorize(p: FeedbackPayload): {
+export type FeedbackSeverity = 'low' | 'medium' | 'high' | 'critical';
+
+/**
+ * Critical issue groups, ordered by triage importance. A match in any group
+ * escalates severity to `critical` and provides a descriptive subject label.
+ * Keywords are matched case-insensitively as substrings across all free-text.
+ */
+const CRITICAL_GROUPS: { label: string; keywords: string[] }[] = [
+  { label: 'Payment Issue', keywords: ['payment', 'charged', 'double charge', 'refund', 'billing', 'card declined', 'paid but'] },
+  { label: 'Login Failure', keywords: ['login', 'log in', 'sign in', 'signin', 'sign-in', 'log-in', "can't log", 'cant log', 'cannot log'] },
+  { label: "Can't Start Interview", keywords: ["can't start", 'cant start', 'cannot start', 'can not start', "won't start", 'wont start', 'unable to start', 'interview not starting', "won't begin"] },
+  { label: 'Crash / Frozen', keywords: ['crash', 'crashed', 'crashing', 'frozen', 'freeze', 'froze', 'stuck', 'hangs', 'hung', 'unresponsive'] },
+  { label: 'Data Loss', keywords: ['data loss', 'lost my data', 'lost all', 'lost my progress', 'disappeared'] },
+];
+
+/** Generic bug indicators (don't escalate to critical, but mark a real defect). */
+const BUG_KEYWORDS = [
+  'bug', 'error', 'broken', 'glitch', 'not working', "doesn't work", 'does not work',
+  "won't work", 'wont work', 'failed', 'fails', 'failure', 'blank screen', '404', '500',
+];
+
+function haystack(p: FeedbackPayload): string {
+  return `${p.likedText}\n${p.confusionText}\n${p.bugsText}`.toLowerCase();
+}
+
+function matchesAny(hay: string, keywords: string[]): boolean {
+  return keywords.some((k) => hay.includes(k));
+}
+
+/**
+ * Auto-classifies a submission into a severity level + a short subject label.
+ * Pure + deterministic so the API route (DB persistence) and the email builder
+ * derive the same value independently.
+ *
+ * Precedence:
+ *   1. critical keyword anywhere        → critical
+ *   2. rating ≤ 2 AND a bug is reported → high
+ *   3. a bug is reported (rating ≥ 3)   → medium
+ *   4. confusion reported               → medium
+ *   5. rating ≤ 2 (no specifics)        → medium
+ *   6. rating ≥ 4                        → low (positive)
+ *   7. otherwise                         → low
+ */
+export function assessFeedback(p: FeedbackPayload): {
   label: string;
-  priority: 'high' | 'medium' | 'low';
+  severity: FeedbackSeverity;
 } {
-  if (p.bugsText.trim()) return { label: 'Bug Report', priority: 'high' };
-  if (p.rating <= 2) return { label: 'Confusing UX', priority: 'high' };
-  if (p.confusionText.trim()) return { label: 'Confusing UX', priority: 'medium' };
-  if (p.rating >= 4) return { label: 'Positive Feedback', priority: 'low' };
-  return { label: 'General Feedback', priority: 'medium' };
+  const hay = haystack(p);
+
+  for (const group of CRITICAL_GROUPS) {
+    if (matchesAny(hay, group.keywords)) {
+      return { label: group.label, severity: 'critical' };
+    }
+  }
+
+  const hasBug = p.bugsText.trim().length > 0 || matchesAny(hay, BUG_KEYWORDS);
+  if (hasBug) {
+    return { label: 'Bug Report', severity: p.rating <= 2 ? 'high' : 'medium' };
+  }
+  if (p.confusionText.trim()) {
+    return { label: 'Confusing UX', severity: 'medium' };
+  }
+  if (p.rating <= 2) {
+    return { label: 'Negative Feedback', severity: 'medium' };
+  }
+  if (p.rating >= 4) {
+    return { label: 'Positive Feedback', severity: 'low' };
+  }
+  return { label: 'General Feedback', severity: 'low' };
 }
 
 export function buildSubject(p: FeedbackPayload): string {
-  const { label } = categorize(p);
-  return `[InterviewEra Feedback] Rating: ${p.rating}/5 — ${label}`;
+  const { label, severity } = assessFeedback(p);
+  return `[${severity.toUpperCase()}][InterviewEra Feedback] Rating: ${p.rating}/5 — ${label}`;
 }
 
 /** Submission timestamp rendered in IST (Asia/Kolkata). */
@@ -64,7 +125,8 @@ function nl2br(escaped: string): string {
   return escaped.replace(/\r?\n/g, '<br>');
 }
 
-const PRIORITY_COLORS: Record<'high' | 'medium' | 'low', { bg: string; fg: string }> = {
+const SEVERITY_COLORS: Record<FeedbackSeverity, { bg: string; fg: string }> = {
+  critical: { bg: '#fecaca', fg: '#7f1d1d' },
   high: { bg: '#fee2e2', fg: '#b91c1c' },
   medium: { bg: '#fef3c7', fg: '#b45309' },
   low: { bg: '#dcfce7', fg: '#15803d' },
@@ -86,11 +148,24 @@ function emptyValue(): string {
   return '<span style="color:#9ca3af;font-style:italic;">— not provided —</span>';
 }
 
+/** Inline preview + clickable link for an attached screenshot. */
+function screenshotSection(url: string): string {
+  const safeUrl = escapeHtml(url);
+  return `
+    <tr><td style="padding:18px 0 0;">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;">Screenshot</p>
+      <a href="${safeUrl}" target="_blank" style="display:block;border:1px solid #eef0f3;border-radius:8px;overflow:hidden;text-decoration:none;">
+        <img src="${safeUrl}" alt="Feedback screenshot attached by the user" style="display:block;width:100%;max-width:100%;height:auto;background:#f9fafb;" />
+      </a>
+      <p style="margin:8px 0 0;font-size:12px;"><a href="${safeUrl}" target="_blank" style="color:#4f46e5;font-weight:600;">Open full-size screenshot →</a></p>
+    </td></tr>`;
+}
+
 // ─── Email HTML ───────────────────────────────────────────────────────────────
 
 export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
-  const { label, priority } = categorize(p);
-  const pc = PRIORITY_COLORS[priority];
+  const { label, severity } = assessFeedback(p);
+  const sc = SEVERITY_COLORS[severity];
 
   const wouldUse =
     p.wouldUseAgain === null
@@ -126,8 +201,14 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
       <td style="padding:20px 24px;background:linear-gradient(135deg,#4f46e5,#7c3aed);">
         <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e0e7ff;">InterviewEra Feedback</p>
         <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">${ratingStars(p.rating)} &nbsp;${p.rating}/5</p>
-        <div style="margin-top:10px;">
-          <span style="display:inline-block;font-size:11px;font-weight:700;padding:3px 10px;border-radius:999px;background:${pc.bg};color:${pc.fg};">${escapeHtml(label)} · ${priority.toUpperCase()} PRIORITY</span>
+        <div style="margin-top:12px;">
+          <span style="display:inline-block;font-size:12px;font-weight:800;letter-spacing:.07em;padding:4px 12px;border-radius:999px;background:${sc.bg};color:${sc.fg};">${severity.toUpperCase()} SEVERITY</span>
+          <span style="display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;background:rgba(255,255,255,0.18);color:#ffffff;">${escapeHtml(label)}</span>
+          ${
+            p.screenshotUrl
+              ? `<span style="display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;background:#ffffff;color:#4f46e5;">📎 Screenshot attached</span>`
+              : ''
+          }
         </div>
       </td>
     </tr>
@@ -142,6 +223,7 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
           ${section('What they liked', p.likedText.trim() ? nl2br(escapeHtml(p.likedText)) : emptyValue())}
           ${section('What confused them', p.confusionText.trim() ? nl2br(escapeHtml(p.confusionText)) : emptyValue())}
           ${section('Bugs / issues', p.bugsText.trim() ? nl2br(escapeHtml(p.bugsText)) : emptyValue())}
+          ${p.screenshotUrl ? screenshotSection(p.screenshotUrl) : ''}
         </table>
       </td>
     </tr>
@@ -157,10 +239,10 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
 
 /** Plain-text fallback for clients that don't render HTML. */
 function buildFeedbackEmailText(p: FeedbackPayload): string {
-  const { label, priority } = categorize(p);
+  const { label, severity } = assessFeedback(p);
   const yn = p.wouldUseAgain === null ? 'not provided' : p.wouldUseAgain ? 'Yes' : 'No';
   return [
-    `InterviewEra Feedback — ${label} (${priority} priority)`,
+    `[${severity.toUpperCase()}] InterviewEra Feedback — ${label}`,
     `Rating: ${p.rating}/5`,
     ``,
     `Name: ${p.name}`,
@@ -179,6 +261,8 @@ function buildFeedbackEmailText(p: FeedbackPayload): string {
     ``,
     `Bugs / issues:`,
     p.bugsText.trim() || '(not provided)',
+    ``,
+    `Screenshot: ${p.screenshotUrl ?? '(none attached)'}`,
   ].join('\n');
 }
 
