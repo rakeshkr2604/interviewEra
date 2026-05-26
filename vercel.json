@@ -13,10 +13,6 @@
       "path": "/api/cron/weekly-digest",
       "schedule": "0 9 * * 1"
     },
-    {
-      "path": "/api/cron/feedback-retry",
-      "schedule": "*/5 * * * *"
-    }
   ],
   "functions": {
     "src/app/api/resume/upload/route.ts": { "maxDuration": 60 },

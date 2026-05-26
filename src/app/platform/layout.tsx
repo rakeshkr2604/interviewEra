@@ -77,6 +77,13 @@ export default async function PlatformLayout({ children }: { children: React.Rea
             >
               Analytics
             </Link>
+            <Link
+              href="/platform/feedback"
+              className="font-semibold transition-opacity hover:opacity-80"
+              style={{ color: 'var(--accent-primary)' }}
+            >
+              Feedback
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-3">
