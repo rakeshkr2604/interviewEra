@@ -5,6 +5,7 @@ import { feedbackSubmitSchema } from '@/lib/validations/schemas';
 import { assessFeedback, type FeedbackPayload } from '@/lib/email/feedback-notification';
 import { SCREENSHOT_BUCKET, isOwnedScreenshotPath } from '@/lib/feedback/screenshot';
 import { sendFeedbackEmail } from '@/lib/feedback/email-sender';
+import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
 
 const SCREENSHOT_URL_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year — outlives the email
 
@@ -97,7 +98,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     pageUrl,
     browserInfo,
     screenshotUrl,
-    sessionContext: sessionContext ?? null,
+    sessionContext: (sessionContext ?? null) as unknown as FeedbackSessionContext | null,
     createdAt,
   };
 
