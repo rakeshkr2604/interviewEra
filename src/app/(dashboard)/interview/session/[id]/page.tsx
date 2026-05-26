@@ -211,7 +211,7 @@ export default function InterviewSessionPage() {
           interview_type:
             firstQ?.category === 'technical'
               ? 'technical'
-              : firstQ?.category === 'hr_behavioral'
+              : firstQ?.category === 'behavioral' || firstQ?.category === 'situational'
                 ? 'hr_behavioral'
                 : 'mixed',
           difficulty_level: result.data.difficulty,
