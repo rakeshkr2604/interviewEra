@@ -16,6 +16,7 @@
  *   show_archived ('true' | '', default hidden)
  *   date_from   (ISO date string)
  *   date_to     (ISO date string)
+ *   label       (one of the FeedbackLabel values, e.g. 'Mobile')
  *   sort        ('newest' | 'oldest' | 'rating_asc' | 'rating_desc' | 'severity', default 'newest')
  *
  * Secured: platform admin only (ADMIN_EMAILS env var).
@@ -53,6 +54,8 @@ export interface FeedbackRow {
   is_pinned: boolean;
   notes: string | null;
   assigned_to: string | null;
+  // Auto-generated labels (migration 032)
+  labels: string[];
 }
 
 export interface DashboardStats {
@@ -106,6 +109,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const showArchived  = searchParams.get('show_archived') === 'true';
   const dateFrom      = searchParams.get('date_from') ?? '';
   const dateTo        = searchParams.get('date_to') ?? '';
+  const labelFilter   = searchParams.get('label') ?? '';
   const sort          = searchParams.get('sort') ?? 'newest';
 
   const service = createServiceClient();
@@ -144,6 +148,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (isPinnedParam === 'true') query = query.eq('is_pinned', true);
   if (dateFrom)               query = query.gte('created_at', dateFrom);
   if (dateTo)                 query = query.lte('created_at', dateTo + 'T23:59:59Z');
+  if (labelFilter)            query = query.contains('labels', [labelFilter]);
 
   // Full-text search across multiple text columns
   if (q) {

@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
+import type { FeedbackLabel } from '@/lib/feedback/auto-tag';
 
 const FROM_EMAIL = 'InterviewEra <transactional@interviewera.com>';
 
@@ -22,6 +23,8 @@ export interface FeedbackPayload {
   screenshotUrl: string | null;
   /** Full technical context collected client-side. Null for older submissions. */
   sessionContext: FeedbackSessionContext | null;
+  /** Auto-detected category labels. Empty array means no label matched. */
+  labels: FeedbackLabel[];
   createdAt: Date;
 }
 
@@ -126,6 +129,37 @@ function escapeHtml(input: string): string {
 /** Preserve user line breaks inside an already-escaped string. */
 function nl2br(escaped: string): string {
   return escaped.replace(/\r?\n/g, '<br>');
+}
+
+// ─── Label colours (email) ────────────────────────────────────────────────────
+
+const LABEL_COLORS: Record<string, { bg: string; fg: string }> = {
+  'UX':                 { bg: '#ede9fe', fg: '#5b21b6' },
+  'Mobile':             { bg: '#e0f2fe', fg: '#075985' },
+  'Performance':        { bg: '#fef3c7', fg: '#92400e' },
+  'AI Accuracy':        { bg: '#f0fdf4', fg: '#166534' },
+  'Audio Issue':        { bg: '#fce7f3', fg: '#9d174d' },
+  'Camera Issue':       { bg: '#fce7f3', fg: '#9d174d' },
+  'Payment':            { bg: '#fee2e2', fg: '#991b1b' },
+  'Login':              { bg: '#fff7ed', fg: '#9a3412' },
+  'Credits Confusion':  { bg: '#fefce8', fg: '#713f12' },
+  'Dashboard Bug':      { bg: '#f1f5f9', fg: '#334155' },
+  'Interview Crash':    { bg: '#fee2e2', fg: '#991b1b' },
+};
+
+function labelPillsHtml(labels: FeedbackLabel[]): string {
+  if (!labels.length) return '';
+  const pills = labels
+    .map((l) => {
+      const c = LABEL_COLORS[l] ?? { bg: '#f3f4f6', fg: '#374151' };
+      return `<span style="display:inline-block;font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;background:${c.bg};color:${c.fg};margin:2px 3px 2px 0;">${escapeHtml(l)}</span>`;
+    })
+    .join('');
+  return `
+    <tr><td style="padding:12px 0 0;">
+      <p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;">Auto-detected Labels</p>
+      <div>${pills}</div>
+    </td></tr>`;
 }
 
 const SEVERITY_COLORS: Record<FeedbackSeverity, { bg: string; fg: string }> = {
@@ -302,6 +336,7 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
           ${section('What they liked', p.likedText.trim() ? nl2br(escapeHtml(p.likedText)) : emptyValue())}
           ${section('What confused them', p.confusionText.trim() ? nl2br(escapeHtml(p.confusionText)) : emptyValue())}
           ${section('Bugs / issues', p.bugsText.trim() ? nl2br(escapeHtml(p.bugsText)) : emptyValue())}
+          ${labelPillsHtml(p.labels)}
           ${p.screenshotUrl ? screenshotSection(p.screenshotUrl) : ''}
           ${buildContextSection(p.sessionContext)}
         </table>
@@ -365,6 +400,8 @@ export function buildFeedbackEmailText(p: FeedbackPayload): string {
     ``,
     `Bugs / issues:`,
     p.bugsText.trim() || '(not provided)',
+    ``,
+    `Labels: ${p.labels.length ? p.labels.join(', ') : '(none)'}`,
     ``,
     `Screenshot: ${p.screenshotUrl ?? '(none attached)'}`,
     ...contextLines,

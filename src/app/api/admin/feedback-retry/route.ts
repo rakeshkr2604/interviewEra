@@ -16,6 +16,7 @@ import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { sendFeedbackEmail } from '@/lib/feedback/email-sender';
 import type { FeedbackPayload } from '@/lib/email/feedback-notification';
+import type { FeedbackLabel } from '@/lib/feedback/auto-tag';
 
 export const runtime = 'nodejs';
 
@@ -36,6 +37,7 @@ interface FeedbackRow {
   browser_info: string | null;
   screenshot_url: string | null;
   session_context: Record<string, unknown> | null;
+  labels: string[] | null;
   created_at: string;
   email_attempts: number;
 }
@@ -70,7 +72,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     .from('feedbacks')
     .select(
       'id, name, email, user_id, rating, liked_text, confusion_text, bugs_text, ' +
-        'would_use_again, page_url, browser_info, screenshot_url, session_context, created_at, email_attempts',
+        'would_use_again, page_url, browser_info, screenshot_url, session_context, labels, created_at, email_attempts',
     )
     .eq('email_status', 'failed')
     .order('created_at', { ascending: true })
@@ -114,6 +116,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       sessionContext: row.session_context
         ? (row.session_context as unknown as import('@/lib/feedback/collect-context').FeedbackSessionContext)
         : null,
+      labels: (row.labels ?? []) as FeedbackLabel[],
       createdAt: new Date(row.created_at),
     };
 

@@ -6,6 +6,7 @@ import { assessFeedback, type FeedbackPayload } from '@/lib/email/feedback-notif
 import { SCREENSHOT_BUCKET, isOwnedScreenshotPath } from '@/lib/feedback/screenshot';
 import { sendFeedbackEmail } from '@/lib/feedback/email-sender';
 import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
+import { autoTagFeedback } from '@/lib/feedback/auto-tag';
 
 const SCREENSHOT_URL_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year — outlives the email
 
@@ -86,6 +87,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   const email = user.email ?? '';
   const createdAt = new Date();
 
+  const typedSessionCtx = (sessionContext ?? null) as unknown as FeedbackSessionContext | null;
+  const labels = autoTagFeedback(likedText, confusionText, bugsText, typedSessionCtx);
+
   const payload: FeedbackPayload = {
     name,
     email,
@@ -98,7 +102,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     pageUrl,
     browserInfo,
     screenshotUrl,
-    sessionContext: (sessionContext ?? null) as unknown as FeedbackSessionContext | null,
+    sessionContext: typedSessionCtx,
+    labels,
     createdAt,
   };
 
@@ -125,6 +130,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       severity,
       screenshot_url: screenshotUrl,
       session_context: sessionContext ?? null,
+      labels,
       created_at: createdAt.toISOString(),
       // Retry-system columns — start in 'pending'; email-sender will update.
       email_status: 'pending',

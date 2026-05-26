@@ -32,6 +32,7 @@ import type {
 } from '@/app/api/admin/feedback/route';
 import type { RetryResultRow } from '@/app/api/admin/feedback-retry/route';
 import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
+import { ALL_LABELS, type FeedbackLabel } from '@/lib/feedback/auto-tag';
 
 // ─── Shared card style (matches analytics page) ───────────────────────────────
 
@@ -68,6 +69,20 @@ const SEVERITY_MAP = {
   high:     { bg: '#fee2e2', fg: '#b91c1c', dot: '#ef4444', label: 'HIGH'     },
   medium:   { bg: '#fef3c7', fg: '#b45309', dot: '#f59e0b', label: 'MEDIUM'   },
   low:      { bg: '#dcfce7', fg: '#15803d', dot: '#22c55e', label: 'LOW'      },
+};
+
+const LABEL_COLOR: Record<FeedbackLabel, { bg: string; fg: string }> = {
+  'UX':                { bg: '#ede9fe', fg: '#5b21b6' },
+  'Mobile':            { bg: '#e0f2fe', fg: '#075985' },
+  'Performance':       { bg: '#fef3c7', fg: '#92400e' },
+  'AI Accuracy':       { bg: '#f0fdf4', fg: '#166534' },
+  'Audio Issue':       { bg: '#fce7f3', fg: '#9d174d' },
+  'Camera Issue':      { bg: '#fce7f3', fg: '#9d174d' },
+  'Payment':           { bg: '#fee2e2', fg: '#991b1b' },
+  'Login':             { bg: '#fff7ed', fg: '#9a3412' },
+  'Credits Confusion': { bg: '#fefce8', fg: '#713f12' },
+  'Dashboard Bug':     { bg: '#f1f5f9', fg: '#334155' },
+  'Interview Crash':   { bg: '#fee2e2', fg: '#991b1b' },
 };
 
 function SeverityBadge({ severity }: { severity: string | null }) {
@@ -109,6 +124,18 @@ function Chip({ children, style }: { children: React.ReactNode; style?: React.CS
       style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)', ...style }}
     >
       {children}
+    </span>
+  );
+}
+
+function LabelChip({ label }: { label: FeedbackLabel }) {
+  const c = LABEL_COLOR[label] ?? { bg: '#f3f4f6', fg: '#374151' };
+  return (
+    <span
+      className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold"
+      style={{ background: c.bg, color: c.fg }}
+    >
+      {label}
     </span>
   );
 }
@@ -366,7 +393,7 @@ function FeedbackCard({
 
           {/* Middle: main content */}
           <div className="min-w-0 flex-1 space-y-2">
-            {/* Row 1: severity + rating + time */}
+            {/* Row 1: severity + rating + status */}
             <div className="flex flex-wrap items-center gap-2">
               <SeverityBadge severity={row.severity} />
               <RatingStars rating={row.rating} />
@@ -383,6 +410,15 @@ function FeedbackCard({
                 </span>
               )}
             </div>
+
+            {/* Row 1b: auto-detected labels */}
+            {row.labels?.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {(row.labels as FeedbackLabel[]).map((l) => (
+                  <LabelChip key={l} label={l} />
+                ))}
+              </div>
+            )}
 
             {/* Row 2: name + email */}
             <div className="flex flex-wrap items-baseline gap-x-2">
@@ -703,6 +739,7 @@ interface Filters {
   is_pinned:    string;
   show_archived: string;
   date_range:   string;   // '' | 'today' | 'week' | 'month'
+  label:        string;   // '' | one of FeedbackLabel
 }
 
 function dateRangeToParams(range: string): { date_from?: string; date_to?: string } {
@@ -730,6 +767,7 @@ export default function PlatformFeedbackPage() {
     is_pinned:     '',
     show_archived: '',
     date_range:    '',
+    label:         '',
   });
   const [sort,  setSort]  = useState('newest');
   const [page,  setPage]  = useState(1);
@@ -777,6 +815,7 @@ export default function PlatformFeedbackPage() {
       if (filters.is_resolved) p.set('is_resolved',   filters.is_resolved);
       if (filters.is_pinned)   p.set('is_pinned',     filters.is_pinned);
       if (filters.show_archived) p.set('show_archived', filters.show_archived);
+      if (filters.label)         p.set('label',         filters.label);
       const dr = dateRangeToParams(filters.date_range);
       if (dr.date_from) p.set('date_from', dr.date_from);
       if (dr.date_to)   p.set('date_to',   dr.date_to);
@@ -801,7 +840,7 @@ export default function PlatformFeedbackPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, sort, debouncedQ, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.date_range]);
+  }, [page, sort, debouncedQ, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.date_range, filters.label]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -859,7 +898,7 @@ export default function PlatformFeedbackPage() {
 
   // Clear all filters
   function clearFilters() {
-    setFilters({ q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', date_range: '' });
+    setFilters({ q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', date_range: '', label: '' });
     setDebouncedQ('');
     setSort('newest');
     setPage(1);
@@ -867,7 +906,7 @@ export default function PlatformFeedbackPage() {
 
   const hasActiveFilters = !!(
     filters.severity || filters.rating || filters.is_read || filters.is_resolved ||
-    filters.is_pinned || filters.show_archived || filters.date_range || debouncedQ
+    filters.is_pinned || filters.show_archived || filters.date_range || filters.label || debouncedQ
   );
 
   return (
@@ -989,6 +1028,23 @@ export default function PlatformFeedbackPage() {
             {d === 'today' ? 'Today' : d === 'week' ? 'This week' : 'This month'}
           </FilterPill>
         ))}
+
+        <div className="mx-1 w-px self-stretch" style={{ background: 'var(--card-border)' }} />
+
+        {/* Labels */}
+        {ALL_LABELS.map((l) => {
+          const c = LABEL_COLOR[l];
+          return (
+            <FilterPill
+              key={l}
+              active={filters.label === l}
+              activeColor={c.fg}
+              onClick={() => setFilter('label', filters.label === l ? '' : l)}
+            >
+              {l}
+            </FilterPill>
+          );
+        })}
 
         {/* Clear all */}
         {hasActiveFilters && (
