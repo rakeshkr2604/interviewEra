@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
 
 const FROM_EMAIL = 'InterviewEra <transactional@interviewera.com>';
 
@@ -19,6 +20,8 @@ export interface FeedbackPayload {
   browserInfo: string;
   /** Long-lived signed URL to the attached screenshot, or null if none. */
   screenshotUrl: string | null;
+  /** Full technical context collected client-side. Null for older submissions. */
+  sessionContext: FeedbackSessionContext | null;
   createdAt: Date;
 }
 
@@ -161,6 +164,82 @@ function screenshotSection(url: string): string {
     </td></tr>`;
 }
 
+// ─── Technical context section ────────────────────────────────────────────────
+
+function formatDuration(seconds: number | null | undefined): string {
+  if (seconds == null) return '—';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m}m ${s}s` : `${s}s`;
+}
+
+function boolBadge(val: boolean | null | undefined): string {
+  if (val == null) return emptyValue();
+  return val
+    ? '<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#dcfce7;color:#15803d;">Yes</span>'
+    : '<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:#fee2e2;color:#b91c1c;">No</span>';
+}
+
+function permBadge(val: string | null | undefined): string {
+  if (!val || val === 'unknown') return emptyValue();
+  const colors: Record<string, { bg: string; fg: string }> = {
+    granted: { bg: '#dcfce7', fg: '#15803d' },
+    denied:  { bg: '#fee2e2', fg: '#b91c1c' },
+    prompt:  { bg: '#fef3c7', fg: '#b45309' },
+  };
+  const c = colors[val] ?? { bg: '#f3f4f6', fg: '#6b7280' };
+  return `<span style="display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:${c.bg};color:${c.fg};">${escapeHtml(val)}</span>`;
+}
+
+function ctxRow(k: string, v: string): string {
+  return `
+    <tr>
+      <td style="padding:4px 12px 4px 0;font-size:12px;color:#6b7280;white-space:nowrap;vertical-align:top;">${escapeHtml(k)}</td>
+      <td style="padding:4px 0;font-size:12px;color:#111827;word-break:break-word;">${v}</td>
+    </tr>`;
+}
+
+function buildContextSection(ctx: FeedbackPayload['sessionContext']): string {
+  if (!ctx) return '';
+
+  const sessionRows = [
+    ctx.session_id       ? ctxRow('Session ID',     escapeHtml(ctx.session_id))              : '',
+    ctx.interview_role   ? ctxRow('Role',            escapeHtml(ctx.interview_role))          : '',
+    ctx.interview_type   ? ctxRow('Interview type',  escapeHtml(ctx.interview_type))          : '',
+    ctx.difficulty_level ? ctxRow('Difficulty',      escapeHtml(ctx.difficulty_level))        : '',
+    ctxRow('Duration',    escapeHtml(formatDuration(ctx.interview_duration_seconds))),
+  ].filter(Boolean).join('');
+
+  const deviceRows = [
+    ctx.browser_name   ? ctxRow('Browser',       escapeHtml(ctx.browser_name))   : '',
+    ctx.os             ? ctxRow('OS',             escapeHtml(ctx.os))             : '',
+    ctx.device_type    ? ctxRow('Device type',   escapeHtml(ctx.device_type))    : '',
+    ctx.screen_size    ? ctxRow('Screen',         escapeHtml(ctx.screen_size))    : '',
+    ctxRow('Network',         ctx.network_type ? escapeHtml(ctx.network_type) : emptyValue()),
+    ctxRow('Mic permission',  permBadge(ctx.mic_permission_status)),
+    ctxRow('Camera perm.',    permBadge(ctx.camera_permission_status)),
+    ctxRow('Speech API',      boolBadge(ctx.speech_recognition_supported)),
+    ctxRow('Speech enabled',  boolBadge(ctx.speech_recognition_enabled)),
+    ctx.current_page   ? ctxRow('Page at submit', `<span style="font-size:11px;">${escapeHtml(ctx.current_page)}</span>`) : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <tr><td style="padding:18px 0 0;">
+      <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7280;">Technical Context</p>
+      <div style="border:1px solid #eef0f3;border-radius:8px;overflow:hidden;">
+        ${sessionRows ? `
+        <div style="background:#f0f4ff;padding:8px 14px;">
+          <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6366f1;">Interview Session</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${sessionRows}</table>
+        </div>` : ''}
+        <div style="background:#f9fafb;padding:8px 14px;">
+          <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#6b7280;">Browser &amp; Device</p>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${deviceRows}</table>
+        </div>
+      </div>
+    </td></tr>`;
+}
+
 // ─── Email HTML ───────────────────────────────────────────────────────────────
 
 export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
@@ -224,6 +303,7 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
           ${section('What confused them', p.confusionText.trim() ? nl2br(escapeHtml(p.confusionText)) : emptyValue())}
           ${section('Bugs / issues', p.bugsText.trim() ? nl2br(escapeHtml(p.bugsText)) : emptyValue())}
           ${p.screenshotUrl ? screenshotSection(p.screenshotUrl) : ''}
+          ${buildContextSection(p.sessionContext)}
         </table>
       </td>
     </tr>
@@ -241,6 +321,30 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
 export function buildFeedbackEmailText(p: FeedbackPayload): string {
   const { label, severity } = assessFeedback(p);
   const yn = p.wouldUseAgain === null ? 'not provided' : p.wouldUseAgain ? 'Yes' : 'No';
+  const ctx = p.sessionContext;
+
+  const contextLines = ctx
+    ? [
+        ``,
+        `── Technical Context ──`,
+        `Session ID:          ${ctx.session_id ?? '—'}`,
+        `Role:                ${ctx.interview_role ?? '—'}`,
+        `Interview type:      ${ctx.interview_type ?? '—'}`,
+        `Difficulty:          ${ctx.difficulty_level ?? '—'}`,
+        `Duration:            ${formatDuration(ctx.interview_duration_seconds)}`,
+        `Browser:             ${ctx.browser_name ?? '—'}`,
+        `OS:                  ${ctx.os ?? '—'}`,
+        `Device type:         ${ctx.device_type ?? '—'}`,
+        `Screen:              ${ctx.screen_size ?? '—'}`,
+        `Network:             ${ctx.network_type ?? '—'}`,
+        `Mic permission:      ${ctx.mic_permission_status ?? '—'}`,
+        `Camera permission:   ${ctx.camera_permission_status ?? '—'}`,
+        `Speech API:          ${ctx.speech_recognition_supported != null ? String(ctx.speech_recognition_supported) : '—'}`,
+        `Speech enabled:      ${ctx.speech_recognition_enabled != null ? String(ctx.speech_recognition_enabled) : '—'}`,
+        `Page at submit:      ${ctx.current_page ?? '—'}`,
+      ]
+    : [];
+
   return [
     `[${severity.toUpperCase()}] InterviewEra Feedback — ${label}`,
     `Rating: ${p.rating}/5`,
@@ -263,6 +367,7 @@ export function buildFeedbackEmailText(p: FeedbackPayload): string {
     p.bugsText.trim() || '(not provided)',
     ``,
     `Screenshot: ${p.screenshotUrl ?? '(none attached)'}`,
+    ...contextLines,
   ].join('\n');
 }
 

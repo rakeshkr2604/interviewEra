@@ -184,6 +184,27 @@ export const feedbackSubmitSchema = z.object({
     .max(512)
     .regex(/^feedback\/[^/]+\/[^/]+$/, 'Invalid screenshot reference.')
     .optional(),
+  // Technical context collected client-side: browser, device, interview session.
+  // Optional — older clients or ad-blockers may not send it; API handles absence gracefully.
+  sessionContext: z
+    .object({
+      session_id: z.string().max(200).nullable().optional(),
+      interview_role: z.string().max(200).nullable().optional(),
+      interview_type: z.string().max(100).nullable().optional(),
+      difficulty_level: z.string().max(50).nullable().optional(),
+      interview_duration_seconds: z.number().int().nonnegative().max(86400).nullable().optional(),
+      current_page: z.string().max(2048).optional(),
+      browser_name: z.string().max(100).optional(),
+      os: z.string().max(100).optional(),
+      device_type: z.enum(['mobile', 'tablet', 'desktop']).optional(),
+      screen_size: z.string().max(20).optional(),
+      network_type: z.string().max(50).nullable().optional(),
+      mic_permission_status: z.string().max(20).optional(),
+      camera_permission_status: z.string().max(20).optional(),
+      speech_recognition_supported: z.boolean().optional(),
+      speech_recognition_enabled: z.boolean().optional(),
+    })
+    .optional(),
 })
 
 export type FeedbackSubmitInput = z.infer<typeof feedbackSubmitSchema>;

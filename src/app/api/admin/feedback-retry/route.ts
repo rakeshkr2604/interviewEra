@@ -35,6 +35,7 @@ interface FeedbackRow {
   page_url: string | null;
   browser_info: string | null;
   screenshot_url: string | null;
+  session_context: Record<string, unknown> | null;
   created_at: string;
   email_attempts: number;
 }
@@ -69,7 +70,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     .from('feedbacks')
     .select(
       'id, name, email, user_id, rating, liked_text, confusion_text, bugs_text, ' +
-        'would_use_again, page_url, browser_info, screenshot_url, created_at, email_attempts',
+        'would_use_again, page_url, browser_info, screenshot_url, session_context, created_at, email_attempts',
     )
     .eq('email_status', 'failed')
     .order('created_at', { ascending: true })
@@ -109,6 +110,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       browserInfo: row.browser_info ?? '',
       // screenshot_url is already a long-lived signed URL created at submit time.
       screenshotUrl: row.screenshot_url ?? null,
+      // Re-hydrate stored JSONB as FeedbackSessionContext (shape is identical).
+      sessionContext: row.session_context
+        ? (row.session_context as import('@/lib/feedback/collect-context').FeedbackSessionContext)
+        : null,
       createdAt: new Date(row.created_at),
     };
 

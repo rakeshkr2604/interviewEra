@@ -55,6 +55,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     pageUrl,
     browserInfo,
     screenshotPath,
+    sessionContext,
   } = parsed.data;
 
   // Require at least one substantive field (text or screenshot).
@@ -96,6 +97,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     pageUrl,
     browserInfo,
     screenshotUrl,
+    sessionContext: sessionContext ?? null,
     createdAt,
   };
 
@@ -121,6 +123,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       browser_info: browserInfo,
       severity,
       screenshot_url: screenshotUrl,
+      session_context: sessionContext ?? null,
       created_at: createdAt.toISOString(),
       // Retry-system columns — start in 'pending'; email-sender will update.
       email_status: 'pending',

@@ -30,6 +30,7 @@ import {
   type TierCelebrationPayload,
 } from '@/components/retention/TierUnlockCelebrationDialog'
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
+import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -202,6 +203,20 @@ export default function InterviewSessionPage() {
         )
         setCurrentIndex(restoredIndex)
         setPhase('avatar_speaking')
+        // Persist session context so the feedback form can include it automatically.
+        const firstQ = result.data.questions[0]
+        storeSessionContext({
+          session_id: result.data.interviewId,
+          interview_role: result.data.role,
+          interview_type:
+            firstQ?.category === 'technical'
+              ? 'technical'
+              : firstQ?.category === 'hr_behavioral'
+                ? 'hr_behavioral'
+                : 'mixed',
+          difficulty_level: result.data.difficulty,
+          session_started_at: Date.now(),
+        })
       } catch {
         setFetchError('Failed to load interview. Please go back and try again.')
       }
@@ -230,6 +245,8 @@ export default function InterviewSessionPage() {
   // ─── Complete Interview (defined first — used by Next/Skip) ─
   const handleCompleteInterview = useCallback(async () => {
     setPhase('completed')
+    // Record session end time so feedback form can compute accurate duration.
+    patchSessionContext({ session_ended_at: Date.now() })
     try {
       const result = await api.post<{
         reportId?: string

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import { Star, Loader2, MessageSquarePlus } from 'lucide-react'
+import { collectFeedbackContext, type FeedbackSessionContext } from '@/lib/feedback/collect-context'
 import {
   Dialog,
   DialogTrigger,
@@ -85,6 +86,16 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   const [screenshotUploading, setScreenshotUploading] = useState(false)
   // Bumping this key remounts the uploader, clearing its internal state on reset.
   const [uploaderKey, setUploaderKey] = useState(0)
+  // Collected once when the dialog opens; cached so submit has no async delay.
+  const [sessionCtx, setSessionCtx] = useState<FeedbackSessionContext | null>(null)
+
+  // Kick off context collection the moment the dialog opens.
+  useEffect(() => {
+    if (!open) return
+    collectFeedbackContext()
+      .then(setSessionCtx)
+      .catch(() => { /* non-fatal — feedback still submits without context */ })
+  }, [open])
 
   function reset() {
     setName(defaultName)
@@ -130,6 +141,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
           pageUrl: typeof window !== 'undefined' ? window.location.href : '',
           browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           ...(screenshotPath ? { screenshotPath } : {}),
+          ...(sessionCtx ? { sessionContext: sessionCtx } : {}),
         }),
       })
 
