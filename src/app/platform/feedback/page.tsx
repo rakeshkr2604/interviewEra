@@ -31,6 +31,7 @@ import type {
   FeedbackListResponse,
 } from '@/app/api/admin/feedback/route';
 import type { RetryResultRow } from '@/app/api/admin/feedback-retry/route';
+import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
 
 // ─── Shared card style (matches analytics page) ───────────────────────────────
 
@@ -294,7 +295,7 @@ function FeedbackCard({
   onSaveNotes:    (notes: string) => void;
 }) {
   const [notes, setNotes] = useState(row.notes ?? '');
-  const notesTimer = useRef<ReturnType<typeof setTimeout>>();
+  const notesTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Sync notes if the row updates externally
   useEffect(() => { setNotes(row.notes ?? ''); }, [row.notes]);
@@ -313,7 +314,7 @@ function FeedbackCard({
     notesTimer.current = setTimeout(() => onSaveNotes(val), 600);
   }
 
-  const ctx = row.session_context as Record<string, unknown> | null;
+  const ctx = row.session_context as unknown as FeedbackSessionContext | null;
   const hasSession = ctx && (ctx.interview_role || ctx.session_id);
   const hasDevice  = ctx && (ctx.browser_name || ctx.os || ctx.device_type);
 
@@ -746,7 +747,7 @@ export default function PlatformFeedbackPage() {
   const [mutating, setMutating] = useState<Record<string, boolean>>({});
 
   // Debounced search
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [debouncedQ, setDebouncedQ] = useState('');
   function handleSearchChange(val: string) {
     setFilters(f => ({ ...f, q: val }));
