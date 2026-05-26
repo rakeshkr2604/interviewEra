@@ -112,7 +112,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       screenshotUrl: row.screenshot_url ?? null,
       // Re-hydrate stored JSONB as FeedbackSessionContext (shape is identical).
       sessionContext: row.session_context
-        ? (row.session_context as import('@/lib/feedback/collect-context').FeedbackSessionContext)
+        ? (row.session_context as unknown as import('@/lib/feedback/collect-context').FeedbackSessionContext)
         : null,
       createdAt: new Date(row.created_at),
     };
