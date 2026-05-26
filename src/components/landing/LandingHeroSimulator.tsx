@@ -634,7 +634,7 @@ export default function LandingHeroSimulator() {
                 />
                 <img
                   src="/assets/female-avatar-900.webp"
-                  alt=""
+                  alt="InterviewEra AI interviewer avatar"
                   width={150}
                   height={200}
                   decoding="async"
