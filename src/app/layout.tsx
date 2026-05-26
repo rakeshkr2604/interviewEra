@@ -10,6 +10,7 @@ import { OfflineBanner } from "@/components/shared/OfflineBanner";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
 import { DeferredWebManifest } from "@/components/shared/DeferredWebManifest";
+import { Clarity } from "@/components/Clarity";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -163,6 +164,7 @@ export default function RootLayout({
         </ThemeProvider>
         <DeferredWebManifest />
         <DeferredVercelMetrics />
+        <Clarity />
       </body>
     </html>
   );
