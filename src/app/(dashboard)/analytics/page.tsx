@@ -94,7 +94,10 @@ export default async function AnalyticsPage() {
 
   const retentionDashboardSnap = progressTableMissing
     ? null
-    : await buildRetentionDashboardSnapFromRow((progressSnap as UserProgressRow | null) ?? null)
+    : await buildRetentionDashboardSnapFromRow(
+        (progressSnap as UserProgressRow | null) ?? null,
+        user.id,
+      )
 
   if (progressErr && !progressTableMissing) {
     console.error('analytics user_progress fetch', progressErr.message)

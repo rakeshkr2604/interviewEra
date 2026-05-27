@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
+import { getOpenRouterModelForOperation } from '@/lib/ai/openrouter-model-router';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import { clampInputForOperation } from '@/lib/ai/context-hygiene';
@@ -432,6 +433,7 @@ async function evaluateWithPrimaryChain(
     { role: 'user' as const, content: prompt },
   ];
 
+  const model = getOpenRouterModelForOperation('answer_evaluation');
   const t0 = Date.now();
   const result = await completeInterviewChat({
     messages,
@@ -440,16 +442,20 @@ async function evaluateWithPrimaryChain(
     operation:   'answer_evaluation',
     jsonMode:    true,
     signal,
+    recordTelemetry: false,
   });
   const parsed = tryParseResponse(result.content, 'openrouter');
   recordProviderOutcome({
     provider:       'openrouter',
     operation:      'answer_evaluation',
+    model:          result.model ?? model,
     latencyMs:      Date.now() - t0,
     success:        parsed !== null,
     timeout:        false,
     quotaExhausted: false,
     jsonValid:      parsed !== null,
+    inputTokens:    result.usage?.prompt_tokens,
+    outputTokens:   result.usage?.completion_tokens,
   });
   if (!parsed) {
     throw new Error('Failed to parse evaluation response from OpenRouter');

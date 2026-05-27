@@ -9,13 +9,10 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { DimensionScores } from '@/types/app.types';
 import type { SessionQualityRow, UserProgressRow } from '@/lib/retention/types';
 import { checkAndUnlockTier } from './tier-unlock';
-import {
-  QUALITY_CRITERIA,
-  effectiveMinQuestionsAnswered,
-  type BadgeKey,
-} from './constants';
+import { type BadgeKey } from './constants';
 import { logger } from './logger';
-import { updateStreak } from './streak-tracker';
+import { buildSessionQualityFeedback, type SessionQualityFeedback } from './quality-feedback';
+import { evaluateQuality, updateStreak } from './streak-tracker';
 import {
   lifetimeMaxDimensionScore,
   maxDimensionScore,
@@ -32,6 +29,8 @@ export interface InterviewRetentionClientPayload {
   totalXp: number;
   sessionLogged: boolean;
   qualityMet: boolean;
+  /** Present when qualityMet is false and session was logged. */
+  qualityFeedback?: SessionQualityFeedback | null;
   tierUnlocked: boolean;
   previousTier: number | null;
   newTier: number | null;
@@ -275,13 +274,15 @@ export async function processInterviewRetention(
     throw new Error('Dimension scores incomplete');
   }
 
-  const minAnsweredRequired = effectiveMinQuestionsAnswered(totalQuestions);
-  const qualityMet =
-    questionsAnswered >= minAnsweredRequired &&
-    questionsAnswered === totalQuestions &&
-    questionsSkipped === 0 &&
-    avgAnswerDurationSec >= QUALITY_CRITERIA.minAvgDurationSec &&
-    agg.sessionScore >= QUALITY_CRITERIA.minSessionScore;
+  const qualityVerdict = evaluateQuality({
+    interviewId,
+    questionsAnswered,
+    totalQuestions,
+    avgAnswerDurationSec,
+    sessionScore: agg.sessionScore,
+  });
+  const qualityMet = qualityVerdict.passed;
+  const qualityFeedback = buildSessionQualityFeedback(qualityVerdict, agg.sessionScore);
 
   const xpAdded = qualityMet ? Math.round(agg.sessionScore * 10) : 0;
   const totalXpNext = Math.max(0, (progressRowBefore.total_xp ?? 0) + xpAdded);
@@ -434,6 +435,7 @@ export async function processInterviewRetention(
     totalXp: totalXpNext,
     sessionLogged: true,
     qualityMet,
+    qualityFeedback: qualityMet ? null : qualityFeedback,
     tierUnlocked: unlockedOk,
     previousTier: unlockedOk ? tierBeforeUnlock : null,
     newTier: unlockTierNew ?? null,

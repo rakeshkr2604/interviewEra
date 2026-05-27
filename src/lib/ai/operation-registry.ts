@@ -199,6 +199,7 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0,
     maxOutputTokens:      400,
+    llmAttemptTimeoutMs:    6_500,
     timeoutMs:            8_000,
     responseFormat:       'json',
     context: {
@@ -212,6 +213,7 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0,
     maxOutputTokens:      200,
+    llmAttemptTimeoutMs:    4_500,
     timeoutMs:            6_000,
     responseFormat:       'json',
     context: {

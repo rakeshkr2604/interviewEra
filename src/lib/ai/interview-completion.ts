@@ -32,8 +32,61 @@ import { logInterviewAiCompletion } from '@/lib/telemetry/structured-ai-log';
 
 export type InterviewAiChatProvider = 'openrouter';
 
+export interface InterviewChatCompletionResult {
+  content: string;
+  provider: InterviewAiChatProvider;
+  /** OpenRouter model id actually used for the successful request. */
+  model: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
+  };
+}
+
 function orKey(model: string): string {
   return `openrouter:${model}`;
+}
+
+function emitOpenRouterTelemetry(opts: {
+  opName: string;
+  model: string;
+  latencyMs: number;
+  success: boolean;
+  timeout?: boolean;
+  quotaExhausted?: boolean;
+  jsonValid?: boolean;
+  httpStatus?: number;
+  usage?: InterviewChatCompletionResult['usage'];
+}): void {
+  const inputTokens = opts.usage?.prompt_tokens;
+  const outputTokens = opts.usage?.completion_tokens;
+
+  recordProviderOutcome({
+    provider: 'openrouter',
+    operation: opts.opName,
+    model: opts.model,
+    latencyMs: opts.latencyMs,
+    success: opts.success,
+    timeout: opts.timeout ?? false,
+    quotaExhausted: opts.quotaExhausted ?? false,
+    jsonValid: opts.jsonValid ?? true,
+    inputTokens,
+    outputTokens,
+  });
+
+  logInterviewAiCompletion({
+    event: 'openrouter_completion',
+    operation: opts.opName,
+    model: opts.model,
+    provider: 'openrouter',
+    latency_ms: opts.latencyMs,
+    success: opts.success,
+    timeout: opts.timeout,
+    http_status: opts.httpStatus,
+    prompt_tokens: inputTokens,
+    completion_tokens: outputTokens,
+  });
 }
 
 function resolveRegistryOperation(name: string | undefined): AiOperation {
@@ -50,7 +103,12 @@ export async function completeInterviewChat(options: {
   operation?: string;
   jsonMode?: boolean;
   signal?: AbortSignal;
-}): Promise<{ content: string; provider: InterviewAiChatProvider }> {
+  /**
+   * When false, caller records telemetry after post-processing (e.g. JSON parse).
+   * Structured stdout + DB rows always use the resolved `model` id.
+   */
+  recordTelemetry?: boolean;
+}): Promise<InterviewChatCompletionResult> {
   const client = createOpenRouterClient();
   if (!client) {
     throw new Error('[interview-ai] OpenRouter is not configured (OPENROUTER_API_KEY missing)');
@@ -76,10 +134,11 @@ export async function completeInterviewChat(options: {
   const key = orKey(model);
 
   const jsonMode = wantJson && !modelPrefersPlainJson(model);
+  const recordTelemetry = options.recordTelemetry !== false;
   const t0 = Date.now();
 
-  const run = async (useJson: boolean): Promise<string> => {
-    const { content } = await completionWithRetries(
+  const run = async (useJson: boolean) => {
+    return completionWithRetries(
       client,
       model,
       options.messages,
@@ -89,30 +148,21 @@ export async function completeInterviewChat(options: {
       signal,
       attemptTimeoutMs,
     );
-    return content;
   };
 
   try {
-    const content = await run(jsonMode);
+    const { content, usage } = await run(jsonMode);
     recordModelSuccess(key);
-    recordProviderOutcome({
-      provider:      'openrouter',
-      operation:     opName,
-      latencyMs:     Date.now() - t0,
-      success:       true,
-      timeout:       false,
-      quotaExhausted: false,
-      jsonValid:     true,
-    });
-    logInterviewAiCompletion({
-      event:         'openrouter_completion',
-      operation:     opName,
-      model,
-      provider:      'openrouter',
-      latency_ms:    Date.now() - t0,
-      success:       true,
-    });
-    return { content, provider: 'openrouter' };
+    if (recordTelemetry) {
+      emitOpenRouterTelemetry({
+        opName,
+        model,
+        latencyMs: Date.now() - t0,
+        success: true,
+        usage,
+      });
+    }
+    return { content, provider: 'openrouter', model, usage };
   } catch (e) {
     if (signal?.aborted) throw e;
     const statusCode = e instanceof OpenAI.APIError ? e.status ?? undefined : undefined;
@@ -121,66 +171,51 @@ export async function completeInterviewChat(options: {
     const isQuota =
       (e instanceof OpenAI.APIError && e.code === 'insufficient_quota') || statusCode === 402;
     recordModelFailure(key, statusCode);
-    recordProviderOutcome({
-      provider:       'openrouter',
-      operation:      opName,
-      latencyMs:      Date.now() - t0,
-      success:        false,
-      timeout:        isTimeout,
-      quotaExhausted: isQuota,
-      jsonValid:      true,
-    });
-    logInterviewAiCompletion({
-      event:         'openrouter_completion',
-      operation:     opName,
-      model,
-      provider:      'openrouter',
-      latency_ms:    Date.now() - t0,
-      success:       false,
-      timeout:       isTimeout,
-      http_status:   statusCode,
-    });
+    if (recordTelemetry) {
+      emitOpenRouterTelemetry({
+        opName,
+        model,
+        latencyMs: Date.now() - t0,
+        success: false,
+        timeout: isTimeout,
+        quotaExhausted: isQuota,
+        httpStatus: statusCode,
+      });
+    }
 
     // json_object rejected by some routers — one plain-text attempt (same model, same deadline)
     if (jsonMode) {
       if (signal?.aborted) throw e;
       const t1 = Date.now();
       try {
-        const content = await run(false);
+        const { content, usage } = await run(false);
         recordModelSuccess(key);
-        recordProviderOutcome({
-          provider:       'openrouter',
-          operation:      opName,
-          latencyMs:      Date.now() - t1,
-          success:        true,
-          timeout:        false,
-          quotaExhausted: false,
-          jsonValid:      true,
-        });
-        logInterviewAiCompletion({
-          event:        'openrouter_completion',
-          operation:    opName,
-          model,
-          provider:     'openrouter',
-          latency_ms:   Date.now() - t1,
-          success:      true,
-        });
-        return { content, provider: 'openrouter' };
+        if (recordTelemetry) {
+          emitOpenRouterTelemetry({
+            opName,
+            model,
+            latencyMs: Date.now() - t1,
+            success: true,
+            usage,
+          });
+        }
+        return { content, provider: 'openrouter', model, usage };
       } catch (e2) {
         if (signal?.aborted) throw e2;
         const sc = e2 instanceof OpenAI.APIError ? e2.status ?? undefined : undefined;
         const timeout2 =
           e2 instanceof Error && (e2.name === 'AbortError' || e2.message.includes('timeout'));
         recordModelFailure(key, sc);
-        recordProviderOutcome({
-          provider:       'openrouter',
-          operation:      opName,
-          latencyMs:      Date.now() - t1,
-          success:        false,
-          timeout:        timeout2,
-          quotaExhausted: false,
-          jsonValid:      true,
-        });
+        if (recordTelemetry) {
+          emitOpenRouterTelemetry({
+            opName,
+            model,
+            latencyMs: Date.now() - t1,
+            success: false,
+            timeout: timeout2,
+            httpStatus: sc,
+          });
+        }
         console.warn(`[interview-ai] OpenRouter "${model}" (plain) failed:`, e2);
       }
     }

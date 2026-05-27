@@ -1,6 +1,8 @@
 import { Flame, Layers, Sparkles, Trophy } from 'lucide-react';
+import { SessionQualityNotice } from '@/components/retention/SessionQualityNotice';
 import type { RetentionTierProgressView } from '@/lib/retention/dashboard-tier-progress';
 import { MAX_TIER } from '@/lib/retention/constants';
+import type { SessionQualityFeedback } from '@/lib/retention/quality-feedback';
 import { getTierPublicLabel } from '@/lib/retention/tier-copy';
 
 export interface RetentionDashboardSnapshot {
@@ -10,6 +12,8 @@ export interface RetentionDashboardSnapshot {
   total_sessions: number;
   /** Next-tier UX; absent when max tier or data incomplete. */
   tierProgress?: RetentionTierProgressView | null;
+  /** Latest completed session when it did not meet quality criteria. */
+  lastSessionQualityFeedback?: SessionQualityFeedback | null;
 }
 
 export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapshot | null }) {
@@ -36,6 +40,12 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
         atMaxTier={atMaxTier}
         tierProgress={snap.tierProgress}
       />
+
+      {snap.lastSessionQualityFeedback ? (
+        <div className="mt-4">
+          <SessionQualityNotice feedback={snap.lastSessionQualityFeedback} />
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-3 mt-4 sm:grid-cols-3">
         <div className="rounded-xl px-4 py-3" style={{ background: 'var(--bg-secondary)' }}>

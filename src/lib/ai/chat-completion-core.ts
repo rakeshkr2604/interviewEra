@@ -4,7 +4,8 @@
 
 import OpenAI from 'openai';
 
-const COMPLETION_RETRIES = 1;
+/** Initial attempt + one retry on transient errors. */
+const COMPLETION_RETRIES = 2;
 const RETRY_BASE_MS = 900;
 /** When an operation does not set `llmAttemptTimeoutMs` in the registry. */
 export const DEFAULT_ATTEMPT_TIMEOUT_MS = 20_000;
@@ -136,7 +137,21 @@ export async function completionWithRetries(
         `[chat-completion-core] Retryable error (attempt ${attempt + 1}/${COMPLETION_RETRIES}), waiting ${delay}ms — model: ${model}`,
         api ? `HTTP ${api.status}` : error,
       );
-      await new Promise((r) => setTimeout(r, delay));
+      await new Promise<void>((resolve, reject) => {
+        if (operationSignal?.aborted) {
+          reject(new DOMException('Operation aborted during retry backoff', 'AbortError'));
+          return;
+        }
+        const onAbort = () => {
+          clearTimeout(timer);
+          reject(new DOMException('Operation aborted during retry backoff', 'AbortError'));
+        };
+        const timer = setTimeout(() => {
+          operationSignal?.removeEventListener('abort', onAbort);
+          resolve();
+        }, delay);
+        operationSignal?.addEventListener('abort', onAbort, { once: true });
+      });
     }
   }
 

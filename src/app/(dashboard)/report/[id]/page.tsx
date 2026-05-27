@@ -29,6 +29,8 @@ import { ExecutiveSummaryPanel } from '@/components/report/ExecutiveSummaryPanel
 import { generateInsights } from '@/lib/report/insight-engine';
 import type { PerQuestionInsightData } from '@/lib/report/insight-engine';
 import { radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
+import { sessionQualityFeedbackFromLogRow } from '@/lib/retention/quality-feedback';
+import { SessionQualityNotice } from '@/components/retention/SessionQualityNotice';
 
 const exportPdfLinkClass =
   'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
@@ -109,6 +111,25 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
   const planTier = (profile?.plan_tier ?? 'free') as PlanTier;
   const canSeeDetails = planTier === 'pro' || planTier === 'campus';
+
+  const { data: sessionQualityRow } = await supabase
+    .from('session_quality_log')
+    .select(
+      'interview_id, session_score, questions_answered, total_questions, avg_answer_duration_sec, quality_met',
+    )
+    .eq('interview_id', report.interview_id)
+    .maybeSingle();
+
+  const sessionQualityFeedback = sessionQualityRow
+    ? sessionQualityFeedbackFromLogRow({
+        interview_id: sessionQualityRow.interview_id as string,
+        session_score: Number(sessionQualityRow.session_score),
+        questions_answered: Number(sessionQualityRow.questions_answered),
+        total_questions: Number(sessionQualityRow.total_questions),
+        avg_answer_duration_sec: Number(sessionQualityRow.avg_answer_duration_sec),
+        quality_met: Boolean(sessionQualityRow.quality_met),
+      })
+    : null;
 
   // Fetch per-question breakdown (include rubric for keyword analysis)
   const { data: questions } = await supabase
@@ -252,6 +273,10 @@ export default async function ReportPage({ params }: ReportPageProps) {
         userPlan={planTier}
         interviewId={interview.id as string}
       />
+
+      {sessionQualityFeedback ? (
+        <SessionQualityNotice feedback={sessionQualityFeedback} />
+      ) : null}
 
       <DashboardPageHeader
         eyebrow="Insights"

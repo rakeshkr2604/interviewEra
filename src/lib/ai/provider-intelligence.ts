@@ -14,6 +14,7 @@
  * - Routing is only reordered when composite score gap ≥ RERANK_THRESHOLD points
  */
 
+import { OPENROUTER_CHEAP_MODEL } from '@/lib/ai/openrouter-model-router';
 import { logAICall } from '@/lib/telemetry/ai-logger';
 import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
 
@@ -170,8 +171,9 @@ function pruneWindow(provider: ProviderKey): void {
  * Record the outcome of a single provider call attempt.
  * Call this immediately after each provider attempt resolves (success or failure).
  */
+/** Last-resort model labels when a caller omits `model` — must match router policy. */
 const DEFAULT_MODELS: Record<ProviderKey, string> = {
-  openrouter: 'gpt-4o-mini',
+  openrouter: OPENROUTER_CHEAP_MODEL,
   openai:     'gpt-4o-mini',
   mistral:    'mistral-small-latest',
 };
