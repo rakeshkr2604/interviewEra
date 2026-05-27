@@ -173,10 +173,10 @@ export default function OnboardingPage() {
 
     let cancelled  = false
     let attempts   = 0
-    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    let timeoutId: number | null = null
 
     const schedule = (delayMs: number) => {
-      timeoutId = window.setTimeout(() => void poll(delayMs), delayMs)
+      timeoutId = window.setTimeout(() => void poll(delayMs), delayMs) as number
     }
 
     const poll = async (currentDelay: number) => {
