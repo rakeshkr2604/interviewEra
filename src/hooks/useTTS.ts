@@ -126,6 +126,12 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
           case 'voice-unavailable':
           case 'language-unavailable':
             console.warn('[tts] voice_lang_unavailable', { code })
+            // One retry with engine default voice — resolves most "wrong gender" / missing pack issues.
+            if (voice !== null && utterance.voice !== null) {
+              console.info('[tts] retry_with_default_voice')
+              queueMicrotask(() => startUtterance(null))
+              return
+            }
             break
           case 'audio-busy':
           case 'audio-hardware':

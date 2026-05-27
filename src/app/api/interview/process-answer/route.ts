@@ -113,4 +113,4 @@ export async function POST(request: NextRequest) {
 }
 
 export const runtime = 'nodejs';
-export const maxDuration = 30; // Allow up to 30s for LLM calls
+export const maxDuration = 55;

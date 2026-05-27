@@ -1,71 +1,79 @@
 /**
- * Free-tool chat completions: OpenRouter when OPENROUTER_API_KEY is set, else direct OpenAI.
- * Does not use shared callWithRetry (avoids global quota lock / circuit breaker).
+ * Free-tool chat completions — OpenRouter ONLY (same policy as interview flows).
  */
 
 import OpenAI from 'openai';
-import openai from '@/lib/openai/client';
 import { createOpenRouterClient } from '@/lib/openrouter/client';
-import { completionWithRetries, modelPrefersPlainJson } from '@/lib/ai/chat-completion-core';
+import { completionWithRetries, modelPrefersPlainJson, DEFAULT_ATTEMPT_TIMEOUT_MS } from '@/lib/ai/chat-completion-core';
+import { getLlmAttemptTimeoutMs } from '@/lib/ai/operation-registry';
+import { OPENROUTER_CHEAP_MODEL } from '@/lib/ai/openrouter-model-router';
 
-export type ToolChatRoute = 'openrouter' | 'openai';
+export type ToolChatRoute = 'openrouter';
 
 export function getToolChatClient(): { client: OpenAI; route: ToolChatRoute } {
   const or = createOpenRouterClient();
-  if (or) return { client: or, route: 'openrouter' };
-  return { client: openai, route: 'openai' };
+  if (!or) {
+    throw new Error('[free-tool-ai] OpenRouter is not configured (OPENROUTER_API_KEY missing)');
+  }
+  return { client: or, route: 'openrouter' };
 }
 
 export function isFreeToolAiConfigured(): boolean {
-  return !!(
-    process.env.OPENROUTER_API_KEY?.trim() ||
-    process.env.OPENAI_API_KEY?.trim()
-  );
+  return !!(process.env.OPENROUTER_API_KEY?.trim());
 }
 
+/**
+ * @param openrouterModels Ignored — canonical cheap model is always used for tools
+ *   (callers may still pass a list for API stability).
+ */
 export async function completeFreeToolChatChain(options: {
-  /** Tried in order when route is openrouter */
   openrouterModels: string[];
-  /** Tried in order when route is direct OpenAI */
   openaiModels: string[];
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   temperature: number;
 }): Promise<string> {
-  const { client, route } = getToolChatClient();
-  const models = route === 'openrouter' ? options.openrouterModels : options.openaiModels;
+  const { client } = getToolChatClient();
+  const model = options.openrouterModels[0]?.trim() || OPENROUTER_CHEAP_MODEL;
+  const attemptMs = getLlmAttemptTimeoutMs('free_tool') ?? DEFAULT_ATTEMPT_TIMEOUT_MS;
   let lastError: unknown;
 
-  for (const model of models) {
-    const jsonMode = !modelPrefersPlainJson(model);
+  const jsonMode = !modelPrefersPlainJson(model);
+  try {
+    const { content } = await completionWithRetries(
+      client,
+      model,
+      options.messages,
+      options.temperature,
+      jsonMode,
+      undefined,
+      undefined,
+      attemptMs,
+    );
+    return content;
+  } catch (e) {
+    lastError = e;
+    console.warn(`[free-tool-ai] model "${model}" (json_mode=${jsonMode}) failed:`, e instanceof Error ? e.message : e);
+  }
+
+  if (jsonMode) {
     try {
-      return await completionWithRetries(
+      const { content } = await completionWithRetries(
         client,
         model,
         options.messages,
         options.temperature,
-        jsonMode,
+        false,
+        undefined,
+        undefined,
+        attemptMs,
       );
+      return content;
     } catch (e) {
       lastError = e;
-      console.warn(`[free-tool-ai] [${route}] model "${model}" failed:`, e instanceof Error ? e.message : e);
-    }
-
-    if (jsonMode) {
-      try {
-        return await completionWithRetries(
-          client,
-          model,
-          options.messages,
-          options.temperature,
-          false,
-        );
-      } catch (e) {
-        lastError = e;
-        console.warn(
-          `[free-tool-ai] [${route}] model "${model}" (no json_mode) failed:`,
-          e instanceof Error ? e.message : e,
-        );
-      }
+      console.warn(
+        `[free-tool-ai] model "${model}" (plain) failed:`,
+        e instanceof Error ? e.message : e,
+      );
     }
   }
 

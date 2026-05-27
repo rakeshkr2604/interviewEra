@@ -3,6 +3,7 @@ import type { DimensionScores, RadarDataPoint, ReportSummary, ReportSpeechSummar
 import type { FillerAnalysis } from '@/lib/filler-words/analyze';
 import { analyzeFillerWords } from '@/lib/filler-words/analyze';
 import { FILLER_THRESHOLDS, FILLER_MESSAGES } from '@/lib/filler-words/config';
+import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity';
 
 export interface ReportGenerationResult {
   reportId: string;
@@ -102,6 +103,23 @@ export async function aggregateReport(
 ): Promise<ReportGenerationResult> {
   const supabase = createServiceClient();
 
+  const { data: existingReport } = await supabase
+    .from('reports')
+    .select('id, overall_score, radar_data, trend_data')
+    .eq('interview_id', interviewId)
+    .order('generated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingReport?.id) {
+    return {
+      reportId: existingReport.id as string,
+      overallScore: existingReport.overall_score as number,
+      radarData: existingReport.radar_data as RadarDataPoint[],
+      trendData: (existingReport.trend_data as RadarDataPoint[] | null) ?? null,
+    };
+  }
+
   // Fetch all questions for this interview
   const { data: questions, error: qError } = await supabase
     .from('questions')
@@ -129,33 +147,36 @@ export async function aggregateReport(
   // Fetch all evaluations
   const { data: rawEvaluations, error: eError } = await supabase
     .from('evaluations')
-    .select('overall_score, dimension_scores')
+    .select('answer_id, overall_score, dimension_scores')
     .in('answer_id', answerIds);
 
   if (eError) {
     throw new Error(`Failed to fetch evaluations: ${eError.message}`);
   }
 
-  // Filter to only valid evaluations (non-null scores and dimension_scores)
-  // Fallback rows from failed evaluations have null scores and must be excluded
-  const validEvaluations = (rawEvaluations ?? []).filter((e): e is {
-    overall_score: number;
-    dimension_scores: DimensionScores;
-  } => {
-    const score = e.overall_score;
-    const dims = e.dimension_scores as DimensionScores | null;
-    return (
-      typeof score === 'number' &&
-      Number.isFinite(score) &&
-      dims !== null &&
-      typeof dims === 'object' &&
-      typeof dims.communication_clarity === 'number' &&
-      typeof dims.technical_depth === 'number' &&
-      typeof dims.answer_structure === 'number' &&
-      typeof dims.confidence === 'number' &&
-      typeof dims.relevance === 'number'
-    );
-  });
+  // One usable evaluation per answer — shared validity rules + de-duplication
+  const bestByAnswer = new Map<
+    string,
+    { overall_score: number; dimension_scores: DimensionScores }
+  >();
+  for (const row of rawEvaluations ?? []) {
+    const aid = typeof row.answer_id === 'string' ? row.answer_id : null;
+    if (!aid) continue;
+    if (
+      !isValidPersistedEvaluation({
+        overall_score: row.overall_score,
+        dimension_scores: row.dimension_scores,
+      })
+    ) {
+      continue;
+    }
+    bestByAnswer.set(aid, {
+      overall_score: row.overall_score as number,
+      dimension_scores: row.dimension_scores as DimensionScores,
+    });
+  }
+
+  const validEvaluations = [...bestByAnswer.values()];
 
   const totalAnswers = answerIds.length;
   const evaluatedCount = validEvaluations.length;

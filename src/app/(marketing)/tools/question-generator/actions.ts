@@ -2,7 +2,7 @@
 
 import { headers } from 'next/headers';
 import { completeFreeToolChatChain, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
-import { callMistralChat } from '@/lib/mistral/client';
+import { parseJsonObject } from '@/lib/ai/response-contract';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
 
 export interface GeneratedQuestion {
@@ -24,26 +24,13 @@ const questionCache = new Map<
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const OPENROUTER_QUESTION_MODELS = [
-  process.env.OPENROUTER_QUESTIONS_MODEL?.trim() || 'openai/gpt-4o-mini',
-  'openai/gpt-4.1-mini',
-  'google/gemini-2.0-flash-001',
-  'openai/gpt-3.5-turbo',
-];
-
-const OPENAI_QUESTION_MODELS = [
-  process.env.OPENAI_TOOL_MODEL?.trim() || 'gpt-4o-mini',
-  'gpt-4.1-mini',
-  'gpt-4o-mini-2024-07-18',
-  'gpt-3.5-turbo-0125',
+  process.env.OPENROUTER_QUESTIONS_MODEL?.trim() || 'openai/gpt-4.1-mini',
 ];
 
 function extractJSON(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fenced) return fenced[1].trim();
-  const start = content.indexOf('{');
-  const end = content.lastIndexOf('}');
-  if (start >= 0 && end > start) return content.slice(start, end + 1);
-  return content.trim();
+  const pr = parseJsonObject(content);
+  if (pr.ok) return JSON.stringify(pr.value);
+  throw new Error(pr.error || 'parse failed');
 }
 
 function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
@@ -83,8 +70,7 @@ export async function generateQuestionsAction(
 
   if (!isFreeToolAiConfigured()) {
     return {
-      error:
-        'AI is not configured. Set OPENROUTER_API_KEY (recommended) or OPENAI_API_KEY, then try again.',
+      error: 'AI is not configured. Set OPENROUTER_API_KEY, then try again.',
     };
   }
 
@@ -113,28 +99,16 @@ Return ONLY valid JSON, no markdown:
   try {
     raw = await completeFreeToolChatChain({
       openrouterModels: [...new Set(OPENROUTER_QUESTION_MODELS.filter(Boolean))],
-      openaiModels: [...new Set(OPENAI_QUESTION_MODELS.filter(Boolean))],
+      openaiModels: [],
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
     });
   } catch (openErr) {
-    console.warn('[question-generator] OpenRouter/OpenAI chain failed, trying Mistral:', openErr);
-    if (!process.env.MISTRAL_API_KEY) {
-      return {
-        error:
-          'Primary AI failed and Mistral is not configured. Check OpenRouter/OpenAI keys and credits, or add MISTRAL_API_KEY as backup.',
-      };
-    }
-    try {
-      const mistralPrompt = `${prompt}\n\nOutput: one JSON object only, no markdown fences.`;
-      raw = await callMistralChat(mistralPrompt, 0.65);
-    } catch (mistralErr) {
-      console.error('[question-generator] Mistral failed:', mistralErr);
-      return {
-        error:
-          'All AI providers failed (quota, rate limit, or network). Wait a few minutes, then try again.',
-      };
-    }
+    console.warn('[question-generator] OpenRouter failed:', openErr);
+    return {
+      error:
+        'Question generation failed (quota, rate limit, or network). Wait a moment and try again.',
+    };
   }
 
   let parsed: { questions?: GeneratedQuestion[] };

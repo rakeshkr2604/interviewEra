@@ -3,15 +3,13 @@
  *
  * Template-first: probe_depth / clarify use deterministic templates (fast, no API).
  * LLM is used only for challenge follow-ups and uncovered probe_depth cases, routed
- * through the shared interview chain (gpt-4o-mini + circuit breaker, Mistral fallback)
+ * through the shared OpenRouter completion client — never raw keys.
  * — never a raw OpenAI client, per CLAUDE.md AI PROVIDER ROUTING.
  */
 
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { clampHistoryForOperation } from '@/lib/ai/context-hygiene';
-import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
 import type {
   AnswerAnalysis,
   DialogueEntry,
@@ -67,31 +65,10 @@ async function llmQuestion(
     });
     const trimmed = content.trim();
     if (trimmed) return trimmed;
-    throw new Error('Empty follow-up from primary chain');
+    throw new Error('Empty follow-up from OpenRouter');
   } catch (primaryError) {
-    console.warn('[followup-generator] Primary chain failed, trying Mistral:', primaryError);
-    emitAiTelemetry({
-      event:         'ai_fallback_triggered',
-      operation:     'followup_generation',
-      provider:      'mistral',
-      model:         'mistral-small-latest',
-      from_provider: 'openrouter',
-      to_provider:   'mistral',
-      reason:        'primary_chain_failure',
-    });
-    try {
-      const content = await callMistralChat(
-        `${systemPrompt}\n\n${userPrompt}`,
-        temperature,
-        getTokenBudget('followup_generation'),
-      );
-      const trimmed = content.trim();
-      if (trimmed) return trimmed;
-      throw new Error('Empty follow-up from Mistral');
-    } catch (fallbackError) {
-      console.error('[followup-generator] All providers failed:', fallbackError);
-      return staticFallback;
-    }
+    console.warn('[followup-generator] OpenRouter follow-up failed, using template:', primaryError);
+    return staticFallback;
   }
 }
 

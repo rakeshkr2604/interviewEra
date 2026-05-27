@@ -29,6 +29,57 @@ export type ParseResult<T> =
 // ── Extraction ────────────────────────────────────────────────────────────────
 
 /**
+ * Walk the string and return the first `{...}` or `[...]` substring that
+ * `JSON.parse` accepts. Respects JSON string escaping so nested `{` in strings
+ * does not break balancing. Fixes greedy-regex false positives when the model
+ * emits trailing commentary after a valid object.
+ */
+export function findFirstBalancedJsonSlice(input: string): string | null {
+  const s = input;
+  for (let start = 0; start < s.length; start++) {
+    const open = s[start];
+    if (open !== '{' && open !== '[') continue;
+    const close = open === '{' ? '}' : ']';
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    for (let i = start; i < s.length; i++) {
+      const ch = s[i];
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (ch === '\\') {
+          escape = true;
+          continue;
+        }
+        if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === open) depth += 1;
+      else if (ch === close) {
+        depth -= 1;
+        if (depth === 0) {
+          const slice = s.slice(start, i + 1);
+          try {
+            JSON.parse(slice);
+            return slice;
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Strip markdown fences and locate the JSON block.
  * Returns the original input when it already parses cleanly.
  */
@@ -46,24 +97,26 @@ export function extractJsonBlock(content: string): {
     /* fall through */
   }
 
-  // 2. Strip markdown fences
-  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fence) {
-    const inner = fence[1].trim();
+  // 2. Strip markdown fences (non-greedy inner; may be multiple — try each)
+  const fenceRe = /```(?:json)?\s*([\s\S]*?)```/gi;
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(trimmed)) !== null) {
+    const inner = m[1].trim();
+    const balanced = findFirstBalancedJsonSlice(inner) ?? inner;
     try {
-      JSON.parse(inner);
-      return { text: inner, via: 'fence-strip' };
+      JSON.parse(balanced);
+      return { text: balanced, via: 'fence-strip' };
     } catch {
-      /* fall through */
+      /* next fence */
     }
   }
 
-  // 3. Brace-match — handles preamble like "Sure! Here is the JSON: {...}"
-  const brace = trimmed.match(/\{[\s\S]*\}/);
-  if (brace) {
+  // 3. Balanced slice on full text — preamble / trailing prose
+  const balancedFull = findFirstBalancedJsonSlice(trimmed);
+  if (balancedFull) {
     try {
-      JSON.parse(brace[0]);
-      return { text: brace[0], via: 'brace-match' };
+      JSON.parse(balancedFull);
+      return { text: balancedFull, via: 'brace-match' };
     } catch {
       /* fall through */
     }

@@ -24,7 +24,7 @@ async function getCircuitStates(): Promise<Record<string, boolean>> {
   try {
     const { isModelHealthy } = await import('@/lib/ai/provider-health');
     return {
-      openrouter: !isModelHealthy('openrouter:gpt-4o-mini'),
+      openrouter: !isModelHealthy('openrouter:openai/gpt-4.1-mini'),
       openai:     !isModelHealthy('openai:gpt-4o-mini'),
       mistral:    !isModelHealthy('mistral:mistral-small-latest'),
     };
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   const providers: ProviderKey[] = ['openrouter', 'openai', 'mistral'];
 
   const MODEL_NAMES: Record<ProviderKey, string> = {
-    openrouter: 'gpt-4o-mini',
+    openrouter: 'openai/gpt-4.1-mini',
     openai:     'gpt-4o-mini',
     mistral:    'mistral-small-latest',
   };

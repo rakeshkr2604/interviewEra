@@ -1,18 +1,13 @@
 import { z } from 'zod';
-import OpenAI from 'openai';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
-import openai, { callWithRetry } from '@/lib/openai/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import { clampInputForOperation } from '@/lib/ai/context-hygiene';
-import { extractJsonBlock } from '@/lib/ai/response-contract';
+import { parseJsonObject } from '@/lib/ai/response-contract';
 import type { QuestionRubric, DimensionScores, DetailedAnalysis, ScoreJustification } from '@/types/app.types';
 import type { AnswerStyle } from '@/lib/settings/client-preferences';
 import { recordProviderOutcome } from '@/lib/ai/provider-intelligence';
-import { isSingleProviderMode } from '@/lib/ai/single-provider-mode';
 import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
-import { logProviderFailover } from '@/lib/telemetry/ai-logger';
 
 export type EvaluationProvider = 'openrouter' | 'openai' | 'mistral';
 
@@ -53,14 +48,6 @@ function computeWeightedScore(dims: DimensionScores): number {
 
 function clamp(score: number): number {
   return Math.max(1, Math.min(10, Math.round(score * 10) / 10));
-}
-
-function extractJSON(content: string, source = 'unknown'): string {
-  const { text, via } = extractJsonBlock(content);
-  if (via === 'brace-match') {
-    console.log(`[JSON_PARSE][${source}] ✓ Extracted JSON via brace-match`);
-  }
-  return text;
 }
 
 function normalizeScoreJustification(raw: unknown): ScoreJustification | null {
@@ -264,50 +251,6 @@ const EvaluationZodSchema = z.object({
   }),
 });
 
-// JSON Schema for OpenAI structured outputs (strict: true guarantees schema-conformant output)
-const EVALUATION_JSON_SCHEMA = {
-  type: 'object',
-  properties: {
-    overall_score: { type: 'number' },
-    dimension_scores: {
-      type: 'object',
-      properties: {
-        communication_clarity: { type: 'number' },
-        technical_depth: { type: 'number' },
-        answer_structure: { type: 'number' },
-        confidence: { type: 'number' },
-        relevance: { type: 'number' },
-      },
-      required: ['communication_clarity', 'technical_depth', 'answer_structure', 'confidence', 'relevance'],
-      additionalProperties: false,
-    },
-    feedback_text: { type: 'string' },
-    score_justification: {
-      type: 'object',
-      properties: {
-        why_this_score: { type: 'string' },
-        key_strengths: { type: 'array', items: { type: 'string' } },
-        improvement_areas: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['why_this_score', 'key_strengths', 'improvement_areas'],
-      additionalProperties: false,
-    },
-    detailed_analysis: {
-      type: 'object',
-      properties: {
-        strengths: { type: 'array', items: { type: 'string' } },
-        improvements: { type: 'array', items: { type: 'string' } },
-        model_answer_hint: { type: 'string' },
-        keywords_missing: { type: 'array', items: { type: 'string' } },
-      },
-      required: ['strengths', 'improvements', 'model_answer_hint', 'keywords_missing'],
-      additionalProperties: false,
-    },
-  },
-  required: ['overall_score', 'dimension_scores', 'feedback_text', 'score_justification', 'detailed_analysis'],
-  additionalProperties: false,
-} as const;
-
 function answerStyleInstruction(style: AnswerStyle | undefined): string {
   if (!style) return '';
   const lines: Record<AnswerStyle, string> = {
@@ -403,12 +346,14 @@ function tryParseResponse(
   content: string,
   source: string,
 ): Omit<EvaluationResult, 'provider'> | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJSON(content, source));
-  } catch {
-    console.error(`[JSON_PARSE][${source}] ✗ JSON.parse failed after extraction`);
+  const pr = parseJsonObject(content);
+  if (!pr.ok) {
+    console.error(`[JSON_PARSE][${source}] ✗ ${pr.error}`, pr.rawPreview?.slice(0, 200));
     return null;
+  }
+  let parsed: unknown = pr.value;
+  if (pr.repairedVia !== 'direct') {
+    console.log(`[JSON_PARSE][${source}] ✓ Recovered JSON via ${pr.repairedVia}`);
   }
 
   // Fast path: perfect schema match → skip coercion entirely (eliminates Auto-healed log noise)
@@ -448,19 +393,9 @@ RIGHT (specific, quoted, shows what better looks like):
 
 Apply this standard to: feedback_text, score_justification.why_this_score, and detailed_analysis.improvements.
 
-MODEL ANSWER HINT — write 3–4 bullet points (• character) covering:
-  • The core concept or method the question tests (e.g. STAR for behavioral, trade-off reasoning for system design)
-  • What evidence or metric a strong answer includes (e.g. actual numbers, specific tech choices)
-  • Ownership language expected (e.g. "I decided", "I owned", not "we did it")
-  • One concrete example of strong phrasing for this specific question
+MODEL ANSWER HINT — 3–4 bullets (•): concept tested, evidence/metrics, ownership language, one strong phrasing line for this question.
 
-Example model_answer_hint for a behavioral leadership question:
-  "• Use STAR: keep Situation/Task to 1–2 sentences, spend time on Action and Result
-  • Name the specific conflict or blocker you resolved — avoid vague 'team disagreement'
-  • Own the decision: 'I decided to escalate because...' not 'we eventually resolved it'
-  • End with a measurable outcome: delivery date met, team alignment achieved, retention improved"
-
-CRITICAL: Respond with ONLY valid JSON. No markdown fences, no text before or after. Start with { and end with }.
+CRITICAL: ONLY valid JSON — no markdown fences or prose outside the object.
 
 Required structure:
 {
@@ -488,23 +423,27 @@ Required structure:
 
 Scoring: 7+ means genuinely good. Be strict. Do not inflate. Indian candidates often answer in Hinglish (English–Hindi code-switching) — treat this as normal; never penalize it unless it genuinely impairs comprehension. OUTPUT ONLY THE JSON OBJECT.`;
 
-async function evaluateWithPrimaryChain(prompt: string): Promise<EvaluationResult> {
+async function evaluateWithPrimaryChain(
+  prompt: string,
+  signal: AbortSignal,
+): Promise<EvaluationResult> {
   const messages = [
     { role: 'system' as const, content: EVALUATOR_SYSTEM_PROMPT },
     { role: 'user' as const, content: prompt },
   ];
 
-  const t0     = Date.now();
+  const t0 = Date.now();
   const result = await completeInterviewChat({
     messages,
     temperature: 0.3,
     maxTokens:   getTokenBudget('answer_evaluation'),
     operation:   'answer_evaluation',
+    jsonMode:    true,
+    signal,
   });
-  const parsed = tryParseResponse(result.content, result.provider);
-  // Record JSON validity — overrides the optimistic 'true' set in interview-completion
+  const parsed = tryParseResponse(result.content, 'openrouter');
   recordProviderOutcome({
-    provider:       result.provider === 'openai' ? 'openai' : 'openrouter',
+    provider:       'openrouter',
     operation:      'answer_evaluation',
     latencyMs:      Date.now() - t0,
     success:        parsed !== null,
@@ -513,81 +452,9 @@ async function evaluateWithPrimaryChain(prompt: string): Promise<EvaluationResul
     jsonValid:      parsed !== null,
   });
   if (!parsed) {
-    throw new Error(`Failed to parse evaluation response from ${result.provider}`);
+    throw new Error('Failed to parse evaluation response from OpenRouter');
   }
-  return normalizeResult(parsed, result.provider);
-}
-
-async function evaluateWithStructuredOpenAI(
-  messages: OpenAI.Chat.ChatCompletionMessageParam[],
-): Promise<EvaluationResult> {
-  const model = process.env.OPENAI_INTERVIEW_MODEL?.trim() ?? 'gpt-4o-mini';
-  const t0    = Date.now();
-  const response = await callWithRetry(() =>
-    openai.chat.completions.create({
-      model,
-      messages,
-      temperature: 0.3,
-      max_tokens: getTokenBudget('answer_evaluation', 'openai'),
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'evaluation', strict: true, schema: EVALUATION_JSON_SCHEMA },
-      },
-    }),
-  );
-
-  const content = response.choices[0]?.message?.content;
-  if (!content?.trim()) {
-    recordProviderOutcome({ provider: 'openai', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: false, timeout: false, quotaExhausted: false, jsonValid: false });
-    throw new Error('Empty structured output from OpenAI');
-  }
-
-  const zodResult = EvaluationZodSchema.safeParse(JSON.parse(content));
-  if (!zodResult.success) {
-    recordProviderOutcome({ provider: 'openai', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: false, timeout: false, quotaExhausted: false, jsonValid: false });
-    console.warn('[evaluate-answer] Structured OpenAI output failed Zod:', zodResult.error.flatten());
-    throw new Error('Structured OpenAI output schema mismatch');
-  }
-
-  recordProviderOutcome({ provider: 'openai', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: true, timeout: false, quotaExhausted: false, jsonValid: true });
-
-  const d = zodResult.data;
-  const scoreJustification = normalizeScoreJustification(d.score_justification);
-  if (!scoreJustification) throw new Error('score_justification normalization failed in structured output');
-
-  return normalizeResult(
-    {
-      overall_score: d.overall_score,
-      dimension_scores: d.dimension_scores,
-      feedback_text: d.feedback_text,
-      score_justification: scoreJustification,
-      detailed_analysis: { ...d.detailed_analysis, score_justification: scoreJustification },
-    },
-    'openai',
-  );
-}
-
-async function evaluateWithMistral(prompt: string): Promise<EvaluationResult> {
-  const t0      = Date.now();
-  const content = await callMistralChat(prompt, 0.3, getTokenBudget('answer_evaluation', 'mistral'));
-
-  const parsed = tryParseResponse(content, 'mistral');
-  if (!parsed) {
-    recordProviderOutcome({ provider: 'mistral', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: false, timeout: false, quotaExhausted: false, jsonValid: false });
-    console.warn('[evaluate-answer] Mistral parse failed — retrying with no max_tokens constraint');
-    const t1           = Date.now();
-    const retryContent = await callMistralChat(prompt, 0.3);
-    const retryParsed  = tryParseResponse(retryContent, 'mistral-retry');
-    if (!retryParsed) {
-      recordProviderOutcome({ provider: 'mistral', operation: 'answer_evaluation', latencyMs: Date.now() - t1, success: false, timeout: false, quotaExhausted: false, jsonValid: false });
-      throw new Error('Failed to parse evaluation from Mistral after retry');
-    }
-    recordProviderOutcome({ provider: 'mistral', operation: 'answer_evaluation', latencyMs: Date.now() - t1, success: true, timeout: false, quotaExhausted: false, jsonValid: true });
-    return normalizeResult(retryParsed, 'mistral');
-  }
-
-  recordProviderOutcome({ provider: 'mistral', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: true, timeout: false, quotaExhausted: false, jsonValid: true });
-  return normalizeResult(parsed, 'mistral');
+  return normalizeResult(parsed, 'openrouter');
 }
 
 export async function evaluateAnswer({
@@ -596,75 +463,9 @@ export async function evaluateAnswer({
   answerText,
   answerStyle,
 }: EvaluateAnswerInput): Promise<EvaluationResult> {
-  return withOperationDeadline('answer_evaluation', async () => {
-    // Cap answer length so a runaway transcript can't blow the prompt.
+  return withOperationDeadline('answer_evaluation', async (signal) => {
     const boundedAnswer = clampInputForOperation(answerText, 'answer_evaluation');
     const prompt = buildPrompt(questionText, rubric, boundedAnswer, answerStyle);
-    const messages = [
-      { role: 'system' as const, content: EVALUATOR_SYSTEM_PROMPT },
-      { role: 'user' as const, content: prompt },
-    ];
-
-    // Tier 1: structured OpenAI — skipped in single-provider mode
-    if (!isSingleProviderMode()) {
-      try {
-        return await evaluateWithStructuredOpenAI(messages);
-      } catch (structuredError) {
-        console.warn('[evaluate-answer] Structured OpenAI failed, falling back to primary chain:', structuredError);
-        emitAiTelemetry({
-          event:         'ai_fallback_triggered',
-          operation:     'answer_evaluation',
-          provider:      'openrouter',
-          model:         'openai/gpt-4o-mini',
-          from_provider: 'openai',
-          to_provider:   'openrouter',
-          reason:        'structured_output_failure',
-        });
-        void logProviderFailover({
-          operation:     'answer_evaluation',
-          from_provider: 'openai',
-          from_model:    process.env.OPENAI_INTERVIEW_MODEL?.trim() ?? 'gpt-4o-mini',
-          to_provider:   'openrouter',
-          to_model:      'openai/gpt-4o-mini',
-          reason:        'structured_output_failure',
-        });
-      }
-    }
-
-    // Tier 2: OpenRouter primary chain
-    try {
-      return await evaluateWithPrimaryChain(prompt);
-    } catch (primaryError) {
-      if (isSingleProviderMode()) {
-        console.error('[evaluate-answer] OpenRouter eval failed; Mistral disabled in single-provider mode');
-        throw primaryError;
-      }
-      console.warn('[evaluate-answer] Primary chain failed, switching to Mistral:', primaryError);
-      emitAiTelemetry({
-        event:         'ai_fallback_triggered',
-        operation:     'answer_evaluation',
-        provider:      'mistral',
-        model:         'mistral-small-latest',
-        from_provider: 'openrouter',
-        to_provider:   'mistral',
-        reason:        'primary_chain_failure',
-      });
-      void logProviderFailover({
-        operation:     'answer_evaluation',
-        from_provider: 'openrouter',
-        from_model:    'openai/gpt-4o-mini',
-        to_provider:   'mistral',
-        to_model:      'mistral-small-latest',
-        reason:        'primary_chain_failure',
-      });
-
-      // Tier 3: Mistral
-      try {
-        return await evaluateWithMistral(prompt);
-      } catch (mistralError) {
-        console.error('[evaluate-answer] All evaluation providers failed:', mistralError);
-        throw mistralError;
-      }
-    }
+    return evaluateWithPrimaryChain(prompt, signal);
   });
 }

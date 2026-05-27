@@ -1,10 +1,7 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { clampInputForOperation } from '@/lib/ai/context-hygiene';
 import { parseJsonObject } from '@/lib/ai/response-contract';
-import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
-import { logProviderFailover } from '@/lib/telemetry/ai-logger';
 import type { ParsedJobDescription } from '@/types/app.types';
 
 const PROMPT_TEMPLATE = `You extract structured employer job posting content for interview preparation.
@@ -72,46 +69,15 @@ async function callOpenAI(prompt: string): Promise<string> {
   return content;
 }
 
-async function getAIContent(prompt: string): Promise<string> {
-  try {
-    return await callOpenAI(prompt);
-  } catch (openaiError) {
-    console.warn('[parse-job-description] Primary chain failed, switching to Mistral:', openaiError);
-    emitAiTelemetry({
-      event:         'ai_fallback_triggered',
-      operation:     'jd_parse',
-      provider:      'mistral',
-      model:         'mistral-small-latest',
-      from_provider: 'openrouter',
-      to_provider:   'mistral',
-      reason:        'primary_chain_failure',
-    });
-    void logProviderFailover({
-      operation:     'jd_parse',
-      from_provider: 'openrouter',
-      from_model:    'openai/gpt-4o-mini',
-      to_provider:   'mistral',
-      to_model:      'mistral-small-latest',
-      reason:        'primary_chain_failure',
-    });
-    try {
-      return await callMistralChat(prompt, 0);
-    } catch (mistralError) {
-      console.error('[parse-job-description] All providers failed:', mistralError);
-      throw mistralError;
-    }
-  }
-}
-
 export async function parseJobDescription(rawText: string): Promise<ParsedJobDescription> {
   // Cap is owned by operation-registry; previously inlined as .slice(0, 12_000).
   const clamped = clampInputForOperation(rawText, 'jd_parse');
   const prompt = PROMPT_TEMPLATE.replace('{JD_TEXT}', clamped);
 
-  let content = await getAIContent(prompt);
+  let content = await callOpenAI(prompt);
   let parseResult = parseJsonObject(content);
   if (!parseResult.ok) {
-    content = await getAIContent(prompt);
+    content = await callOpenAI(prompt);
     parseResult = parseJsonObject(content);
     if (!parseResult.ok) {
       console.error('[parseJobDescription] JSON retry failed:', parseResult.error);

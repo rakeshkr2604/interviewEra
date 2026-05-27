@@ -6,13 +6,13 @@
  * on cold boot) to surface misconfiguration early rather than mid-request.
  */
 
-import { isSingleProviderMode, logSingleProviderBanner } from '@/lib/ai/single-provider-mode';
+import { logSingleProviderBanner } from '@/lib/ai/single-provider-mode';
 
 export interface StartupCheckResult {
   hasOpenAI:     boolean;
   hasOpenRouter: boolean;
   hasMistral:    boolean;
-  /** True when at least one primary provider (OpenAI or OpenRouter) is configured. */
+  /** True when OpenRouter is configured — required for all LLM completions. */
   canOperate:    boolean;
   warnings:      string[];
 }
@@ -36,18 +36,19 @@ export function runProviderStartupCheck(): StartupCheckResult {
   const hasOpenAI    = openaiKey.startsWith('sk-') && openaiKey.length > 10;
   const hasOpenRouter = Boolean(process.env.OPENROUTER_API_KEY?.trim());
   const hasMistral   = Boolean(process.env.MISTRAL_API_KEY?.trim());
-  const canOperate   = isSingleProviderMode() ? hasOpenRouter : (hasOpenAI || hasOpenRouter);
+  const canOperate   = hasOpenRouter;
 
-  if (isSingleProviderMode() && !hasOpenRouter) {
+  if (!hasOpenRouter) {
     console.error(
-      '[provider-startup-check] CRITICAL: SINGLE_PROVIDER_MODE=true requires OPENROUTER_API_KEY.',
+      '[provider-startup-check] CRITICAL: OPENROUTER_API_KEY is required — all AI traffic routes through OpenRouter.',
     );
   }
 
   const warnings: string[] = [];
-  if (!hasOpenAI)     warnings.push('OPENAI_API_KEY missing or invalid (expected sk-… prefix)');
-  if (!hasOpenRouter) warnings.push('OPENROUTER_API_KEY not set — OpenRouter provider unavailable');
-  if (!hasMistral)    warnings.push('MISTRAL_API_KEY not set — Mistral fallback unavailable');
+  if (!hasOpenAI)
+    warnings.push('OPENAI_API_KEY missing — unused for LLM completions (reserved for tooling only)');
+  if (!hasOpenRouter) warnings.push('OPENROUTER_API_KEY missing — REQUIRED for InterviewEra AI');
+  if (!hasMistral) warnings.push('MISTRAL_API_KEY missing — Mistral is not enabled in current build');
 
   for (const w of warnings) {
     console.warn(`[provider-startup-check] ${w}`);
@@ -56,7 +57,7 @@ export function runProviderStartupCheck(): StartupCheckResult {
   if (!canOperate) {
     console.error(
       '[provider-startup-check] CRITICAL: No viable AI provider configured. ' +
-      'Set OPENAI_API_KEY (sk-…) or OPENROUTER_API_KEY before handling requests.',
+      'Set OPENROUTER_API_KEY before handling inference requests.',
     );
   }
 

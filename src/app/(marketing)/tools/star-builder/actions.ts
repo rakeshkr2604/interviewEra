@@ -2,7 +2,6 @@
 
 import { headers } from 'next/headers';
 import { completeFreeToolChatChain, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
-import { callMistralChat } from '@/lib/mistral/client';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
 
 export interface StarScores {
@@ -31,17 +30,7 @@ const MIN_STAR_FIELD_LEN = 10;
 const MIN_POLISHED_LEN = 35;
 
 const OPENROUTER_STAR_MODELS = [
-  process.env.OPENROUTER_STAR_MODEL?.trim() || 'openai/gpt-4o-mini',
-  'openai/gpt-4.1-mini',
-  'google/gemini-2.0-flash-001',
-  'openai/gpt-3.5-turbo',
-];
-
-const OPENAI_STAR_MODELS = [
-  process.env.OPENAI_STAR_MODEL?.trim() || 'gpt-4o-mini',
-  'gpt-4.1-mini',
-  'gpt-4o-mini-2024-07-18',
-  'gpt-3.5-turbo-0125',
+  process.env.OPENROUTER_STAR_MODEL?.trim() || 'openai/gpt-4.1-mini',
 ];
 
 const FALLBACK_SUGGESTIONS = [
@@ -237,11 +226,11 @@ function parseStarPayload(raw: string): StarResult | null {
 
 async function completePrimaryStar(prompt: string): Promise<string> {
   if (!isFreeToolAiConfigured()) {
-    throw new Error('No OpenRouter/OpenAI keys configured');
+    throw new Error('No OpenRouter key configured — set OPENROUTER_API_KEY');
   }
   const raw = await completeFreeToolChatChain({
     openrouterModels: [...new Set(OPENROUTER_STAR_MODELS.filter(Boolean))],
-    openaiModels: [...new Set(OPENAI_STAR_MODELS.filter(Boolean))],
+    openaiModels: [],
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
   });
@@ -249,15 +238,6 @@ async function completePrimaryStar(prompt: string): Promise<string> {
   return raw;
 }
 
-async function completeMistral(prompt: string): Promise<string> {
-  const p = `${prompt}\n\nOutput rules: Return one JSON object only. No markdown fences, no text before or after the JSON.`;
-  const content = await callMistralChat(p, 0.45);
-  if (!content.trim()) throw new Error('Empty Mistral content');
-  return content;
-}
-
-const MISTRAL_NOTICE =
-  'Delivered via our backup AI — same coaching rules. Primary service was busy or unavailable.';
 
 const OFFLINE_NOTICE =
   'AI is over quota or unavailable — we combined your STAR fields into a speakable draft. Scores are neutral; retry later for AI polish and feedback.';
@@ -348,22 +328,10 @@ export async function buildStarAction(
     const raw = await completePrimaryStar(prompt);
     result = parseStarPayload(raw);
     if (!result) {
-      console.warn('[star-builder] Primary AI returned unusable JSON; trying Mistral');
+      console.warn('[star-builder] Primary AI returned unusable JSON');
     }
   } catch (openErr) {
-    console.warn('[star-builder] OpenRouter/OpenAI chain failed:', openErr);
-  }
-
-  if (!result && process.env.MISTRAL_API_KEY) {
-    try {
-      const raw = await completeMistral(prompt);
-      result = parseStarPayload(raw);
-      if (result) {
-        notice = MISTRAL_NOTICE;
-      }
-    } catch (mistralErr) {
-      console.error('[star-builder] Mistral failed:', mistralErr);
-    }
+    console.warn('[star-builder] OpenRouter failed:', openErr);
   }
 
   if (!result) {

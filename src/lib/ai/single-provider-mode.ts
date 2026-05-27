@@ -1,10 +1,6 @@
 /**
- * MVP launch kill-switch. When SINGLE_PROVIDER_MODE=true:
- *   - All fallback chains short-circuit to OpenRouter → gpt-4o-mini.
- *   - Direct OpenAI calls + Mistral calls throw before hitting the network.
- *   - Provider routing tables collapse to a single spec.
- * Reversible at runtime by toggling the env var (no redeploy required for
- * subsequent cold boots).
+ * MVP launch banner. When SINGLE_PROVIDER_MODE=true we log loudly at cold boot —
+ * Mistral/direct OpenAI are not wired for completions in this codebase.
  */
 export function isSingleProviderMode(): boolean {
   return process.env.SINGLE_PROVIDER_MODE === 'true';
@@ -21,8 +17,8 @@ export class FallbackDisabledError extends Error {
 export function logSingleProviderBanner(): void {
   if (isSingleProviderMode()) {
     console.warn(
-      '[single-provider-mode] ACTIVE — OpenRouter→gpt-4o-mini only. ' +
-      'Direct OpenAI and Mistral fallbacks are blocked.',
+      '[single-provider-mode] ACTIVE — OpenRouter-only completions. ' +
+        'Ensure OPENROUTER_API_KEY is set and OPENROUTER_CHEAP_MODEL / OPENROUTER_SMART_MODEL are valid.',
     );
   }
 }

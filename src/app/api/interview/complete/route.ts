@@ -10,6 +10,7 @@ import type { InterviewCompleteRetentionPayload } from '@/lib/retention/intervie
 import type { InterviewRetentionClientPayload } from '@/lib/retention/process-interview-complete';
 import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete';
 import type { UserProgressRow } from '@/lib/retention/types';
+import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity';
 
 type RetentionResponsePayload = InterviewCompleteRetentionPayload;
 
@@ -199,7 +200,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         const validEvalIds = new Set(
           (evaluations ?? [])
-            .filter(e => typeof e.overall_score === 'number' && e.dimension_scores !== null)
+            .filter((e) =>
+              typeof e.answer_id === 'string' &&
+              isValidPersistedEvaluation({
+                overall_score: e.overall_score,
+                dimension_scores: e.dimension_scores,
+              }),
+            )
             .map(e => e.answer_id as string),
         );
 

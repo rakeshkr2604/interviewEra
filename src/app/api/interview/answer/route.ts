@@ -306,3 +306,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const runtime = 'nodejs';
+/** Outer route budget — must exceed answer_evaluation deadline + inserts (see operation-registry). */
+export const maxDuration = 60;

@@ -1,20 +1,16 @@
 /**
  * Agent 2 — Silent Evaluator.
  *
- * Runs in the background after each answer, producing a structured AnswerAnalysis
- * that Agent 1 (Interviewer) consumes to decide its next conversational move.
- *
- * AI routing: uses the repo's shared interview chain (OpenRouter → OpenAI gpt-4o-mini,
- * with quota/circuit breaker) and falls back to Mistral on primary failure — the same
- * D3 pattern as evaluate-answer.ts. Per CLAUDE.md this never instantiates a raw OpenAI
- * client and never uses gpt-4o.
+ * OpenRouter-only (`openai/gpt-4.1-mini` via centralized router). Parses with
+ * shared `parseJsonObject` (fences + balanced JSON recovery).
  */
 
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { clampInputForOperation } from '@/lib/ai/context-hygiene';
 import { getContextLimits } from '@/lib/ai/operation-registry';
+import { withOperationDeadline } from '@/lib/ai/timeout-policy';
+import { parseJsonObject } from '@/lib/ai/response-contract';
 import type { AnswerAnalysis, FollowUpType, InterviewContext } from '@/lib/interview/types';
 
 const FOLLOWUP_TYPES: readonly FollowUpType[] = [
@@ -133,23 +129,19 @@ IMPORTANT:
 OUTPUT (JSON only, no explanation):`;
 }
 
-function extractJSON(content: string, source = 'agent'): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const stripped = fenced ? fenced[1].trim() : content.trim();
+function tryParse(content: string, source = 'agent'): AnswerAnalysis | null {
+  const pr = parseJsonObject(content);
+  if (!pr.ok) {
+    console.error(`[JSON_PARSE][${source}] ✗ ${pr.error}`, pr.rawPreview?.slice(0, 200));
+    return null;
+  }
+  if (pr.repairedVia !== 'direct') {
+    console.log(`[JSON_PARSE][${source}] ✓ Recovered via ${pr.repairedVia}`);
+  }
   try {
-    JSON.parse(stripped);
-    return stripped;
+    return validateAnalysis(pr.value);
   } catch {
-    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        JSON.parse(jsonMatch[0]);
-        console.log(`[JSON_PARSE][${source}] ✓ Extracted JSON via brace-match`);
-        return jsonMatch[0];
-      } catch { /* fall through */ }
-    }
-    console.error(`[JSON_PARSE][${source}] ✗ No valid JSON found. First 500 chars:`, stripped.slice(0, 500));
-    return stripped;
+    return null;
   }
 }
 
@@ -211,57 +203,39 @@ function getDefaultAnalysis(): AnswerAnalysis {
   };
 }
 
-function tryParse(content: string, source = 'agent'): AnswerAnalysis | null {
-  try {
-    return validateAnalysis(JSON.parse(extractJSON(content, source)));
-  } catch {
-    return null;
-  }
-}
-
 export async function analyzeAnswer(
   question: string,
   answer: string,
   context: InterviewContext,
   previousAnalyses: AnswerAnalysis[] = [],
 ): Promise<AnswerAnalysis> {
-  const messages = [
-    { role: 'system' as const, content: EVALUATOR_SYSTEM_PROMPT },
-    {
-      role: 'user' as const,
-      content: buildAnalysisPrompt(question, answer, context, previousAnalyses),
-    },
-  ];
+  return withOperationDeadline('agent_analysis', async (signal) => {
+    const messages = [
+      { role: 'system' as const, content: EVALUATOR_SYSTEM_PROMPT },
+      {
+        role: 'user' as const,
+        content: buildAnalysisPrompt(question, answer, context, previousAnalyses),
+      },
+    ];
 
-  try {
-    const { content, provider } = await completeInterviewChat({
-      messages,
-      temperature: 0.3,
-      maxTokens: getTokenBudget('agent_analysis', 'openrouter'),
-      operation: 'agent_analysis',
-    });
-    const parsed = tryParse(content, provider);
-    if (parsed) return parsed;
-    throw new Error('Primary chain returned unparseable analysis');
-  } catch (primaryError) {
-    console.warn('[agent-evaluator] Primary chain failed, trying Mistral:', primaryError);
     try {
-      const prompt = `${EVALUATOR_SYSTEM_PROMPT}\n\n${buildAnalysisPrompt(
-        question,
-        answer,
-        context,
-        previousAnalyses,
-      )}`;
-      const content = await callMistralChat(prompt, 0.3, getTokenBudget('agent_analysis'));
-      const parsed = tryParse(content, 'mistral');
+      const { content } = await completeInterviewChat({
+        messages,
+        temperature: 0.3,
+        maxTokens: getTokenBudget('agent_analysis', 'openrouter'),
+        operation: 'agent_analysis',
+        jsonMode: true,
+        signal,
+      });
+      const parsed = tryParse(content, 'openrouter');
       if (parsed) return parsed;
-      throw new Error('Mistral returned unparseable analysis');
-    } catch (fallbackError) {
-      console.error('[agent-evaluator] All providers failed:', fallbackError);
-      // Safe default keeps the interview loop alive — Agent 1 treats this as "move on".
+      console.warn('[agent-evaluator] Unparseable OpenRouter analysis — neutral fallback');
+      return getDefaultAnalysis();
+    } catch (e) {
+      console.warn('[agent-evaluator] OpenRouter analysis failed:', e);
       return getDefaultAnalysis();
     }
-  }
+  });
 }
 
 /** Deterministic local filler-word scan — no AI call. */

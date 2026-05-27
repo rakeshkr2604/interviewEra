@@ -66,6 +66,11 @@ export interface OperationSpec {
   temperature: number;
   /** Output token cap (max_tokens). Caller may override for special paths. */
   maxOutputTokens: number;
+  /**
+   * Per-upstream-request socket budget (completionWithRetries / oneCompletion).
+   * Must be ≤ outer timeoutMs. When omitted, chat-completion-core uses its default.
+   */
+  llmAttemptTimeoutMs?: number;
   /** Hard outer deadline for the entire chain (all retries + fallbacks). */
   timeoutMs: number;
   /** Expected response format — drives response-contract parser selection. */
@@ -94,7 +99,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'realtime_critical',
     temperature:          0.8,
     maxOutputTokens:      900,
-    timeoutMs:            8_000,
+    llmAttemptTimeoutMs:    9_500,
+    timeoutMs:            11_500,
     responseFormat:       'plain',
     context: {
       maxInputChars:        4_000,
@@ -107,7 +113,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'realtime_critical',
     temperature:          0.3,
     maxOutputTokens:      600,
-    timeoutMs:            8_000,
+    llmAttemptTimeoutMs:    9_500,
+    timeoutMs:            11_500,
     responseFormat:       'json',
     context: {
       maxInputChars:        6_000,
@@ -120,12 +127,9 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'structured_evaluation',
     temperature:          0.3,
     maxOutputTokens:      1_800,
-    // 25s: Increased from 20s to accommodate OpenRouter latency variance.
-    // The old 12s caused frequent timeouts; 20s still saw occasional noise
-    // under load. 25s gives a comfortable buffer while staying well inside
-    // Vercel's 30s serverless budget. Evaluation is not realtime-critical —
-    // the candidate sees feedback after submission, so extra latency is acceptable.
-    timeoutMs:            25_000,
+    // Stack under `/api/interview/answer` maxDuration=30 — leave DB + JSON headroom.
+    llmAttemptTimeoutMs:    21_500,
+    timeoutMs:            26_500,
     responseFormat:       'json',
     context: {
       maxInputChars:        8_000,
@@ -138,19 +142,9 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0.7,
     maxOutputTokens:      1_200,
-    // 25s hard outer deadline for the entire operation (single plain-mode
-    // attempt, no json/mode retries). Must be meaningfully larger than
-    // chat-completion-core's ATTEMPT_TIMEOUT_MS (12s) so the per-attempt
-    // timeout fires first on a slow model — giving the abort chain time to
-    // propagate and the operation to fail gracefully, rather than both
-    // timers firing simultaneously and leaving no time for error handling.
-    //
-    // Calibration: gpt-4.1-mini on OpenRouter takes ~7s for resume parse
-    // (856 in / 653 out tokens). Question generation has a bigger prompt
-    // and 1200 max output tokens — expect 10–18s under normal load. 25s
-    // gives a comfortable buffer while staying well inside Vercel's 30s
-    // serverless budget even when stacked with ~5s of auth + DB pre-flight.
-    timeoutMs:            25_000,
+    // `/api/interview/start` outer maxDuration=60 — prioritize room for retries.
+    llmAttemptTimeoutMs:    26_000,
+    timeoutMs:            54_000,
     responseFormat:       'json',
     context: {
       maxInputChars:        3_500,
@@ -163,9 +157,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0,
     maxOutputTokens:      800,
-    // 15s hard deadline — single model (openai/gpt-4.1-mini via OpenRouter),
-    // single call, no retry chain. Fail fast rather than hang onboarding.
-    timeoutMs:            15_000,
+    llmAttemptTimeoutMs:    13_500,
+    timeoutMs:            14_750,
     responseFormat:       'json',
     context: {
       maxInputChars:        18_000,
@@ -178,7 +171,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'batch_analysis',
     temperature:          0.3,
     maxOutputTokens:      2_200,
-    timeoutMs:            20_000,
+    llmAttemptTimeoutMs:    17_500,
+    timeoutMs:            22_500,
     responseFormat:       'json',
     context: {
       maxInputChars:        12_000,
@@ -191,7 +185,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0,
     maxOutputTokens:      800,
-    timeoutMs:            12_000,
+    llmAttemptTimeoutMs:    10_500,
+    timeoutMs:            13_750,
     responseFormat:       'json',
     context: {
       maxInputChars:        12_000,
@@ -230,7 +225,8 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'lightweight_parse',
     temperature:          0.5,
     maxOutputTokens:      1_200,
-    timeoutMs:            15_000,
+    llmAttemptTimeoutMs:    13_500,
+    timeoutMs:            14_750,
     responseFormat:       'json',
     context: {
       maxInputChars:        8_000,
@@ -267,6 +263,11 @@ export function getOperationTemperature(operation: AiOperation): number {
 /** Returns the hard outer deadline (ms) for an operation. */
 export function getOperationTimeoutMs(operation: AiOperation): number {
   return getOperationSpec(operation).timeoutMs;
+}
+
+/** Per-LLM-HTTP-call timeout ceiling for an operation. */
+export function getLlmAttemptTimeoutMs(operation: AiOperation): number | undefined {
+  return getOperationSpec(operation).llmAttemptTimeoutMs;
 }
 
 /** Returns the expected response format for an operation. */
