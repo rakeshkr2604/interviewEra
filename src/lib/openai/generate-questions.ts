@@ -330,9 +330,22 @@ export async function generateQuestions({
   return withOperationDeadline('question_generation', async (signal) => {
     const content = await callOpenAI(prompt, signal);
 
+    // Guard against empty responses (model returned nothing)
+    if (!content || content.trim().length === 0) {
+      console.error('[generate-questions] AI returned empty response');
+      throw new QuestionGenerationError(
+        'Failed to generate questions: AI returned empty response. Please try again.',
+      );
+    }
+
     const parseResult = parseJsonObject(content);
     if (!parseResult.ok) {
-      console.error('[generate-questions] JSON parse failed:', parseResult.error);
+      console.error('[generate-questions] JSON parse failed:', {
+        error: parseResult.error,
+        rawPreview: parseResult.rawPreview,
+        contentLength: content.length,
+        contentStart: content.slice(0, 200),
+      });
       throw new QuestionGenerationError(
         'Failed to parse questions: invalid JSON from AI',
       );

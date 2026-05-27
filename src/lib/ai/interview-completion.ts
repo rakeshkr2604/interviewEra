@@ -29,17 +29,16 @@ import { logProviderFailover } from '@/lib/telemetry/ai-logger';
 export type InterviewAiChatProvider = 'openrouter' | 'openai';
 
 // Model priority order: env-configured model first (operator control), then
-// gpt-4.1-mini (faster, confirmed stable on OpenRouter for this workload),
-// then gpt-4o-mini as last resort only. gpt-4o-mini was the previous default
-// and consistently exceeded the 12s per-attempt timeout on question generation
-// prompts — it is intentionally demoted to the end of the list.
+// reliable models that are widely available on OpenRouter.
+// gpt-4o-mini is fast and stable; gpt-4-turbo is a reliable fallback.
 const OPENROUTER_INTERVIEW_MODELS: string[] = [
   ...new Set(
     [
       process.env.OPENROUTER_INTERVIEW_MODEL?.trim(),
       process.env.OPENROUTER_MODEL?.trim(),
-      'openai/gpt-4.1-mini',
-      'openai/gpt-4o-mini',
+      'openai/gpt-4o-mini',      // Primary: fast, cheap, reliable
+      'openai/gpt-4-turbo',      // Fallback: more capable, widely available
+      'openai/gpt-4o',           // Secondary fallback
     ].filter((m): m is string => Boolean(m)),
   ),
 ];
@@ -48,8 +47,9 @@ const OPENAI_INTERVIEW_MODELS: string[] = [
   ...new Set(
     [
       process.env.OPENAI_INTERVIEW_MODEL?.trim(),
-      'gpt-4.1-mini',
-      'gpt-4o-mini',
+      'gpt-4o-mini',             // Primary: fast, cheap
+      'gpt-4-turbo',             // Fallback: reliable
+      'gpt-4o',                  // Secondary fallback
     ].filter((m): m is string => Boolean(m)),
   ),
 ];
