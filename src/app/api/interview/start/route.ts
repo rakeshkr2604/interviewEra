@@ -237,12 +237,30 @@ export async function POST(request: Request): Promise<NextResponse> {
             userTier: userTier as 1 | 2 | 3 | 4,
           });
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.error('[interview/start] Question generation failed:', {
+            message,
+            name: err instanceof Error ? err.name : 'unknown',
+            isTimeout: message.includes('deadline') || message.includes('timeout') || message.includes('Abort'),
+          });
           if (err instanceof QuestionGenerationError) {
             return NextResponse.json({ error: err.message }, { status: 500 });
           }
+          if (message.includes('deadline') || message.includes('timeout') || message.includes('Abort')) {
+            return NextResponse.json(
+              { error: 'Question generation timed out. Please try again in a moment.' },
+              { status: 504 },
+            );
+          }
+          if (message.includes('OpenRouter unavailable') || message.includes('Interview AI completion failed')) {
+            return NextResponse.json(
+              { error: 'AI service is temporarily unavailable. Please try again shortly.' },
+              { status: 503 },
+            );
+          }
           return NextResponse.json(
             { error: 'Failed to generate questions. Please try again.' },
-            { status: 500 }
+            { status: 500 },
           );
         }
 
@@ -331,3 +349,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/** Question generation can take 15–25s (LLM + fallbacks). Default Vercel limit is 10s. */
+export const runtime = 'nodejs';
+export const maxDuration = 60;

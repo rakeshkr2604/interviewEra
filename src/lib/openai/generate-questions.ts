@@ -155,27 +155,77 @@ function buildResumeSummary(resume: ParsedResume, role: string): string {
   );
 }
 
-function isValidQuestionsResponse(
-  data: unknown
-): data is { questions: GeneratedQuestion[] } {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
-  if (!Array.isArray(d.questions) || d.questions.length === 0) return false;
+function coerceNumber(val: unknown): number | null {
+  if (typeof val === 'number' && Number.isFinite(val)) return val;
+  if (typeof val === 'string') {
+    const n = parseInt(val.trim(), 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
 
-  return d.questions.every((q: unknown) => {
-    if (!q || typeof q !== 'object') return false;
+function coerceStringArray(val: unknown): string[] {
+  if (Array.isArray(val)) {
+    return val.filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+  }
+  if (typeof val === 'string' && val.trim()) return [val.trim()];
+  return [];
+}
+
+function normalizeCategory(raw: unknown): Question['category'] | null {
+  if (typeof raw !== 'string') return null;
+  const c = raw.trim().toLowerCase();
+  if (c === 'technical' || c === 'tech') return 'technical';
+  if (c === 'behavioral' || c === 'behavioural' || c === 'hr') return 'behavioral';
+  if (c === 'situational' || c === 'scenario') return 'situational';
+  return null;
+}
+
+/**
+ * Self-healing coercion: models often emit numeric strings, loose categories,
+ * or partial rubrics. Repair what we can instead of failing the whole interview start.
+ */
+function coerceQuestionsResponse(data: unknown): GeneratedQuestion[] | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  const rawList = d.questions;
+  if (!Array.isArray(rawList) || rawList.length === 0) return null;
+
+  const out: GeneratedQuestion[] = [];
+  for (let i = 0; i < rawList.length; i++) {
+    const q = rawList[i];
+    if (!q || typeof q !== 'object') continue;
     const qObj = q as Record<string, unknown>;
-    if (typeof qObj.order !== 'number') return false;
-    if (typeof qObj.question_text !== 'string') return false;
-    if (!['technical', 'behavioral', 'situational'].includes(qObj.category as string))
-      return false;
-    const rubric = qObj.rubric as Record<string, unknown>;
-    if (!rubric || typeof rubric !== 'object') return false;
-    if (!Array.isArray(rubric.ideal_keywords)) return false;
-    if (typeof rubric.ideal_structure !== 'string') return false;
-    if (!Array.isArray(rubric.red_flags)) return false;
-    return true;
-  });
+    const questionText =
+      typeof qObj.question_text === 'string'
+        ? qObj.question_text.trim()
+        : typeof qObj.question === 'string'
+          ? qObj.question.trim()
+          : '';
+    if (!questionText) continue;
+
+    const category = normalizeCategory(qObj.category) ?? 'technical';
+    const rubricRaw = (qObj.rubric ?? {}) as Record<string, unknown>;
+    const idealKeywords = coerceStringArray(rubricRaw.ideal_keywords);
+    const idealStructure =
+      typeof rubricRaw.ideal_structure === 'string' && rubricRaw.ideal_structure.trim()
+        ? rubricRaw.ideal_structure.trim()
+        : 'Clear structure with context, approach, and outcome.';
+    const redFlags = coerceStringArray(rubricRaw.red_flags);
+
+    out.push({
+      order: coerceNumber(qObj.order) ?? i,
+      question_text: questionText,
+      category,
+      rubric: {
+        ideal_keywords: idealKeywords.length > 0 ? idealKeywords : ['relevant', 'specific'],
+        ideal_structure: idealStructure,
+        red_flags: redFlags.length > 0 ? redFlags : ['vague', 'off-topic'],
+      },
+    });
+  }
+
+  return out.length > 0 ? out : null;
 }
 
 function getTierSpecificGuidance(tier: UserTierId): string {
@@ -321,68 +371,111 @@ export async function generateQuestions({
     `  }]\n` +
     `}`;
 
-  // ── Single deterministic attempt under operation deadline ────────────────
-  // - Plain mode (no json_object) → bypasses the 18s json hang on gpt-4o-mini
-  // - parseJsonObject handles fenced/dirty output via brace-matching
-  // - No JSON parse retry (fail fast)
-  // - No mode-violation regeneration (drop violating items, fail if too few)
-  // - withOperationDeadline aborts the in-flight fetch on timeout
-  return withOperationDeadline('question_generation', async (signal) => {
-    const content = await callOpenAI(prompt, signal);
+  // Up to 2 LLM attempts when parse/coercion/mode-filter leaves too few questions.
+  const MAX_ATTEMPTS = 2;
+  let lastError: QuestionGenerationError | null = null;
 
-    // Guard against empty responses (model returned nothing)
-    if (!content || content.trim().length === 0) {
-      console.error('[generate-questions] AI returned empty response');
-      throw new QuestionGenerationError(
-        'Failed to generate questions: AI returned empty response. Please try again.',
-      );
+  try {
+    return await withOperationDeadline('question_generation', async (signal) => {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (signal.aborted) {
+          throw new QuestionGenerationError(
+            'Question generation timed out. Please try again.',
+          );
+        }
+
+        try {
+          const content = await callOpenAI(prompt, signal);
+
+          if (!content || content.trim().length === 0) {
+            throw new QuestionGenerationError(
+              'Failed to generate questions: AI returned empty response. Please try again.',
+            );
+          }
+
+          const parseResult = parseJsonObject(content);
+          if (!parseResult.ok) {
+            console.error('[generate-questions] JSON parse failed:', {
+              attempt,
+              error: parseResult.error,
+              rawPreview: parseResult.rawPreview,
+              contentLength: content.length,
+              contentStart: content.slice(0, 200),
+            });
+            throw new QuestionGenerationError(
+              'Failed to parse questions: invalid JSON from AI',
+            );
+          }
+
+          const coerced = coerceQuestionsResponse(parseResult.value);
+          if (!coerced || coerced.length === 0) {
+            throw new QuestionGenerationError(
+              'Failed to parse questions: AI response missing required fields',
+            );
+          }
+
+          const { valid, violating } = partitionByMode(coerced, canonicalMode);
+
+          if (violating.length > 0) {
+            console.warn(
+              `[generate-questions] Mode "${canonicalMode}" violated by ${violating.length}/${coerced.length} ` +
+              `questions (categories: ${[...new Set(violating.map((q) => q.category))].join(', ')}).`,
+            );
+          }
+
+          // Prefer mode-valid questions; if too few, use full set so start never
+          // fails when the model returned enough questions with wrong categories.
+          let pool = valid;
+          if (valid.length < questionCount && coerced.length >= questionCount) {
+            console.warn(
+              `[generate-questions] Using ${coerced.length} questions despite mode filter (need ${questionCount} for ${canonicalMode})`,
+            );
+            pool = coerced;
+          } else if (valid.length === 0 && coerced.length > 0) {
+            pool = coerced;
+          }
+
+          const enforced = pool
+            .slice(0, questionCount)
+            .map((q, idx) => ({ ...q, order: idx }));
+
+          if (enforced.length < questionCount) {
+            throw new QuestionGenerationError(
+              `Only ${enforced.length} questions generated (need ${questionCount})`,
+            );
+          }
+
+          console.log(
+            `[generate-questions] completed in ${Date.now() - t0}ms ` +
+            `(attempt=${attempt}, ${enforced.length} questions, mode=${canonicalMode})`,
+          );
+
+          return { questions: enforced };
+        } catch (err) {
+          if (err instanceof QuestionGenerationError) {
+            lastError = err;
+            if (attempt < MAX_ATTEMPTS && !signal.aborted) {
+              console.warn(`[generate-questions] Attempt ${attempt} failed, retrying:`, err.message);
+              continue;
+            }
+            throw err;
+          }
+          throw err;
+        }
+      }
+
+      throw lastError ?? new QuestionGenerationError('Failed to generate questions. Please try again.');
+    });
+  } catch (err) {
+    if (err instanceof QuestionGenerationError) throw err;
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('deadline') || msg.includes('timeout') || msg.includes('Abort')) {
+      throw new QuestionGenerationError('Question generation timed out. Please try again.');
     }
-
-    const parseResult = parseJsonObject(content);
-    if (!parseResult.ok) {
-      console.error('[generate-questions] JSON parse failed:', {
-        error: parseResult.error,
-        rawPreview: parseResult.rawPreview,
-        contentLength: content.length,
-        contentStart: content.slice(0, 200),
-      });
-      throw new QuestionGenerationError(
-        'Failed to parse questions: invalid JSON from AI',
-      );
+    if (msg.includes('Interview AI completion failed') || msg.includes('OpenRouter unavailable')) {
+      throw new QuestionGenerationError('AI service is temporarily unavailable. Please try again shortly.');
     }
-
-    if (!isValidQuestionsResponse(parseResult.value)) {
-      throw new QuestionGenerationError(
-        'Failed to parse questions: AI response missing required fields',
-      );
-    }
-
-    const { valid, violating } = partitionByMode(parseResult.value.questions, canonicalMode);
-
-    if (violating.length > 0) {
-      console.warn(
-        `[generate-questions] Mode "${canonicalMode}" violated by ${violating.length}/${parseResult.value.questions.length} ` +
-        `questions (categories: ${[...new Set(violating.map((q) => q.category))].join(', ')}). Dropping violating items.`,
-      );
-    }
-
-    const enforced = valid
-      .slice(0, questionCount)
-      .map((q, idx) => ({ ...q, order: idx }));
-
-    if (enforced.length < questionCount) {
-      throw new QuestionGenerationError(
-        `Only ${enforced.length} mode-valid questions for "${canonicalMode}" (need ${questionCount})`,
-      );
-    }
-
-    if (!signal.aborted) {
-      console.log(
-        `[generate-questions] completed in ${Date.now() - t0}ms ` +
-        `(${enforced.length} questions, mode=${canonicalMode})`,
-      );
-    }
-
-    return { questions: enforced };
-  });
+    console.error('[generate-questions] Unexpected error:', err);
+    throw new QuestionGenerationError('Failed to generate questions. Please try again.');
+  }
 }
