@@ -138,8 +138,45 @@ export async function POST(request: Request): Promise<NextResponse> {
     const estimatedCost = estimateLLMCallCostUSD('answer_evaluation');
     const costGuard = await checkLLMCostGuard(user.id, planTier, estimatedCost, 'answer_evaluation');
     if (!costGuard.allowed) {
+      // Save fallback evaluation so answer isn't orphaned — report can still be generated
+      console.warn('[interview/answer] Cost guard blocked evaluation — saving fallback', {
+        answerId: answer.id,
+        userId: user.id,
+      });
+      const fallbackDimensions = {
+        communication_clarity: 5,
+        technical_depth: 5,
+        answer_structure: 5,
+        confidence: 5,
+        relevance: 5,
+      };
+      await serviceClient
+        .from('evaluations')
+        .insert({
+          answer_id: answer.id,
+          overall_score: 5,
+          dimension_scores: fallbackDimensions,
+          feedback_text: 'Evaluation skipped — monthly AI usage limit reached.',
+          detailed_analysis: {
+            strengths: ['Your answer was recorded.'],
+            improvements: ['Upgrade your plan to get detailed feedback.'],
+            model_answer_hint: '',
+            keywords_missing: [],
+            score_justification: {
+              why_this_score: 'Neutral score assigned due to usage limit.',
+              key_strengths: ['Answer submitted.'],
+              improvement_areas: ['Upgrade for full evaluation.'],
+            },
+          },
+        });
       return NextResponse.json(
-        { error: 'Monthly AI usage limit reached. Please upgrade your plan or try again next month.' },
+        {
+          error: 'Monthly AI usage limit reached. Your answer was saved with a neutral score.',
+          evaluationId: null,
+          score: 5,
+          feedback: 'Evaluation skipped — upgrade your plan for detailed feedback.',
+          fallback: true,
+        },
         { status: 429 },
       );
     }
@@ -153,7 +190,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         answerStyle,
       });
 
-      const { data: evaluation } = await serviceClient
+      const { data: evaluation, error: evalInsertErr } = await serviceClient
         .from('evaluations')
         .insert({
           answer_id: answer.id,
@@ -164,6 +201,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         })
         .select('id')
         .single();
+
+      if (evalInsertErr) {
+        console.error('[interview/answer] Evaluation insert failed:', evalInsertErr);
+        throw new Error(`Evaluation insert failed: ${evalInsertErr.message}`);
+      }
 
       // Record actual estimated cost after successful evaluation
       await recordLLMSpend(user.id, estimatedCost);
@@ -177,27 +219,86 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     } catch (evalErr) {
       // Answer is safely saved — evaluation failure is non-fatal.
-      // Persist a sentinel evaluation row so the question is never silently
-      // omitted from the PDF report; the fallback text will render instead.
-      console.error('[interview/answer] Evaluation failed (non-fatal):', evalErr);
-      try {
-        await serviceClient
-          .from('evaluations')
-          .insert({
-            answer_id: answer.id,
-            overall_score: null,
-            dimension_scores: null,
-            feedback_text: 'Evaluation unavailable for this response.',
-            detailed_analysis: null,
-          });
-      } catch (dbErr) {
-        console.warn('[interview/answer] Could not persist fallback evaluation row:', dbErr);
+      // Persist a VALID fallback evaluation with neutral scores (5/10) so the
+      // report can still be generated. Null scores cause aggregation failures.
+      const errMsg = evalErr instanceof Error ? evalErr.message : String(evalErr);
+      const isTimeout = errMsg.includes('deadline') || errMsg.includes('timeout');
+      console.error('[interview/answer] Evaluation failed (non-fatal):', {
+        error: errMsg,
+        isTimeout,
+        answerId: answer.id,
+        questionId: questionId,
+      });
+
+      // Fallback evaluation with neutral scores — ensures report aggregation works
+      const fallbackDimensions = {
+        communication_clarity: 5,
+        technical_depth: 5,
+        answer_structure: 5,
+        confidence: 5,
+        relevance: 5,
+      };
+      const fallbackScore = 5;
+      const fallbackFeedback = isTimeout
+        ? 'Evaluation timed out. Your answer was recorded but could not be scored in time.'
+        : 'Evaluation unavailable for this response. Your answer was recorded.';
+      const fallbackAnalysis = {
+        strengths: ['Your answer was recorded successfully.'],
+        improvements: ['Evaluation was unavailable — practice with another session for detailed feedback.'],
+        model_answer_hint: '',
+        keywords_missing: [],
+        score_justification: {
+          why_this_score: 'Neutral score assigned due to evaluation service unavailability.',
+          key_strengths: ['Answer submitted successfully.'],
+          improvement_areas: ['Try another session for detailed evaluation.'],
+        },
+      };
+
+      // Retry fallback insert up to 2 times to ensure persistence
+      let fallbackInserted = false;
+      for (let attempt = 1; attempt <= 2 && !fallbackInserted; attempt++) {
+        try {
+          const { error: fallbackErr } = await serviceClient
+            .from('evaluations')
+            .insert({
+              answer_id: answer.id,
+              overall_score: fallbackScore,
+              dimension_scores: fallbackDimensions,
+              feedback_text: fallbackFeedback,
+              detailed_analysis: fallbackAnalysis,
+            });
+
+          if (fallbackErr) {
+            console.warn(`[interview/answer] Fallback insert attempt ${attempt} failed:`, fallbackErr.message);
+            if (attempt < 2) {
+              // Brief delay before retry
+              await new Promise(r => setTimeout(r, 200));
+            }
+          } else {
+            fallbackInserted = true;
+            console.info('[interview/answer] Fallback evaluation persisted successfully', {
+              answerId: answer.id,
+              attempt,
+            });
+          }
+        } catch (dbErr) {
+          console.warn(`[interview/answer] Fallback insert attempt ${attempt} threw:`, dbErr);
+        }
       }
+
+      if (!fallbackInserted) {
+        console.error('[interview/answer] CRITICAL: All fallback insert attempts failed', {
+          answerId: answer.id,
+          questionId: questionId,
+        });
+      }
+
       return NextResponse.json({
         evaluationId: null,
-        score: null,
-        feedback: 'Unable to evaluate this answer.',
+        score: fallbackInserted ? fallbackScore : null,
+        feedback: fallbackFeedback,
         provider: null,
+        fallback: true,
       });
     }
   } catch (err) {

@@ -119,12 +119,25 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
   const questionIds = (questions ?? []).map((q) => q.id as string);
 
-  const { data: answers } = await supabase
+  // Order by submitted_at ascending so later answers (post-follow-up) overwrite earlier ones
+  // This matches the PDF export logic and ensures we show the final evaluated answer
+  const { data: rawAnswers } = await supabase
     .from('answers')
-    .select('id, question_id, answer_text')
-    .in('question_id', questionIds);
+    .select('id, question_id, answer_text, submitted_at')
+    .in('question_id', questionIds)
+    .order('submitted_at', { ascending: true });
 
-  const answerIds = (answers ?? []).map((a) => a.id as string);
+  // Keep only the LATEST answer per question (follow-ups create multiple answer rows)
+  const answerByQuestion = new Map<string, { id: string; question_id: string; answer_text: string }>();
+  for (const a of rawAnswers ?? []) {
+    answerByQuestion.set(a.question_id as string, {
+      id: a.id as string,
+      question_id: a.question_id as string,
+      answer_text: (a.answer_text as string) ?? '',
+    });
+  }
+  const answers = Array.from(answerByQuestion.values());
+  const answerIds = answers.map((a) => a.id);
 
   const { data: evaluations } = await supabase
     .from('evaluations')
@@ -154,7 +167,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
 
   // Build breakdown — compute keyword counts from raw data regardless of plan tier
   const breakdown = (questions ?? []).map((q) => {
-    const answer = (answers ?? []).find((a) => a.question_id === q.id) ?? null;
+    const answer = answerByQuestion.get(q.id as string) ?? null;
     const rawEval = answer
       ? ((evaluations ?? []).find((e) => e.answer_id === answer.id) ?? null)
       : null;
@@ -202,7 +215,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
     relevance:             partialDimAvgs.relevance ?? 5,
   };
   const perQuestions: PerQuestionInsightData[] = (questions ?? []).flatMap((q) => {
-    const answer = (answers ?? []).find((a) => a.question_id === q.id) ?? null;
+    const answer = answerByQuestion.get(q.id as string) ?? null;
     const rawEval = answer ? ((evaluations ?? []).find((e) => e.answer_id === answer.id) ?? null) : null;
     if (!rawEval) return [];
     const detail = rawEval.detailed_analysis as DetailedAnalysis | null;

@@ -127,21 +127,61 @@ export async function aggregateReport(
   const answerIds = answers.map((a) => a.id as string);
 
   // Fetch all evaluations
-  const { data: evaluations, error: eError } = await supabase
+  const { data: rawEvaluations, error: eError } = await supabase
     .from('evaluations')
     .select('overall_score, dimension_scores')
     .in('answer_id', answerIds);
 
-  if (eError || !evaluations || evaluations.length === 0) {
-    throw new Error('No evaluations found for interview');
+  if (eError) {
+    throw new Error(`Failed to fetch evaluations: ${eError.message}`);
   }
 
-  // Calculate overall score (mean of all evaluation scores)
-  const overallScore =
-    evaluations.reduce((sum, e) => sum + (e.overall_score as number), 0) /
-    evaluations.length;
+  // Filter to only valid evaluations (non-null scores and dimension_scores)
+  // Fallback rows from failed evaluations have null scores and must be excluded
+  const validEvaluations = (rawEvaluations ?? []).filter((e): e is {
+    overall_score: number;
+    dimension_scores: DimensionScores;
+  } => {
+    const score = e.overall_score;
+    const dims = e.dimension_scores as DimensionScores | null;
+    return (
+      typeof score === 'number' &&
+      Number.isFinite(score) &&
+      dims !== null &&
+      typeof dims === 'object' &&
+      typeof dims.communication_clarity === 'number' &&
+      typeof dims.technical_depth === 'number' &&
+      typeof dims.answer_structure === 'number' &&
+      typeof dims.confidence === 'number' &&
+      typeof dims.relevance === 'number'
+    );
+  });
 
-  // Calculate per-dimension averages
+  const totalAnswers = answerIds.length;
+  const evaluatedCount = validEvaluations.length;
+  const unevaluatedCount = totalAnswers - evaluatedCount;
+
+  if (unevaluatedCount > 0) {
+    console.warn(
+      `[report/generate] ${unevaluatedCount}/${totalAnswers} answers missing valid evaluations — ` +
+      `report will use ${evaluatedCount} evaluated answers`,
+      { interviewId, totalAnswers, evaluatedCount },
+    );
+  }
+
+  if (validEvaluations.length === 0) {
+    throw new Error(
+      `No valid evaluations found for interview (${totalAnswers} answers, 0 evaluated). ` +
+      `This may indicate evaluation timeout issues.`,
+    );
+  }
+
+  // Calculate overall score (mean of all VALID evaluation scores)
+  const overallScore =
+    validEvaluations.reduce((sum, e) => sum + e.overall_score, 0) /
+    validEvaluations.length;
+
+  // Calculate per-dimension averages from valid evaluations only
   const dimSums: DimensionScores = {
     communication_clarity: 0,
     technical_depth: 0,
@@ -150,8 +190,8 @@ export async function aggregateReport(
     relevance: 0,
   };
 
-  for (const ev of evaluations) {
-    const d = ev.dimension_scores as DimensionScores;
+  for (const ev of validEvaluations) {
+    const d = ev.dimension_scores;
     dimSums.communication_clarity += d.communication_clarity;
     dimSums.technical_depth += d.technical_depth;
     dimSums.answer_structure += d.answer_structure;
@@ -159,7 +199,7 @@ export async function aggregateReport(
     dimSums.relevance += d.relevance;
   }
 
-  const n = evaluations.length;
+  const n = validEvaluations.length;
   const round1 = (v: number) => Math.round(v * 10) / 10;
 
   const radarData: RadarDataPoint[] = [

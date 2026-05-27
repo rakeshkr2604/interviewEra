@@ -120,10 +120,12 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     requestClass:         'structured_evaluation',
     temperature:          0.3,
     maxOutputTokens:      1_800,
-    // 20s: OpenAI quota-exhaust → OpenRouter fallback path can take ~8-12s on
-    // OpenRouter alone; the old 12s caused occasional non-fatal timeout noise
-    // when the quota check + fallback + model response crossed the boundary.
-    timeoutMs:            20_000,
+    // 25s: Increased from 20s to accommodate OpenRouter latency variance.
+    // The old 12s caused frequent timeouts; 20s still saw occasional noise
+    // under load. 25s gives a comfortable buffer while staying well inside
+    // Vercel's 30s serverless budget. Evaluation is not realtime-critical —
+    // the candidate sees feedback after submission, so extra latency is acceptable.
+    timeoutMs:            25_000,
     responseFormat:       'json',
     context: {
       maxInputChars:        8_000,

@@ -822,6 +822,17 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     return () => clearInterval(iv);
   }, [recognitionState]);
 
+  // ── StrictMode remount fix ───────────────────────────────────────────────
+  // React StrictMode (dev) performs a mount → unmount → remount cycle. The
+  // unmount cleanup sets mountedRef.current = false, but useRef preserves the
+  // same object across the remount — so mountedRef.current stays false forever.
+  // Resetting it to true HERE (on every mount/remount) ensures the remounted
+  // instance has a valid mounted flag for all async callbacks.
+  useEffect(() => {
+    mountedRef.current = true;
+    voiceDebug('mount_flag_reset', { source: 'useSpeechRecognition_mount' });
+  }, []);
+
   // Deterministic unmount teardown. Ordering matters:
   //   1. mark unmounted (gates every async callback) and disable auto-restart
   //   2. cancel any pending restart timer (no resurrection)

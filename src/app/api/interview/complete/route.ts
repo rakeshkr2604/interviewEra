@@ -173,6 +173,107 @@ export async function POST(request: Request): Promise<NextResponse> {
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('id', interviewId);
 
+    // ── Evaluation integrity check: ensure all answers have valid evaluations ──
+    // Fetch all questions and their answers for this interview
+    const { data: questions } = await serviceClient
+      .from('questions')
+      .select('id')
+      .eq('interview_id', interviewId);
+
+    if (questions && questions.length > 0) {
+      const questionIds = questions.map(q => q.id as string);
+
+      const { data: answers } = await serviceClient
+        .from('answers')
+        .select('id, question_id')
+        .in('question_id', questionIds);
+
+      if (answers && answers.length > 0) {
+        const answerIds = answers.map(a => a.id as string);
+
+        // Check which answers have valid evaluations (non-null scores)
+        const { data: evaluations } = await serviceClient
+          .from('evaluations')
+          .select('answer_id, overall_score, dimension_scores')
+          .in('answer_id', answerIds);
+
+        const validEvalIds = new Set(
+          (evaluations ?? [])
+            .filter(e => typeof e.overall_score === 'number' && e.dimension_scores !== null)
+            .map(e => e.answer_id as string),
+        );
+
+        // Find answers missing valid evaluations
+        const missingEvalAnswerIds = answerIds.filter(id => !validEvalIds.has(id));
+
+        if (missingEvalAnswerIds.length > 0) {
+          console.warn(
+            `[interview/complete] ${missingEvalAnswerIds.length}/${answerIds.length} answers ` +
+            `missing valid evaluations — backfilling with neutral scores`,
+            { interviewId, missingCount: missingEvalAnswerIds.length },
+          );
+
+          // Backfill missing evaluations with neutral scores
+          const fallbackDimensions = {
+            communication_clarity: 5,
+            technical_depth: 5,
+            answer_structure: 5,
+            confidence: 5,
+            relevance: 5,
+          };
+          const fallbackAnalysis = {
+            strengths: ['Answer submitted successfully.'],
+            improvements: ['Evaluation was unavailable — try another session for detailed feedback.'],
+            model_answer_hint: '',
+            keywords_missing: [],
+            score_justification: {
+              why_this_score: 'Neutral score assigned due to evaluation unavailability at completion time.',
+              key_strengths: ['Answer was recorded.'],
+              improvement_areas: ['Practice with another session.'],
+            },
+          };
+
+          for (const answerId of missingEvalAnswerIds) {
+            // Check if there's an existing row (might have null scores)
+            const { data: existingEval } = await serviceClient
+              .from('evaluations')
+              .select('id')
+              .eq('answer_id', answerId)
+              .maybeSingle();
+
+            if (existingEval) {
+              // Update existing row with valid scores
+              await serviceClient
+                .from('evaluations')
+                .update({
+                  overall_score: 5,
+                  dimension_scores: fallbackDimensions,
+                  feedback_text: 'Evaluation backfilled at report generation time.',
+                  detailed_analysis: fallbackAnalysis,
+                })
+                .eq('id', existingEval.id);
+            } else {
+              // Insert new fallback evaluation
+              await serviceClient
+                .from('evaluations')
+                .insert({
+                  answer_id: answerId,
+                  overall_score: 5,
+                  dimension_scores: fallbackDimensions,
+                  feedback_text: 'Evaluation unavailable — neutral score assigned.',
+                  detailed_analysis: fallbackAnalysis,
+                });
+            }
+          }
+
+          console.info(
+            `[interview/complete] Backfilled ${missingEvalAnswerIds.length} evaluations`,
+            { interviewId },
+          );
+        }
+      }
+    }
+
     const { reportId } = await aggregateReport(interviewId, user.id);
 
     let retentionPayload: RetentionResponsePayload | null = null;
