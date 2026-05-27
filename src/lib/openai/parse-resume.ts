@@ -1,37 +1,48 @@
-import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
-import { getTokenBudget } from '@/lib/ai/token-budget';
+/**
+ * Resume parsing — lightweight deterministic extraction.
+ *
+ * Design constraints:
+ *  - Single model, single call, no fallback chain, no retry.
+ *  - Fail fast: if the model returns bad JSON, throw immediately.
+ *  - Token and latency metrics logged on every call for operator visibility.
+ *
+ * Model is configurable via RESUME_PARSE_MODEL env var so you can swap it
+ * without a code deploy. Defaults to openai/gpt-4.1-mini on OpenRouter.
+ */
+
+import { createOpenRouterClient } from '@/lib/openrouter/client';
+import { clampInputForOperation } from '@/lib/ai/context-hygiene';
+import { parseJsonObject } from '@/lib/ai/response-contract';
+import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import type { ParsedResume } from '@/types/app.types';
 
-const PROMPT_TEMPLATE = `You are a resume parsing engine. Extract structured information from the following resume text.
-Return ONLY valid JSON. No explanation, no markdown, no preamble.
+// ── Model config ──────────────────────────────────────────────────────────────
 
-Schema:
+const RESUME_PARSE_MODEL =
+  process.env.RESUME_PARSE_MODEL ?? 'openai/gpt-4.1-mini';
+
+// ── Prompts ───────────────────────────────────────────────────────────────────
+
+const SYSTEM_PROMPT =
+  `Extract resume data as JSON. Return only JSON — no markdown, no explanation.`;
+
+const USER_PROMPT_TEMPLATE =
+  `Extract from this resume and return JSON matching exactly:
 {
   "name": string,
   "email": string,
   "phone": string,
   "skills": string[],
-  "experience": [{
-    "company": string, "role": string, "duration": string, "description": string
-  }],
-  "projects": [{
-    "name": string, "tech_stack": string[], "description": string
-  }],
-  "education": [{
-    "degree": string, "institution": string, "year": string, "cgpa": string
-  }],
+  "experience": [{"company": string, "role": string, "duration": string, "description": string}],
+  "projects": [{"name": string, "tech_stack": string[], "description": string}],
+  "education": [{"degree": string, "institution": string, "year": string, "cgpa": string}],
   "target_roles": string[]
 }
 
-Resume text:
+Resume:
 {RESUME_TEXT}`;
 
-function extractJSON(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  return content.trim();
-}
+// ── Validation ────────────────────────────────────────────────────────────────
 
 function isValidParsedResume(data: unknown): data is ParsedResume {
   if (!data || typeof data !== 'object') return false;
@@ -48,51 +59,54 @@ function isValidParsedResume(data: unknown): data is ParsedResume {
   );
 }
 
-async function callOpenAI(prompt: string): Promise<string> {
-  const { content } = await completeInterviewChat({
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0,
-    maxTokens: getTokenBudget('resume_parse'),
-  });
-  return content;
-}
-
-async function getAIContent(prompt: string): Promise<string> {
-  try {
-    return await callOpenAI(prompt);
-  } catch (openaiError) {
-    console.warn('[AI] Interview AI chain failed, switching to Mistral:', openaiError);
-
-    try {
-      return await callMistralChat(prompt, 0, getTokenBudget('resume_parse', 'mistral'));
-    } catch (mistralError) {
-      console.error('[AI] Interview AI chain and Mistral failed:', mistralError);
-      throw mistralError;
-    }
-  }
-}
+// ── Main export ───────────────────────────────────────────────────────────────
 
 export async function parseResume(rawText: string): Promise<ParsedResume> {
-  const prompt = PROMPT_TEMPLATE.replace('{RESUME_TEXT}', rawText);
+  const t0 = Date.now();
 
-  let content = await getAIContent(prompt);
+  const client = createOpenRouterClient();
+  if (!client) {
+    throw new Error('[parse-resume] OpenRouter not configured — set OPENROUTER_API_KEY');
+  }
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJSON(content));
-  } catch {
-    try {
-      content = await getAIContent(prompt);
-      parsed = JSON.parse(extractJSON(content));
-    } catch (retryErr) {
-      console.error('[parseResume] JSON retry failed:', retryErr);
-      throw new Error('Failed to parse resume: invalid JSON from AI after retry');
+  const clamped = clampInputForOperation(rawText, 'resume_parse');
+  const userContent = USER_PROMPT_TEMPLATE.replace('{RESUME_TEXT}', clamped);
+
+  return withOperationDeadline('resume_parse', async (signal) => {
+    const response = await client.chat.completions.create(
+      {
+        model: RESUME_PARSE_MODEL,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user',   content: userContent },
+        ],
+        temperature: 0,
+        max_tokens:  800,
+        response_format: { type: 'json_object' },
+      },
+      { signal },
+    );
+
+    const content = response.choices[0]?.message?.content ?? '';
+    const usage   = response.usage;
+
+    console.log(
+      `[parse-resume] model=${RESUME_PARSE_MODEL}` +
+      ` latency=${Date.now() - t0}ms` +
+      ` prompt_tokens=${usage?.prompt_tokens ?? '?'}` +
+      ` completion_tokens=${usage?.completion_tokens ?? '?'}` +
+      ` total_tokens=${usage?.total_tokens ?? '?'}`,
+    );
+
+    const parseResult = parseJsonObject(content);
+    if (!parseResult.ok) {
+      throw new Error(`[parse-resume] Invalid JSON from model: ${parseResult.error}`);
     }
-  }
 
-  if (!isValidParsedResume(parsed)) {
-    throw new Error('Failed to parse resume: AI response missing required fields');
-  }
+    if (!isValidParsedResume(parseResult.value)) {
+      throw new Error('[parse-resume] Response missing required fields');
+    }
 
-  return parsed;
+    return parseResult.value;
+  });
 }

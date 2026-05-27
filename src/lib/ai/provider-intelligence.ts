@@ -15,6 +15,7 @@
  */
 
 import { logAICall } from '@/lib/telemetry/ai-logger';
+import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -195,11 +196,13 @@ export function recordProviderOutcome(outcome: ProviderCallOutcome): void {
     outputTokens,
   });
 
-  // Fire-and-forget telemetry — never blocks the AI response path
+  const resolvedModel = outcome.model ?? DEFAULT_MODELS[outcome.provider];
+
+  // Fire-and-forget: DB telemetry row
   void logAICall({
     operation:      outcome.operation,
     provider:       outcome.provider,
-    model:          outcome.model ?? DEFAULT_MODELS[outcome.provider],
+    model:          resolvedModel,
     input_tokens:   inputTokens || undefined,
     output_tokens:  outputTokens || undefined,
     latency_ms:     outcome.latencyMs,
@@ -211,6 +214,31 @@ export function recordProviderOutcome(outcome: ProviderCallOutcome): void {
         : undefined,
     json_parse_ok:  outcome.jsonValid,
   });
+
+  // Structured stdout event — picked up by log aggregators (Vercel Logs, Datadog, etc.)
+  if (outcome.success) {
+    emitAiTelemetry({
+      event:      'ai_request_success',
+      operation:  outcome.operation,
+      provider:   outcome.provider,
+      model:      resolvedModel,
+      attempt:    1,
+      latency_ms: outcome.latencyMs,
+    });
+  } else {
+    emitAiTelemetry({
+      event:      'ai_request_failure',
+      operation:  outcome.operation,
+      provider:   outcome.provider,
+      model:      resolvedModel,
+      attempt:    1,
+      error_code: outcome.timeout
+        ? 'timeout'
+        : outcome.quotaExhausted
+          ? 'quota_exhausted'
+          : 'provider_error',
+    });
+  }
 }
 
 // ─── Compute stats ────────────────────────────────────────────────────────────

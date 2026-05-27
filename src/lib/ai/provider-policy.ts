@@ -67,9 +67,10 @@ const ROUTING_TABLE: Record<PolicyOperation, ProviderSpec[]> = {
     { provider: 'mistral',    model: 'mistral-small-latest', tier: 'fallback' },
   ],
   resume_parse: [
-    { provider: 'openrouter', model: 'openai/gpt-4o-mini',   tier: 'fast'     },
-    { provider: 'openai',     model: 'gpt-4o-mini',          tier: 'fast'     },
-    { provider: 'mistral',    model: 'mistral-small-latest', tier: 'fallback' },
+    // Single deterministic model — no fallback chain for resume parsing.
+    // parse-resume.ts calls OpenRouter directly; this entry is the
+    // authoritative model declaration for diagnostics and policy tooling.
+    { provider: 'openrouter', model: 'openai/gpt-4.1-mini', tier: 'fast' },
   ],
   report_generation: [
     { provider: 'openai',     model: 'gpt-4o-mini',          tier: 'quality'  },

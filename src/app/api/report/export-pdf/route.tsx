@@ -128,8 +128,12 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
         questionText: q.question_text as string,
         category: q.category as QuestionCategory,
         answerText: answer ? answer.answer_text : null,
-        overallScore: evaluation ? (evaluation.overall_score as number) : null,
-        feedbackText: evaluation ? (evaluation.feedback_text as string) : null,
+        overallScore: evaluation ? (evaluation.overall_score as number | null) : null,
+        // When an answer exists but evaluation is missing (old data or DB failure),
+        // show a fallback message instead of silently omitting evaluation context.
+        feedbackText: evaluation
+          ? ((evaluation.feedback_text as string) ?? 'Evaluation unavailable for this response.')
+          : (answer ? 'Evaluation unavailable for this response.' : null),
         strengths: detail?.strengths ?? [],
         improvements: detail?.improvements ?? [],
         modelAnswerHint: detail?.model_answer_hint ?? null,

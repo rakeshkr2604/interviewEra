@@ -9,11 +9,18 @@ const COMPLETION_RETRIES = 1;
 const RETRY_BASE_MS = 900;
 /**
  * Hard per-attempt deadline — prevents a single hung LLM call from eating the
- * 30s route budget. Sized to absorb p99 OpenRouter latency for our largest
- * operations (resume_parse, question_generation): observed steady-state is
- * ~10s, so 18s gives 80% headroom without consuming the full route slot.
+ * 30s route budget.
+ *
+ * Set to 20s after observing that question_generation prompts (large resume +
+ * calibration block + 1200 output tokens) consistently need 12–18s on
+ * gpt-4.1-mini via OpenRouter, causing false timeout failures at the old 12s
+ * limit. Resume parse and short-timeout operations are unaffected because
+ * their operation-level deadline (15s and 8s respectively) fires first — the
+ * per-attempt timer is a secondary "last resort" safeguard for genuinely hung
+ * requests, not the primary throttle. The operation-level deadline in
+ * operation-registry.ts remains the single source of truth for budget sizing.
  */
-const ATTEMPT_TIMEOUT_MS = 18_000;
+const ATTEMPT_TIMEOUT_MS = 20_000;
 
 export function modelPrefersPlainJson(model: string): boolean {
   return /gpt-3\.5|gemini|llama|mistral|qwen/i.test(model);
@@ -26,9 +33,24 @@ async function oneCompletion(
   temperature: number,
   jsonObject: boolean,
   maxTokens?: number,
+  operationSignal?: AbortSignal,
 ): Promise<string> {
+  // Bail immediately if the operation was already cancelled before we start.
+  if (operationSignal?.aborted) {
+    throw new DOMException('Operation aborted before attempt', 'AbortError');
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+
+  // Bridge: when the operation-level deadline fires, abort this attempt's
+  // controller immediately — the underlying fetch terminates instead of
+  // waiting out the remaining per-attempt 18s window (true cancellation).
+  let opAbortHandler: (() => void) | undefined;
+  if (operationSignal) {
+    opAbortHandler = () => controller.abort();
+    operationSignal.addEventListener('abort', opAbortHandler, { once: true });
+  }
 
   try {
     const res = await client.chat.completions.create(
@@ -48,6 +70,9 @@ async function oneCompletion(
     return content;
   } finally {
     clearTimeout(timer);
+    if (opAbortHandler && operationSignal) {
+      operationSignal.removeEventListener('abort', opAbortHandler);
+    }
   }
 }
 
@@ -58,20 +83,33 @@ export async function completionWithRetries(
   temperature: number,
   jsonObject: boolean,
   maxTokens?: number,
+  operationSignal?: AbortSignal,
 ): Promise<string> {
   let lastError: unknown;
 
   for (let attempt = 0; attempt < COMPLETION_RETRIES; attempt++) {
+    // Operation-level abort takes absolute priority — stop before wasting a
+    // retry on a cancelled operation.
+    if (operationSignal?.aborted) {
+      console.warn(`[chat-completion-core] Attempt ${attempt + 1} skipped — operation aborted — model: ${model}`);
+      throw new DOMException('Operation aborted before retry', 'AbortError');
+    }
     try {
-      return await oneCompletion(client, model, messages, temperature, jsonObject, maxTokens);
+      return await oneCompletion(client, model, messages, temperature, jsonObject, maxTokens, operationSignal);
     } catch (error) {
+      // Operation abort is non-retryable and supersedes all other error handling.
+      if (operationSignal?.aborted) {
+        console.warn(`[chat-completion-core] Attempt ${attempt + 1} aborted by operation signal — model: ${model}`);
+        throw new DOMException('Operation aborted', 'AbortError');
+      }
+
       lastError = error;
       const api = error instanceof OpenAI.APIError ? error : null;
 
       // Quota exhaustion: propagate immediately — caller decides provider switch
       if (api?.code === 'insufficient_quota') throw error;
 
-      // Abort = timeout: non-retryable for this attempt set
+      // Abort = per-attempt timeout: non-retryable for this attempt set
       if (error instanceof DOMException && error.name === 'AbortError') {
         console.warn(`[chat-completion-core] Attempt ${attempt + 1} timed out (${ATTEMPT_TIMEOUT_MS}ms) — model: ${model}`);
         throw new Error(`Completion timeout after ${ATTEMPT_TIMEOUT_MS}ms`);

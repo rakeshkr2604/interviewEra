@@ -5,10 +5,14 @@ import { callMistralChat } from '@/lib/mistral/client';
 import openai, { callWithRetry } from '@/lib/openai/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
+import { clampInputForOperation } from '@/lib/ai/context-hygiene';
+import { extractJsonBlock } from '@/lib/ai/response-contract';
 import type { QuestionRubric, DimensionScores, DetailedAnalysis, ScoreJustification } from '@/types/app.types';
 import type { AnswerStyle } from '@/lib/settings/client-preferences';
 import { recordProviderOutcome } from '@/lib/ai/provider-intelligence';
 import { isSingleProviderMode } from '@/lib/ai/single-provider-mode';
+import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
+import { logProviderFailover } from '@/lib/telemetry/ai-logger';
 
 export type EvaluationProvider = 'openrouter' | 'openai' | 'mistral';
 
@@ -52,30 +56,11 @@ function clamp(score: number): number {
 }
 
 function extractJSON(content: string, source = 'unknown'): string {
-  // 1. Strip markdown fences
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const stripped = fenced ? fenced[1].trim() : content.trim();
-
-  // 2. Try direct parse — if it works, we're done
-  try {
-    JSON.parse(stripped);
-    return stripped;
-  } catch {
-    // 3. Regex-extract the first {...} block (handles preamble / trailing text)
-    const jsonMatch = stripped.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      try {
-        JSON.parse(jsonMatch[0]);
-        console.log(`[JSON_PARSE][${source}] ✓ Extracted JSON via brace-match`);
-        return jsonMatch[0];
-      } catch {
-        /* fall through to log + throw */
-      }
-    }
-    console.error(`[JSON_PARSE][${source}] ✗ Could not extract JSON. First 500 chars:`, stripped.slice(0, 500));
-    // Return stripped so the caller can still throw with useful context
-    return stripped;
+  const { text, via } = extractJsonBlock(content);
+  if (via === 'brace-match') {
+    console.log(`[JSON_PARSE][${source}] ✓ Extracted JSON via brace-match`);
   }
+  return text;
 }
 
 function normalizeScoreJustification(raw: unknown): ScoreJustification | null {
@@ -214,22 +199,36 @@ function coerceEvaluation(
   }
 
   const analysisRaw = (d.detailed_analysis ?? {}) as Record<string, unknown>;
+  const rawHint = analysisRaw.model_answer_hint;
+  const model_answer_hint =
+    typeof rawHint === 'string' && rawHint.trim() ? rawHint.trim() : '';
+  if (!model_answer_hint) {
+    console.warn(
+      `[evaluate-answer][${source}] model_answer_hint missing or empty — PDF will show fallback message`,
+      { rawHint },
+    );
+    fixes.push('model_answer_hint→empty(fallback-will-show)');
+  }
   const detailed_analysis: DetailedAnalysis = {
     strengths: coerceStringArray(analysisRaw.strengths),
     improvements: coerceStringArray(analysisRaw.improvements),
-    model_answer_hint:
-      typeof analysisRaw.model_answer_hint === 'string'
-        ? analysisRaw.model_answer_hint
-        : '',
+    model_answer_hint,
     keywords_missing: coerceStringArray(analysisRaw.keywords_missing),
     score_justification: scoreJustification,
   };
 
   if (fixes.length > 0) {
-    console.log(
-      `[JSON_PARSE][${source}] ✓ Auto-healed ${fixes.length} field(s):`,
-      fixes.join(', '),
+    console.warn(
+      `[evaluate-answer][coerce][${source}] auto-healed ${fixes.length} field(s): ${fixes.join(', ')}`,
     );
+    emitAiTelemetry({
+      event:           'ai_json_repair',
+      operation:       'answer_evaluation',
+      provider:        source.startsWith('mistral') ? 'mistral' : source === 'openai' ? 'openai' : 'openrouter',
+      model:           'unknown',
+      fields_repaired: fixes.length,
+      repair_actions:  fixes.join(',').slice(0, 300),
+    });
   }
 
   return {
@@ -359,7 +358,7 @@ function buildPrompt(
     `  "detailed_analysis": {\n` +
     `    "strengths": string[],\n` +
     `    "improvements": string[],\n` +
-    `    "model_answer_hint": string,\n` +
+    `    "model_answer_hint": string (REQUIRED — 3–4 bullet points using • showing what a strong answer includes: core method/structure expected, evidence or metrics needed, ownership language, one example phrasing; must NEVER be empty or generic),\n` +
     `    "keywords_missing": string[]\n` +
     `  }\n` +
     `}`
@@ -433,19 +432,35 @@ function tryParseResponse(
   return coerceEvaluation(parsed, source);
 }
 
-const EVALUATOR_SYSTEM_PROMPT = `You are an experienced technical interviewer giving feedback — not a rubric robot.
+const EVALUATOR_SYSTEM_PROMPT = `You are an experienced interviewer writing post-interview feedback — not a rubric robot filling in a template.
 
-FEEDBACK QUALITY (this is what makes the product feel human):
-- Be SPECIFIC to what THIS candidate said. Quote or paraphrase their actual words.
-- Be ACTIONABLE: show a concrete example of a stronger answer, don't just label the gap.
-- NEVER use generic filler like "lacks clarity", "needs more structure", "be more specific" on their own.
+FEEDBACK QUALITY RULES (non-negotiable):
+- Be SPECIFIC to what THIS candidate said. Quote or paraphrase their actual words in every feedback field.
+- Be ACTIONABLE: show what a stronger version of their answer would look like — don't just label the gap.
+- NEVER use generic filler on its own: banned phrases include "lacks clarity", "needs more structure", "be more specific", "improve communication", "be more confident", "provide more examples".
+- feedback_text should read like a real interviewer speaking to the candidate, not like a grading rubric.
 
-WRONG (generic, banned): "The answer lacks clarity and structure. Provide specific examples."
-RIGHT (specific, quoted, actionable): "You said 'I used MongoDB for flexibility' — but which schema decision did that flexibility actually enable? Embedded documents or references? Naming that, e.g. 'I embedded order items to avoid a join on the hot path', would show real depth."
+WRONG (banned, generic):
+  "The answer lacks clarity and structure. You should provide specific examples to support your points."
 
-Apply this to feedback_text, score_justification.why_this_score, and detailed_analysis.improvements.
+RIGHT (specific, quoted, shows what better looks like):
+  "You said 'I used MongoDB for flexibility' — but which schema decision did that flexibility enable? Naming it, e.g. 'I embedded order items to avoid a join on the read path', would show real depth here."
 
-CRITICAL: Respond with ONLY valid JSON. No markdown fences, no text before or after, no preamble. Start with { and end with }.
+Apply this standard to: feedback_text, score_justification.why_this_score, and detailed_analysis.improvements.
+
+MODEL ANSWER HINT — write 3–4 bullet points (• character) covering:
+  • The core concept or method the question tests (e.g. STAR for behavioral, trade-off reasoning for system design)
+  • What evidence or metric a strong answer includes (e.g. actual numbers, specific tech choices)
+  • Ownership language expected (e.g. "I decided", "I owned", not "we did it")
+  • One concrete example of strong phrasing for this specific question
+
+Example model_answer_hint for a behavioral leadership question:
+  "• Use STAR: keep Situation/Task to 1–2 sentences, spend time on Action and Result
+  • Name the specific conflict or blocker you resolved — avoid vague 'team disagreement'
+  • Own the decision: 'I decided to escalate because...' not 'we eventually resolved it'
+  • End with a measurable outcome: delivery date met, team alignment achieved, retention improved"
+
+CRITICAL: Respond with ONLY valid JSON. No markdown fences, no text before or after. Start with { and end with }.
 
 Required structure:
 {
@@ -457,16 +472,16 @@ Required structure:
     "confidence": <number 1-10>,
     "relevance": <number 1-10>
   },
-  "feedback_text": "<2-3 sentences, specific and actionable>",
+  "feedback_text": "<2-3 sentences, recruiter-tone, specific to what they said, actionable>",
   "score_justification": {
-    "why_this_score": "<2-3 sentences referencing concrete content>",
-    "key_strengths": ["<strength 1>", "<strength 2>"],
-    "improvement_areas": ["<improvement 1>", "<improvement 2>"]
+    "why_this_score": "<2-3 sentences referencing concrete content from their answer; no rubric formula language>",
+    "key_strengths": ["<specific strength from this answer>", "<specific strength from this answer>"],
+    "improvement_areas": ["<specific actionable improvement for this answer>", "<specific actionable improvement for this answer>"]
   },
   "detailed_analysis": {
     "strengths": ["<string>"],
     "improvements": ["<string>"],
-    "model_answer_hint": "<string>",
+    "model_answer_hint": "<REQUIRED: 3–4 bullet points using • showing what a strong answer includes for this specific question. Must NEVER be empty or a generic restatement of the question.>",
     "keywords_missing": ["<string>"]
   }
 }
@@ -559,7 +574,7 @@ async function evaluateWithMistral(prompt: string): Promise<EvaluationResult> {
   const parsed = tryParseResponse(content, 'mistral');
   if (!parsed) {
     recordProviderOutcome({ provider: 'mistral', operation: 'answer_evaluation', latencyMs: Date.now() - t0, success: false, timeout: false, quotaExhausted: false, jsonValid: false });
-    console.warn('[evaluate-answer] Mistral retry attempt');
+    console.warn('[evaluate-answer] Mistral parse failed — retrying with no max_tokens constraint');
     const t1           = Date.now();
     const retryContent = await callMistralChat(prompt, 0.3);
     const retryParsed  = tryParseResponse(retryContent, 'mistral-retry');
@@ -582,7 +597,9 @@ export async function evaluateAnswer({
   answerStyle,
 }: EvaluateAnswerInput): Promise<EvaluationResult> {
   return withOperationDeadline('answer_evaluation', async () => {
-    const prompt = buildPrompt(questionText, rubric, answerText, answerStyle);
+    // Cap answer length so a runaway transcript can't blow the prompt.
+    const boundedAnswer = clampInputForOperation(answerText, 'answer_evaluation');
+    const prompt = buildPrompt(questionText, rubric, boundedAnswer, answerStyle);
     const messages = [
       { role: 'system' as const, content: EVALUATOR_SYSTEM_PROMPT },
       { role: 'user' as const, content: prompt },
@@ -593,7 +610,24 @@ export async function evaluateAnswer({
       try {
         return await evaluateWithStructuredOpenAI(messages);
       } catch (structuredError) {
-        console.warn('[AI] Structured OpenAI evaluation failed, falling back to primary chain:', structuredError);
+        console.warn('[evaluate-answer] Structured OpenAI failed, falling back to primary chain:', structuredError);
+        emitAiTelemetry({
+          event:         'ai_fallback_triggered',
+          operation:     'answer_evaluation',
+          provider:      'openrouter',
+          model:         'openai/gpt-4o-mini',
+          from_provider: 'openai',
+          to_provider:   'openrouter',
+          reason:        'structured_output_failure',
+        });
+        void logProviderFailover({
+          operation:     'answer_evaluation',
+          from_provider: 'openai',
+          from_model:    process.env.OPENAI_INTERVIEW_MODEL?.trim() ?? 'gpt-4o-mini',
+          to_provider:   'openrouter',
+          to_model:      'openai/gpt-4o-mini',
+          reason:        'structured_output_failure',
+        });
       }
     }
 
@@ -602,16 +636,33 @@ export async function evaluateAnswer({
       return await evaluateWithPrimaryChain(prompt);
     } catch (primaryError) {
       if (isSingleProviderMode()) {
-        console.error('[AI] OpenRouter eval failed; Mistral disabled in single-provider mode');
+        console.error('[evaluate-answer] OpenRouter eval failed; Mistral disabled in single-provider mode');
         throw primaryError;
       }
-      console.warn('[AI] Primary interview AI failed, switching to Mistral:', primaryError);
+      console.warn('[evaluate-answer] Primary chain failed, switching to Mistral:', primaryError);
+      emitAiTelemetry({
+        event:         'ai_fallback_triggered',
+        operation:     'answer_evaluation',
+        provider:      'mistral',
+        model:         'mistral-small-latest',
+        from_provider: 'openrouter',
+        to_provider:   'mistral',
+        reason:        'primary_chain_failure',
+      });
+      void logProviderFailover({
+        operation:     'answer_evaluation',
+        from_provider: 'openrouter',
+        from_model:    'openai/gpt-4o-mini',
+        to_provider:   'mistral',
+        to_model:      'mistral-small-latest',
+        reason:        'primary_chain_failure',
+      });
 
       // Tier 3: Mistral
       try {
         return await evaluateWithMistral(prompt);
       } catch (mistralError) {
-        console.error('[AI] All evaluation providers failed:', mistralError);
+        console.error('[evaluate-answer] All evaluation providers failed:', mistralError);
         throw mistralError;
       }
     }

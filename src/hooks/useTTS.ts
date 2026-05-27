@@ -93,9 +93,61 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
         setIsSpeaking(false)
         onComplete?.()
       }
-      utterance.onerror = () => {
+      utterance.onerror = (event) => {
+        // Branch on the SpeechSynthesisErrorEvent's `error` code so we don't
+        // surface harmless lifecycle events (cancellations, voice swaps) as
+        // "Speech output failed" — that was the source of the spurious amber
+        // banner appearing after every successful question on some browsers.
+        //
+        // Error codes (W3C):
+        //   - canceled / interrupted: WE called speechSynthesis.cancel() (e.g.
+        //     Skip, Submit, next question). Benign — no user-facing message.
+        //   - voice-unavailable / language-unavailable: requested voice/lang
+        //     not available. Logged, no red banner — engine usually still
+        //     speaks with a fallback voice.
+        //   - audio-busy / audio-hardware: device contention. Surface a
+        //     friendly hint.
+        //   - network: speech engine fetched online voice and failed. Surface.
+        //   - synthesis-failed / synthesis-unavailable: hard engine failure.
+        //     Surface.
+        //   - default / unknown: generic message — but we now name the code so
+        //     users can report it accurately.
+        //
+        // CRITICAL: every branch still calls onComplete so the phase machine
+        // releases. A silent failure (no onComplete) would leave the session
+        // stuck in avatar_speaking forever.
         setIsSpeaking(false)
-        setError('Speech output failed. Continuing without voice playback.')
+        const code = (event as SpeechSynthesisErrorEvent).error
+        switch (code) {
+          case 'canceled':
+          case 'interrupted':
+            console.log('[tts] benign_cancel', { code })
+            break
+          case 'voice-unavailable':
+          case 'language-unavailable':
+            console.warn('[tts] voice_lang_unavailable', { code })
+            break
+          case 'audio-busy':
+          case 'audio-hardware':
+            setError('Speakers are busy or unavailable. Voice playback paused.')
+            break
+          case 'network':
+            setError('Network issue while loading the voice. Continuing without voice playback.')
+            break
+          case 'synthesis-failed':
+          case 'synthesis-unavailable':
+            setError('Browser voice engine failed. Continuing without voice playback.')
+            break
+          case 'not-allowed':
+            setError('Voice playback is blocked. Click anywhere on the page to enable it, then try the next question.')
+            break
+          case 'text-too-long':
+            setError('Question is too long for the voice engine. Continuing without voice playback.')
+            break
+          default:
+            setError(`Speech output failed (${code ?? 'unknown'}). Continuing without voice playback.`)
+        }
+        onComplete?.()
       }
 
       if (onWordBoundary) {

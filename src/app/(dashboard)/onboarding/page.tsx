@@ -162,39 +162,91 @@ export default function OnboardingPage() {
   useEffect(() => {
     if (!data.resumeId || resumeState !== 'processing') return
 
-    const intervalId = window.setInterval(async () => {
+    // Exponential backoff: 2s → ~2.8s → ~3.9s → ~5.5s → capped at 8s.
+    // Hard limit of 20 polls (~75s total wall time) prevents infinite loops
+    // when the backend is stuck. Cleanup cancels any pending timer so
+    // navigation/unmount never fires a state update on a torn-down component.
+    const INITIAL_DELAY_MS = 2_000
+    const BACKOFF_FACTOR   = 1.4
+    const MAX_DELAY_MS     = 8_000
+    const MAX_POLLS        = 20
+
+    let cancelled  = false
+    let attempts   = 0
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const schedule = (delayMs: number) => {
+      timeoutId = window.setTimeout(() => void poll(delayMs), delayMs)
+    }
+
+    const poll = async (currentDelay: number) => {
+      if (cancelled) return
+      attempts++
+
+      // Hard timeout guard — fail safely instead of looping forever.
+      if (attempts > MAX_POLLS) {
+        if (!cancelled) {
+          setResumeState('failed')
+          setError(
+            'Resume parsing timed out. Please retry — complex resumes occasionally take longer. ' +
+            'Shortening your resume or pasting text directly can help.',
+          )
+        }
+        return
+      }
+
+      // Progressive status messages as wait time grows.
+      if (attempts === 1) {
+        setStatusMessage('Analyzing your resume — usually takes 10–20 seconds…')
+      } else if (attempts === 5) {
+        setStatusMessage('Still working on it — AI parsing can take a moment with longer resumes…')
+      } else if (attempts === 10) {
+        setStatusMessage('This is taking longer than usual — almost there, hang on…')
+      } else if (attempts === 16) {
+        setStatusMessage('Parsing is taking longer than expected. You can retry if it seems stuck.')
+      }
+
       try {
-        const res = await fetch(`/api/resume/status?id=${encodeURIComponent(data.resumeId as string)}`, {
-          method: 'GET',
-          credentials: 'include',
-        })
+        const res = await fetch(
+          `/api/resume/status?id=${encodeURIComponent(data.resumeId as string)}`,
+          { method: 'GET', credentials: 'include' },
+        )
+        if (cancelled) return
 
         const payload = await parseResponseJsonSafe<ResumeStatusPayload>(res)
+        if (cancelled) return
+
         if (!res.ok) {
           setResumeState('failed')
           setError(payload.error ?? 'Unable to check resume status. Please retry.')
-          window.clearInterval(intervalId)
           return
         }
 
         if (payload.status === 'parsed') {
           setResumeState('parsed')
-          setStatusMessage('Resume parsed successfully.')
+          setStatusMessage('Resume analyzed successfully.')
           if (payload.parsed_data) setParsedResume(payload.parsed_data)
-          window.clearInterval(intervalId)
         } else if (payload.status === 'failed') {
           setResumeState('failed')
-          setError('Resume parsing failed. Please retry.')
-          window.clearInterval(intervalId)
+          setError('Resume parsing failed. Please retry with a different file or paste your resume text.')
+        } else {
+          // Still processing — schedule next poll with capped backoff delay.
+          const nextDelay = Math.min(currentDelay * BACKOFF_FACTOR, MAX_DELAY_MS)
+          schedule(nextDelay)
         }
       } catch {
+        if (cancelled) return
         setResumeState('failed')
-        setError('Network issue while checking resume status. Please retry.')
-        window.clearInterval(intervalId)
+        setError('Network issue while checking resume status. Please check your connection and retry.')
       }
-    }, 2000)
+    }
 
-    return () => window.clearInterval(intervalId)
+    schedule(INITIAL_DELAY_MS)
+
+    return () => {
+      cancelled = true
+      if (timeoutId !== null) window.clearTimeout(timeoutId)
+    }
   }, [data.resumeId, resumeState])
 
   const handleUploadResume = async () => {

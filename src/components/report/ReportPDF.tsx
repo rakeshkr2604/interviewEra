@@ -506,13 +506,17 @@ function PerQuestionPage({ questions, role }: { questions: PDFQuestionItem[]; ro
             </View>
             <Text style={s.qText}>{q.questionText}</Text>
 
-            {q.overallScore !== null && (
+            {(q.overallScore !== null || q.feedbackText) && (
               <View style={s.scoreRow}>
-                <Text style={[s.scoreSmall, { color: scoreColor(q.overallScore) }]}>
-                  {q.overallScore.toFixed(1)}/10
-                </Text>
+                {q.overallScore !== null && (
+                  <Text style={[s.scoreSmall, { color: scoreColor(q.overallScore) }]}>
+                    {q.overallScore.toFixed(1)}/10
+                  </Text>
+                )}
                 {q.feedbackText && (
-                  <Text style={s.feedback}>{q.feedbackText}</Text>
+                  <Text style={[s.feedback, q.overallScore === null ? { color: '#b45309' } : {}]}>
+                    {q.feedbackText}
+                  </Text>
                 )}
               </View>
             )}
@@ -534,12 +538,12 @@ function PerQuestionPage({ questions, role }: { questions: PDFQuestionItem[]; ro
               </View>
             )}
 
-            {q.modelAnswerHint && (
-              <View style={s.modelBox}>
-                <Text style={s.modelLabel}>Model Answer</Text>
-                <Text style={s.modelText}>{q.modelAnswerHint}</Text>
-              </View>
-            )}
+            <View style={s.modelBox}>
+              <Text style={s.modelLabel}>Model Answer</Text>
+              <Text style={s.modelText}>
+                {q.modelAnswerHint || 'Model answer unavailable for this question.'}
+              </Text>
+            </View>
           </View>
         );
       })}

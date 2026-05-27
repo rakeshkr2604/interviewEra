@@ -6,6 +6,7 @@ import {
   ListenV1VadEvents,
   type ListenV1Model,
 } from '@deepgram/sdk';
+import { lifecycleLog, lifecycleWarn, voiceDebug } from './lifecycle-log';
 
 export interface TranscriptChunk {
   text: string;
@@ -17,11 +18,32 @@ export interface STTCallbacks {
   onPartial: (chunk: TranscriptChunk) => void;
   onFinal: (fullText: string) => void;
   onError: (error: Error) => void;
+  /**
+   * Fires exactly once when the underlying WebSocket reaches OPEN state.
+   * Callers should treat this as the only authoritative signal that the
+   * Deepgram pipeline is ready to receive audio — the connect() promise
+   * resolving is necessary but not sufficient because the socket goes
+   * through CONNECTING → OPEN asynchronously.
+   *
+   * UI must NOT render "Listening…" before this fires.
+   */
+  onOpen?: () => void;
 }
 
 // Deepgram Nova-3 streaming STT with VAD via utterance_end_ms.
 // Optimised for Indian English + Hinglish (en-IN locale).
 // SDK v4 API: new DeepgramClient({ apiKey }) → client.listen.v1.connect() → V1Socket
+//
+// LIFECYCLE OWNERSHIP
+// -------------------
+// Owns: one WebSocket at a time. Two invariants the audit caller relies on:
+//   1. If stop() is called BEFORE start() resolves, the socket that connect()
+//      eventually returns must be closed immediately and never deliver callbacks.
+//   2. After stop() returns, no message/error/close callback may invoke the
+//      caller-supplied STTCallbacks — they may close over React state.
+// Both invariants are enforced by a generation counter `gen`. Every start()
+// claims a fresh gen; the message handler and the late-resolved-socket guard
+// compare against the live gen and become no-ops if superseded.
 export class StreamingSTT {
   private client: DeepgramClient;
   private apiKey: string;
@@ -29,6 +51,10 @@ export class StreamingSTT {
   private socket: any = null;
   private fullTranscript = '';
   private lastFinal = '';
+  // Monotonic id of the current session. Bumped on every start() and stop().
+  private gen = 0;
+  // Set true after stop() — any in-flight connect() resolution must close.
+  private aborted = false;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
@@ -38,29 +64,77 @@ export class StreamingSTT {
   async start(callbacks: STTCallbacks): Promise<void> {
     this.fullTranscript = '';
     this.lastFinal = '';
+    this.aborted = false;
+    const mySession = ++this.gen;
 
     // ConnectArgs requires Authorization for WebSocket auth (SDK v4 doesn't
     // auto-inject the header for live streaming connections).
-    this.socket = await this.client.listen.v1.connect({
-      model: 'nova-3' as ListenV1Model,
-      language: 'en-IN',
-      smart_format: ListenV1SmartFormat.True,
-      interim_results: ListenV1InterimResults.True,
-      punctuate: ListenV1Punctuate.True,   // cleaner sentence boundaries
-      vad_events: ListenV1VadEvents.True,  // explicit speech events → steadier VAD
-      // More patient endpointing: campus candidates pause mid-thought; the old
-      // 300/1000 ms cut them off and produced fragmented "unstable" transcripts.
-      endpointing: 500,        // 500 ms silence → utterance end detection
-      utterance_end_ms: 1500,  // 1.5 s of silence → UtteranceEnd fires
-      Authorization: `Token ${this.apiKey}`,
-    });
+    let socket: unknown;
+    try {
+      socket = await this.client.listen.v1.connect({
+        model: 'nova-3' as ListenV1Model,
+        language: 'en-IN',
+        smart_format: ListenV1SmartFormat.True,
+        interim_results: ListenV1InterimResults.True,
+        punctuate: ListenV1Punctuate.True,   // cleaner sentence boundaries
+        vad_events: ListenV1VadEvents.True,  // explicit speech events → steadier VAD
+        // More patient endpointing: campus candidates pause mid-thought; the old
+        // 300/1000 ms cut them off and produced fragmented "unstable" transcripts.
+        endpointing: 500,        // 500 ms silence → utterance end detection
+        utterance_end_ms: 1500,  // 1.5 s of silence → UtteranceEnd fires
+        Authorization: `Token ${this.apiKey}`,
+      });
+    } catch (err) {
+      lifecycleWarn('stt', 'connect_failed', { mySession, err: err instanceof Error ? err.message : String(err) });
+      // Surface as an STTCallbacks error so the caller can recover.
+      try { callbacks.onError(err instanceof Error ? err : new Error(String(err))); } catch { /* */ }
+      throw err;
+    }
+
+    // If stop() was called while connect() was awaiting, the socket we just
+    // received must be closed silently — nobody is listening for it, and
+    // delivering callbacks would re-enter a torn-down React tree.
+    if (this.aborted || mySession !== this.gen) {
+      lifecycleWarn('stt', 'connect_resolved_after_abort', { mySession, current: this.gen });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      try { (socket as any)?.close?.(); } catch { /* */ }
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.socket = socket as any;
+    lifecycleLog('stt', 'open', { session: mySession });
 
     this.socket.on('open', () => {
-      console.log('[STT] Connection opened');
+      // Stale-event gate: a delayed 'open' on a superseded session must not
+      // unblock UI for the new session.
+      if (mySession !== this.gen || this.aborted) {
+        voiceDebug('dg_ws_opened_ignored', {
+          reason: this.aborted ? 'aborted' : 'stale_gen',
+          session: mySession,
+          current: this.gen,
+        });
+        return;
+      }
+      voiceDebug('dg_ws_opened', { session: mySession });
+      lifecycleLog('stt', 'ws_open', { session: mySession });
+      try { callbacks.onOpen?.(); } catch { /* */ }
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     this.socket.on('message', (msg: any) => {
+      // Stale-event gate: a late frame after stop() must not surface to React.
+      if (mySession !== this.gen || this.aborted) {
+        if (msg?.type === 'Results' && msg?.channel?.alternatives?.[0]?.transcript) {
+          voiceDebug('dg_transcript_ignored', {
+            reason: this.aborted ? 'aborted' : 'stale_gen',
+            session: mySession,
+            current: this.gen,
+          });
+        }
+        return;
+      }
+
       if (msg?.type === 'Results') {
         const alt = msg.channel?.alternatives?.[0];
         if (!alt?.transcript) return;
@@ -73,15 +147,26 @@ export class StreamingSTT {
           if (clean && clean !== this.lastFinal) {
             this.fullTranscript += clean + ' ';
             this.lastFinal = clean;
-            callbacks.onPartial({ text: clean, isFinal: true, confidence });
+            voiceDebug('dg_transcript_received', {
+              session: mySession,
+              is_final: true,
+              chars: clean.length,
+            });
+            try { callbacks.onPartial({ text: clean, isFinal: true, confidence }); } catch { /* */ }
           }
         } else {
-          callbacks.onPartial({ text: transcript, isFinal: false, confidence });
+          voiceDebug('dg_transcript_received', {
+            session: mySession,
+            is_final: false,
+            chars: transcript.length,
+          });
+          try { callbacks.onPartial({ text: transcript, isFinal: false, confidence }); } catch { /* */ }
         }
       } else if (msg?.type === 'UtteranceEnd') {
         const text = this.fullTranscript.trim();
         if (text) {
-          callbacks.onFinal(text);
+          voiceDebug('dg_utterance_end', { session: mySession, chars: text.length });
+          try { callbacks.onFinal(text); } catch { /* */ }
           this.fullTranscript = '';
           this.lastFinal = '';
         }
@@ -89,27 +174,45 @@ export class StreamingSTT {
     });
 
     this.socket.on('error', (error: unknown) => {
-      console.error('[STT] Error:', error);
+      if (mySession !== this.gen || this.aborted) return;
       const err = error instanceof Error ? error : new Error(String(error));
-      callbacks.onError(err);
+      voiceDebug('dg_ws_error', { session: mySession, message: err.message });
+      lifecycleWarn('stt', 'ws_error', { session: mySession, err: err.message });
+      try { callbacks.onError(err); } catch { /* */ }
     });
 
     this.socket.on('close', () => {
-      console.log('[STT] Connection closed');
+      voiceDebug('dg_ws_closed', {
+        session: mySession,
+        was_aborted: this.aborted,
+        was_superseded: mySession !== this.gen,
+      });
+      lifecycleLog('stt', 'ws_close', { session: mySession });
     });
   }
 
   sendAudio(audioData: ArrayBuffer): void {
+    if (this.aborted) return;
     // readyState 1 = WebSocket OPEN
     if (this.socket?.readyState === 1) {
       this.socket.sendMedia(audioData);
     }
   }
 
+  // Idempotent. Safe to call repeatedly (Submit + onFinal VAD + unmount cleanup
+  // routinely race on the same WebSocket).
   stop(): void {
-    if (this.socket) {
-      this.socket.close();
-      this.socket = null;
+    if (this.aborted && !this.socket) return;
+    this.aborted = true;
+    // Bump the generation BEFORE closing so any callbacks dispatched between
+    // close() and the close-event landing are dropped by the stale-gate.
+    this.gen += 1;
+    const s = this.socket;
+    this.socket = null;
+    if (s) {
+      try { s.close(); } catch { /* */ }
     }
+    voiceDebug('dg_stop_called', { gen: this.gen });
+    lifecycleLog('stt', 'stop', { gen: this.gen });
   }
 }

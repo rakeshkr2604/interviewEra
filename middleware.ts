@@ -1,4 +1,5 @@
 import { updateSession } from '@/lib/supabase/middleware';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_ROUTES = new Set([
@@ -23,29 +24,16 @@ const PUBLIC_ROUTES = new Set([
 const AUTH_ROUTES = new Set(['/login', '/signup']);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
-// In-memory store: adequate for MVP; resets on cold start / new instance.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-
-// [pathPrefix, requestsPerWindow, windowMs]
+// Redis-backed rate limiter (Upstash) — works correctly across all edge instances
+// and survives cold starts.  Falls open if Redis is unavailable (see rate-limit.ts).
+// [pathPrefix, requestsPerWindow, windowSeconds]
 const RATE_LIMITS: [string, number, number][] = [
-  ['/api/interview/start', 10, 60_000],
-  ['/api/interview/answer', 60, 60_000],
-  ['/api/resume/upload', 5, 60_000],
-  ['/api/payments', 10, 60_000],
-  ['/api/tools', 5, 60_000],
+  ['/api/interview/start',  10, 60],
+  ['/api/interview/answer', 60, 60],
+  ['/api/resume/upload',     5, 60],
+  ['/api/payments',         10, 60],
+  ['/api/tools',             5, 60],
 ];
-
-function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-  if (!entry || now >= entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + windowMs });
-    return true;
-  }
-  if (entry.count >= limit) return false;
-  entry.count++;
-  return true;
-}
 
 /** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
 const PRODUCTION_APEX = 'interviewera.com';
@@ -153,13 +141,15 @@ export async function middleware(request: NextRequest) {
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
 
-  // Rate limiting — checked before auth/DB calls for efficiency
+  // Rate limiting — checked before auth/DB calls for efficiency.
+  // Uses Redis so limits are enforced consistently across all edge instances.
   const rateConfig = RATE_LIMITS.find(([prefix]) => pathname.startsWith(prefix));
   if (rateConfig) {
-    const [, limit, windowMs] = rateConfig;
+    const [, limit, windowSeconds] = rateConfig;
     const ip =
       request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-    if (!checkRateLimit(`${ip}:${pathname}`, limit, windowMs)) {
+    const rl = await checkRateLimit(`mw:${ip}:${pathname}`, windowSeconds, limit);
+    if (!rl.allowed) {
       if (isApi) {
         const reqId = crypto.randomUUID().slice(0, 8);
         return NextResponse.json(
@@ -168,12 +158,12 @@ export async function middleware(request: NextRequest) {
             code: 'RATE_LIMITED',
             requestId: reqId,
           },
-          { status: 429, headers: { 'Retry-After': '60', 'X-Request-Id': reqId } },
+          { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds), 'X-Request-Id': reqId } },
         );
       }
       return new NextResponse('Too Many Requests', {
         status: 429,
-        headers: { 'Retry-After': '60' },
+        headers: { 'Retry-After': String(rl.resetInSeconds) },
       });
     }
   }

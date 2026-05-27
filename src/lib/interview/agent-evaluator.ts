@@ -13,6 +13,8 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
+import { clampInputForOperation } from '@/lib/ai/context-hygiene';
+import { getContextLimits } from '@/lib/ai/operation-registry';
 import type { AnswerAnalysis, FollowUpType, InterviewContext } from '@/lib/interview/types';
 
 const FOLLOWUP_TYPES: readonly FollowUpType[] = [
@@ -90,16 +92,22 @@ function buildAnalysisPrompt(
   context: InterviewContext,
   previousAnalyses: AnswerAnalysis[],
 ): string {
+  // Sliding window for the trend block is owned by the registry.
+  const trendWindow = getContextLimits('agent_analysis').maxHistoryTurns;
   const trendContext =
     previousAnalyses.length > 0
       ? `\n\nPREVIOUS PERFORMANCE TREND:\n${previousAnalyses
-          .slice(-3)
+          .slice(-trendWindow)
           .map(
             (a, i) =>
               `Answer ${i + 1}: Depth=${a.technical_depth}/10, Specificity=${a.specificity}/10`,
           )
           .join('\n')}`
       : '';
+
+  // Cap candidate answer so a rambling 50KB transcript can't dominate the
+  // prompt and burn output tokens.
+  const boundedAnswer = clampInputForOperation(answer, 'agent_analysis');
 
   return `INTERVIEW CONTEXT:
 Role: ${context.role}
@@ -112,7 +120,7 @@ QUESTION ASKED:
 "${question}"
 
 CANDIDATE'S ANSWER:
-"${answer}"
+"${boundedAnswer}"
 
 ANALYZE THIS ANSWER:
 Provide a structured JSON analysis following the evaluation criteria. Be strict but fair. Indian candidates often use Hinglish (code-switching between English and Hindi) - this is normal and should not negatively impact scores unless it affects clarity.

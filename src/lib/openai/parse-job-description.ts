@@ -1,5 +1,10 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
+import { getTokenBudget } from '@/lib/ai/token-budget';
+import { clampInputForOperation } from '@/lib/ai/context-hygiene';
+import { parseJsonObject } from '@/lib/ai/response-contract';
+import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
+import { logProviderFailover } from '@/lib/telemetry/ai-logger';
 import type { ParsedJobDescription } from '@/types/app.types';
 
 const PROMPT_TEMPLATE = `You extract structured employer job posting content for interview preparation.
@@ -36,12 +41,6 @@ Return ONLY valid JSON. No markdown, no preamble.
 Job description text:
 {JD_TEXT}`;
 
-function extractJSON(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  return content.trim();
-}
-
 function isValidParsedJobDescription(data: unknown): data is ParsedJobDescription {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
@@ -67,6 +66,8 @@ async function callOpenAI(prompt: string): Promise<string> {
   const { content } = await completeInterviewChat({
     messages: [{ role: 'user', content: prompt }],
     temperature: 0,
+    maxTokens: getTokenBudget('jd_parse'),
+    operation: 'jd_parse',
   });
   return content;
 }
@@ -75,36 +76,52 @@ async function getAIContent(prompt: string): Promise<string> {
   try {
     return await callOpenAI(prompt);
   } catch (openaiError) {
-    console.warn('[parseJobDescription] OpenAI chain failed, Mistral:', openaiError);
+    console.warn('[parse-job-description] Primary chain failed, switching to Mistral:', openaiError);
+    emitAiTelemetry({
+      event:         'ai_fallback_triggered',
+      operation:     'jd_parse',
+      provider:      'mistral',
+      model:         'mistral-small-latest',
+      from_provider: 'openrouter',
+      to_provider:   'mistral',
+      reason:        'primary_chain_failure',
+    });
+    void logProviderFailover({
+      operation:     'jd_parse',
+      from_provider: 'openrouter',
+      from_model:    'openai/gpt-4o-mini',
+      to_provider:   'mistral',
+      to_model:      'mistral-small-latest',
+      reason:        'primary_chain_failure',
+    });
     try {
       return await callMistralChat(prompt, 0);
     } catch (mistralError) {
-      console.error('[parseJobDescription] Mistral failed:', mistralError);
+      console.error('[parse-job-description] All providers failed:', mistralError);
       throw mistralError;
     }
   }
 }
 
 export async function parseJobDescription(rawText: string): Promise<ParsedJobDescription> {
-  const prompt = PROMPT_TEMPLATE.replace('{JD_TEXT}', rawText.slice(0, 12_000));
+  // Cap is owned by operation-registry; previously inlined as .slice(0, 12_000).
+  const clamped = clampInputForOperation(rawText, 'jd_parse');
+  const prompt = PROMPT_TEMPLATE.replace('{JD_TEXT}', clamped);
 
   let content = await getAIContent(prompt);
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJSON(content));
-  } catch {
-    try {
-      content = await getAIContent(prompt);
-      parsed = JSON.parse(extractJSON(content));
-    } catch (retryErr) {
-      console.error('[parseJobDescription] JSON retry failed:', retryErr);
+  let parseResult = parseJsonObject(content);
+  if (!parseResult.ok) {
+    content = await getAIContent(prompt);
+    parseResult = parseJsonObject(content);
+    if (!parseResult.ok) {
+      console.error('[parseJobDescription] JSON retry failed:', parseResult.error);
       throw new Error('Failed to parse job description: invalid JSON from AI after retry');
     }
   }
 
-  if (!isValidParsedJobDescription(parsed)) {
+  if (!isValidParsedJobDescription(parseResult.value)) {
     throw new Error('Failed to parse job description: AI response missing required fields');
   }
 
-  return parsed;
+  return parseResult.value;
 }

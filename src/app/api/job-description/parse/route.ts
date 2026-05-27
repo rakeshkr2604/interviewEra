@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { assertLooksLikeJobDescription } from '@/lib/documents/document-classification';
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean';
 import { enrichParsedJobDescriptionFromRaw } from '@/lib/documents/enrich-parsed-job-description';
@@ -64,6 +65,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: check.message }, { status: 422 });
     }
 
+    // ── LLM cost guard ────────────────────────────────────────────────────────
+    const serviceClient = createServiceClient();
+    const { data: userProfile } = await serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .single();
+    const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+    const jdParseCost = estimateLLMCallCostUSD('jd_parse');
+    const jdCostGuard = await checkLLMCostGuard(user.id, planTier, jdParseCost, 'jd_parse');
+    if (!jdCostGuard.allowed) {
+      return NextResponse.json(
+        { error: 'Monthly AI usage limit reached. Please upgrade your plan or try again next month.' },
+        { status: 429 },
+      );
+    }
+
     let parsed: ParsedJobDescription;
     try {
       const aiParsed = await parseJobDescription(toValidate);
@@ -73,6 +91,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error('[job-description/parse] AI error:', err);
       return NextResponse.json({ error: 'Could not structure this job description. Try again in a moment.' }, { status: 422 });
     }
+
+    // Record spend after successful parse (fire-and-forget)
+    void recordLLMSpend(user.id, jdParseCost);
 
     return NextResponse.json({ parsed });
   } catch (err) {

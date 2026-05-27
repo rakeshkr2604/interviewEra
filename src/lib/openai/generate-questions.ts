@@ -1,6 +1,9 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
+import { getContextLimits } from '@/lib/ai/operation-registry';
+import { clampText } from '@/lib/ai/context-hygiene';
+import { parseJsonObject } from '@/lib/ai/response-contract';
+import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import type { ParsedResume, Question } from '@/types/app.types';
 import type { InterviewGoal } from '@/types/onboarding.types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
@@ -41,8 +44,18 @@ export interface GenerateQuestionsInput {
   interviewerId: InterviewerId;
   /** Employer JD excerpt — improves role alignment when present */
   jobDescription?: string;
-  /** When provided, calibration is sharpened with the user's retention tier. */
+  /**
+   * When provided, calibration is sharpened with the user's retention tier.
+   * Prefer passing `userTier` directly when the caller already knows it —
+   * that avoids a second `getUserProgress` round-trip on the start path.
+   */
   userId?: string;
+  /**
+   * Pre-resolved retention tier (1–4). When set, generateQuestions skips the
+   * internal `getUserProgress` lookup. The route already fetches tier for the
+   * cache key, so passing it through eliminates the duplicate DB read.
+   */
+  userTier?: UserTierId;
 }
 
 function goalToneRules(goal: InterviewGoal): string {
@@ -142,12 +155,6 @@ function buildResumeSummary(resume: ParsedResume, role: string): string {
   );
 }
 
-function extractJSON(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  return content.trim();
-}
-
 function isValidQuestionsResponse(
   data: unknown
 ): data is { questions: GeneratedQuestion[] } {
@@ -212,36 +219,43 @@ function tierCalibrationBlock(
   return lines.join('\n');
 }
 
-async function resolveTierCalibration(userId: string): Promise<string> {
-  const progress = await getUserProgress(userId);
-  const tier: UserTierId = (progress?.current_tier as UserTierId | undefined) ?? 1;
+async function resolveTierCalibration(
+  userId: string | undefined,
+  userTier: UserTierId | undefined,
+): Promise<string> {
+  let tier: UserTierId;
+  if (userTier !== undefined) {
+    tier = userTier;
+  } else if (userId !== undefined) {
+    const progress = await getUserProgress(userId);
+    tier = (progress?.current_tier as UserTierId | undefined) ?? 1;
+  } else {
+    return '';
+  }
   const cfg = await getTierConfig(tier);
   const modifiers = (cfg?.prompt_modifiers ?? null) as TierPromptModifiers | null;
   return tierCalibrationBlock(tier, modifiers);
 }
 
-async function callOpenAI(prompt: string): Promise<string> {
+/**
+ * Single-attempt completion in plain text mode. The historic json_object→plain
+ * same-model retry inside interview-completion is bypassed by passing
+ * `jsonMode: false` — we rely on `parseJsonObject` (which handles fenced and
+ * dirty output via brace-matching) to extract the JSON from a plain response.
+ *
+ * The AbortSignal threads through provider fetches so the operation-level
+ * deadline aborts in-flight HTTP requests instead of waiting them out.
+ */
+async function callOpenAI(prompt: string, signal: AbortSignal): Promise<string> {
   const { content } = await completeInterviewChat({
-    messages: [{ role: 'user', content: prompt }],
+    messages:  [{ role: 'user', content: prompt }],
     temperature: 0.7,
-    maxTokens: getTokenBudget('question_generation'),
+    maxTokens:   getTokenBudget('question_generation'),
+    operation:   'question_generation',
+    jsonMode:    false,
+    signal,
   });
   return content;
-}
-
-async function getAIContent(prompt: string): Promise<string> {
-  try {
-    return await callOpenAI(prompt);
-  } catch (openaiError) {
-    console.warn('[AI] Interview AI chain failed for question generation, switching to Mistral:', openaiError);
-
-    try {
-      return await callMistralChat(prompt, 0.7, getTokenBudget('question_generation', 'mistral'));
-    } catch (mistralError) {
-      console.error('[AI] Interview AI chain and Mistral failed for question generation:', mistralError);
-      throw mistralError;
-    }
-  }
 }
 
 export async function generateQuestions({
@@ -255,15 +269,22 @@ export async function generateQuestions({
   interviewerId,
   jobDescription,
   userId,
+  userTier,
 }: GenerateQuestionsInput): Promise<GenerateQuestionsResult> {
+  const t0 = Date.now();
   const canonicalMode = normalizeInterviewMode(interviewMode);
   const resumeSummary = buildResumeSummary(parsedResume, role);
-  const jdSnippet = jobDescription?.trim().slice(0, 3500);
+  const jdCap = getContextLimits('question_generation').maxInputChars;
+  const trimmedJd = jobDescription?.trim();
+  const jdSnippet = trimmedJd ? clampText(trimmedJd, jdCap) : undefined;
   const jdBlock = jdSnippet
     ? `\nEmployer job description (align competencies and scenarios with this posting; do not paste it verbatim into questions):\n${jdSnippet}\n`
     : '';
 
-  const tierBlock = userId ? await resolveTierCalibration(userId) : '';
+  // Tier calibration uses `userTier` if the route has already fetched it,
+  // otherwise falls back to a single getUserProgress lookup. Either way we
+  // never hit user_progress twice on the same start request.
+  const tierBlock = await resolveTierCalibration(userId, userTier);
 
   const calibration =
     [
@@ -300,77 +321,55 @@ export async function generateQuestions({
     `  }]\n` +
     `}`;
 
-  let content = await getAIContent(prompt);
+  // ── Single deterministic attempt under operation deadline ────────────────
+  // - Plain mode (no json_object) → bypasses the 18s json hang on gpt-4o-mini
+  // - parseJsonObject handles fenced/dirty output via brace-matching
+  // - No JSON parse retry (fail fast)
+  // - No mode-violation regeneration (drop violating items, fail if too few)
+  // - withOperationDeadline aborts the in-flight fetch on timeout
+  return withOperationDeadline('question_generation', async (signal) => {
+    const content = await callOpenAI(prompt, signal);
 
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJSON(content));
-  } catch {
-    try {
-      content = await getAIContent(prompt);
-      parsed = JSON.parse(extractJSON(content));
-    } catch (retryErr) {
-      console.error('[generate-questions] JSON retry failed:', retryErr);
+    const parseResult = parseJsonObject(content);
+    if (!parseResult.ok) {
+      console.error('[generate-questions] JSON parse failed:', parseResult.error);
       throw new QuestionGenerationError(
-        'Failed to parse questions: invalid JSON from AI after retry'
+        'Failed to parse questions: invalid JSON from AI',
       );
     }
-  }
 
-  if (!isValidQuestionsResponse(parsed)) {
-    throw new QuestionGenerationError(
-      'Failed to parse questions: AI response missing required fields'
-    );
-  }
-
-  // ── STRICT MODE ENFORCEMENT (non-negotiable trust rule) ──────────────────
-  // The model can ignore the prompt and emit out-of-mode questions. Those must
-  // NEVER reach the candidate, so validate every question's category and, if
-  // any violate the locked mode, regenerate once with an explicit correction.
-  let questions = parsed.questions;
-  let { valid, violating } = partitionByMode(questions, canonicalMode);
-
-  if (violating.length > 0) {
-    console.warn(
-      `[generate-questions] Mode "${canonicalMode}" violated by ${violating.length}/${questions.length} questions ` +
-        `(categories: ${[...new Set(violating.map((q) => q.category))].join(', ')}). Regenerating strictly.`
-    );
-
-    const strictPrompt =
-      prompt +
-      `\n\nCRITICAL CORRECTION: The previous attempt included disallowed categories. ` +
-      `${modeGenerationRules(canonicalMode)} ` +
-      `Return ONLY questions whose "category" is permitted for this mode. No exceptions.`;
-
-    try {
-      const retryContent = await getAIContent(strictPrompt);
-      const retryParsed: unknown = JSON.parse(extractJSON(retryContent));
-      if (isValidQuestionsResponse(retryParsed)) {
-        questions = retryParsed.questions;
-      }
-    } catch (regenErr) {
-      // Keep the first batch's valid subset rather than failing outright.
-      console.error('[generate-questions] Strict regeneration failed:', regenErr);
+    if (!isValidQuestionsResponse(parseResult.value)) {
+      throw new QuestionGenerationError(
+        'Failed to parse questions: AI response missing required fields',
+      );
     }
 
-    ({ valid, violating } = partitionByMode(questions, canonicalMode));
+    const { valid, violating } = partitionByMode(parseResult.value.questions, canonicalMode);
+
     if (violating.length > 0) {
       console.warn(
-        `[generate-questions] Dropping ${violating.length} still-violating question(s) after strict regen.`
+        `[generate-questions] Mode "${canonicalMode}" violated by ${violating.length}/${parseResult.value.questions.length} ` +
+        `questions (categories: ${[...new Set(violating.map((q) => q.category))].join(', ')}). Dropping violating items.`,
       );
     }
-  }
 
-  // Only mode-valid questions survive; re-index so order stays contiguous.
-  const enforced = valid
-    .slice(0, questionCount)
-    .map((q, idx) => ({ ...q, order: idx }));
+    const enforced = valid
+      .slice(0, questionCount)
+      .map((q, idx) => ({ ...q, order: idx }));
 
-  if (enforced.length < questionCount) {
-    throw new QuestionGenerationError(
-      `Only ${enforced.length} mode-valid questions for "${canonicalMode}" (need ${questionCount})`
-    );
-  }
+    if (enforced.length < questionCount) {
+      throw new QuestionGenerationError(
+        `Only ${enforced.length} mode-valid questions for "${canonicalMode}" (need ${questionCount})`,
+      );
+    }
 
-  return { questions: enforced };
+    if (!signal.aborted) {
+      console.log(
+        `[generate-questions] completed in ${Date.now() - t0}ms ` +
+        `(${enforced.length} questions, mode=${canonicalMode})`,
+      );
+    }
+
+    return { questions: enforced };
+  });
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { parseResume } from '@/lib/openai/parse-resume';
 import { sanitizeParsedResume } from '@/lib/utils/sanitize-parsed-resume';
+import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 
 export const maxDuration = 60;
 
@@ -52,6 +53,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // ── LLM cost guard ────────────────────────────────────────────────────────
+    const serviceClientForGuard = createServiceClient();
+    const { data: userProfile } = await serviceClientForGuard
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .single();
+    const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+    const resumeParseCost = estimateLLMCallCostUSD('resume_parse');
+    const resumeCostGuard = await checkLLMCostGuard(user.id, planTier, resumeParseCost, 'resume_parse');
+    if (!resumeCostGuard.allowed) {
+      return NextResponse.json(
+        { error: 'Monthly AI usage limit reached. Please upgrade your plan or try again next month.' },
+        { status: 429 },
+      );
+    }
+
     // ── AI parsing ────────────────────────────────────────────────────────────
     let parsedData: Awaited<ReturnType<typeof parseResume>>;
     try {
@@ -81,6 +99,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 500 }
       );
     }
+
+    // Record spend after successful parse (fire-and-forget)
+    void recordLLMSpend(user.id, resumeParseCost);
 
     return NextResponse.json({
       status: 'parsed',

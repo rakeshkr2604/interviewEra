@@ -31,6 +31,7 @@ import {
 } from '@/components/retention/TierUnlockCelebrationDialog'
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
+import { lifecycleLog, lifecycleWarn, voiceDebug } from '@/lib/voice/lifecycle-log'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -38,6 +39,72 @@ const TEXT_ANSWER_TIME_MULTIPLIER = 2
 const MAX_SKIPS = 2
 
 const THINKING_BAR_HEIGHTS = [0.4, 0.7, 1, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1, 0.6, 0.9]
+
+/**
+ * Builds the text spoken by the interviewer at the start of each question.
+ *
+ * Q0 — formal introduction + first question. Tells the candidate who they're
+ *   speaking to, how many questions there are, and sets a calm expectation.
+ * Q1+ — a short, varied transition phrase followed by the question text.
+ *   Phrases cycle deterministically (index % pool) so consecutive questions
+ *   never sound identical, but require zero AI calls and add zero latency.
+ */
+function buildSessionIntro(
+  index: number,
+  questionText: string,
+  interviewerName: string,
+  role: string,
+  totalQuestions: number,
+): string {
+  if (index === 0) {
+    const name = interviewerName && interviewerName !== 'The interviewer'
+      ? interviewerName
+      : 'your interviewer today'
+    return (
+      `Hi, welcome. I'm ${name}. ` +
+      `We have ${totalQuestions} question${totalQuestions === 1 ? '' : 's'} for a ${role} role today. ` +
+      `Answer each one naturally — as you would in a real interview. ` +
+      `Alright, here we go. ${questionText}`
+    )
+  }
+
+  // Rotate through short, professional transitions so the interview
+  // doesn't start each question with the same robotic prefix.
+  const transitions = [
+    'Let\'s continue.',
+    'Moving on.',
+    'Alright.',
+    'Let me ask you this —',
+    'Next question.',
+    'Right. Now —',
+    'Let\'s shift topics.',
+  ]
+  const t = transitions[index % transitions.length]
+  return `${t} ${questionText}`
+}
+
+/**
+ * Cycles through contextual messages during the `loading` phase so the
+ * candidate sees meaningful progress rather than a bare spinner.
+ * Messages rotate every 3s, which is slow enough to feel informative and
+ * fast enough to signal that something is actually happening.
+ */
+function useLoadingMessage(active: boolean): string {
+  const msgs = [
+    'Preparing your interview…',
+    'Loading your questions…',
+    'Setting up the session…',
+    'Almost ready…',
+  ]
+  const [idx, setIdx] = useState(0)
+  useEffect(() => {
+    if (!active) { setIdx(0); return }
+    const t = setInterval(() => setIdx(i => (i + 1) % msgs.length), 3000)
+    return () => clearInterval(t)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [active])
+  return active ? msgs[idx] : msgs[0]
+}
 
 /** Cycles through analysis messages while the interviewer "thinks" — eliminates dead spinner. */
 function useThinkingMessage(active: boolean, interviewerName: string): string {
@@ -77,6 +144,25 @@ type SessionPhase =
   | 'feedback'
   | 'completed'
 
+/**
+ * Deterministic interview-startup state machine.
+ *
+ * Lives strictly inside `phase === 'loading'`. Each transition is gated on a
+ * readiness signal — no state may be skipped, no transition may run before
+ * its predecessor has been entered. When the machine reaches `interview_ready`
+ * the page hands off to the runtime SessionPhase (`avatar_speaking`).
+ *
+ * The runtime composite "listening_active" is NOT a startup step — it is
+ * derived from `phase === 'candidate_answering'` + (`webSpeechActive` or
+ * `dgListening`) from Phase 2 of the realtime stabilization pass.
+ */
+type StartupStep =
+  | 'fetching_interview'   // GET /api/interview/[id] in flight
+  | 'questions_ready'      // interview + questions hydrated
+  | 'initializing_audio'   // priming TTS / audio context (Phase 4 fills in actual probe)
+  | 'speech_ready'         // TTS engine verified
+  | 'interview_ready'      // gate cleared; phase transitions to avatar_speaking
+
 export default function InterviewSessionPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
@@ -86,6 +172,19 @@ export default function InterviewSessionPage() {
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [phase, setPhase] = useState<SessionPhase>('loading')
+  // Deterministic startup state machine. Drives the gated transition from
+  // mount → fetch interview → audio init → first-question playback. Each
+  // setter call below MUST verify its predecessor before advancing.
+  const [startupStep, setStartupStep] = useState<StartupStep>('fetching_interview')
+  // `audioReady` is the readiness signal for `initializing_audio →
+  // speech_ready`. Phase 3 sets it true via a placeholder microtask (the
+  // pipeline is structurally validated); Phase 4 of this stabilization pass
+  // replaces the placeholder with real TTS/AudioContext probes and surfaces
+  // failures explicitly.
+  const [audioReady, setAudioReady] = useState(false)
+  // Surface audio-init failures distinctly from generic fetchError so the
+  // recovery UI can offer a "Retry audio" CTA without forcing a full reload.
+  const [audioInitError, setAudioInitError] = useState<string | null>(null)
   const [skipCount, setSkipCount] = useState(0)
   const [answers, setAnswers] = useState<AnswerRecord[]>([])
   const [lastFeedback, setLastFeedback] = useState<string>('')
@@ -103,6 +202,12 @@ export default function InterviewSessionPage() {
   const [dgInterim, setDgInterim] = useState('')
   const [dgError, setDgError] = useState<string | null>(null)
   const [dgRecordingSeconds, setDgRecordingSeconds] = useState(0)
+  // dgWsOpen — Deepgram WebSocket has reached OPEN state. UI must NOT render
+  // "Listening…" until this is true even if the mic stream (dgIsRecording)
+  // already came up. Set by the StreamingSTT.onOpen callback, cleared in
+  // stopDgListening. Combined with dgIsRecording into `dgListening` below
+  // — that composite is the only flag the UI uses for "Listening…" gates.
+  const [dgWsOpen, setDgWsOpen] = useState(false)
   // Voice tone from last processAnswer response; drives ElevenLabs on next question
   const [lastVoiceMeta, setLastVoiceMeta] = useState<VoiceMetadata | null>(null)
   // Orchestrator follow-up: when set, the NEXT interviewer turn is this probing
@@ -117,11 +222,30 @@ export default function InterviewSessionPage() {
   const dgMicCleanupRef = useRef<(() => void) | null>(null)
   // Ref so the VAD callback can read the current phase without a stale closure
   const phaseRef = useRef<SessionPhase>('loading')
+  // Lifecycle guards (added in realtime stabilization pass)
+  // mountedRef: any async callback (api.post, setTimeout, awaits) that writes
+  //   state must bail when this is false. Set to false in unmount cleanup.
+  const mountedRef = useRef<boolean>(true)
+  // submitInFlightRef: single-source-of-truth that an evaluation request is
+  //   already running. The Submit button, the Deepgram VAD onFinal callback
+  //   and the timer-out effect can all race to call handleSubmitAnswer; only
+  //   the first wins, and the others become silent no-ops.
+  const submitInFlightRef = useRef<boolean>(false)
+  // dgStartInFlightRef: prevents overlapping startDgListening calls. The
+  //   "post-TTS auto-start" and the explicit deepgram mic toggle button can
+  //   both fire the same start within a tick — second caller bails.
+  const dgStartInFlightRef = useRef<boolean>(false)
+  // postTtsTimerRef: the 500ms gap between TTS-end and mic-start. Must be
+  //   cleared on any phase change away from avatar_speaking (Skip, Retry,
+  //   Submit, unmount) so an in-flight timer cannot resurrect candidate_answering
+  //   on a torn-down phase.
+  const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
   const interviewerDisplayName = resolvedInterviewer?.name ?? 'The interviewer'
   const thinkingMessage = useThinkingMessage(phase === 'submitting', interviewerDisplayName)
+  const loadingMessage = useLoadingMessage(phase === 'loading')
 
   // ─── Avatar + TTS ─────────────────────────────────────────
   const { isSpeaking, currentWordIndex, speechError, speakQuestion, stopSpeaking } =
@@ -129,7 +253,7 @@ export default function InterviewSessionPage() {
 
   // ─── ElevenLabs TTS (Deepgram mode) ───────────────────────
   const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
-  const { isPlaying: elIsPlaying, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
+  const { isPlaying: elIsPlaying, error: elTtsError, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
 
   // ─── Deepgram Microphone (Deepgram mode) ──────────────────
   const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
@@ -143,6 +267,7 @@ export default function InterviewSessionPage() {
   const {
     transcript,
     interimTranscript,
+    recognitionState,
     isListening,
     isSupported: isMicSupported,
     error: micError,
@@ -154,6 +279,13 @@ export default function InterviewSessionPage() {
     getMergedTranscript,
     hasRecentSpeech,
   } = useSpeechRecognition()
+  // The ONLY state that may surface "Listening…" in the Web Speech path.
+  // 'starting' (between onstart and first transcript) intentionally does NOT
+  // qualify — that was the source of the false-positive label.
+  const webSpeechActive = recognitionState === 'active'
+  // The ONLY state that may surface "Listening…" in the Deepgram path.
+  // Requires: local mic stream is up AND the Deepgram WebSocket is OPEN.
+  const dgListening = dgIsRecording && dgWsOpen
   const useManualInput = inputMode === 'text' || (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError)))
 
   const useManualInputRef = useRef(useManualInput)
@@ -189,11 +321,41 @@ export default function InterviewSessionPage() {
 
   // ─── Load interview data ───────────────────────────────────
   useEffect(() => {
+    // React StrictMode (dev) performs a mount → unmount → remount cycle on
+    // initial render. The shared `mountedRef` is set to `false` by the unmount
+    // cleanup and is never reset by the remount because `useRef` preserves the
+    // same object across the cycle. Resetting it to `true` HERE — at the top
+    // of the effect body — ensures the second (real) invocation sees a valid
+    // `mounted` flag and does not bail out of the async callback path
+    // prematurely. Without this line the machine is stuck at
+    // `fetching_interview` forever in development (and on any fast-refresh).
+    mountedRef.current = true
     const loadInterview = async () => {
+      // Hard deadline: if the interview data fetch stalls (slow DB, cold
+      // serverless function, network issue) the candidate sees a clear error
+      // rather than an infinite loading spinner.
+      let timedOut = false
+      const loadTimeoutId = window.setTimeout(() => {
+        timedOut = true
+        if (mountedRef.current) {
+          setFetchError(
+            'Interview session took too long to load. Please go back and try again.',
+          )
+        }
+      }, 15_000)
+
       try {
         const result = await api.get<InterviewData>(`/api/interview/${interviewId}`)
+        window.clearTimeout(loadTimeoutId)
+        if (timedOut || !mountedRef.current) return
         if (!result.data.interviewerId) {
           setFetchError('Interviewer configuration is missing for this interview.')
+          return
+        }
+        // Validate questions array BEFORE entering the next startup step —
+        // never advance the state machine on a degenerate payload.
+        if (!result.data.questions || result.data.questions.length === 0) {
+          setFetchError('Interview has no questions. Please go back and try again.')
           return
         }
         setInterviewData(result.data)
@@ -202,7 +364,10 @@ export default function InterviewSessionPage() {
           Math.max(0, result.data.questions.length - 1)
         )
         setCurrentIndex(restoredIndex)
-        setPhase('avatar_speaking')
+        // GATED TRANSITION 1 → 2: only advance when interview + non-empty
+        // questions are present. The next step (audio init) is driven by its
+        // own useEffect watching this state value.
+        setStartupStep('questions_ready')
         // Persist session context so the feedback form can include it automatically.
         const firstQ = result.data.questions[0]
         storeSessionContext({
@@ -218,11 +383,129 @@ export default function InterviewSessionPage() {
           session_started_at: Date.now(),
         })
       } catch {
+        window.clearTimeout(loadTimeoutId)
+        if (timedOut || !mountedRef.current) return
         setFetchError('Failed to load interview. Please go back and try again.')
       }
     }
     loadInterview()
   }, [interviewId])
+
+  // ─── Startup state machine: questions_ready → initializing_audio ────────────
+  // Single-shot transition. Guarded on:
+  //  - startupStep === 'questions_ready' (predecessor reached)
+  //  - interviewData hydrated (defensive — predecessor cannot enter without it)
+  //  - phase still 'loading' (runtime hasn't started)
+  useEffect(() => {
+    if (startupStep !== 'questions_ready') return
+    if (!interviewData) return
+    if (phase !== 'loading') return
+    setStartupStep('initializing_audio')
+  }, [startupStep, interviewData, phase])
+
+  // ─── Startup state machine: initializing_audio → speech_ready ──────────────
+  // Real audio-pipeline readiness probe. Verifies the APIs the runtime needs
+  // BEFORE the avatar tries to speak. Failures surface via setAudioInitError
+  // which holds the machine in `initializing_audio` and renders the
+  // "Retry audio setup" CTA on the loading screen.
+  //
+  // What is verified:
+  //   1. window + speechSynthesis (only if browser-TTS path)
+  //   2. At least one voice present (waits up to 2s for the async
+  //      `voiceschanged` event Chrome fires on first paint)
+  //   3. AudioContext constructor exists (needed for both paths; ElevenLabs
+  //      uses Web Audio for decoded playback, browser TTS uses it for the
+  //      gesture-warmed context that prevents autoplay-policy failures)
+  //
+  // What is NOT done here (deliberate):
+  //   - Actually creating an AudioContext — that would consume an autoplay
+  //     gesture allowance the runtime needs. Creation happens in the first
+  //     speak() call. The probe only verifies the API exists.
+  //   - Calling /api/tts HEAD — adds a 200–500ms network hop on every load
+  //     for marginal extra confidence. The runtime speak path already
+  //     handles 429/502 responses and falls back to browser TTS in Phase 5.
+  useEffect(() => {
+    if (startupStep !== 'initializing_audio') return
+    let cancelled = false
+    const probeAudio = async () => {
+      try {
+        if (typeof window === 'undefined') {
+          throw new Error('Audio pipeline unavailable in this environment')
+        }
+        if (inputMode !== 'deepgram') {
+          if (!('speechSynthesis' in window)) {
+            throw new Error('Speech synthesis is not supported in this browser. Try Chrome or Edge.')
+          }
+          let voices = window.speechSynthesis.getVoices()
+          if (voices.length === 0) {
+            // Chrome populates voices asynchronously on first call. Wait up
+            // to 2s for the `voiceschanged` event; abort the wait on
+            // unmount or cancellation so we never setState into a dead tree.
+            await new Promise<void>((resolve) => {
+              let settled = false
+              const settle = () => {
+                if (settled) return
+                settled = true
+                window.speechSynthesis.removeEventListener('voiceschanged', settle)
+                clearTimeout(timeout)
+                resolve()
+              }
+              const timeout = setTimeout(settle, 2000)
+              window.speechSynthesis.addEventListener('voiceschanged', settle)
+            })
+            if (cancelled || !mountedRef.current) return
+            voices = window.speechSynthesis.getVoices()
+          }
+          // Empty voices after the wait is NOT fatal — Safari lazy-loads on
+          // first speak. We only warn so logs surface a degraded pipeline.
+          if (voices.length === 0) {
+            console.warn('[startup] No TTS voices populated yet; first speak may bootstrap them')
+          }
+        }
+        // Web Audio is required for both modes (ElevenLabs decoded playback +
+        // any gesture-warmed context the runtime may want later).
+        const AudioCtxCtor =
+          (window as Window & { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).AudioContext ??
+          (window as Window & { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        if (!AudioCtxCtor) {
+          throw new Error('Web Audio is not supported in this browser')
+        }
+        if (cancelled || !mountedRef.current) return
+        setAudioReady(true)
+      } catch (err) {
+        if (cancelled || !mountedRef.current) return
+        const message = err instanceof Error ? err.message : 'Audio init failed'
+        console.error('[startup] Audio probe failed:', message)
+        setAudioInitError(message)
+      }
+    }
+    void probeAudio()
+    return () => { cancelled = true }
+  }, [startupStep, inputMode])
+
+  // ─── Startup state machine: initializing_audio → speech_ready (gate) ───────
+  // Listens for the audioReady signal flipped by the probe above. The gate is
+  // separate from the probe so failure handling (audioInitError) can hold the
+  // machine in `initializing_audio` until the user retries.
+  useEffect(() => {
+    if (startupStep !== 'initializing_audio') return
+    if (!audioReady) return
+    if (audioInitError) return
+    setStartupStep('speech_ready')
+  }, [startupStep, audioReady, audioInitError])
+
+  // ─── Startup state machine: speech_ready → interview_ready → runtime ───────
+  // Final gate. Once speech_ready is entered we immediately advance to
+  // interview_ready and hand off to the runtime phase (avatar_speaking).
+  // Both transitions in one effect because there is no asynchronous work
+  // between them — interview_ready is purely a sentinel state so the loading
+  // screen can render "Ready to start" briefly before the avatar speaks.
+  useEffect(() => {
+    if (startupStep !== 'speech_ready') return
+    if (phase !== 'loading') return
+    setStartupStep('interview_ready')
+    setPhase('avatar_speaking')
+  }, [startupStep, phase])
 
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
@@ -253,6 +536,12 @@ export default function InterviewSessionPage() {
         error?: string
         retention?: InterviewCompleteRetentionPayload | null
       }>('/api/interview/complete', { interviewId })
+      // The user can navigate away during /api/interview/complete (it generates
+      // a report — can take 3-8 s on slow providers). Bail if the page is gone.
+      if (!mountedRef.current) {
+        lifecycleWarn('session', 'complete_response_after_unmount')
+        return
+      }
       const reportId = result.data.reportId
       if (!reportId) {
         setFetchError(result.data.error ?? 'Report generation failed. Please try again.')
@@ -287,6 +576,7 @@ export default function InterviewSessionPage() {
       }
       router.push(href)
     } catch {
+      if (!mountedRef.current) return
       setFetchError('Report generation failed. Please try again.')
       setPhase('feedback')
     }
@@ -300,14 +590,53 @@ export default function InterviewSessionPage() {
   // which is declared further down.
   const handleNextQuestionRef = useRef<() => void>(() => {})
 
+  // Idempotent: safe to call from the Submit button, the VAD onFinal callback,
+  // the error path of startDgListening, and the unmount cleanup, in any order.
   const stopDgListening = useCallback(() => {
-    dgSttRef.current?.stop()
-    dgMicCleanupRef.current?.()
+    // Clear the in-flight guard FIRST so a queued start that observes the flag
+    // before this stop completes still observes it as "open" — but the actual
+    // teardown below also bumps StreamingSTT's generation, so a still-pending
+    // connect() will close its socket on resolution.
+    dgStartInFlightRef.current = false
+    // Drop the listening-allowed flag IMMEDIATELY so the UI cannot show
+    // "Listening…" for the brief window between teardown start and the
+    // socket-close event landing.
+    if (mountedRef.current) setDgWsOpen(false)
+    const stt = dgSttRef.current
+    dgSttRef.current = null
+    if (stt) {
+      try { stt.stop() } catch (err) {
+        lifecycleWarn('session', 'dg_stt_stop_threw', { err: err instanceof Error ? err.message : String(err) })
+      }
+    }
+    const micCleanup = dgMicCleanupRef.current
     dgMicCleanupRef.current = null
+    if (micCleanup) {
+      try { micCleanup() } catch (err) {
+        lifecycleWarn('session', 'dg_mic_cleanup_threw', { err: err instanceof Error ? err.message : String(err) })
+      }
+    }
     dgStopRecording()
   }, [dgStopRecording])
 
   const startDgListening = useCallback(async () => {
+    if (!mountedRef.current) {
+      lifecycleWarn('session', 'dg_start_after_unmount_ignored')
+      return
+    }
+    if (dgStartInFlightRef.current) {
+      lifecycleWarn('session', 'dg_start_already_in_flight')
+      return
+    }
+    // If a previous session is somehow still live (rapid mode-switching, a
+    // missed cleanup), tear it down before opening a new one. Single-owner
+    // invariant for the Deepgram pipeline.
+    if (dgSttRef.current || dgMicCleanupRef.current) {
+      lifecycleWarn('session', 'dg_start_with_lingering_session_teardown_first')
+      stopDgListening()
+    }
+
+    dgStartInFlightRef.current = true
     setDgError(null)
     setDgTranscript('')
     setDgInterim('')
@@ -316,47 +645,124 @@ export default function InterviewSessionPage() {
     try {
       token = await fetchSTTToken(interviewId)
     } catch (err) {
+      dgStartInFlightRef.current = false
       const msg = err instanceof Error ? err.message : 'Failed to start voice recording.'
-      setDgError(msg)
+      if (mountedRef.current) setDgError(msg)
+      lifecycleWarn('session', 'dg_token_failed', { err: msg })
+      return
+    }
+
+    // The user may have navigated / submitted / switched mode while the token
+    // fetch was outstanding. If so, do not open a socket.
+    if (!mountedRef.current) {
+      dgStartInFlightRef.current = false
+      lifecycleWarn('session', 'dg_start_aborted_post_token_unmount')
       return
     }
 
     const stt = new StreamingSTT(token)
     dgSttRef.current = stt
 
-    await stt.start({
-      onPartial: (chunk) => {
-        if (chunk.isFinal) {
-          setDgTranscript(prev => prev + chunk.text + ' ')
-          setDgInterim('')
-        } else {
-          setDgInterim(chunk.text)
-        }
-      },
-      onFinal: () => {
-        // VAD detected end of utterance — auto-submit if still answering.
-        // Called through ref to avoid a forward-declaration error.
-        if (phaseRef.current === 'candidate_answering') {
-          queueMicrotask(() => { void handleSubmitAnswerRef.current() })
-        }
-        stopDgListening()
-      },
-      onError: (err) => {
-        console.error('[DG STT]', err)
-        setDgError(err.message)
-        stopDgListening()
-      },
-    })
+    try {
+      await stt.start({
+        onOpen: () => {
+          // Authoritative signal that the Deepgram WebSocket is OPEN. Until
+          // this fires, the UI is forbidden from showing "Listening…" — the
+          // composite `dgListening` flag computed at the top of the component
+          // ANDs this with `dgIsRecording` (local mic stream).
+          if (mountedRef.current && dgSttRef.current === stt) setDgWsOpen(true)
+        },
+        onPartial: (chunk) => {
+          if (!mountedRef.current) return
+          if (chunk.isFinal) {
+            setDgTranscript(prev => prev + chunk.text + ' ')
+            setDgInterim('')
+          } else {
+            setDgInterim(chunk.text)
+          }
+        },
+        onFinal: () => {
+          // VAD detected end of utterance — auto-submit if still answering.
+          // Called through ref to avoid a forward-declaration error.
+          if (phaseRef.current === 'candidate_answering' && mountedRef.current) {
+            queueMicrotask(() => { void handleSubmitAnswerRef.current() })
+          }
+          stopDgListening()
+        },
+        onError: (err) => {
+          lifecycleWarn('session', 'dg_stt_error', { err: err.message })
+          if (mountedRef.current) setDgError(err.message)
+          stopDgListening()
+        },
+      })
+    } catch (err) {
+      // stt.start can throw if Deepgram connect() rejects. Unwind cleanly so
+      // no half-opened session lingers, and surface the error to the user.
+      stopDgListening()
+      const msg = err instanceof Error ? err.message : 'Could not open voice connection.'
+      if (mountedRef.current) setDgError(msg)
+      lifecycleWarn('session', 'dg_stt_start_failed', { err: msg })
+      return
+    }
 
-    const cleanup = await dgStartRecording((data) => stt.sendAudio(data))
-    dgMicCleanupRef.current = cleanup
+    // Same-tick unmount check: if the component tore down during stt.start, the
+    // unmount cleanup already nulled dgSttRef. Don't open a mic stream that no
+    // one owns.
+    if (!mountedRef.current || dgSttRef.current !== stt) {
+      stopDgListening()
+      lifecycleWarn('session', 'dg_start_superseded_post_stt_open')
+      return
+    }
+
+    try {
+      const cleanup = await dgStartRecording((data) => stt.sendAudio(data))
+      // Yet another race window: the component may have unmounted (or another
+      // startDgListening superseded us) during the getUserMedia await. If so,
+      // run the freshly-returned cleanup and bail.
+      if (!mountedRef.current || dgSttRef.current !== stt) {
+        try { cleanup() } catch { /* */ }
+        stopDgListening()
+        lifecycleWarn('session', 'dg_start_superseded_post_mic_open')
+        return
+      }
+      dgMicCleanupRef.current = cleanup
+      lifecycleLog('session', 'dg_started')
+    } catch (err) {
+      // Permission denied, device busy, or hook double-start. Unwind the STT
+      // socket so we don't bill Deepgram for a session with no mic feeding it.
+      stopDgListening()
+      const msg = err instanceof Error ? err.message : 'Microphone unavailable.'
+      if (mountedRef.current) setDgError(msg)
+      lifecycleWarn('session', 'dg_mic_start_failed', { err: msg })
+    } finally {
+      dgStartInFlightRef.current = false
+    }
   }, [dgStartRecording, stopDgListening, interviewId])
 
-  // Cleanup Deepgram on unmount
+  // Cleanup Deepgram + lifecycle guards on unmount. Order matters:
+  //   1. mark unmounted → every async callback already in flight bails on its
+  //      next state-write attempt
+  //   2. clear the post-TTS timer → no resurrection of candidate_answering
+  //   3. tear down the Deepgram socket + mic stream
   useEffect(() => {
     return () => {
-      dgSttRef.current?.stop()
-      dgMicCleanupRef.current?.()
+      mountedRef.current = false
+      if (postTtsTimerRef.current) {
+        clearTimeout(postTtsTimerRef.current)
+        postTtsTimerRef.current = null
+      }
+      dgStartInFlightRef.current = false
+      const stt = dgSttRef.current
+      dgSttRef.current = null
+      if (stt) {
+        try { stt.stop() } catch { /* */ }
+      }
+      const micCleanup = dgMicCleanupRef.current
+      dgMicCleanupRef.current = null
+      if (micCleanup) {
+        try { micCleanup() } catch { /* */ }
+      }
+      lifecycleLog('session', 'unmounted')
     }
   }, [])
 
@@ -368,14 +774,36 @@ export default function InterviewSessionPage() {
     // it's a contextual probe on the SAME question the candidate just answered.
     const intro = pendingFollowUp
       ? pendingFollowUp.text
-      : currentIndex === 0
-        ? `Let us begin. Question ${currentIndex + 1}: ${currentQuestion.question_text}`
-        : `Question ${currentIndex + 1}: ${currentQuestion.question_text}`
+      : buildSessionIntro(
+          currentIndex,
+          currentQuestion.question_text,
+          interviewerDisplayName,
+          interviewData?.role ?? '',
+          interviewData?.questions.length ?? 0,
+        )
 
     setSpokenText(intro)
 
     const onTTSComplete = () => {
-      setTimeout(() => {
+      // The 500ms gap is registered in a ref so any phase change (Skip, Retry,
+      // Submit, navigation) clears it before it fires. Without this, a Skip
+      // during the gap would resurrect candidate_answering after the user
+      // already advanced.
+      if (postTtsTimerRef.current) clearTimeout(postTtsTimerRef.current)
+      postTtsTimerRef.current = setTimeout(() => {
+        postTtsTimerRef.current = null
+        // Triple-validate before mutating phase: still mounted, still in the
+        // avatar_speaking phase that scheduled us, and still on the same
+        // question index. Stale completions (e.g. TTS-complete that arrives
+        // for a question the user already skipped) become silent no-ops.
+        if (!mountedRef.current) {
+          lifecycleWarn('session', 'post_tts_unmounted')
+          return
+        }
+        if (phaseRef.current !== 'avatar_speaking') {
+          lifecycleLog('session', 'post_tts_phase_changed', { current: phaseRef.current })
+          return
+        }
         const manual = useManualInputRef.current
         const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
         setAnswerTimeBudget(budget)
@@ -385,11 +813,18 @@ export default function InterviewSessionPage() {
         startTimer()
         // Continuous conversation: the mic auto-activates the moment the
         // interviewer finishes — the candidate never re-enables it manually.
+        voiceDebug('question_transitioned', {
+          mode: inputMode,
+          question_index: currentIndex,
+          has_follow_up: !!pendingFollowUp,
+        })
         if (inputMode === 'deepgram') {
+          voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'deepgram' })
           void startDgListening()
         } else if (!useManualInputRef.current && isMicSupported) {
           // Web Speech mode — start listening immediately so the UI shows
           // "Listening…" before the candidate says anything (not after).
+          voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'web_speech' })
           void startListening()
         }
       }, 500)
@@ -403,12 +838,33 @@ export default function InterviewSessionPage() {
     } else {
       speakQuestion(intro, onTTSComplete)
     }
+
+    // Effect cleanup: when the avatar_speaking phase ends (Skip / Retry /
+    // Submit / Next / unmount), cancel any post-TTS timer that has not yet
+    // fired. The useVoicePlayer / useTTS hooks themselves are already
+    // cancelled by the handlers' explicit elStop()/stopSpeaking() calls — we
+    // only own the gap timer here.
+    return () => {
+      if (postTtsTimerRef.current) {
+        clearTimeout(postTtsTimerRef.current)
+        postTtsTimerRef.current = null
+        lifecycleLog('session', 'post_tts_timer_cancelled_on_phase_exit')
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentIndex, pendingFollowUp])
 
   // ─── Submit Answer ────────────────────────────────────────
   const handleSubmitAnswer = useCallback(async () => {
     if (phaseRef.current !== 'candidate_answering') return
+    // Synchronous double-submit guard. The Submit button, the VAD onFinal
+    // callback and the timer-out effect all converge here; without this,
+    // two evaluations would be billed for the same answer and the second
+    // would land after setPhase('submitting') already changed the phase.
+    if (submitInFlightRef.current) {
+      lifecycleWarn('session', 'submit_duplicate_ignored')
+      return
+    }
 
     // Read the merged transcript BEFORE stopping the mic. getMergedTranscript()
     // reads from refs, so we get whatever the recognizer has produced up to
@@ -430,9 +886,11 @@ export default function InterviewSessionPage() {
 
     console.log('[speech] submitted', { payload_length: submittedText.length, durationSeconds, mode: inputMode })
 
+    submitInFlightRef.current = true
     setPhase('submitting')
     setShowEmptyWarning(false)
     stopTimer()
+    voiceDebug('stop_listening_triggered', { source: 'submit', mode: inputMode })
     stopListening()
     stopSpeaking()
     elStop()
@@ -482,6 +940,24 @@ export default function InterviewSessionPage() {
           : Promise.resolve(null),
       ])
 
+      // Post-await mount/phase guard: the user can navigate or unmount while
+      // /api/interview/answer + /api/interview/process-answer are in flight.
+      // If so, drop the response on the floor rather than calling setState on
+      // a torn-down tree (or worse, advancing a stale interview).
+      //
+      // Cast through SessionPhase to defeat TS control-flow narrowing from
+      // the entry guard above. At runtime the ref *can* mutate during the
+      // await, even though the type-checker has lost that information.
+      const phaseAfterAwait = phaseRef.current as SessionPhase
+      if (!mountedRef.current) {
+        lifecycleWarn('session', 'submit_response_after_unmount')
+        return
+      }
+      if (phaseAfterAwait !== 'submitting') {
+        lifecycleWarn('session', 'submit_response_phase_changed', { current: phaseAfterAwait })
+        return
+      }
+
       if (orchestratorResult?.voice_metadata) {
         setLastVoiceMeta(orchestratorResult.voice_metadata as VoiceMetadata)
       }
@@ -517,9 +993,14 @@ export default function InterviewSessionPage() {
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
     } catch {
+      if (!mountedRef.current) return
       setLastFeedback('Unable to evaluate this answer. Moving to next question.')
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
+    } finally {
+      // Always release the in-flight flag, even on early-bail or thrown error,
+      // so subsequent attempts can proceed.
+      submitInFlightRef.current = false
     }
   }, [
     inputMode,
@@ -631,6 +1112,7 @@ export default function InterviewSessionPage() {
     if (skipCount >= MAX_SKIPS || phase !== 'candidate_answering') return
     setSkipCount(prev => prev + 1)
     stopTimer()
+    voiceDebug('stop_listening_triggered', { source: 'skip' })
     stopListening()
     elStop()
     stopDgListening()
@@ -654,6 +1136,7 @@ export default function InterviewSessionPage() {
   // ─── Retry (re-speak current question) ───────────────────
   const handleRetry = useCallback(() => {
     if (phase !== 'candidate_answering') return
+    voiceDebug('retry_triggered', { source: 'retry_question_button' })
     stopListening()
     elStop()
     stopDgListening()
@@ -675,9 +1158,11 @@ export default function InterviewSessionPage() {
     if (phase !== 'candidate_answering') return
     if (!isMicSupported) return
     if (isListening) {
+      voiceDebug('stop_listening_triggered', { source: 'toggle_mic_off' })
       stopListening()
       return
     }
+    voiceDebug('start_listening_triggered', { source: 'toggle_mic_on' })
     await startListening()
   }
 
@@ -709,13 +1194,52 @@ export default function InterviewSessionPage() {
   }
 
   if (phase === 'loading' || !interviewData || !currentQuestion) {
+    // Startup-step-specific message. Each label corresponds to exactly one
+    // state in the StartupStep machine — the user sees deterministic
+    // progress instead of a generic "loading" spinner.
+    const startupLabel = (() => {
+      switch (startupStep) {
+        case 'fetching_interview':  return 'Loading your interview…'
+        case 'questions_ready':     return 'Preparing audio pipeline…'
+        case 'initializing_audio':  return audioInitError
+          ? 'Audio setup failed — please retry'
+          : 'Initializing voice playback…'
+        case 'speech_ready':        return 'Almost ready…'
+        case 'interview_ready':     return 'Starting interview…'
+        default:                    return loadingMessage
+      }
+    })()
     return (
       <div className="flex min-h-screen items-center justify-center"
            style={{ background: 'var(--page-gradient)' }}>
         <div className="text-center space-y-3">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full
                           border-2 border-(--accent-primary) border-t-transparent" />
-          <p className="text-(--text-secondary) text-sm">Preparing your interview...</p>
+          <p className="text-(--text-secondary) text-sm">{startupLabel}</p>
+          {audioInitError ? (
+            <div className="space-y-2">
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                {audioInitError}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAudioInitError(null)
+                  setAudioReady(false)
+                  setStartupStep('initializing_audio')
+                }}
+                className="rounded-lg border border-(--card-border) bg-(--bg-secondary)
+                           px-3 py-1.5 text-xs font-semibold text-(--text-primary)
+                           hover:bg-(--bg-tertiary)"
+              >
+                Retry audio setup
+              </button>
+            </div>
+          ) : (
+            <p className="text-(--text-muted) text-xs">
+              This usually takes a few seconds — stay on this page.
+            </p>
+          )}
         </div>
       </div>
     )
@@ -933,7 +1457,7 @@ export default function InterviewSessionPage() {
                   {/* Deepgram live transcript */}
                   <div className="min-h-[100px] rounded-xl border border-(--card-border) bg-(--bg-secondary) p-4">
                     <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                      {dgIsRecording
+                      {dgListening
                         ? `Live transcript · ${dgRecordingSeconds}s`
                         : 'Your answer'}
                     </p>
@@ -946,7 +1470,11 @@ export default function InterviewSessionPage() {
                       </p>
                     ) : (
                       <p className="text-sm text-(--text-muted)">
-                        {dgIsRecording ? 'Listening…' : 'Waiting for microphone…'}
+                        {dgListening
+                          ? 'Listening…'
+                          : dgIsRecording
+                            ? 'Connecting voice channel…'
+                            : 'Waiting for microphone…'}
                       </p>
                     )}
                   </div>
@@ -982,6 +1510,7 @@ export default function InterviewSessionPage() {
                     transcript={transcript}
                     interimTranscript={interimTranscript}
                     isListening={isListening}
+                    recognitionState={recognitionState}
                     isSupported={isMicSupported}
                     error={micError}
                     permissionState={permissionState}
@@ -1165,7 +1694,21 @@ export default function InterviewSessionPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (inputMode === 'deepgram') { void startDgListening() }
+                      // Retry mic must FULLY rebuild the pipeline cleanly, not
+                      // just hide the warning. For Web Speech this means
+                      // stopListening() → startListening() so the generation
+                      // token bumps and the previous (possibly stalled)
+                      // recognition instance is torn down before a fresh one
+                      // is created. Previously this button was a no-op for
+                      // Web Speech mode and only restarted Deepgram.
+                      voiceDebug('retry_triggered', { source: 'stuck_escape_retry_mic', mode: inputMode })
+                      if (inputMode === 'deepgram') {
+                        stopDgListening()
+                        void startDgListening()
+                      } else {
+                        stopListening()
+                        void startListening()
+                      }
                       setShowStuckEscape(false)
                     }}
                     className="rounded-lg border border-(--card-border) bg-(--bg-secondary)
@@ -1195,12 +1738,16 @@ export default function InterviewSessionPage() {
                 </button>
                 <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
                   {inputMode === 'deepgram'
-                    ? dgIsRecording
+                    ? dgListening
                       ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Recording · {dgRecordingSeconds}s</>
-                      : <><Radio size={12} /> AI Voice</>
-                    : isListening
+                      : dgIsRecording
+                        ? <><Radio size={12} className="animate-pulse" /> Connecting voice channel…</>
+                        : <><Radio size={12} /> AI Voice</>
+                    : webSpeechActive
                       ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Listening…</>
-                      : <><MicOff size={12} /> {isMicSupported ? 'Mic off' : 'Type to answer'}</>
+                      : recognitionState === 'starting'
+                        ? <><Mic size={12} className="animate-pulse" /> Starting mic…</>
+                        : <><MicOff size={12} /> {isMicSupported ? 'Mic off' : 'Type to answer'}</>
                   }
                 </div>
               </div>
@@ -1213,6 +1760,17 @@ export default function InterviewSessionPage() {
               {speechError && (
                 <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                   {speechError}
+                </p>
+              )}
+              {/* ElevenLabs TTS errors (Deepgram mode) — same amber surface
+                  as browser TTS errors so the user has a single place to
+                  notice voice degradation regardless of which engine is in
+                  play. The hook resets the error at the start of every
+                  successful speak, so this banner self-clears on the next
+                  question if the underlying issue (quota, upstream) resolves. */}
+              {inputMode === 'deepgram' && elTtsError && (
+                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  {elTtsError}
                 </p>
               )}
 

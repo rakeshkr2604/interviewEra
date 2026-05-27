@@ -66,6 +66,21 @@ export interface AiQuotaExhaustedEvent extends AiTelemetryBase {
   cooldown_ms:  number;
 }
 
+/**
+ * Emitted when the LLM cost guard blocks a call before it reaches the provider.
+ * No user PII — user_id lives only in the console.warn already emitted by the guard.
+ */
+export interface AiCostBlockedEvent {
+  event:               'ai_cost_blocked';
+  operation:           string;
+  provider:            string;
+  model:               string;
+  plan_tier:           string;
+  current_spend_usd:   number;
+  limit_usd:           number;
+  estimated_cost_usd:  number;
+}
+
 /** Emitted when intelligence-based routing reorders the static provider list. */
 export interface AiIntelligenceRoutingEvent {
   event:                  'ai_intelligence_routing';
@@ -100,7 +115,8 @@ export type AiTelemetryEvent =
   | AiJsonRepairEvent
   | AiQuotaExhaustedEvent
   | AiIntelligenceRoutingEvent
-  | AiCostEstimateEvent;
+  | AiCostEstimateEvent
+  | AiCostBlockedEvent;
 
 /**
  * Emits a structured telemetry event to stdout as a single JSON line.

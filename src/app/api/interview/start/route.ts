@@ -4,6 +4,7 @@ import { generateQuestions, QuestionGenerationError } from '@/lib/openai/generat
 import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
+import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 
 import {
   buildCacheKey,
@@ -146,7 +147,130 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // ── Step 3: Deduct 1 credit (atomic, prevents race conditions via RPC) ────
+    // ── Step 3: Resolve question payload BEFORE any state mutation ────────────
+    // Credit deduction + interview INSERT are deferred until questions are in
+    // hand. That eliminates orphan interview rows + credit-refund churn when
+    // AI fails, and keeps the user uncharged on slow/failed generation paths.
+    // `order_index` is computed now; `interview_id` is filled in after the
+    // interview row is created below.
+    type QuestionPayload = {
+      order_index: number;
+      question_text: string;
+      rubric: unknown;
+      category: string;
+    };
+    let resolvedQuestions: QuestionPayload[];
+
+    if (domainPackId) {
+      // ── Domain pack path: fetch questions from DB ─────────────────────────
+      const { data: packQuestions, error: packError } = await serviceClient
+        .from('domain_pack_questions')
+        .select('id, question_text, rubric, category, difficulty')
+        .eq('pack_id', domainPackId)
+        .order('id'); // stable ordering for shuffle
+
+      if (packError || !packQuestions || packQuestions.length === 0) {
+        return NextResponse.json({ error: 'Domain pack not found or empty.' }, { status: 404 });
+      }
+
+      const shuffled = packQuestions
+        .map((q) => ({ q, sort: Math.random() }))
+        .sort((a, b) => a.sort - b.sort)
+        .map(({ q }) => q);
+
+      resolvedQuestions = shuffled.slice(0, questionCount).map((q, idx) => ({
+        order_index: idx,
+        question_text: q.question_text as string,
+        rubric: q.rubric,
+        category: q.category as string,
+      }));
+    } else {
+      // ── AI path: generate questions via GPT (with Redis cache) ───────────
+      const parsedResume = resume.parsed_data as ParsedResume;
+      const cacheKey = buildCacheKey(role, difficulty, parsedResume, cacheSession);
+      const cached = await getCachedQuestions(cacheKey);
+
+      if (cached) {
+        const shuffled = cached
+          .map((q) => ({ q, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .map(({ q }) => q);
+
+        resolvedQuestions = shuffled.slice(0, questionCount).map((q, idx) => ({
+          order_index: idx,
+          question_text: q.question_text,
+          rubric: q.rubric,
+          category: q.category as QuestionCategory,
+        }));
+      } else {
+        // ── LLM cost guard: only runs on real AI calls, not cache hits ─────
+        const { data: userProfile } = await serviceClient
+          .from('users')
+          .select('plan_tier')
+          .eq('id', user.id)
+          .single();
+        const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+        const qGenCost = estimateLLMCallCostUSD('question_generation');
+        const qGenCostGuard = await checkLLMCostGuard(user.id, planTier, qGenCost, 'question_generation');
+        if (!qGenCostGuard.allowed) {
+          return NextResponse.json(
+            { error: 'Monthly AI usage limit reached. Please upgrade your plan or try again next month.' },
+            { status: 429 },
+          );
+        }
+
+        let generatedQuestions: Awaited<ReturnType<typeof generateQuestions>>;
+        try {
+          generatedQuestions = await generateQuestions({
+            parsedResume,
+            role,
+            difficulty,
+            questionCount,
+            goal,
+            interviewMode,
+            experienceYears,
+            interviewerId,
+            jobDescription,
+            userId: user.id,
+            // Pass tier from the cacheSession block — avoids a second
+            // getUserProgress lookup inside generate-questions.
+            userTier: userTier as 1 | 2 | 3 | 4,
+          });
+        } catch (err) {
+          if (err instanceof QuestionGenerationError) {
+            return NextResponse.json({ error: err.message }, { status: 500 });
+          }
+          return NextResponse.json(
+            { error: 'Failed to generate questions. Please try again.' },
+            { status: 500 }
+          );
+        }
+
+        void recordLLMSpend(user.id, qGenCost);
+
+        void setCachedQuestions(
+          cacheKey,
+          generatedQuestions.questions.map((q) => ({
+            order: q.order,
+            question_text: q.question_text,
+            category: q.category,
+            rubric: q.rubric,
+          }))
+        );
+
+        resolvedQuestions = generatedQuestions.questions.map((q) => ({
+          order_index: q.order,
+          question_text: q.question_text,
+          rubric: q.rubric,
+          category: q.category as QuestionCategory,
+        }));
+      }
+    }
+
+    // ── Step 4: Deduct 1 credit (atomic RPC) ──────────────────────────────────
+    // Now that questions are resolved, charge the user. Failure here means the
+    // user can't start — no orphan state to clean up because we haven't
+    // mutated anything yet.
     const creditResult = await checkAndDeductCredit(user.id);
     if (!creditResult.success) {
       return NextResponse.json(
@@ -155,7 +279,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // ── Step 4: Create interview record ───────────────────────────────────────
+    // ── Step 5: Create interview record ───────────────────────────────────────
     const { data: interview, error: interviewError } = await serviceClient
       .from('interviews')
       .insert({
@@ -178,113 +302,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
     }
 
-    // ── Steps 5–6: Generate questions (AI or domain pack) ────────────────────
-    let questionsToInsert: Array<{
-      interview_id: string;
-      order_index: number;
-      question_text: string;
-      rubric: unknown;
-      category: string;
-    }>;
+    // ── Step 6: Insert questions (fill in interview_id) ───────────────────────
+    const questionsToInsert = resolvedQuestions.map((q) => ({
+      interview_id: interview.id,
+      ...q,
+    }));
 
-    if (domainPackId) {
-      // ── Domain pack path: fetch questions from DB ─────────────────────────
-      const { data: packQuestions, error: packError } = await serviceClient
-        .from('domain_pack_questions')
-        .select('id, question_text, rubric, category, difficulty')
-        .eq('pack_id', domainPackId)
-        .order('id'); // stable ordering for shuffle
-
-      if (packError || !packQuestions || packQuestions.length === 0) {
-        await refundCredit(user.id);
-        await serviceClient.from('interviews').delete().eq('id', interview.id);
-        return NextResponse.json({ error: 'Domain pack not found or empty.' }, { status: 404 });
-      }
-
-      // Shuffle and take up to questionCount
-      const shuffled = packQuestions
-        .map((q) => ({ q, sort: Math.random() }))
-        .sort((a, b) => a.sort - b.sort)
-        .map(({ q }) => q);
-
-      questionsToInsert = shuffled.slice(0, questionCount).map((q, idx) => ({
-        interview_id: interview.id,
-        order_index: idx,
-        question_text: q.question_text as string,
-        rubric: q.rubric,
-        category: q.category as string,
-      }));
-    } else {
-      // ── AI path: generate questions via GPT (with Redis cache) ───────────
-      const parsedResume = resume.parsed_data as ParsedResume;
-      const cacheKey = buildCacheKey(role, difficulty, parsedResume, cacheSession);
-      const cached = await getCachedQuestions(cacheKey);
-
-      if (cached) {
-        // Cache hit — use stored questions (shuffled subset per questionCount)
-        const shuffled = cached
-          .map((q) => ({ q, sort: Math.random() }))
-          .sort((a, b) => a.sort - b.sort)
-          .map(({ q }) => q);
-
-        questionsToInsert = shuffled.slice(0, questionCount).map((q, idx) => ({
-          interview_id: interview.id,
-          order_index: idx,
-          question_text: q.question_text,
-          rubric: q.rubric,
-          category: q.category as QuestionCategory,
-        }));
-      } else {
-        // Cache miss — call GPT then store result
-        let generatedQuestions: Awaited<ReturnType<typeof generateQuestions>>;
-        try {
-          generatedQuestions = await generateQuestions({
-            parsedResume,
-            role,
-            difficulty,
-            questionCount,
-            goal,
-            interviewMode,
-            experienceYears,
-            interviewerId,
-            jobDescription,
-            userId: user.id,
-          });
-        } catch (err) {
-          await refundCredit(user.id);
-          await serviceClient.from('interviews').delete().eq('id', interview.id);
-
-          if (err instanceof QuestionGenerationError) {
-            return NextResponse.json({ error: err.message }, { status: 500 });
-          }
-          return NextResponse.json(
-            { error: 'Failed to generate questions. Please try again.' },
-            { status: 500 }
-          );
-        }
-
-        // Write to cache asynchronously — don't block the response
-        void setCachedQuestions(
-          cacheKey,
-          generatedQuestions.questions.map((q) => ({
-            order: q.order,
-            question_text: q.question_text,
-            category: q.category,
-            rubric: q.rubric,
-          }))
-        );
-
-        questionsToInsert = generatedQuestions.questions.map((q) => ({
-          interview_id: interview.id,
-          order_index: q.order,
-          question_text: q.question_text,
-          rubric: q.rubric,
-          category: q.category as QuestionCategory,
-        }));
-      }
-    }
-
-    // ── Step 7: Insert questions ──────────────────────────────────────────────
     const { data: insertedQuestions, error: questionsError } = await serviceClient
       .from('questions')
       .insert(questionsToInsert)
@@ -297,7 +320,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
     }
 
-    // ── Step 8: Return ────────────────────────────────────────────────────────
+    // ── Step 7: Return ────────────────────────────────────────────────────────
     return NextResponse.json({
       interviewId: interview.id,
       questions: insertedQuestions,

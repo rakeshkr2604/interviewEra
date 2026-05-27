@@ -164,14 +164,28 @@ export async function POST(request: NextRequest) {
     const audio = await upstream.arrayBuffer();
     success = true;
 
+    const ttsLatencyMs = Date.now() - t0;
+
     // ── 9. Post-success: record usage + telemetry (non-blocking) ───────────────
     void recordTTSUsage(user.id, spokenText.length);
     void logTTSCall({
       user_id: user.id, interview_id: interview_id ?? undefined,
       tts_chars: spokenText.length, tts_model: 'eleven_turbo_v2_5',
-      tts_voice_id: voiceId, latency_ms: Date.now() - t0,
+      tts_voice_id: voiceId, latency_ms: ttsLatencyMs,
       success: true, ip,
     });
+
+    // Structured stdout event for log aggregators (mirrors stt_token_issued pattern)
+    console.log(JSON.stringify({
+      ts:            new Date().toISOString(),
+      event:         'tts_call_success',
+      provider:      'elevenlabs',
+      model:         'eleven_turbo_v2_5',
+      latency_ms:    ttsLatencyMs,
+      chars:         spokenText.length,
+      plan_tier:     planTier,
+      quota_warning: quota.warning,
+    }));
 
     if (quota.warning === 'warning' || quota.warning === 'critical') {
       return new NextResponse(audio, {
@@ -188,12 +202,22 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const isTimeout = err instanceof Error && err.name === 'TimeoutError';
     errorCategory = isTimeout ? 'timeout' : 'fetch_error';
+    const ttsFailLatencyMs = Date.now() - t0;
     console.error('[TTS proxy] Fetch failed:', isTimeout ? 'timeout' : err);
     void logTTSCall({
       user_id: user.id, interview_id: interview_id ?? undefined,
       tts_chars: spokenText.length, tts_model: 'eleven_turbo_v2_5',
-      latency_ms: Date.now() - t0, success: false, error_category: errorCategory, ip,
+      latency_ms: ttsFailLatencyMs, success: false, error_category: errorCategory, ip,
     });
+    console.log(JSON.stringify({
+      ts:         new Date().toISOString(),
+      event:      'tts_call_failure',
+      provider:   'elevenlabs',
+      model:      'eleven_turbo_v2_5',
+      latency_ms: ttsFailLatencyMs,
+      error_code: errorCategory,
+      plan_tier:  planTier,
+    }));
     return NextResponse.json(
       { error: isTimeout ? 'TTS timed out. Try text mode.' : 'TTS fetch failed.', fallback: 'browser_tts' },
       { status: 502 },

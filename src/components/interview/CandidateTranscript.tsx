@@ -1,13 +1,29 @@
 'use client'
 import { useEffect, useRef } from 'react'
 import { Mic, MicOff } from 'lucide-react'
+import type { SpeechRecognitionState } from '@/hooks/useSpeechRecognition'
 // Route-scoped: waveform / thinking-bar styles load only with the interview session.
 import './interview-effects.css'
 
 interface CandidateTranscriptProps {
   transcript: string
   interimTranscript: string
+  /**
+   * Backwards-compat "any non-idle" flag. Used for control-flow / button
+   * style only. The "Listening…" label and the audio bars are gated on
+   * `recognitionState === 'active'` instead — see SpeechRecognitionState.
+   */
   isListening: boolean
+  /**
+   * Tri-state lifecycle from useSpeechRecognition.
+   *  - 'idle'     → no session running
+   *  - 'starting' → onstart fired but no transcript event yet (show "Starting mic…")
+   *  - 'active'   → at least one transcript event observed (show "Listening…")
+   *
+   * Optional for back-compat with any caller that hasn't been threaded
+   * through yet — when undefined we fall back to `isListening`.
+   */
+  recognitionState?: SpeechRecognitionState
   isSupported: boolean
   error: string | null
   permissionState: 'unknown' | 'granted' | 'prompt' | 'denied' | 'requesting'
@@ -22,6 +38,7 @@ export function CandidateTranscript({
   transcript,
   interimTranscript,
   isListening,
+  recognitionState,
   isSupported,
   error,
   permissionState,
@@ -37,7 +54,12 @@ export function CandidateTranscript({
   }, [transcript, interimTranscript])
 
   const hasContent = Boolean(transcript || interimTranscript)
-  const showBars   = isListening && !hasContent
+  // "Active" = transcript pipeline verified (first event received).
+  // When the caller does not pass `recognitionState` we fall back to the
+  // legacy boolean so this component keeps working in pre-tri-state callers.
+  const active     = recognitionState ? recognitionState === 'active' : isListening
+  const starting   = recognitionState === 'starting'
+  const showBars   = active && !hasContent
 
   return (
     <div className="w-full min-w-0 space-y-2">
@@ -73,11 +95,13 @@ export function CandidateTranscript({
           {isListening ? <Mic size={12} className="animate-pulse" /> : <MicOff size={12} />}
           {permissionState === 'requesting'
             ? 'Requesting permission…'
-            : isListening
+            : active
               ? 'Listening…'
-              : permissionState === 'denied'
-                ? 'Permission denied'
-                : 'Click mic to enable'}
+              : starting
+                ? 'Starting mic…'
+                : permissionState === 'denied'
+                  ? 'Permission denied'
+                  : 'Click mic to enable'}
         </button>
       </div>
 
@@ -117,11 +141,13 @@ export function CandidateTranscript({
           </>
         ) : (
           <span className="text-(--text-muted)">
-            {isListening
+            {active
               ? 'Start speaking — your words will appear here'
-              : isSupported
-                ? 'Click the mic button to start speaking'
-                : 'Speech recognition not supported in this browser'}
+              : starting
+                ? 'Connecting microphone…'
+                : isSupported
+                  ? 'Click the mic button to start speaking'
+                  : 'Speech recognition not supported in this browser'}
           </span>
         )}
       </div>

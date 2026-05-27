@@ -10,6 +10,8 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { callMistralChat } from '@/lib/mistral/client';
 import { getTokenBudget } from '@/lib/ai/token-budget';
+import { clampHistoryForOperation } from '@/lib/ai/context-hygiene';
+import { emitAiTelemetry } from '@/lib/observability/ai-telemetry';
 import type {
   AnswerAnalysis,
   DialogueEntry,
@@ -23,13 +25,22 @@ import {
   type InterviewMode,
 } from '@/lib/interview/interview-mode';
 
-/** Render the last few turns as a readable transcript for the LLM. */
-function formatDialogue(history: DialogueEntry[], maxTurns = 6): string {
+/**
+ * Render the last few turns as a readable transcript for the LLM.
+ * Sliding window + per-turn char cap are owned by operation-registry
+ * (followup_generation.context). A single rambling turn cannot dominate.
+ */
+function formatDialogue(history: DialogueEntry[]): string {
   if (!Array.isArray(history) || history.length === 0) return '(start of interview)';
-  return history
-    .slice(-maxTurns)
-    .map((e) => `${e.speaker === 'interviewer' ? 'You' : 'Candidate'}: ${e.text}`)
-    .join('\n');
+  const turns = clampHistoryForOperation(
+    history.map((e) => ({
+      speaker: e.speaker === 'interviewer' ? 'You' : 'Candidate',
+      text:    e.text,
+    })),
+    'followup_generation',
+  );
+  if (turns.length === 0) return '(start of interview)';
+  return turns.map((t) => `${t.speaker}: ${t.text}`).join('\n');
 }
 
 function pick<T>(options: readonly T[]): T {
@@ -59,6 +70,15 @@ async function llmQuestion(
     throw new Error('Empty follow-up from primary chain');
   } catch (primaryError) {
     console.warn('[followup-generator] Primary chain failed, trying Mistral:', primaryError);
+    emitAiTelemetry({
+      event:         'ai_fallback_triggered',
+      operation:     'followup_generation',
+      provider:      'mistral',
+      model:         'mistral-small-latest',
+      from_provider: 'openrouter',
+      to_provider:   'mistral',
+      reason:        'primary_chain_failure',
+    });
     try {
       const content = await callMistralChat(
         `${systemPrompt}\n\n${userPrompt}`,
@@ -83,19 +103,28 @@ function buildContextualSystemPrompt(
 
 ${modeConstraint}
 
-You are conducting a realistic Indian campus-placement interview. You are NOT a quiz bot. You listen, react with genuine curiosity, and probe like a human who remembers everything said so far.
+You are a human interviewer at a top Indian company. You listen carefully and probe gaps — not because you're running a script, but because you're genuinely curious about whether the candidate understands what they're talking about.
 
-Hard rules for your follow-up question:
-- Stay in character (the persona above) — your phrasing should sound like that person.
+Rules for your follow-up:
+- Stay in character (the persona above).
 - Obey the MODE LOCK above without exception.
-- REFERENCE something the candidate actually said earlier (quote or paraphrase their words).
-- PROBE the specific gap identified by the analysis — don't ask generic filler.
-- Ask exactly ONE question. No preamble, no "Sure!", no explanation, no markdown.
-- Sound spontaneous and conversational, not templated.
-- Indian candidates often answer in Hinglish — that is normal, never penalize it.
+- Open with a brief natural reaction — not "Sure!" or "Great!" — something like "That makes sense." or "Interesting." or "Right." or just silence into the question. Keep it to 1–3 words max, or skip it.
+- Then REFERENCE something the candidate actually said (quote or paraphrase their words).
+- PROBE the specific gap — don't ask a generic filler question.
+- Ask exactly ONE question. No explanation, no markdown, no preamble beyond the 1–3 word opener.
+- Sound conversational, not scripted.
+- Indian candidates often answer in Hinglish — that is normal; never flag it.
 
-WRONG (generic, banned): "Can you quantify that?" / "Tell me more about your approach." / "What technologies did you use?"
-RIGHT (context-aware): "You said earlier you handled 10K users, but the MongoDB schema you just described looks read-optimized — how did you handle the write load at that scale?"`;
+BANNED (generic filler):
+- "Can you quantify that?"
+- "Tell me more about your approach."
+- "What technologies did you use?"
+- "Could you elaborate on that?"
+
+CORRECT (context-aware, references actual answer):
+- "You said MongoDB for flexibility — which schema decision specifically? Embedded docs, or references?"
+- "You mentioned the deadline was tight. Who decided to cut the testing phase, and what was the risk trade-off?"
+- "Interesting. You said 'we handled it' — but who made the final call on the rollback?"`;
 }
 
 /**
@@ -316,20 +345,42 @@ export function buildAcknowledgment(analysis: AnswerAnalysis): string {
 
   if (avgScore >= 8) {
     return pick([
-      'Excellent answer. I like how you',
-      "Great. That's exactly the kind of detail I was looking for.",
-      'Perfect. You clearly understand',
-      'Strong answer. The way you approached',
+      "Good. That covers what I was looking for.",
+      "Clear and well-structured — I got the full picture.",
+      "Strong answer.",
+      "That's the depth I was looking for.",
     ]);
   }
 
   if (avgScore >= 6) {
     return pick([
-      'Good. I appreciate you sharing that.',
-      "That's a solid example.",
-      "Fair enough. I can see you've thought about this.",
+      "Fair enough.",
+      "Okay, I follow that.",
+      "Thanks for walking me through that.",
+      "Alright, I have a sense of your approach.",
     ]);
   }
 
-  return 'Alright, I understand.';
+  return pick([
+    "Okay.",
+    "I see.",
+    "Alright.",
+  ]);
+}
+
+/**
+ * Deterministic transition phrase before a new question. No API call.
+ * Uses modular index so consecutive questions don't repeat the same phrase.
+ */
+export function buildTransitionPhrase(questionIndex: number): string {
+  const phrases = [
+    "Let's continue.",
+    "Moving on.",
+    "Let me shift topics slightly.",
+    "Right.",
+    "Okay, let's keep going.",
+    "Let me ask you something different.",
+    "Let's move on.",
+  ] as const;
+  return phrases[questionIndex % phrases.length];
 }
