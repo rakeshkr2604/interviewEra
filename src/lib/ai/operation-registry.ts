@@ -155,9 +155,9 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
   resume_parse: {
     requestClass:         'lightweight_parse',
     temperature:          0,
-    maxOutputTokens:      420,
-    llmAttemptTimeoutMs:    10_000,
-    timeoutMs:            11_000,
+    maxOutputTokens:      180,
+    llmAttemptTimeoutMs:    8_000,
+    timeoutMs:            10_000,
     responseFormat:       'json',
     context: {
       maxInputChars:        5_500,

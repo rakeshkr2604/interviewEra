@@ -1,34 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { assessHeuristicQuality, buildFallbackParsedResume } from '@/lib/resume/fallback-parse';
+import { buildFallbackParsedResume } from '@/lib/resume/fallback-parse';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
 const SAMPLE = `
 Rakesh Kumar
-rakesh@email.com | +91 98765 43210
+Skills: JavaScript, TypeScript, React, Node.js
 
-Skills: JavaScript, TypeScript, React, Node.js, PostgreSQL
-
-Experience
-Software Engineer — Acme Corp
+Software Engineer intern at Acme Corp
 Jan 2022 – Present
-Built APIs and React dashboards for internal tools.
-
-Education
-B.Tech Computer Science, IIT Example
-CGPA: 8.5/10, 2021
-
-Projects
-Interview Prep App — Next.js, Supabase
 `;
 
 describe('buildFallbackParsedResume', () => {
-  it('extracts name, skills, experience, and education from typical resume', () => {
-    const { data, quality } = buildFallbackParsedResume(SAMPLE);
-    expect(data.name).toMatch(/Rakesh/i);
-    expect(data.skills.length).toBeGreaterThanOrEqual(3);
-    expect(data.experience.length).toBeGreaterThanOrEqual(1);
-    expect(data.education.length).toBeGreaterThanOrEqual(1);
-    expect(assessHeuristicQuality(data)).toBe('full');
-    expect(quality).toBe('full');
-    expect(data.parse_warning).toBeUndefined();
+  it('returns slim interview profile', () => {
+    const { data } = buildFallbackParsedResume(SAMPLE);
+    expect(data.target_role).toBeTruthy();
+    expect(data.skills.length).toBeGreaterThanOrEqual(2);
+    expect(data.experience_estimate).toBeTruthy();
+    expect('experience' in data).toBe(false);
+  });
+});
+
+describe('coerceParsedResume', () => {
+  it('migrates legacy full resume blobs', () => {
+    const profile = coerceParsedResume({
+      name: 'Rakesh',
+      skills: ['JavaScript', 'React'],
+      target_roles: ['Software Engineer'],
+      experience: [{ role: 'Developer', company: 'Acme', duration: '2022', description: '' }],
+      projects: [{ name: 'App', tech_stack: [], description: '' }],
+      education: [],
+    });
+    expect(profile.target_role).toBe('Software Engineer');
+    expect(profile.skills).toContain('JavaScript');
+    expect(profile.experience_estimate).toBeTruthy();
   });
 });

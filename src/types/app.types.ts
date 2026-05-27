@@ -69,38 +69,13 @@ export interface User {
   created_at: string;
 }
 
-export interface ParsedResumeExperience {
-  company: string;
-  role: string;
-  duration: string;
-  description: string;
-}
-
-export interface ParsedResumeProject {
-  name: string;
-  tech_stack: string[];
-  description: string;
-}
-
-export interface ParsedResumeEducation {
-  degree: string;
-  institution: string;
-  year: string;
-  cgpa: string;
-}
-
 export type ResumeParseQuality = 'full' | 'degraded' | 'minimal';
 
+/** Minimal profile for interview question personalization (not a resume replica). */
 export interface ParsedResume {
-  name: string;
-  email: string;
-  phone: string;
+  target_role: string;
   skills: string[];
-  experience: ParsedResumeExperience[];
-  projects: ParsedResumeProject[];
-  education: ParsedResumeEducation[];
-  target_roles: string[];
-  /** Present when upload/AI extraction was partial — interview still proceeds. */
+  experience_estimate: string;
   parse_quality?: ResumeParseQuality;
   parse_warning?: string;
 }

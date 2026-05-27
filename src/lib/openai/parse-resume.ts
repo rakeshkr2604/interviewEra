@@ -1,5 +1,5 @@
 /**
- * Resume parsing — single fast OpenRouter call, strict token budget.
+ * Resume parsing — minimal JSON for interview personalization only.
  */
 
 import { createOpenRouterClient } from '@/lib/openrouter/client';
@@ -7,19 +7,20 @@ import { getOperationSpec } from '@/lib/ai/operation-registry';
 import { parseJsonObject } from '@/lib/ai/response-contract';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import { prepareTextForAiParse } from '@/lib/resume/parse-input';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 import type { ParsedResume } from '@/types/app.types';
 
-/** Fast, reliable on OpenRouter; override with RESUME_PARSE_MODEL. */
 const RESUME_PARSE_MODEL =
   process.env.RESUME_PARSE_MODEL ?? 'openai/gpt-4o-mini';
 
 const SYSTEM_PROMPT = 'Return only valid JSON. No markdown.';
 
 const USER_PROMPT_PREFIX =
-  'Extract resume fields. Keep each description under 120 chars. Max 6 experience, 4 projects, 3 education.\n' +
-  '{"name":"","email":"","phone":"","skills":[],"experience":[{"company":"","role":"","duration":"","description":""}],' +
-  '"projects":[{"name":"","tech_stack":[],"description":""}],"education":[{"degree":"","institution":"","year":"","cgpa":""}],' +
-  '"target_roles":[]}\n';
+  'For mock interview setup only (not a full resume). Extract:\n' +
+  '{"target_role":"","skills":[],"experience_estimate":""}\n' +
+  'target_role: one primary role (e.g. Software Engineer).\n' +
+  'skills: max 12 short tech/soft skills.\n' +
+  'experience_estimate: one of Fresher, 0-1 years, 1-3 years, 3-5 years, 5+ years.\n';
 
 export type ParseResumeTiming = {
   aiMs: number;
@@ -30,63 +31,12 @@ export type ParseResumeTiming = {
   completionTokens?: number;
 };
 
-function coerceString(val: unknown, fallback = ''): string {
-  return typeof val === 'string' ? val : fallback;
-}
-
-function coerceStringArray(val: unknown): string[] {
-  if (!Array.isArray(val)) return [];
-  return val.filter((x): x is string => typeof x === 'string').slice(0, 32);
-}
-
-function repairParsedResumeShape(data: unknown): ParsedResume | null {
-  if (!data || typeof data !== 'object') return null;
-  const d = data as Record<string, unknown>;
-  const repaired: ParsedResume = {
-    name: coerceString(d.name),
-    email: coerceString(d.email),
-    phone: coerceString(d.phone),
-    skills: coerceStringArray(d.skills),
-    target_roles: coerceStringArray(d.target_roles),
-    experience: Array.isArray(d.experience)
-      ? d.experience
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .slice(0, 8)
-          .map((e) => ({
-            company: coerceString(e.company),
-            role: coerceString(e.role),
-            duration: coerceString(e.duration),
-            description: coerceString(e.description).slice(0, 500),
-          }))
-      : [],
-    projects: Array.isArray(d.projects)
-      ? d.projects
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .slice(0, 6)
-          .map((p) => ({
-            name: coerceString(p.name),
-            tech_stack: coerceStringArray(p.tech_stack).slice(0, 12),
-            description: coerceString(p.description).slice(0, 500),
-          }))
-      : [],
-    education: Array.isArray(d.education)
-      ? d.education
-          .filter((x): x is Record<string, unknown> => !!x && typeof x === 'object')
-          .slice(0, 4)
-          .map((ed) => ({
-            degree: coerceString(ed.degree),
-            institution: coerceString(ed.institution),
-            year: coerceString(ed.year),
-            cgpa: coerceString(ed.cgpa),
-          }))
-      : [],
-  };
+function repairInterviewProfile(data: unknown): ParsedResume | null {
+  const profile = coerceParsedResume(data);
   const hasSignal =
-    repaired.skills.length > 0 ||
-    repaired.experience.length > 0 ||
-    repaired.projects.length > 0 ||
-    repaired.name.length > 0;
-  return hasSignal ? repaired : null;
+    profile.skills.length > 0 ||
+    (profile.target_role.length > 0 && profile.target_role !== 'Software Engineer');
+  return hasSignal ? profile : null;
 }
 
 export async function parseResume(rawText: string): Promise<{
@@ -132,7 +82,7 @@ export async function parseResume(rawText: string): Promise<{
     throw new Error(`[parse-resume] Invalid JSON from model: ${parseResult.error}`);
   }
 
-  const repaired = repairParsedResumeShape(parseResult.value);
+  const repaired = repairInterviewProfile(parseResult.value);
   if (!repaired) {
     throw new Error('[parse-resume] Response missing required fields');
   }

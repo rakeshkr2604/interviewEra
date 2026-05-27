@@ -240,13 +240,13 @@ export default function OnboardingPage() {
             ''
           setResumeParseWarning(warn)
           const skills = payload.parsed_data?.skills?.length ?? 0
-          const hasProfile = !!(payload.parsed_data?.name?.trim() || skills >= 2)
+          const hasProfile = !!(
+            payload.parsed_data?.target_role?.trim() || skills >= 2
+          )
           setStatusMessage(
             warn && !hasProfile
-              ? 'Resume saved — some sections may be incomplete.'
-              : warn
-                ? 'Resume ready — quick extraction completed.'
-                : 'Resume analyzed successfully.',
+              ? 'Resume saved — profile may be limited.'
+              : 'Ready for your interview.',
           )
           if (payload.parsed_data) setParsedResume(payload.parsed_data)
         } else if (payload.status === 'failed') {

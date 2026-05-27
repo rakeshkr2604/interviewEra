@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
 import type { ParsedResume } from '@/types/app.types';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
 type UploadStatus = 'idle' | 'uploading' | 'extracting' | 'parsing' | 'success' | 'error';
 
 interface ParsedSummary {
-  name: string;
+  targetRole: string;
   skills: string[];
-  targetRoles: string[];
+  experienceEstimate: string;
 }
 
 interface UploadZoneProps {
@@ -34,15 +35,15 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
   const [status, setStatus] = useState<UploadStatus>(
     initialResume ? 'success' : 'idle'
   );
-  const [parsedSummary, setParsedSummary] = useState<ParsedSummary | null>(
-    initialResume
-      ? {
-          name: initialResume.name,
-          skills: initialResume.skills.slice(0, 10),
-          targetRoles: initialResume.target_roles,
-        }
-      : null
-  );
+  const [parsedSummary, setParsedSummary] = useState<ParsedSummary | null>(() => {
+    if (!initialResume) return null;
+    const p = coerceParsedResume(initialResume);
+    return {
+      targetRole: p.target_role,
+      skills: p.skills.slice(0, 8),
+      experienceEstimate: p.experience_estimate,
+    };
+  });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -131,12 +132,10 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
           <div>
             {parsedSummary ? (
               <>
-                <p className="font-semibold">{parsedSummary.name}</p>
-                {parsedSummary.targetRoles.length > 0 && (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Target: {parsedSummary.targetRoles.join(', ')}
-                  </p>
-                )}
+                <p className="font-semibold">{parsedSummary.targetRole}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Experience: {parsedSummary.experienceEstimate}
+                </p>
                 {parsedSummary.skills.length > 0 && (
                   <div className="mt-2 flex flex-wrap gap-1">
                     {parsedSummary.skills.slice(0, 6).map((skill) => (

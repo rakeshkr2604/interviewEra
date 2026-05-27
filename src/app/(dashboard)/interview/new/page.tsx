@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { StartInterviewForm } from './StartInterviewForm';
 import { privatePageMetadata } from '@/lib/seo/metadata';
-import type { DomainPack, ParsedResume, PlanTier } from '@/types/app.types';
+import type { DomainPack, PlanTier } from '@/types/app.types';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
 export const metadata = privatePageMetadata({
   title: 'Start interview',
@@ -51,10 +52,11 @@ export default async function NewInterviewPage() {
     redirect('/dashboard?notice=upload_resume');
   }
 
-  const parsed = resume.parsed_data as ParsedResume | null;
+  const resumeProfile = coerceParsedResume(resume.parsed_data);
   const resumeInfo = {
-    name: parsed?.name ?? 'Your Resume',
-    skillCount: parsed?.skills?.length ?? 0,
+    targetRole: resumeProfile.target_role,
+    skillCount: resumeProfile.skills.length,
+    experienceEstimate: resumeProfile.experience_estimate,
   };
 
   return (

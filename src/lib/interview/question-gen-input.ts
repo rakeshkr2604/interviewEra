@@ -3,24 +3,19 @@
  */
 
 import type { ParsedResume } from '@/types/app.types';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 import { clampText } from '@/lib/ai/context-hygiene';
 
 export const QUESTION_GEN_JD_MAX_CHARS = 1_800;
-export const QUESTION_GEN_RESUME_SUMMARY_MAX = 1_100;
+export const QUESTION_GEN_RESUME_SUMMARY_MAX = 600;
 
-export function buildCompactResumeSummary(resume: ParsedResume, role: string): string {
-  const skills = resume.skills.slice(0, 10).join(', ');
-  const exp = resume.experience
-    .slice(0, 3)
-    .map((e) => `${e.role}@${e.company}`)
-    .join('; ');
-  const projects = resume.projects
-    .slice(0, 2)
-    .map((p) => p.name)
-    .join(', ');
-  let s = `Role:${role}. Skills:${skills || 'n/a'}`;
-  if (exp) s += `. Exp:${exp}`;
-  if (projects) s += `. Projects:${projects}`;
+export function buildCompactResumeSummary(resume: ParsedResume | unknown, role: string): string {
+  const p = coerceParsedResume(resume);
+  const skills = p.skills.slice(0, 10).join(', ');
+  const target = p.target_role || role;
+  const exp = p.experience_estimate;
+  let s = `Target:${target}. Skills:${skills || 'n/a'}. Experience:${exp}`;
+  if (role && role !== target) s += `. InterviewRole:${role}`;
   return clampText(s, QUESTION_GEN_RESUME_SUMMARY_MAX);
 }
 

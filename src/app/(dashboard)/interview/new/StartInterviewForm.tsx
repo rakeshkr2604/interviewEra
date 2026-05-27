@@ -39,7 +39,7 @@ const DOMAIN_LABELS: Record<string, string> = {
 
 interface StartInterviewFormProps {
   resumeId: string;
-  resumeInfo: { name: string; skillCount: number };
+  resumeInfo: { targetRole: string; skillCount: number; experienceEstimate: string };
   creditsRemaining: number;
   planTier: PlanTier;
   domainPacks: DomainPack[];
@@ -138,7 +138,7 @@ export function StartInterviewForm({
       >
         <span className="font-semibold">Your resume:</span>{' '}
         <span style={{ color: 'var(--text-secondary)' }}>
-          {resumeInfo.name} — {resumeInfo.skillCount} skills detected
+          {resumeInfo.targetRole} · {resumeInfo.skillCount} skills · {resumeInfo.experienceEstimate}
         </span>
       </div>
 

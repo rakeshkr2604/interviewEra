@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { jobDescriptionSummaryLine } from '@/lib/onboarding/job-description-summary-line'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import type { ParsedJobDescription, ParsedResume, InterviewDifficulty } from '@/types/app.types'
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume'
 import type { OnboardingData } from '@/types/onboarding.types'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -250,9 +251,8 @@ function ParsedSuccessCard({
   resumeFile: File | null
   parseWarning?: string
 }) {
-  const skillCount = parsedResume?.skills.length ?? 0
-  const expCount   = parsedResume?.experience.length ?? 0
-  const projCount  = parsedResume?.projects.length ?? 0
+  const profile = parsedResume ? coerceParsedResume(parsedResume) : null
+  const topSkills = profile?.skills.slice(0, 5) ?? []
 
   return (
     <div
@@ -280,101 +280,25 @@ function ParsedSuccessCard({
           </p>
         )}
 
-        {/* Detected stats */}
-        {parsedResume && (skillCount > 0 || expCount > 0 || projCount > 0) && (
+        {profile && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {skillCount > 0 && (
+            {profile.target_role && (
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
-                {skillCount} skills detected
+                Role: {profile.target_role}
               </span>
             )}
-            {expCount > 0 && (
+            {topSkills.length > 0 && (
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
-                {expCount} experience{expCount > 1 ? 's' : ''}
+                Skills: {topSkills.join(', ')}
+                {profile.skills.length > topSkills.length ? '…' : ''}
               </span>
             )}
-            {projCount > 0 && (
+            {profile.experience_estimate && profile.experience_estimate !== 'Not specified' && (
               <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
-                {projCount} project{projCount > 1 ? 's' : ''}
+                Experience: {profile.experience_estimate}
               </span>
             )}
           </div>
-        )}
-
-        {/* View parsed dialog */}
-        {parsedResume && (
-          <Dialog>
-            <DialogTrigger className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-(--card-border) bg-(--card-bg) px-3 py-1.5 text-[11px] font-semibold text-(--text-primary) shadow-sm transition-colors hover:bg-(--bg-secondary)">
-              <Eye className="size-3" aria-hidden />
-              View parsed details
-            </DialogTrigger>
-            <DialogContent className="max-w-3xl p-0">
-              <DialogHeader className="border-b border-(--card-border) p-4 sm:p-5">
-                <DialogTitle>Parsed Resume</DialogTitle>
-                <DialogDescription>
-                  Review extracted sections. Close and continue — no extra step required.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="max-h-[70vh] overflow-y-auto p-4 sm:p-5">
-                <div className="space-y-5 text-sm">
-                  {parsedResume.projects.length > 0 && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-(--text-secondary)">Projects</h3>
-                      <ul className="list-disc space-y-1.5 pl-4 text-(--text-primary)">
-                        {parsedResume.projects.map((p) => (
-                          <li key={p.name}>
-                            <span className="font-semibold">{p.name}</span>
-                            {p.description && (
-                              <span className="text-(--text-secondary)">
-                                {' '}— {p.description.length > 160 ? `${p.description.slice(0, 157)}…` : p.description}
-                              </span>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-                  {parsedResume.skills.length > 0 && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-(--text-secondary)">Skills</h3>
-                      <div className="flex flex-wrap gap-1.5">
-                        {parsedResume.skills.map((s) => (
-                          <span key={s} className="rounded-full border border-(--card-border) bg-(--bg-secondary) px-2.5 py-1 text-[11px] font-medium text-(--text-primary)">
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                  {parsedResume.experience.length > 0 && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-(--text-secondary)">Experience</h3>
-                      <ul className="space-y-2 text-(--text-primary)">
-                        {parsedResume.experience.map((ex, idx) => (
-                          <li key={`${ex.company}-${idx}`} className="text-xs leading-snug">
-                            <span className="font-semibold">{ex.role}</span>
-                            <span className="text-(--text-secondary)"> · {ex.company} · {ex.duration}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-                  {parsedResume.education.length > 0 && (
-                    <section>
-                      <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-(--text-secondary)">Education</h3>
-                      <ul className="space-y-1.5 text-xs text-(--text-primary)">
-                        {parsedResume.education.map((ed, idx) => (
-                          <li key={`${ed.institution}-${idx}`}>
-                            {ed.degree} · {ed.institution} ({ed.year})
-                          </li>
-                        ))}
-                      </ul>
-                    </section>
-                  )}
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
         )}
       </div>
     </div>

@@ -1,22 +1,16 @@
 /**
- * AI parse with heuristic fallback on timeout/error.
- * Uses a single operation deadline (no shorter outer race) so models that
- * finish in ~9s are not discarded while the HTTP call keeps running.
+ * AI interview-profile parse with fast heuristic fallback.
  */
 
 import { parseResume } from '@/lib/openai/parse-resume';
 import { sanitizeParsedResume } from '@/lib/utils/sanitize-parsed-resume';
-import {
-  assessHeuristicQuality,
-  buildFallbackParsedResume,
-} from '@/lib/resume/fallback-parse';
+import { assessHeuristicQuality, buildFallbackParsedResume } from '@/lib/resume/fallback-parse';
 import { scoreExtractedText } from '@/lib/resume/extraction-quality';
 import {
   logResumeParsePipelineTiming,
   type ResumeParsePipelineTiming,
 } from '@/lib/resume/parse-pipeline-timing';
-import type { ParsedResume } from '@/types/app.types';
-import type { ResumeParseQuality } from '@/types/app.types';
+import type { ParsedResume, ResumeParseQuality } from '@/types/app.types';
 
 export type GracefulParseResult = {
   data: ParsedResume;
@@ -29,12 +23,10 @@ export type GracefulParseResult = {
 function assessAiQuality(data: ParsedResume): ResumeParseQuality {
   const fields =
     (data.skills.length > 0 ? 1 : 0) +
-    (data.experience.length > 0 ? 1 : 0) +
-    (data.projects.length > 0 ? 1 : 0) +
-    (data.education.length > 0 ? 1 : 0) +
-    (data.name.trim() ? 1 : 0);
-  if (fields >= 4) return 'full';
-  if (fields >= 2) return 'degraded';
+    (data.target_role.trim() ? 1 : 0) +
+    (data.experience_estimate !== 'Not specified' ? 1 : 0);
+  if (fields >= 3) return 'full';
+  if (fields >= 1) return 'degraded';
   return 'minimal';
 }
 
@@ -100,19 +92,15 @@ export async function parseResumeGracefully(rawText: string): Promise<GracefulPa
 
   try {
     const { data: aiRaw, timing: aiTiming } = await parseResume(rawText);
-    const aiMs = Date.now() - aiStart;
-
-    const sanStart = Date.now();
     const ai = sanitizeParsedResume(aiRaw);
-    const sanitizeMs = Date.now() - sanStart;
-
     const quality = assessAiQuality(ai);
+
     const timing: ResumeParsePipelineTiming = {
       pipelineMs: Date.now() - pipelineStart,
       qualityMs,
       aiMs: aiTiming.aiMs,
       jsonRepairMs: aiTiming.jsonRepairMs,
-      sanitizeMs,
+      sanitizeMs: 0,
       fallbackMs: null,
       inputChars: aiTiming.inputChars,
       rawChars: rawText.length,
@@ -127,34 +115,23 @@ export async function parseResumeGracefully(rawText: string): Promise<GracefulPa
       data: {
         ...ai,
         parse_quality: quality,
-        ...(quality !== 'full'
-          ? {
-              parse_warning:
-                'We extracted most of your resume, but some sections may be incomplete.',
-            }
-          : {}),
+        parse_warning:
+          quality !== 'full'
+            ? 'Basic profile saved — you can start your interview.'
+            : undefined,
       },
       quality,
       stage: 'ai_full',
-      warning:
-        quality !== 'full'
-          ? 'We extracted most of your resume, but some sections may be incomplete.'
-          : undefined,
+      warning: quality !== 'full' ? 'Basic profile saved — you can start your interview.' : undefined,
       timing,
     };
   } catch (aiErr) {
     const aiMs = Date.now() - aiStart;
-    const isTimeout =
-      aiErr instanceof Error &&
-      (/deadline|timeout|abort/i.test(aiErr.message) || aiErr.name === 'AbortError');
     console.warn(
-      '[graceful-parse] AI unavailable, using heuristic parse',
+      '[graceful-parse] AI unavailable, using heuristic profile',
       aiErr instanceof Error ? aiErr.message : aiErr,
-      { isTimeout, aiMs },
+      { aiMs },
     );
-
-    return finishWithHeuristic(rawText, pipelineStart, qualityMs, 'heuristic_fallback', {
-      aiMs,
-    });
+    return finishWithHeuristic(rawText, pipelineStart, qualityMs, 'heuristic_fallback', { aiMs });
   }
 }

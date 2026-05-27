@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import type { ParsedResume } from '@/types/app.types';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -53,9 +54,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     };
 
     if (resume.status === 'parsed' && parsed) {
-      payload.parsed_data = parsed;
-      if (parsed.parse_quality) payload.parseQuality = parsed.parse_quality;
-      if (parsed.parse_warning) payload.parseWarning = parsed.parse_warning;
+      const profile = coerceParsedResume(parsed);
+      payload.parsed_data = profile;
+      if (profile.parse_quality) payload.parseQuality = profile.parse_quality;
+      if (profile.parse_warning) payload.parseWarning = profile.parse_warning;
     }
 
     return NextResponse.json(payload);

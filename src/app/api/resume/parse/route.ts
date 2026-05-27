@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { parseResumeGracefully } from '@/lib/resume/graceful-parse';
+import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 import { scoreExtractedText } from '@/lib/resume/extraction-quality';
 import { resumeUserError } from '@/lib/resume/parse-outcome';
 import { trackProductEvent } from '@/lib/analytics/product-events';
@@ -112,9 +113,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json(userErr, { status: 422 });
     }
 
+    const profile = coerceParsedResume(parseResult.data);
+
     const { error: updateError } = await createServiceClient()
       .from('resumes')
-      .update({ parsed_data: parseResult.data, status: 'parsed' })
+      .update({ parsed_data: profile, status: 'parsed' })
       .eq('id', resumeId);
 
     if (updateError) {
@@ -161,9 +164,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       parseQuality: parseResult.quality,
       parseWarning: parseResult.warning,
       parsedSummary: {
-        name: parseResult.data.name,
-        skills: parseResult.data.skills.slice(0, 10),
-        targetRoles: parseResult.data.target_roles,
+        targetRole: profile.target_role,
+        skills: profile.skills.slice(0, 8),
+        experienceEstimate: profile.experience_estimate,
       },
     });
   } catch (err) {
