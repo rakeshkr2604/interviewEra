@@ -13,12 +13,16 @@ import {
 interface ShareCardProps {
   overallScore: number;
   role: string;
+  /** When set, enables “Copy report link” for this session. */
+  reportId?: string;
 }
 
-export function ShareCard({ overallScore, role }: ShareCardProps) {
+export function ShareCard({ overallScore, role, reportId }: ShareCardProps) {
   const [copied, setCopied] = useState(false);
+  const [reportCopied, setReportCopied] = useState(false);
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+  const reportUrl = reportId && appUrl ? `${appUrl.replace(/\/$/, '')}/report/${reportId}` : '';
   const cardUrl = `${appUrl}/api/share/card?score=${overallScore.toFixed(1)}&role=${encodeURIComponent(role)}`;
   const shareText = `I scored ${overallScore.toFixed(1)}/10 in my ${role} mock interview on InterviewEra! Can you beat it? ${appUrl}`;
 
@@ -29,6 +33,17 @@ export function ShareCard({ overallScore, role }: ShareCardProps) {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard not available
+    }
+  }
+
+  async function copyReportLink() {
+    if (!reportUrl) return;
+    try {
+      await navigator.clipboard.writeText(reportUrl);
+      setReportCopied(true);
+      setTimeout(() => setReportCopied(false), 2000);
+    } catch {
+      /* ignore */
     }
   }
 
@@ -99,6 +114,12 @@ export function ShareCard({ overallScore, role }: ShareCardProps) {
               <Button variant="outline" onClick={copyLink} className="w-full">
                 {copied ? 'Copied!' : 'Copy share text'}
               </Button>
+
+              {reportUrl ? (
+                <Button variant="outline" onClick={copyReportLink} className="w-full">
+                  {reportCopied ? 'Report link copied!' : 'Copy report link'}
+                </Button>
+              ) : null}
 
               {/* Download */}
               <a href={cardUrl} download="interviewera-score.png" className="w-full">

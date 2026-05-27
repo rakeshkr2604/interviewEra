@@ -10,4 +10,8 @@ export type InterviewCompleteRetentionPayload = InterviewRetentionClientPayload 
   progress: string | null;
   nextTierNumber: number | null;
   nextTierProgressPercent: number;
+  xpEarned?: number;
+  nextUnlockTeaser?: string | null;
+  streakLabel?: string;
+  recoveryHint?: string | null;
 };

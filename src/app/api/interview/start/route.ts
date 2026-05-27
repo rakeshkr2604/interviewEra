@@ -1,25 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { generateQuestions, QuestionGenerationError } from '@/lib/openai/generate-questions';
 import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
-import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
-
-import {
-  buildCacheKey,
-  computeJdFingerprint,
-  getCachedQuestions,
-  setCachedQuestions,
-} from '@/lib/redis/question-cache';
-import type { ParsedResume, QuestionCategory, InterviewSessionContext } from '@/types/app.types';
+import { computeJdFingerprint } from '@/lib/redis/question-cache';
+import type { InterviewSessionContext, InterviewGenerationContext } from '@/types/app.types';
 import { getInterviewerById } from '@/lib/config/interviewers';
 import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
 import { getUserProgress } from '@/lib/retention';
+import { trackProductEvent } from '@/lib/analytics/product-events';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
-    // ── Step 1: Authenticate user ─────────────────────────────────────────────
     const supabase = await createClient();
     const {
       data: { user },
@@ -30,7 +22,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // ── Rate limiting (5 starts / 60s per user) ───────────────────────────────
     const rateLimit = await checkRateLimit(`start:${user.id}`, 60, 5);
     if (!rateLimit.allowed) {
       return NextResponse.json(
@@ -41,11 +32,10 @@ export async function POST(request: Request): Promise<NextResponse> {
             'Retry-After': String(rateLimit.resetInSeconds),
             'X-RateLimit-Remaining': '0',
           },
-        }
+        },
       );
     }
 
-    // ── Validate input ────────────────────────────────────────────────────────
     let rawBody: unknown;
     try {
       rawBody = await request.json();
@@ -60,9 +50,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
       return NextResponse.json(
         { error: validation.error.issues[0]?.message ?? 'Invalid request body' },
-        { status: 400 }
+        { status: 400 },
       );
     }
+
     const {
       resumeId,
       role,
@@ -89,25 +80,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const questionCount = Math.min(10, Math.max(4, rawCount));
 
-    const sessionContext: InterviewSessionContext = {
-      goal,
-      interviewMode,
-      experienceYears,
-      interviewerId,
-    };
-    if (jobDescription) {
-      sessionContext.jobDescription = jobDescription;
-    }
-
     const userTier = (await getUserProgress(user.id))?.current_tier ?? 1;
-    const cacheSession = {
-      goal,
-      interviewMode,
-      experienceYears,
-      interviewerId,
-      jdFingerprint: computeJdFingerprint(jobDescription),
-      tier: userTier,
-    };
+    const jdFingerprint = computeJdFingerprint(jobDescription);
+
     const interviewer = getInterviewerById(interviewerId);
     if (!interviewer) {
       return NextResponse.json({ error: 'Invalid interviewer selection' }, { status: 400 });
@@ -115,7 +90,6 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const serviceClient = createServiceClient();
 
-    // ── Domain pack: Pro-only gate ────────────────────────────────────────────
     if (domainPackId) {
       const { data: profile } = await serviceClient
         .from('users')
@@ -127,12 +101,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (tier !== 'pro' && tier !== 'campus') {
         return NextResponse.json(
           { error: 'Domain packs are a Pro feature. Please upgrade your plan.' },
-          { status: 403 }
+          { status: 403 },
         );
       }
     }
 
-    // ── Step 2: Fetch resume (verify ownership + parsed status) ───────────────
     const { data: resume } = await serviceClient
       .from('resumes')
       .select('id, user_id, parsed_data, status')
@@ -143,31 +116,26 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!resume || resume.status !== 'parsed') {
       return NextResponse.json(
         { error: 'Resume is not ready yet. Please wait for parsing to complete.' },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
-    // ── Step 3: Resolve question payload BEFORE any state mutation ────────────
-    // Credit deduction + interview INSERT are deferred until questions are in
-    // hand. That eliminates orphan interview rows + credit-refund churn when
-    // AI fails, and keeps the user uncharged on slow/failed generation paths.
-    // `order_index` is computed now; `interview_id` is filled in after the
-    // interview row is created below.
     type QuestionPayload = {
       order_index: number;
       question_text: string;
       rubric: unknown;
       category: string;
     };
-    let resolvedQuestions: QuestionPayload[];
+
+    let resolvedQuestions: QuestionPayload[] | null = null;
+    let useAsyncPrepare = !domainPackId;
 
     if (domainPackId) {
-      // ── Domain pack path: fetch questions from DB ─────────────────────────
       const { data: packQuestions, error: packError } = await serviceClient
         .from('domain_pack_questions')
         .select('id, question_text, rubric, category, difficulty')
         .eq('pack_id', domainPackId)
-        .order('id'); // stable ordering for shuffle
+        .order('id');
 
       if (packError || !packQuestions || packQuestions.length === 0) {
         return NextResponse.json({ error: 'Domain pack not found or empty.' }, { status: 404 });
@@ -184,120 +152,41 @@ export async function POST(request: Request): Promise<NextResponse> {
         rubric: q.rubric,
         category: q.category as string,
       }));
-    } else {
-      // ── AI path: generate questions via GPT (with Redis cache) ───────────
-      const parsedResume = resume.parsed_data as ParsedResume;
-      const cacheKey = buildCacheKey(role, difficulty, parsedResume, cacheSession);
-      const cached = await getCachedQuestions(cacheKey);
-
-      if (cached) {
-        const shuffled = cached
-          .map((q) => ({ q, sort: Math.random() }))
-          .sort((a, b) => a.sort - b.sort)
-          .map(({ q }) => q);
-
-        resolvedQuestions = shuffled.slice(0, questionCount).map((q, idx) => ({
-          order_index: idx,
-          question_text: q.question_text,
-          rubric: q.rubric,
-          category: q.category as QuestionCategory,
-        }));
-      } else {
-        // ── LLM cost guard: only runs on real AI calls, not cache hits ─────
-        const { data: userProfile } = await serviceClient
-          .from('users')
-          .select('plan_tier')
-          .eq('id', user.id)
-          .single();
-        const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
-        const qGenCost = estimateLLMCallCostUSD('question_generation');
-        const qGenCostGuard = await checkLLMCostGuard(user.id, planTier, qGenCost, 'question_generation');
-        if (!qGenCostGuard.allowed) {
-          return NextResponse.json(
-            { error: 'Monthly AI usage limit reached. Please upgrade your plan or try again next month.' },
-            { status: 429 },
-          );
-        }
-
-        let generatedQuestions: Awaited<ReturnType<typeof generateQuestions>>;
-        try {
-          generatedQuestions = await generateQuestions({
-            parsedResume,
-            role,
-            difficulty,
-            questionCount,
-            goal,
-            interviewMode,
-            experienceYears,
-            interviewerId,
-            jobDescription,
-            userId: user.id,
-            // Pass tier from the cacheSession block — avoids a second
-            // getUserProgress lookup inside generate-questions.
-            userTier: userTier as 1 | 2 | 3 | 4,
-          });
-        } catch (err) {
-          const message = err instanceof Error ? err.message : String(err);
-          console.error('[interview/start] Question generation failed:', {
-            message,
-            name: err instanceof Error ? err.name : 'unknown',
-            isTimeout: message.includes('deadline') || message.includes('timeout') || message.includes('Abort'),
-          });
-          if (err instanceof QuestionGenerationError) {
-            return NextResponse.json({ error: err.message }, { status: 500 });
-          }
-          if (message.includes('deadline') || message.includes('timeout') || message.includes('Abort')) {
-            return NextResponse.json(
-              { error: 'Question generation timed out. Please try again in a moment.' },
-              { status: 504 },
-            );
-          }
-          if (message.includes('OpenRouter unavailable') || message.includes('Interview AI completion failed')) {
-            return NextResponse.json(
-              { error: 'AI service is temporarily unavailable. Please try again shortly.' },
-              { status: 503 },
-            );
-          }
-          return NextResponse.json(
-            { error: 'Failed to generate questions. Please try again.' },
-            { status: 500 },
-          );
-        }
-
-        void recordLLMSpend(user.id, qGenCost);
-
-        void setCachedQuestions(
-          cacheKey,
-          generatedQuestions.questions.map((q) => ({
-            order: q.order,
-            question_text: q.question_text,
-            category: q.category,
-            rubric: q.rubric,
-          }))
-        );
-
-        resolvedQuestions = generatedQuestions.questions.map((q) => ({
-          order_index: q.order,
-          question_text: q.question_text,
-          rubric: q.rubric,
-          category: q.category as QuestionCategory,
-        }));
-      }
+      useAsyncPrepare = false;
     }
 
-    // ── Step 4: Deduct 1 credit (atomic RPC) ──────────────────────────────────
-    // Now that questions are resolved, charge the user. Failure here means the
-    // user can't start — no orphan state to clean up because we haven't
-    // mutated anything yet.
     const creditResult = await checkAndDeductCredit(user.id);
     if (!creditResult.success) {
       return NextResponse.json(
         { error: 'no_credits', upgradeUrl: '/upgrade' },
-        { status: 402 }
+        { status: 402 },
       );
     }
 
-    // ── Step 5: Create interview record ───────────────────────────────────────
+    const generation: InterviewGenerationContext | undefined = useAsyncPrepare
+      ? {
+          status: 'pending',
+          resumeId,
+          role,
+          difficulty,
+          questionCount,
+          goal,
+          interviewMode,
+          experienceYears,
+          userTier,
+          jdFingerprint,
+        }
+      : undefined;
+
+    const sessionContext: InterviewSessionContext = {
+      goal,
+      interviewMode,
+      experienceYears,
+      interviewerId,
+      ...(jobDescription ? { jobDescription } : {}),
+      ...(generation ? { generation } : {}),
+    };
+
     const { data: interview, error: interviewError } = await serviceClient
       .from('interviews')
       .insert({
@@ -306,8 +195,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         role,
         difficulty,
         interviewer_id: interviewer.id,
-        status: 'in_progress',
-        started_at: new Date().toISOString(),
+        status: useAsyncPrepare ? 'pending' : 'in_progress',
+        started_at: useAsyncPrepare ? null : new Date().toISOString(),
         question_count: questionCount,
         session_context: sessionContext,
       })
@@ -320,15 +209,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
     }
 
-    // ── Step 6: Insert questions (fill in interview_id) ───────────────────────
-    const questionsToInsert = resolvedQuestions.map((q) => ({
-      interview_id: interview.id,
-      ...q,
-    }));
+    if (useAsyncPrepare) {
+      trackProductEvent({
+        event: 'interview_generation_started',
+        userId: user.id,
+        interviewId: interview.id,
+        async: true,
+      });
+      return NextResponse.json({
+        interviewId: interview.id,
+        preparing: true,
+        phase: 'generating_questions',
+        creditsRemaining: creditResult.remaining,
+      });
+    }
+
+    if (!resolvedQuestions?.length) {
+      await refundCredit(user.id);
+      await serviceClient.from('interviews').delete().eq('id', interview.id);
+      return NextResponse.json({ error: 'No questions available for this interview.' }, { status: 500 });
+    }
 
     const { data: insertedQuestions, error: questionsError } = await serviceClient
       .from('questions')
-      .insert(questionsToInsert)
+      .insert(
+        resolvedQuestions.map((q) => ({
+          interview_id: interview.id,
+          ...q,
+        })),
+      )
       .select('id, interview_id, order_index, question_text, rubric, category');
 
     if (questionsError || !insertedQuestions) {
@@ -338,9 +247,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
     }
 
-    // ── Step 7: Return ────────────────────────────────────────────────────────
     return NextResponse.json({
       interviewId: interview.id,
+      preparing: false,
+      phase: 'interview_ready',
       questions: insertedQuestions,
       creditsRemaining: creditResult.remaining,
     });
@@ -350,6 +260,5 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 }
 
-/** Question generation can take 15–25s (LLM + fallbacks). Default Vercel limit is 10s. */
 export const runtime = 'nodejs';
 export const maxDuration = 60;

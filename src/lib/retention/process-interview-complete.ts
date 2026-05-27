@@ -20,6 +20,8 @@ import {
   rollingAverage,
   roundToTwo,
 } from './scoring';
+import { buildCompletionReinforcement } from './completion-reinforcement';
+import { trackProductEvent } from '@/lib/analytics/product-events';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -35,6 +37,10 @@ export interface InterviewRetentionClientPayload {
   previousTier: number | null;
   newTier: number | null;
   newBadges: BadgeKey[];
+  xpEarned?: number;
+  nextUnlockTeaser?: string | null;
+  streakLabel?: string;
+  recoveryHint?: string | null;
 }
 
 async function aggregateEvaluationsFromInterview(
@@ -373,6 +379,20 @@ export async function processInterviewRetention(
 
   const streakDelta = streakResult.newStreak - streakResult.previousStreak;
 
+  if (qualityMet && streakDelta > 0) {
+    trackProductEvent({ event: 'streak_extended', userId, interviewId, streak: streakResult.newStreak });
+  } else if (streakResult.newStreak < streakResult.previousStreak) {
+    trackProductEvent({ event: 'streak_broken', userId, interviewId, streak: streakResult.newStreak });
+  }
+
+  trackProductEvent({
+    event: 'interview_completed',
+    userId,
+    interviewId,
+    qualityMet,
+    sessionScore: agg.sessionScore,
+  });
+
   const { data: afterUnlockProg } = await supabase
     .from('user_progress')
     .select('current_tier, sessions_at_current_tier')
@@ -429,6 +449,21 @@ export async function processInterviewRetention(
     throw new Error(upErr.message);
   }
 
+  const reinforcement = buildCompletionReinforcement({
+    xpEarned: xpAdded,
+    qualityMet,
+    newStreak: streakForPayload,
+    previousStreak: streakResult.previousStreak,
+    currentTier: tierAfterRpc,
+    progressSlice: {
+      total_sessions: rollupRows.length,
+      sessions_at_current_tier: sessionsAtTier,
+      max_dimension_score: maxDimRollup,
+      last_5_sessions_avg: last5AvgRollup,
+      overall_avg_score: overallAvgRollup,
+    },
+  });
+
   return {
     currentTier: tierAfterRpc,
     streak: streakForPayload,
@@ -440,6 +475,10 @@ export async function processInterviewRetention(
     previousTier: unlockedOk ? tierBeforeUnlock : null,
     newTier: unlockTierNew ?? null,
     newBadges,
+    xpEarned: reinforcement.xpEarned,
+    nextUnlockTeaser: reinforcement.nextUnlockTeaser,
+    streakLabel: reinforcement.streakLabel,
+    recoveryHint: reinforcement.recoveryHint,
   };
 }
 

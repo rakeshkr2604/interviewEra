@@ -32,6 +32,8 @@ import {
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
 import { lifecycleLog, lifecycleWarn, voiceDebug } from '@/lib/voice/lifecycle-log'
+import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
+import { trackProductEventClient } from '@/lib/analytics/product-events'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -89,13 +91,20 @@ function buildSessionIntro(
  * Messages rotate every 3s, which is slow enough to feel informative and
  * fast enough to signal that something is actually happening.
  */
-function useLoadingMessage(active: boolean): string {
-  const msgs = [
-    'Preparing your interview…',
-    'Loading your questions…',
-    'Setting up the session…',
-    'Almost ready…',
-  ]
+function useLoadingMessage(active: boolean, generating?: boolean): string {
+  const msgs = generating
+    ? [
+        'Preparing your interview…',
+        'Generating personalized questions…',
+        'Almost ready…',
+        'Finalizing your session…',
+      ]
+    : [
+        'Preparing your interview…',
+        'Loading your questions…',
+        'Setting up the session…',
+        'Almost ready…',
+      ]
   const [idx, setIdx] = useState(0)
   useEffect(() => {
     if (!active) { setIdx(0); return }
@@ -134,6 +143,7 @@ interface InterviewData {
   currentQuestionIndex: number
   questions: InterviewQuestion[]
   creditsLeft?: number
+  preparing?: boolean
 }
 
 type SessionPhase =
@@ -167,6 +177,8 @@ export default function InterviewSessionPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const interviewId = params.id
+  const { ensureQuestionsReady } = useInterviewPrepare()
+  const [questionGenActive, setQuestionGenActive] = useState(false)
 
   // ─── Interview Data ───────────────────────────────────────
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null)
@@ -245,7 +257,7 @@ export default function InterviewSessionPage() {
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
   const interviewerDisplayName = resolvedInterviewer?.name ?? 'The interviewer'
   const thinkingMessage = useThinkingMessage(phase === 'submitting', interviewerDisplayName)
-  const loadingMessage = useLoadingMessage(phase === 'loading')
+  const loadingMessage = useLoadingMessage(phase === 'loading', questionGenActive)
 
   // ─── Avatar + TTS ─────────────────────────────────────────
   const { isSpeaking, currentWordIndex, speechError, speakQuestion, stopSpeaking } =
@@ -345,15 +357,29 @@ export default function InterviewSessionPage() {
       }, 15_000)
 
       try {
-        const result = await api.get<InterviewData>(`/api/interview/${interviewId}`)
+        let result = await api.get<InterviewData & { preparing?: boolean }>(`/api/interview/${interviewId}`)
         window.clearTimeout(loadTimeoutId)
         if (timedOut || !mountedRef.current) return
         if (!result.data.interviewerId) {
           setFetchError('Interviewer configuration is missing for this interview.')
           return
         }
-        // Validate questions array BEFORE entering the next startup step —
-        // never advance the state machine on a degenerate payload.
+
+        if (!result.data.questions?.length || result.data.preparing) {
+          setQuestionGenActive(true)
+          trackProductEventClient('interview_generation_started', { interviewId })
+          const prep = await ensureQuestionsReady(interviewId)
+          if (timedOut || !mountedRef.current) return
+          if (!prep.ok) {
+            setFetchError(prep.error)
+            setQuestionGenActive(false)
+            return
+          }
+          result = await api.get<InterviewData>(`/api/interview/${interviewId}`)
+          trackProductEventClient('interview_generation_completed', { interviewId })
+          setQuestionGenActive(false)
+        }
+
         if (!result.data.questions || result.data.questions.length === 0) {
           setFetchError('Interview has no questions. Please go back and try again.')
           return

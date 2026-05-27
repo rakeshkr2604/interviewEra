@@ -10,6 +10,9 @@ export interface RetentionDashboardSnapshot {
   current_streak: number;
   total_xp: number;
   total_sessions: number;
+  weeklySessions?: number;
+  bestDimensionLabel?: string | null;
+  improvementTrend?: string | null;
   /** Next-tier UX; absent when max tier or data incomplete. */
   tierProgress?: RetentionTierProgressView | null;
   /** Latest completed session when it did not meet quality criteria. */
@@ -87,9 +90,31 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
           </p>
           <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
             Sessions logged · {snap.total_sessions}
+            {snap.weeklySessions != null ? ` · This week · ${snap.weeklySessions}` : ''}
           </p>
         </div>
       </div>
+
+      {(snap.bestDimensionLabel || snap.improvementTrend) && (
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+          {snap.bestDimensionLabel ? (
+            <p>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Strongest dimension:
+              </span>{' '}
+              {snap.bestDimensionLabel}
+            </p>
+          ) : null}
+          {snap.improvementTrend ? (
+            <p>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Recent trend:
+              </span>{' '}
+              {snap.improvementTrend}
+            </p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

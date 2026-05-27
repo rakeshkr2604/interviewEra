@@ -94,6 +94,10 @@ async function enrichRetentionPayload(
     progress,
     nextTierNumber,
     nextTierProgressPercent,
+    xpEarned: base.xpEarned,
+    nextUnlockTeaser: base.nextUnlockTeaser,
+    streakLabel: base.streakLabel,
+    recoveryHint: base.recoveryHint,
   };
 }
 

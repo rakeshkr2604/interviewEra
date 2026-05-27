@@ -28,8 +28,8 @@ const AUTH_ROUTES = new Set(['/login', '/signup']);
 // and survives cold starts.  Falls open if Redis is unavailable (see rate-limit.ts).
 // [pathPrefix, requestsPerWindow, windowSeconds]
 const RATE_LIMITS: [string, number, number][] = [
-  ['/api/interview/start',  10, 60],
   ['/api/interview/answer', 60, 60],
+  ['/api/interview/start',  10, 60],
   ['/api/resume/upload',     5, 60],
   ['/api/payments',         10, 60],
   ['/api/tools',             5, 60],

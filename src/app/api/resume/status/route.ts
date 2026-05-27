@@ -38,10 +38,13 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
     }
 
+    const parsed = resume.parsed_data as ParsedResume | null;
     const payload: {
       resumeId: string;
       status: string;
       ready: boolean;
+      parseQuality?: string;
+      parseWarning?: string;
       parsed_data?: ParsedResume;
     } = {
       resumeId: resume.id,
@@ -49,8 +52,10 @@ export async function GET(request: Request): Promise<NextResponse> {
       ready: resume.status === 'parsed',
     };
 
-    if (resume.status === 'parsed' && resume.parsed_data) {
-      payload.parsed_data = resume.parsed_data as ParsedResume;
+    if (resume.status === 'parsed' && parsed) {
+      payload.parsed_data = parsed;
+      if (parsed.parse_quality) payload.parseQuality = parsed.parse_quality;
+      if (parsed.parse_warning) payload.parseWarning = parsed.parse_warning;
     }
 
     return NextResponse.json(payload);

@@ -27,6 +27,8 @@ type ResumeStatusPayload = {
   status?: string
   error?: string
   ready?: boolean
+  parseQuality?: string
+  parseWarning?: string
   parsed_data?: ParsedResume
 }
 
@@ -38,7 +40,14 @@ function withRequestRef(msg: string, requestId?: string): string {
   return `${msg} Ref: ${requestId.trim()}`
 }
 
-type ApiErr = { error?: string; code?: string; requestId?: string }
+type ApiErr = {
+  error?: string
+  code?: string
+  requestId?: string
+  userMessage?: string
+  suggestion?: string
+  extractionWarning?: string
+}
 
 type JdParseStatus = 'idle' | 'parsing' | 'ready' | 'failed'
 
@@ -62,6 +71,7 @@ export default function OnboardingPage() {
   const [error, setError] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [parsedResume, setParsedResume] = useState<ParsedResume | null>(null)
+  const [resumeParseWarning, setResumeParseWarning] = useState('')
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(() => readDefaultDifficulty())
   const [difficultyTouched, setDifficultyTouched] = useState(false)
   const [startLoading, setStartLoading] = useState(false)
@@ -224,11 +234,26 @@ export default function OnboardingPage() {
 
         if (payload.status === 'parsed') {
           setResumeState('parsed')
-          setStatusMessage('Resume analyzed successfully.')
+          const warn =
+            payload.parseWarning ??
+            payload.parsed_data?.parse_warning ??
+            ''
+          setResumeParseWarning(warn)
+          const skills = payload.parsed_data?.skills?.length ?? 0
+          const hasProfile = !!(payload.parsed_data?.name?.trim() || skills >= 2)
+          setStatusMessage(
+            warn && !hasProfile
+              ? 'Resume saved — some sections may be incomplete.'
+              : warn
+                ? 'Resume ready — quick extraction completed.'
+                : 'Resume analyzed successfully.',
+          )
           if (payload.parsed_data) setParsedResume(payload.parsed_data)
         } else if (payload.status === 'failed') {
           setResumeState('failed')
-          setError('Resume parsing failed. Please retry with a different file or paste your resume text.')
+          setError(
+            'We could not read enough from this resume. Try a text-based PDF, a .txt export, or a clearer file.',
+          )
         } else {
           // Still processing — schedule next poll with capped backoff delay.
           const nextDelay = Math.min(currentDelay * BACKOFF_FACTOR, MAX_DELAY_MS)
@@ -261,6 +286,7 @@ export default function OnboardingPage() {
     setResumeState('uploading')
     setError('')
     setParsedResume(null)
+    setResumeParseWarning('')
     setStatusMessage('Sending your file securely…')
 
     try {
@@ -326,16 +352,24 @@ export default function OnboardingPage() {
           setError(withRequestRef(result.error ?? 'File too large.', rid))
           return
         }
+        const uploadMsg =
+          (typeof result.userMessage === 'string' && result.userMessage) ||
+          result.error
+        const uploadHint =
+          typeof result.suggestion === 'string' && result.suggestion
+            ? ` ${result.suggestion}`
+            : ''
         setError(
           withRequestRef(
-            result.error ??
-              (status === 401
+            uploadMsg
+              ? `${uploadMsg}${uploadHint}`
+              : status === 401
                 ? 'Your session expired. Refresh the page and sign in again.'
                 : status === 429
                   ? 'Too many uploads. Please wait a minute and try again.'
                   : status >= 500
                     ? 'Our servers could not finish the upload. Please try again in a moment.'
-                    : 'Resume upload failed. Please try again.'),
+                    : 'Resume upload failed. Please try again.',
             rid,
           ),
         )
@@ -350,6 +384,9 @@ export default function OnboardingPage() {
 
       setResumeId(result.resumeId)
       setResumeData({ resumeText: '', skills: [], projects: [] })
+      if (result.extractionWarning) {
+        setResumeParseWarning(result.extractionWarning)
+      }
 
       void fetch('/api/resume/parse', {
         method: 'POST',
@@ -371,6 +408,7 @@ export default function OnboardingPage() {
     setError('')
     setStatusMessage('')
     setParsedResume(null)
+    setResumeParseWarning('')
     setResumeState('idle')
     setJdExtractError('')
   }
@@ -501,6 +539,7 @@ export default function OnboardingPage() {
       const responseData = (await response.json().catch(() => null)) as {
         interviewId?: string
         error?: string
+        preparing?: boolean
       } | null
 
       if (response.status === 405) {
@@ -513,7 +552,10 @@ export default function OnboardingPage() {
         return
       }
 
-      router.push(`/interview/session/${responseData.interviewId}?interviewer=${data.interviewerId}`)
+      const prepQ = responseData.preparing ? '&preparing=1' : ''
+      router.push(
+        `/interview/session/${responseData.interviewId}?interviewer=${data.interviewerId}${prepQ}`,
+      )
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to start interview. Please try again.'
       setStartError(msg)
@@ -531,7 +573,7 @@ export default function OnboardingPage() {
   const voiceIsSettingsDefault = data.interviewerId === resolved.interviewerId
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-2 pb-4 max-lg:pb-6 lg:max-h-full lg:max-w-6xl lg:min-h-0 lg:gap-2 lg:overflow-hidden lg:pb-0">
+    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-2 overflow-x-hidden pb-4 max-lg:pb-6 lg:max-h-full lg:max-w-6xl lg:min-h-0 lg:gap-2 lg:overflow-hidden lg:pb-0">
       <div className="flex shrink-0 flex-col items-center gap-2 text-center sm:gap-2.5">
         <div className="min-w-0 max-w-lg">
           <h1 className="text-2xl font-bold tracking-tight text-(--text-primary) sm:text-3xl lg:text-xl lg:leading-snug">
@@ -573,6 +615,7 @@ export default function OnboardingPage() {
           resumeState={resumeState}
           statusMessage={statusMessage}
           parsedResume={parsedResume}
+          resumeParseWarning={resumeParseWarning}
           error={error}
           onResumeFileChange={(file) => {
             if (!file) return

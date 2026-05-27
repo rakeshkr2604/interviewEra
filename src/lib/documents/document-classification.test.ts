@@ -64,12 +64,10 @@ Must-have: PostgreSQL. Nice to have: Kubernetes.
     expect(assertLooksLikeJobDescription(filler).ok).toBe(false);
   });
 
-  it('resume slot rejects JD-leaning balanced doc', () => {
+  it('resume slot accepts balanced docs without clear JD classification', () => {
     const balanced =
       'We are hiring for a recruiter role. Graduates welcome. Team player wanted. ' +
       'Professional experience in sales is a plus.'.repeat(4);
-    const r = assertLooksLikeResume(balanced);
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.message).toContain('job posting');
+    expect(assertLooksLikeResume(balanced).ok).toBe(true);
   });
 });

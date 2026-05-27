@@ -108,7 +108,8 @@ export function StartInterviewForm({
         return;
       }
 
-      router.push(`/interview/${data.interviewId!}`);
+      const prep = (data as { preparing?: boolean }).preparing ? '?preparing=1' : '';
+      router.push(`/interview/session/${data.interviewId!}${prep}`);
     } catch {
       setError('Network error. Please check your connection and try again.');
       setLoading(false);

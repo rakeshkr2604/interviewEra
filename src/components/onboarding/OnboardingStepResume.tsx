@@ -58,6 +58,7 @@ export interface OnboardingStepResumeProps {
   resumeState:      ResumeProcessingState
   statusMessage:    string
   parsedResume:     ParsedResume | null
+  resumeParseWarning?: string
   error:            string
   onResumeFileChange: (file: File | null) => void
   onUploadResume:   () => void
@@ -243,9 +244,11 @@ function ProcessingCard({ message }: { message: string }) {
 function ParsedSuccessCard({
   parsedResume,
   resumeFile,
+  parseWarning,
 }: {
   parsedResume: ParsedResume | null
   resumeFile: File | null
+  parseWarning?: string
 }) {
   const skillCount = parsedResume?.skills.length ?? 0
   const expCount   = parsedResume?.experience.length ?? 0
@@ -270,6 +273,12 @@ function ParsedSuccessCard({
             )}
           </div>
         </div>
+
+        {parseWarning && (
+          <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-200/90">
+            {parseWarning}
+          </p>
+        )}
 
         {/* Detected stats */}
         {parsedResume && (skillCount > 0 || expCount > 0 || projCount > 0) && (
@@ -381,6 +390,7 @@ export function OnboardingStepResume({
   resumeState,
   statusMessage,
   parsedResume,
+  resumeParseWarning = '',
   error,
   onResumeFileChange,
   onUploadResume,
@@ -546,6 +556,11 @@ export function OnboardingStepResume({
                     exit={{ opacity: 0, y: -8 }}
                   >
                     <ProcessingCard message={statusMessage} />
+                    {resumeParseWarning && (
+                      <p className="mt-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-200/90">
+                        {resumeParseWarning}
+                      </p>
+                    )}
                   </motion.div>
                 )}
 
@@ -557,7 +572,11 @@ export function OnboardingStepResume({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0 }}
                   >
-                    <ParsedSuccessCard parsedResume={parsedResume} resumeFile={resumeFile} />
+                    <ParsedSuccessCard
+                      parsedResume={parsedResume}
+                      resumeFile={resumeFile}
+                      parseWarning={resumeParseWarning || parsedResume?.parse_warning}
+                    />
 
                     {/* Change resume */}
                     <label

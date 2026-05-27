@@ -886,6 +886,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
       <ShareCard
         overallScore={report.overall_score as number}
         role={interview.role as string}
+        reportId={interview.id as string}
       />
 
       {/* Practice again CTA */}

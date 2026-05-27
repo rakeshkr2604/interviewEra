@@ -62,8 +62,14 @@ export async function GET(
       answeredCount = count ?? 0
     }
 
+    const preparing =
+      interview.status === 'pending' && (!questions || questions.length === 0);
+
     return NextResponse.json({
       interviewId: interview.id,
+      status: interview.status,
+      preparing,
+      phase: preparing ? 'generating_questions' : 'interview_ready',
       interviewerId: interview.interviewer_id,
       role: interview.role,
       difficulty: interview.difficulty,

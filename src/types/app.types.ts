@@ -20,6 +20,22 @@ export type QuestionCategory = 'technical' | 'behavioral' | 'situational';
 
 export type DomainPackDomain = 'dsa' | 'system_design' | 'hr';
 
+/** Async question generation metadata (stored on pending interviews). */
+export interface InterviewGenerationContext {
+  status: 'pending' | 'ready' | 'failed';
+  usedFallback?: boolean;
+  fromCache?: boolean;
+  resumeId: string;
+  role: string;
+  difficulty: InterviewDifficulty;
+  questionCount: number;
+  goal: InterviewGoal;
+  interviewMode: 'technical' | 'hr_behavioral' | 'mixed';
+  experienceYears: number;
+  userTier: number;
+  jdFingerprint: string;
+}
+
 /** Stored on interviews.session_context — mirrors validated interview start payload */
 export interface InterviewSessionContext {
   goal: InterviewGoal;
@@ -28,6 +44,8 @@ export interface InterviewSessionContext {
   interviewerId: 'priya' | 'arjun';
   /** Optional employer JD text used only for question personalization */
   jobDescription?: string;
+  /** Present while questions are generated in background */
+  generation?: InterviewGenerationContext;
 }
 
 export interface DomainPack {
@@ -71,6 +89,8 @@ export interface ParsedResumeEducation {
   cgpa: string;
 }
 
+export type ResumeParseQuality = 'full' | 'degraded' | 'minimal';
+
 export interface ParsedResume {
   name: string;
   email: string;
@@ -80,6 +100,9 @@ export interface ParsedResume {
   projects: ParsedResumeProject[];
   education: ParsedResumeEducation[];
   target_roles: string[];
+  /** Present when upload/AI extraction was partial — interview still proceeds. */
+  parse_quality?: ResumeParseQuality;
+  parse_warning?: string;
 }
 
 /** Structured JD used for interview personalization (mirrors resume-style parsing). */

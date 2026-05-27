@@ -1,16 +1,18 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { getTokenBudget } from '@/lib/ai/token-budget';
-import { getContextLimits } from '@/lib/ai/operation-registry';
-import { clampText } from '@/lib/ai/context-hygiene';
+import {
+  buildCompactResumeSummary,
+  clampJobDescriptionForQuestions,
+} from '@/lib/interview/question-gen-input';
 import { parseJsonObject } from '@/lib/ai/response-contract';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import type { ParsedResume, Question } from '@/types/app.types';
 import type { InterviewGoal } from '@/types/onboarding.types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
 import {
-  modeGenerationRules,
   normalizeInterviewMode,
   partitionByMode,
+  type InterviewMode,
 } from '@/lib/interview/interview-mode';
 import { getTierConfig, getUserProgress } from '@/lib/retention';
 import type { TierPromptModifiers, UserTierId } from '@/lib/retention';
@@ -61,98 +63,39 @@ export interface GenerateQuestionsInput {
 function goalToneRules(goal: InterviewGoal): string {
   switch (goal) {
     case 'fresher_placement':
-      return (
-        `Goal: Fresher placement — prioritize fundamentals and concrete projects from the resume; ` +
-        `avoid system architecture or large-scale design questions; keep scenarios internship/placement appropriate.`
-      );
+      return 'goal:fresher';
     case 'job_switch':
-      return (
-        `Goal: Job switch — emphasize transferable skills, motivations for change, stack fit, ` +
-        `and how past wins apply to the target role.`
-      );
+      return 'goal:switch';
     case 'promotion_prep':
-      return (
-        `Goal: Promotion prep — emphasize leadership, ownership, stakeholder decisions, ` +
-        `and justified trade-offs for senior scope.`
-      );
-    case 'general_practice':
+      return 'goal:promotion';
     default:
-      return `Goal: General practice — balanced tone without biasing toward one career stage.`;
+      return 'goal:practice';
   }
 }
 
 function seniorityRules(experienceYears: number): string {
-  if (experienceYears <= 0) {
-    return (
-      `Seniority: 0 years — conceptual clarity, definitions, and explain-your-project depth only; ` +
-      `no expectation of production war stories or large-scale architecture.`
-    );
-  }
-  if (experienceYears <= 3) {
-    return (
-      `Seniority: 1–3 years — applied scenarios, debugging, ownership of features, ` +
-      `and realistic team workflows; moderate depth.`
-    );
-  }
-  return (
-    `Seniority: 4+ years — architectural choices, trade-offs, scale/reliability, ` +
-    `mentorship, and stakeholder judgment where relevant to the role.`
-  );
+  if (experienceYears <= 0) return 'yrs:0';
+  if (experienceYears <= 3) return 'yrs:1-3';
+  return 'yrs:4+';
 }
 
 function difficultyRules(difficulty: 'easy' | 'medium' | 'hard'): string {
-  switch (difficulty) {
-    case 'easy':
-      return `Difficulty: Easy — favor definitions, straightforward scenarios, and foundational reasoning.`;
-    case 'hard':
-      return `Difficulty: Hard — include edge cases, trade-offs, and failure modes where appropriate to mode and seniority.`;
-    case 'medium':
-    default:
-      return `Difficulty: Medium — balanced application-level scenarios with some depth.`;
-  }
+  return `diff:${difficulty}`;
 }
 
 // Strict mode rules live in lib/interview/interview-mode.ts (single source of
 // truth shared with the post-generation validator + follow-up lock).
 
+function shortModeRules(mode: InterviewMode): string {
+  if (mode === 'technical') return 'mode:tech-only';
+  if (mode === 'hr') return 'mode:hr-only';
+  return 'mode:mixed';
+}
+
 function interviewerPersonaRules(interviewerId: InterviewerId): string {
   const iv = getInterviewerById(interviewerId);
   if (!iv) return '';
-  if (iv.id === 'priya') {
-    return (
-      `Interviewer persona: Priya (Senior Recruiter) — warm, rapport-building openers, HR-lean phrasing, ` +
-      `professional but supportive framing in how questions are written.`
-    );
-  }
-  return (
-    `Interviewer persona: Arjun (Technical Lead) — direct, concise questions with technical pressure; ` +
-    `minimal hand-holding; expect precise reasoning in the prompts.`
-  );
-}
-
-function buildResumeSummary(resume: ParsedResume, role: string): string {
-  const skills = resume.skills.slice(0, 15).join(', ');
-  const exp = resume.experience
-    .map((e) => `${e.role} at ${e.company} (${e.duration})`)
-    .join('; ');
-  const projects = resume.projects
-    .map((p) => {
-      const tech = p.tech_stack.slice(0, 4).join(', ');
-      const desc = p.description.trim();
-      const short = desc.length > 140 ? `${desc.slice(0, 137)}…` : desc;
-      return `${p.name}${tech ? ` [${tech}]` : ''}${short ? `: ${short}` : ''}`;
-    })
-    .join(' | ');
-  const education = resume.education
-    .slice(0, 3)
-    .map((e) => `${e.degree} at ${e.institution} (${e.year})`)
-    .join('; ');
-  return (
-    `Name: ${resume.name}. Target role: ${role}. Skills: ${skills}.` +
-    (exp ? ` Experience: ${exp}.` : '') +
-    (projects ? ` Projects: ${projects}.` : '') +
-    (education ? ` Education: ${education}.` : '')
-  );
+  return iv.id === 'priya' ? 'iv:hr' : 'iv:tech';
 }
 
 function coerceNumber(val: unknown): number | null {
@@ -228,45 +171,16 @@ function coerceQuestionsResponse(data: unknown): GeneratedQuestion[] | null {
   return out.length > 0 ? out : null;
 }
 
-function getTierSpecificGuidance(tier: UserTierId): string {
-  switch (tier) {
-    case 1:
-      return (
-        `- Lean on basic behavioral questions and resume-rooted prompts.\n` +
-        `- Keep technical asks fundamental; test communication and basic problem-solving.`
-      );
-    case 2:
-      return (
-        `- Go deeper on technical reasoning and follow-up probes.\n` +
-        `- Introduce light system-design thinking and advanced problem-solving.`
-      );
-    case 3:
-      return (
-        `- Include service-company patterns (TCS/Infosys/Wipro style) where relevant.\n` +
-        `- Ask about scalability, trade-offs, multi-part scenarios, and production realities.`
-      );
-    case 4:
-      return (
-        `- Use panel-style prompts with multiple angles and stress framing.\n` +
-        `- Weave in cross-functional, leadership, and ownership considerations.`
-      );
-    default:
-      return '';
-  }
-}
-
 function tierCalibrationBlock(
   tier: UserTierId,
   modifiers: TierPromptModifiers | null,
 ): string {
   const difficultyHint = modifiers?.difficulty?.trim();
   const types = modifiers?.question_types?.filter((t) => typeof t === 'string' && t.length > 0);
-  const lines = [`Retention tier: Tier ${tier} — calibrate difficulty accordingly.`];
-  if (difficultyHint) lines.push(`Tier difficulty band: ${difficultyHint}.`);
-  if (types && types.length > 0) lines.push(`Tier question types to favor: ${types.join(', ')}.`);
-  const guidance = getTierSpecificGuidance(tier);
-  if (guidance) lines.push(guidance);
-  return lines.join('\n');
+  const parts = [`Tier${tier}`];
+  if (difficultyHint) parts.push(difficultyHint);
+  if (types && types.length > 0) parts.push(types.slice(0, 3).join(','));
+  return parts.join(' · ');
 }
 
 async function resolveTierCalibration(
@@ -287,22 +201,13 @@ async function resolveTierCalibration(
   return tierCalibrationBlock(tier, modifiers);
 }
 
-/**
- * Single-attempt completion in plain text mode. The historic json_object→plain
- * same-model retry inside interview-completion is bypassed by passing
- * `jsonMode: false` — we rely on `parseJsonObject` (which handles fenced and
- * dirty output via brace-matching) to extract the JSON from a plain response.
- *
- * The AbortSignal threads through provider fetches so the operation-level
- * deadline aborts in-flight HTTP requests instead of waiting them out.
- */
 async function callOpenAI(prompt: string, signal: AbortSignal): Promise<string> {
   const { content } = await completeInterviewChat({
-    messages:  [{ role: 'user', content: prompt }],
-    temperature: 0.7,
-    maxTokens:   getTokenBudget('question_generation'),
-    operation:   'question_generation',
-    jsonMode:    false,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: 0.5,
+    maxTokens: getTokenBudget('question_generation'),
+    operation: 'question_generation',
+    jsonMode: true,
     signal,
   });
   return content;
@@ -323,13 +228,9 @@ export async function generateQuestions({
 }: GenerateQuestionsInput): Promise<GenerateQuestionsResult> {
   const t0 = Date.now();
   const canonicalMode = normalizeInterviewMode(interviewMode);
-  const resumeSummary = buildResumeSummary(parsedResume, role);
-  const jdCap = getContextLimits('question_generation').maxInputChars;
-  const trimmedJd = jobDescription?.trim();
-  const jdSnippet = trimmedJd ? clampText(trimmedJd, jdCap) : undefined;
-  const jdBlock = jdSnippet
-    ? `\nEmployer job description (align competencies and scenarios with this posting; do not paste it verbatim into questions):\n${jdSnippet}\n`
-    : '';
+  const resumeSummary = buildCompactResumeSummary(parsedResume, role);
+  const jdSnippet = clampJobDescriptionForQuestions(jobDescription);
+  const jdBlock = jdSnippet ? `\nJD:${jdSnippet}\n` : '';
 
   // Tier calibration uses `userTier` if the route has already fetched it,
   // otherwise falls back to a single getUserProgress lookup. Either way we
@@ -341,7 +242,7 @@ export async function generateQuestions({
       goalToneRules(goal),
       seniorityRules(experienceYears),
       difficultyRules(difficulty),
-      modeGenerationRules(canonicalMode),
+      shortModeRules(canonicalMode),
       interviewerPersonaRules(interviewerId),
       tierBlock,
     ]
@@ -349,30 +250,15 @@ export async function generateQuestions({
       .join('\n');
 
   const prompt =
-    `You are an expert interviewer at a top Indian tech company.\n` +
-    `Generate exactly ${questionCount} interview questions for a ${role} position.\n` +
-    `The candidate's profile: ${resumeSummary}${jdBlock}\n` +
-    `${calibration}\n\n` +
-    `Rules:\n` +
-    `- Questions must reference concrete skills, employers, projects, or education from the profile when applicable.\n` +
-    `- No repetitive or overlapping questions.\n` +
-    `- Each question must include a rubric suitable for evaluation.\n\n` +
-    `Return ONLY valid JSON:\n` +
-    `{\n` +
-    `  "questions": [{\n` +
-    `    "order": number,\n` +
-    `    "question_text": string,\n` +
-    `    "category": "technical" | "behavioral" | "situational",\n` +
-    `    "rubric": {\n` +
-    `      "ideal_keywords": string[],\n` +
-    `      "ideal_structure": string,\n` +
-    `      "red_flags": string[]\n` +
-    `    }\n` +
-    `  }]\n` +
-    `}`;
+    `Generate exactly ${questionCount} interview questions for ${role}.\n` +
+    `Profile:${resumeSummary}${jdBlock}\n` +
+    `Calib:${calibration}\n` +
+    `Rules: resume-specific, no duplicates, short rubrics (max 3 keywords, 1-line structure).\n` +
+    `JSON only:{"questions":[{"order":0,"question_text":"","category":"technical|behavioral|situational",` +
+    `"rubric":{"ideal_keywords":[],"ideal_structure":"","red_flags":[]}}]}`;
 
-  // Up to 2 LLM attempts when parse/coercion/mode-filter leaves too few questions.
-  const MAX_ATTEMPTS = 2;
+  /** Single LLM call — resolve-interview-questions uses deterministic fallback on failure. */
+  const MAX_ATTEMPTS = 1;
   let lastError: QuestionGenerationError | null = null;
 
   try {
@@ -385,7 +271,9 @@ export async function generateQuestions({
         }
 
         try {
+          const aiStart = Date.now();
           const content = await callOpenAI(prompt, signal);
+          const aiMs = Date.now() - aiStart;
 
           if (!content || content.trim().length === 0) {
             throw new QuestionGenerationError(
@@ -393,7 +281,9 @@ export async function generateQuestions({
             );
           }
 
+          const jsonStart = Date.now();
           const parseResult = parseJsonObject(content);
+          const jsonMs = Date.now() - jsonStart;
           if (!parseResult.ok) {
             console.error('[generate-questions] JSON parse failed:', {
               attempt,
@@ -445,9 +335,17 @@ export async function generateQuestions({
             );
           }
 
-          console.log(
-            `[generate-questions] completed in ${Date.now() - t0}ms ` +
-            `(attempt=${attempt}, ${enforced.length} questions, mode=${canonicalMode})`,
+          console.info(
+            '[question-gen-pipeline]',
+            JSON.stringify({
+              pipelineMs: Date.now() - t0,
+              aiMs,
+              jsonMs,
+              attempt,
+              count: enforced.length,
+              mode: canonicalMode,
+              promptChars: prompt.length,
+            }),
           );
 
           return { questions: enforced };

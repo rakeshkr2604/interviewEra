@@ -21,6 +21,7 @@ import {
 } from '@/lib/pdf/parser-errors';
 import { isPdfParserDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
 import { ensurePdfJsNodeGlobalsSync, hasPdfJsNodeGlobalsReady } from '@/lib/pdf/pdfjs-node-setup';
+import { extractTextWithOcr } from '@/lib/pdf/ocr-fallback';
 
 export type { PDFParseUserCode };
 
@@ -35,7 +36,23 @@ export type PdfExtractDiagContext = {
   fileNameHint?: string;
   vercelId?: string;
   source?: string;
+  userId?: string;
 };
+
+async function tryOcrFallback(
+  bytes: Uint8Array,
+  diag?: PdfExtractDiagContext,
+): Promise<string | null> {
+  const result = await extractTextWithOcr(bytes, { userId: diag?.userId, source: diag?.source });
+  if (!result?.text || result.text.length < MIN_USEFUL_CHARS) return null;
+  logPdfParseDiag('ocr_fallback_ok', null, {
+    chars: result.text.length,
+    pages: result.pagesProcessed,
+    durationMs: result.durationMs,
+    partial: result.partial,
+  }, 'info');
+  return result.text;
+}
 
 export {
   PDFCorruptError,
@@ -46,7 +63,8 @@ export {
   PDFUnsupportedError,
 };
 
-const MIN_USEFUL_CHARS = 20;
+/** Below this, treat PDF as image-only / unreadable (security floor stays low). */
+const MIN_USEFUL_CHARS = 12;
 
 /** Root of the installed `pdfjs-dist` package (server: project `node_modules`). */
 function pdfJsPackageRootCandidates(): string[] {
@@ -355,6 +373,8 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
     }
 
     await drainPdfJsDocument(primary.doc);
+    const ocrPrimary = await tryOcrFallback(bytes);
+    if (ocrPrimary) return ocrPrimary;
     throw new PDFScannedNoTextError();
   } catch (err) {
     if (err instanceof PDFScannedNoTextError) throw err;
@@ -450,6 +470,8 @@ export async function extractText(
     try {
       const t = await extractWithPdfParse(bytes);
       if (t.length >= MIN_USEFUL_CHARS) return t;
+      const ocrNoCanvas = await tryOcrFallback(bytes, diag);
+      if (ocrNoCanvas) return ocrNoCanvas;
       throw new PDFScannedNoTextError();
     } catch (err) {
       if (err instanceof PDFScannedNoTextError) throw err;
@@ -481,10 +503,18 @@ export async function extractText(
       });
       return fallback;
     }
-    if (pdfJsErr instanceof PDFScannedNoTextError) throw pdfJsErr;
+    if (pdfJsErr instanceof PDFScannedNoTextError) {
+      const ocrAfterParse = await tryOcrFallback(bytes, diag);
+      if (ocrAfterParse) return ocrAfterParse;
+      throw pdfJsErr;
+    }
     throw new PDFScannedNoTextError();
   } catch (fbErr) {
-    if (fbErr instanceof PDFScannedNoTextError) throw fbErr;
+    if (fbErr instanceof PDFScannedNoTextError) {
+      const ocrLast = await tryOcrFallback(bytes, diag);
+      if (ocrLast) return ocrLast;
+      throw fbErr;
+    }
     logPdfParseDiag('pdf_parse_fallback_failed', fbErr, { byteLength: bytes.byteLength });
 
     if (pdfJsErr instanceof PDFCorruptError) throw pdfJsErr;

@@ -14,17 +14,15 @@ const SAMPLE_LEN = 14_000;
 const MIN_LEN_FOR_KIND_GUESS = 60;
 
 /** Minimum pasted/uploaded text before we call it substantial enough to validate. */
-const MIN_SUBSTANTIVE_LEN = 40;
+const MIN_SUBSTANTIVE_LEN = 25;
 
-/**
- * For longer balanced text in the resume slot, require a minimum resume signal count.
- */
+/** Long balanced JD text with zero JD signals — still reject in JD slot only. */
 const STRICT_MIN_LEN = 120;
 
 /**
- * Kind resolution margin: e.g. resume wins only when resumeHits >= jdHits + this.
+ * Kind resolution margin: higher = fewer false "job description" classifications.
  */
-const KIND_MARGIN = 2;
+const KIND_MARGIN = 3;
 
 const RESUME_PATTERNS: readonly RegExp[] = [
   /\bcurriculum vitae\b/i,
@@ -100,38 +98,22 @@ export function classifyDocumentKind(rawText: string): DocumentKindGuess {
 }
 
 export function assertLooksLikeResume(rawText: string): DocumentValidation {
-  const { text, resumeHits, jdHits, kind } = analyzeDocument(rawText);
+  const { text, kind } = analyzeDocument(rawText);
 
   if (text.length < MIN_SUBSTANTIVE_LEN) {
     return {
       ok: false,
-      message: 'Extracted text from this file is too short. Upload a complete resume PDF or TXT.',
+      message: 'We could only read a very small amount of text. Upload a complete resume PDF or TXT.',
     };
   }
 
+  // Only hard-reject when classification is clearly a job posting — not on weak/balanced signals.
   if (kind === 'job_description') {
     return {
       ok: false,
       message:
         'This file reads like a job description, not a resume. Upload your CV/resume here — put the employer’s JD in the Job description section.',
     };
-  }
-
-  if (kind === 'balanced') {
-    if (jdHits >= resumeHits) {
-      return {
-        ok: false,
-        message:
-          'We could not confirm this is a resume — it looks closer to a job posting. Upload your CV in this slot and move the company JD to the Job description section.',
-      };
-    }
-    if (text.length >= STRICT_MIN_LEN && resumeHits < 2) {
-      return {
-        ok: false,
-        message:
-          'This does not look enough like a resume (missing typical education, experience, or skills signals). Upload your actual CV — not a cover letter or JD.',
-      };
-    }
   }
 
   return { ok: true };

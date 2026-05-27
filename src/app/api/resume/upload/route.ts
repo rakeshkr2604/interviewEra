@@ -18,6 +18,10 @@ import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
 import { normalizeExtractedDocumentText } from '@/lib/utils/normalize-extracted-document-text';
+import { runLayeredTextExtraction } from '@/lib/resume/extraction-pipeline';
+import { isObviouslyGarbage, scoreExtractedText } from '@/lib/resume/extraction-quality';
+import { RESUME_HARD_FAIL_MESSAGES, resumeUserError } from '@/lib/resume/parse-outcome';
+import { trackProductEvent } from '@/lib/analytics/product-events';
 import {
   isUploadDiagnosticsEnabled,
   shouldBypassResumeParsePipeline,
@@ -116,21 +120,44 @@ function getSingleUploadedFile(formData: FormData): { file: File } | { error: st
   return { file };
 }
 
-function classifyPdfError(err: unknown): { code: ResumeUploadPdfErrorCode; message: string } {
+function classifyPdfError(err: unknown): {
+  code: ResumeUploadPdfErrorCode;
+  message: string;
+  suggestion?: string;
+} {
   if (err instanceof PDFParserUnavailableError) {
-    return {
-      code: 'PARSER_UNAVAILABLE',
-      message: PDF_PARSER_INFRA_MESSAGES.PARSER_UNAVAILABLE,
-    };
+    const m = RESUME_HARD_FAIL_MESSAGES.PARSER_UNAVAILABLE;
+    return { code: 'PARSER_UNAVAILABLE', message: m.userMessage, suggestion: m.suggestion };
   }
   if (err instanceof PDFParserRuntimeError) {
     return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
   }
-  if (err instanceof PDFEncryptedError) return { code: 'ENCRYPTED', message: PDF_ERROR_MESSAGES.ENCRYPTED };
-  if (err instanceof PDFScannedNoTextError) return { code: 'SCANNED_NO_TEXT', message: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT };
-  if (err instanceof PDFCorruptError) return { code: 'CORRUPT', message: PDF_ERROR_MESSAGES.CORRUPT };
+  if (err instanceof PDFEncryptedError) {
+    const m = RESUME_HARD_FAIL_MESSAGES.ENCRYPTED_PDF;
+    return { code: 'ENCRYPTED', message: m.userMessage, suggestion: m.suggestion };
+  }
+  if (err instanceof PDFScannedNoTextError) {
+    const m = RESUME_HARD_FAIL_MESSAGES.SCANNED_NO_TEXT;
+    return { code: 'SCANNED_NO_TEXT', message: m.userMessage, suggestion: m.suggestion };
+  }
+  if (err instanceof PDFCorruptError) {
+    const m = RESUME_HARD_FAIL_MESSAGES.CORRUPT_FILE;
+    return { code: 'CORRUPT', message: m.userMessage, suggestion: m.suggestion };
+  }
   if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
   return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
+}
+
+function uploadReject(
+  code: string,
+  userMessage: string,
+  suggestion: string | undefined,
+  status: number,
+  reqId: string,
+  extra?: Record<string, string>,
+): NextResponse {
+  const body = resumeUserError(code, userMessage, suggestion);
+  return jsonWithReq(body, status, reqId, extra);
 }
 
 function hasPdfHeader(bytes: Uint8Array): boolean {
@@ -182,6 +209,7 @@ function diagPayload(stage: string, err: unknown, reqId: string): Record<string,
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const uploadStarted = Date.now();
   const reqId = randomUUID().slice(0, 8);
   const vercelId = request.headers.get('x-vercel-id');
 
@@ -337,6 +365,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const { file } = picked;
 
+    trackProductEvent({ event: 'upload_started', userId: user.id });
+
     console.log('[UPLOAD_STAGE] file_meta', {
       reqId,
       name: file.name,
@@ -392,19 +422,29 @@ export async function POST(request: Request): Promise<NextResponse> {
             fileNameHint: normalizedName,
             vercelId: vercelId ?? '',
             source: 'resume-upload',
+            userId: user.id,
           });
         } catch (err) {
-          const { code, message } = classifyPdfError(err);
+          const { code, message, suggestion } = classifyPdfError(err);
           console.error('[UPLOAD_STAGE] pdf_extract_error', {
             reqId,
             code,
+            rejection_reason: code,
             pdf_header: hasPdfHeader(parseBytes),
             err: err instanceof Error ? err.message : err,
           });
           console.error(
             `[resume/upload][${reqId}] PDF parse failed vercel_id=${vercelId ?? 'n/a'} code=${code} size=${file.size} ext=${ext} parse_bytes=${parseBytes.byteLength} pdf_header=${hasPdfHeader(parseBytes)} name=${normalizedName}`,
           );
-          return jsonWithReq({ error: message, code }, 422, reqId, vercelId ? { 'X-Vercel-Id': vercelId } : undefined);
+          trackProductEvent({ event: 'upload_failed', userId: user.id, code });
+          return uploadReject(
+            code,
+            message,
+            suggestion,
+            422,
+            reqId,
+            vercelId ? { 'X-Vercel-Id': vercelId } : undefined,
+          );
         }
         console.log('[UPLOAD_STAGE] pdf_extract_done', { reqId, chars: rawText.length });
       } else {
@@ -413,27 +453,49 @@ export async function POST(request: Request): Promise<NextResponse> {
         console.log('[UPLOAD_STAGE] txt_decode_done', { reqId, chars: rawText.length });
       }
 
-      sanitizedRaw = normalizeExtractedDocumentText(rawText, 400_000);
+      const layered = runLayeredTextExtraction(rawText);
+      sanitizedRaw = layered.text;
+      console.info('[UPLOAD_STAGE] extraction_pipeline', {
+        reqId,
+        stage: layered.stage,
+        quality_band: layered.qualityBand,
+        quality_score: layered.qualityScore,
+        chars: sanitizedRaw.length,
+      });
+
       if (!sanitizedRaw.trim()) {
-        return jsonWithReq(
-          {
-            error: PDF_ERROR_MESSAGES.SCANNED_NO_TEXT,
-            code: 'SCANNED_NO_TEXT' satisfies PDFErrorCode,
-          },
-          422,
-          reqId,
-        );
+        const m = RESUME_HARD_FAIL_MESSAGES.SCANNED_NO_TEXT;
+        return uploadReject('SCANNED_NO_TEXT', m.userMessage, m.suggestion, 422, reqId);
+      }
+
+      if (isObviouslyGarbage(sanitizedRaw)) {
+        const m = RESUME_HARD_FAIL_MESSAGES.GARBAGE_CONTENT;
+        return uploadReject('GARBAGE_CONTENT', m.userMessage, m.suggestion, 422, reqId);
       }
 
       const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
       if (!resumeDocCheck.ok) {
-        return jsonWithReq(
-          { error: resumeDocCheck.message, code: 'WRONG_DOCUMENT_TYPE' },
+        const m = RESUME_HARD_FAIL_MESSAGES.WRONG_DOCUMENT_TYPE;
+        return uploadReject(
+          'WRONG_DOCUMENT_TYPE',
+          resumeDocCheck.message,
+          m.suggestion,
           422,
           reqId,
         );
       }
     }
+
+    const uploadExtractionWarning =
+      !shouldBypassResumeParsePipeline() && sanitizedRaw.trim()
+        ? (() => {
+            const q = scoreExtractedText(sanitizedRaw);
+            if (q.band === 'weak') {
+              return 'We extracted most of your resume, but some sections may be incomplete.';
+            }
+            return undefined;
+          })()
+        : undefined;
 
     const timestamp = Date.now();
     const filePath = `resumes/${user.id}/${timestamp}${ext}`;
@@ -535,12 +597,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       return jsonWithReq(base as Record<string, unknown>, 500, reqId);
     }
 
-    console.log('[UPLOAD_STAGE] ok', { reqId, resume_id: resume.id });
+    console.log('[UPLOAD_STAGE] ok', {
+      reqId,
+      resume_id: resume.id,
+      extraction_warning: uploadExtractionWarning ?? null,
+      total_upload_ms: Date.now() - uploadStarted,
+    });
     return jsonWithReq(
       {
+        success: true,
         resumeId: resume.id,
         status: 'parsing',
         parsed: false,
+        extractionWarning: uploadExtractionWarning,
       },
       200,
       reqId,

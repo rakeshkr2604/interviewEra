@@ -17,5 +17,5 @@ export async function generateMetadata({
 }
 
 export default function Layout({ children }: { children: ReactNode }) {
-  return <>{children}</>
+  return <div className="min-h-0 flex-1 overflow-x-hidden">{children}</div>
 }

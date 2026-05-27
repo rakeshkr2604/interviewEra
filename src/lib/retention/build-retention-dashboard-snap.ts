@@ -77,11 +77,40 @@ export async function buildRetentionDashboardSnapFromRow(
   const lastSessionQualityFeedback =
     userId && total_sessions > 0 ? await loadLatestFailedSessionQualityFeedback(userId) : null;
 
+  let weeklySessions: number | undefined;
+  if (userId) {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const supabase = await createClient();
+    const { count } = await supabase
+      .from('session_quality_log')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('completed_at', weekAgo);
+    weeklySessions = count ?? 0;
+  }
+
+  const last5 = row?.last_5_sessions_avg ?? null;
+  const overall = row?.overall_avg_score ?? null;
+  let improvementTrend: string | null = null;
+  if (last5 != null && overall != null) {
+    const delta = last5 - overall;
+    if (delta >= 0.3) improvementTrend = `Improving (+${delta.toFixed(1)} vs lifetime avg)`;
+    else if (delta <= -0.3) improvementTrend = `Room to grow (${delta.toFixed(1)} vs lifetime avg)`;
+    else improvementTrend = 'Holding steady vs your average';
+  }
+
+  const maxDim = row?.max_dimension_score ?? null;
+  const bestDimensionLabel =
+    maxDim != null ? `Peak score ${maxDim.toFixed(1)}/10 on one dimension` : null;
+
   return {
     current_tier,
     current_streak,
     total_xp,
     total_sessions,
+    weeklySessions,
+    bestDimensionLabel,
+    improvementTrend,
     tierProgress,
     lastSessionQualityFeedback,
   };
