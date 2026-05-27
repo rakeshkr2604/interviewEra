@@ -17,12 +17,13 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import Image from 'next/image';
 import {
   Search, RefreshCw, ChevronLeft, ChevronRight,
   CheckCircle2, Pin, Archive, Eye, EyeOff,
   Star, AlertCircle, X, ChevronDown, ChevronUp,
   Mail, ExternalLink, Monitor, Smartphone, Tablet,
-  Wifi, Mic, Camera, MessageSquare, StickyNote,
+  Wifi, MessageSquare, StickyNote,
   RotateCcw,
 } from 'lucide-react';
 import type {
@@ -562,14 +563,22 @@ function FeedbackCard({
               <p className="mb-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
                 Screenshot
               </p>
-              <a href={row.screenshot_url} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={row.screenshot_url}
-                  alt="User-submitted screenshot"
-                  className="w-full max-w-lg rounded-xl border object-cover"
-                  style={{ borderColor: 'var(--card-border)' }}
-                  loading="lazy"
-                />
+              <a
+                href={row.screenshot_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="relative block w-full max-w-lg overflow-hidden rounded-xl border"
+                style={{ borderColor: 'var(--card-border)' }}
+              >
+                <span className="relative block aspect-video w-full">
+                  <Image
+                    src={row.screenshot_url}
+                    alt="User-submitted screenshot"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 640px) 100vw, 512px"
+                  />
+                </span>
               </a>
             </div>
           )}
@@ -776,7 +785,7 @@ export default function PlatformFeedbackPage() {
   const [total, setTotal]   = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats]   = useState<DashboardStats | null>(null);
-  const [failedEmailCount, setFailedEmailCount] = useState(0);
+  const [failedEmailCount, _setFailedEmailCount] = useState(0);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
 

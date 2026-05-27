@@ -351,7 +351,7 @@ function tryParseResponse(
     console.error(`[JSON_PARSE][${source}] ✗ ${pr.error}`, pr.rawPreview?.slice(0, 200));
     return null;
   }
-  let parsed: unknown = pr.value;
+  const parsed: unknown = pr.value;
   if (pr.repairedVia !== 'direct') {
     console.log(`[JSON_PARSE][${source}] ✓ Recovered JSON via ${pr.repairedVia}`);
   }
