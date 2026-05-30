@@ -25,13 +25,14 @@ interface VoiceSettings {
 
 function toneToVoiceSettings(tone: string, text: string): VoiceSettings {
   const isQuestion = text.includes('?');
+  // Softer, professional interviewer delivery — higher stability, lower expressiveness.
   switch (tone) {
     case 'encouraging':
-      return { stability: 0.28, similarity_boost: 0.72, style: isQuestion ? 0.38 : 0.45, use_speaker_boost: true };
+      return { stability: 0.62, similarity_boost: 0.78, style: isQuestion ? 0.22 : 0.28, use_speaker_boost: true };
     case 'challenging':
-      return { stability: 0.42, similarity_boost: 0.75, style: isQuestion ? 0.48 : 0.55, use_speaker_boost: true };
+      return { stability: 0.58, similarity_boost: 0.76, style: isQuestion ? 0.26 : 0.32, use_speaker_boost: true };
     default:
-      return { stability: 0.35, similarity_boost: 0.74, style: isQuestion ? 0.36 : 0.42, use_speaker_boost: true };
+      return { stability: 0.65, similarity_boost: 0.8, style: isQuestion ? 0.2 : 0.24, use_speaker_boost: true };
   }
 }
 

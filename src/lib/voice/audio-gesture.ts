@@ -22,6 +22,11 @@ export function isIOSInterviewPlatform(): boolean {
   return needsAudioGestureUnlock()
 }
 
+export function isAndroidInterviewPlatform(): boolean {
+  if (typeof window === 'undefined') return false
+  return getPlatformContext().platform === 'android'
+}
+
 /** Reused across ElevenLabs utterances in one session (Chrome context limit). */
 export function getSharedInterviewAudioContext(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -56,6 +61,47 @@ export function closeSharedInterviewAudioContext(): void {
   void sharedAudioContext.close().catch(() => {})
   sharedAudioContext = null
   interviewFlowLog('audio', 'audiocontext_closed', {})
+}
+
+/**
+ * Release speaker/audio focus before Web Speech mic capture.
+ * Android Chrome often fails recognition.start() when ElevenLabs TTS or
+ * speechSynthesis still holds the audio path.
+ */
+export async function releaseAudioForMicCapture(): Promise<void> {
+  if (typeof window === 'undefined') return
+
+  const platform = getPlatformContext()
+  interviewFlowLog('audio', 'mic_capture_prep_start', {
+    platform: platform.platform,
+    browser: platform.browser,
+    pwa: platform.pwa,
+  })
+
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel()
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  const ctx = getSharedInterviewAudioContext()
+  if (ctx && ctx.state === 'running') {
+    try {
+      await ctx.suspend()
+      interviewFlowLog('audio', 'audiocontext_suspended_for_mic', { state: ctx.state })
+    } catch {
+      /* best-effort */
+    }
+  }
+
+  const delayMs = isAndroidInterviewPlatform() ? 480 : 140
+  await new Promise<void>((resolve) => {
+    window.setTimeout(resolve, delayMs)
+  })
+
+  interviewFlowLog('audio', 'mic_capture_prep_done', { delayMs })
 }
 
 /**

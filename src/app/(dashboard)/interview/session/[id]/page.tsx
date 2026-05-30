@@ -44,6 +44,7 @@ import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
+import { releaseAudioForMicCapture } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
@@ -309,6 +310,11 @@ export default function InterviewSessionPage() {
   const onSttTelemetry = useCallback<SttTelemetryCallback>((event, data) => {
     sttTelemetryRef.current?.(event, data)
   }, [])
+  const prepareForMicCapture = useCallback(async () => {
+    try { stopSpeaking() } catch { /* */ }
+    try { elStop() } catch { /* */ }
+    await releaseAudioForMicCapture()
+  }, [stopSpeaking, elStop])
   const [userMicMuted, setUserMicMuted] = useState(false)
   const userMicMutedRef = useRef(false)
   useEffect(() => {
@@ -333,7 +339,11 @@ export default function InterviewSessionPage() {
     resetTranscript,
     getMergedTranscript,
     hasRecentSpeech,
-  } = useSpeechRecognition({ keepArmedDuringAnswerRef: micKeepArmedRef, onSttTelemetry })
+  } = useSpeechRecognition({
+    keepArmedDuringAnswerRef: micKeepArmedRef,
+    onSttTelemetry,
+    prepareForMicCapture,
+  })
   // The ONLY state that may surface "Listening…" in the Web Speech path.
   // 'starting' (between onstart and first transcript) intentionally does NOT
   // qualify — that was the source of the false-positive label.

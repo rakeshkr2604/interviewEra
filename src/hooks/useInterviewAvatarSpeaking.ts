@@ -136,6 +136,8 @@ export function useInterviewAvatarSpeaking(
 
       if (reason === 'audio_completed') {
         trackAvatarTelemetry('avatar_audio_completed', telemetryCtx, { mode: inputMode })
+        try { stopSpeaking() } catch { /* */ }
+        try { elStop() } catch { /* */ }
       }
       if (reason === 'user_continue') {
         trackAvatarTelemetry('avatar_continue_without_audio', telemetryCtx, { mode: inputMode })
@@ -157,7 +159,7 @@ export function useInterviewAvatarSpeaking(
         onAvatarFinished(reason)
       }, AVATAR_FINISHED_BRIDGE_MS)
     },
-    [currentIndex, inputMode, mountedRef, onAvatarFinished, phaseRef, setPhase, telemetryCtx],
+    [currentIndex, inputMode, mountedRef, onAvatarFinished, phaseRef, setPhase, stopSpeaking, elStop, telemetryCtx],
   )
 
   const markPlaybackFailed = useCallback(

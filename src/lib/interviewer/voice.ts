@@ -1,11 +1,17 @@
 import type { Interviewer } from '@/lib/config/interviewers';
 
+/** Prefer calm, professional en-IN / Indian English voices on mobile browsers. */
+const SOFT_VOICE_HINT =
+  /neerja|priya|rishi|google uk english female|microsoft zira|microsoft heera|samantha|aria|female|woman/i
+
 function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
-  const indian = voices.find((voice) =>
-    /en-in|india|hindi|priya|neerja|rishi/i.test(`${voice.lang} ${voice.name}`),
-  );
-  if (indian) return indian;
-  return voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ?? voices[0] ?? null;
+  const softIndian = voices.find((voice) =>
+    /en-in|india|neerja|priya|rishi|heera/i.test(`${voice.lang} ${voice.name}`),
+  )
+  if (softIndian) return softIndian
+  const soft = voices.find((voice) => SOFT_VOICE_HINT.test(voice.name))
+  if (soft) return soft
+  return voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ?? voices[0] ?? null
 }
 
 export function resolveVoiceForInterviewer(

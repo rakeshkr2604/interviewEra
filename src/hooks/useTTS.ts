@@ -82,9 +82,10 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
 
     const startUtterance = (voice: SpeechSynthesisVoice | null) => {
       const utterance = new SpeechSynthesisUtterance(text)
-      utterance.rate = Math.min(1.05, readTtsRate())
-      utterance.pitch = interviewer?.gender === 'female' ? 1.05 : 0.95
-      utterance.volume = 1
+      const baseRate = Math.min(0.92, readTtsRate())
+      utterance.rate = baseRate
+      utterance.pitch = interviewer?.gender === 'female' ? 1.02 : 0.94
+      utterance.volume = 0.92
       utterance.lang = voice?.lang ?? 'en-IN'
       if (voice) utterance.voice = voice
 
