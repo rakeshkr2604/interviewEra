@@ -21,28 +21,34 @@ type PersistInput = {
 const DEBOUNCE_MS = 450
 
 /** Debounced PATCH of users.onboarding_draft — database is source of truth after refresh. */
+async function patchOnboardingDraft(cur: PersistInput): Promise<void> {
+  if (!cur.enabled) return
+
+  const draft = buildPersistedDraft(cur)
+  try {
+    await fetch('/api/onboarding/state', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(draft),
+    })
+  } catch (e) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[onboarding] draft persist failed', e)
+    }
+  }
+}
+
 export function usePersistOnboardingDraft(input: PersistInput) {
   const inputRef = useRef(input)
-  inputRef.current = input
   const timerRef = useRef<number | null>(null)
 
-  const flush = useCallback(async () => {
-    const cur = inputRef.current
-    if (!cur.enabled) return
+  useEffect(() => {
+    inputRef.current = input
+  })
 
-    const draft = buildPersistedDraft(cur)
-    try {
-      await fetch('/api/onboarding/state', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(draft),
-      })
-    } catch (e) {
-      if (process.env.NODE_ENV === 'development') {
-        console.warn('[onboarding] draft persist failed', e)
-      }
-    }
+  const flush = useCallback(async () => {
+    await patchOnboardingDraft(inputRef.current)
   }, [])
 
   useEffect(() => {
@@ -51,7 +57,7 @@ export function usePersistOnboardingDraft(input: PersistInput) {
     if (timerRef.current !== null) window.clearTimeout(timerRef.current)
     timerRef.current = window.setTimeout(() => {
       timerRef.current = null
-      void flush()
+      void patchOnboardingDraft(inputRef.current)
     }, DEBOUNCE_MS) as number
 
     return () => {
@@ -72,7 +78,6 @@ export function usePersistOnboardingDraft(input: PersistInput) {
     input.jdParseStatus,
     input.difficulty,
     input.difficultyTouched,
-    flush,
   ])
 
   return { flushNow: flush }

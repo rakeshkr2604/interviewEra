@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { InterviewDifficulty, ParsedJobDescription } from '@/types/app.types'
-import type { InterviewGoal, OnboardingData } from '@/types/onboarding.types'
+import type { OnboardingData } from '@/types/onboarding.types'
 
 const interviewGoalSchema = z.enum([
   'fresher_placement',

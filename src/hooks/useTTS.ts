@@ -169,7 +169,7 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
         startUtterance(resolveVoiceForInterviewer(vs, interviewer)),
       )
     }
-  }, [isSupported, stop, loadVoices, interviewerId, error])
+  }, [isSupported, stop, loadVoices, interviewerId])
 
   return { speak, stop, isSpeaking, isSupported, error }
 }
