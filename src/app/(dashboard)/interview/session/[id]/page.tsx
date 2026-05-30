@@ -32,6 +32,17 @@ import {
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
 import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interviewLog } from '@/lib/voice/lifecycle-log'
+import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
+import type { RuntimePhase } from '@/lib/interview/runtime-phase'
+import { progressRingLabel } from '@/lib/interview/runtime-phase'
+import { useInterviewSessionController } from '@/hooks/useInterviewSessionController'
+import { useInterviewAudio } from '@/hooks/useInterviewAudio'
+import { useInterviewAvatarSpeaking } from '@/hooks/useInterviewAvatarSpeaking'
+import { useInterviewPwaLifecycle } from '@/hooks/useInterviewPwaLifecycle'
+import { useInterviewVoiceUi } from '@/hooks/useInterviewVoiceUi'
+import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
+import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
+import { installInterviewDebug } from '@/lib/voice/interview-debug'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
@@ -150,21 +161,13 @@ interface InterviewData {
   preparing?: boolean
 }
 
-type SessionPhase =
-  | 'loading'
-  | 'avatar_speaking'
-  | 'candidate_answering'
-  | 'submitting'
-  | 'feedback'
-  | 'completed'
-
 /**
  * Deterministic interview-startup state machine.
  *
  * Lives strictly inside `phase === 'loading'`. Each transition is gated on a
  * readiness signal — no state may be skipped, no transition may run before
  * its predecessor has been entered. When the machine reaches `interview_ready`
- * the page hands off to the runtime SessionPhase (`avatar_speaking`).
+ * the page hands off to the runtime phase (`awaiting_audio_unlock` or `avatar_speaking`).
  *
  * The runtime composite "listening_active" is NOT a startup step — it is
  * derived from `phase === 'candidate_answering'` + (`webSpeechActive` or
@@ -187,7 +190,7 @@ export default function InterviewSessionPage() {
   // ─── Interview Data ───────────────────────────────────────
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null)
   const [currentIndex, setCurrentIndex] = useState(0)
-  const [phase, setPhase] = useState<SessionPhase>('loading')
+  const [phase, setPhase] = useState<RuntimePhase>('loading')
   // Deterministic startup state machine. Drives the gated transition from
   // mount → fetch interview → audio init → first-question playback. Each
   // setter call below MUST verify its predecessor before advancing.
@@ -207,7 +210,6 @@ export default function InterviewSessionPage() {
   const [lastFillerAnalysis, setLastFillerAnalysis] = useState<FillerAnalysis | null>(null)
   const [answerStartTime, setAnswerStartTime] = useState<number>(0)
   const [fetchError, setFetchError] = useState('')
-  const [spokenText, setSpokenText] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
   const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>('voice')
   /** Matches TimerCircle denominator for the active answering phase */
@@ -237,7 +239,7 @@ export default function InterviewSessionPage() {
   const dgSttRef = useRef<StreamingSTT | null>(null)
   const dgMicCleanupRef = useRef<(() => void) | null>(null)
   // Ref so the VAD callback can read the current phase without a stale closure
-  const phaseRef = useRef<SessionPhase>('loading')
+  const phaseRef = useRef<RuntimePhase>('loading')
   // Lifecycle guards (added in realtime stabilization pass)
   // mountedRef: any async callback (api.post, setTimeout, awaits) that writes
   //   state must bail when this is false. Set to false in unmount cleanup.
@@ -251,11 +253,6 @@ export default function InterviewSessionPage() {
   //   "post-TTS auto-start" and the explicit deepgram mic toggle button can
   //   both fire the same start within a tick — second caller bails.
   const dgStartInFlightRef = useRef<boolean>(false)
-  // postTtsTimerRef: the 500ms gap between TTS-end and mic-start. Must be
-  //   cleared on any phase change away from avatar_speaking (Skip, Retry,
-  //   Submit, unmount) so an in-flight timer cannot resurrect candidate_answering
-  //   on a torn-down phase.
-  const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Transcript watchdog: auto-submit if text exists but no request leaves the client.
   const transcriptWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -273,42 +270,21 @@ export default function InterviewSessionPage() {
   const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
   const { isPlaying: elIsPlaying, error: elTtsError, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
 
-  // Live mirrors of TTS playback state — read by the startup watchdog so it
-  // can distinguish "TTS playing normally" from "TTS silently failed". On iOS
-  // Safari / PWA the `utterance.onstart` event NEVER fires when speak() is
-  // invoked after route navigation (no gesture token), so neither `isSpeaking`
-  // nor `elIsPlaying` ever flips to true — that is the signal we use to
-  // fast-fail out of avatar_speaking instead of waiting the full hard deadline.
-  const isSpeakingRef = useRef(false)
-  const elIsPlayingRef = useRef(false)
-  // Per-question one-shot guard so `tts_started` logs exactly once per
-  // question even though isSpeaking/elIsPlaying can oscillate during a single
-  // utterance (Web Speech sometimes fires onstart twice on retry).
-  const ttsStartedLoggedForIndexRef = useRef<number>(-1)
-  useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
-  useEffect(() => { elIsPlayingRef.current = elIsPlaying }, [elIsPlaying])
-  useEffect(() => {
-    if (phase !== 'avatar_speaking') return
-    if (!(isSpeaking || elIsPlaying)) return
-    if (ttsStartedLoggedForIndexRef.current === currentIndex) return
-    ttsStartedLoggedForIndexRef.current = currentIndex
-    interviewStartupLog('tts_started', {
-      questionIndex: currentIndex,
-      engine: elIsPlaying ? 'elevenlabs' : 'browser',
-    })
-  }, [phase, isSpeaking, elIsPlaying, currentIndex])
-  // Avatar-component-ready signal: fires the first time we enter the
-  // avatar_speaking phase with hydrated interview data. Distinct from
-  // tts_started — the avatar surface is mounted and visible even when
-  // TTS itself silently fails (iOS case).
   const avatarReadyLoggedRef = useRef(false)
   useEffect(() => {
     if (avatarReadyLoggedRef.current) return
-    if (phase !== 'avatar_speaking') return
+    if (
+      phase !== 'avatar_speaking' &&
+      phase !== 'awaiting_audio_unlock'
+    ) return
     if (!interviewData) return
     avatarReadyLoggedRef.current = true
     interviewStartupLog('avatar_ready', { interviewerId: resolvedInterviewerId })
-  }, [phase, interviewData, resolvedInterviewerId])
+    interviewFlowLog('avatar', 'avatar_surface_ready', {
+      interviewId,
+      interviewerId: resolvedInterviewerId,
+    })
+  }, [phase, interviewData, resolvedInterviewerId, interviewId])
 
   // ─── Deepgram Microphone (Deepgram mode) ──────────────────
   const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
@@ -714,12 +690,217 @@ export default function InterviewSessionPage() {
       return
     }
 
-    setPhase('avatar_speaking')
+    setPhase(
+      interviewAudio.needsUnlock && !interviewAudio.isUnlocked
+        ? 'awaiting_audio_unlock'
+        : 'avatar_speaking',
+    )
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startupStep, phase, currentIndex])
 
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
+  const totalQuestions = interviewData?.questions.length ?? 0
+
+  const interviewAudio = useInterviewAudio(interviewId)
+  const { goToInterviewerTurn } = useInterviewSessionController({
+    interviewId,
+    questionIndex: currentIndex,
+    audioUnlocked: interviewAudio.isUnlocked,
+    setPhase,
+    stopTimer,
+  })
+  const startDgListeningRef = useRef<() => Promise<unknown>>(async () => {})
+  const startListeningRef = useRef<() => Promise<unknown>>(async () => {})
+
+  const telemetryCtx = useMemo(
+    () => ({
+      interviewId: interviewId ?? '',
+      questionIndex: currentIndex,
+      phase,
+    }),
+    [interviewId, currentIndex, phase],
+  )
+
+  const enterAnsweringPhase = useCallback(
+    (reason: AvatarAnsweringReason) => {
+      const allowed: AvatarAnsweringReason[] = [
+        'audio_completed',
+        'user_continue',
+        'voice_disabled',
+      ]
+      if (!allowed.includes(reason)) {
+        lifecycleWarn('session', 'enter_answering_rejected', { reason })
+        return
+      }
+      if (!mountedRef.current) return
+      if (phaseRef.current !== 'avatar_finished') {
+        lifecycleLog('session', 'enter_answering_skipped', { phase: phaseRef.current })
+        return
+      }
+      const manual = useManualInputRef.current
+      const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
+      setAnswerTimeBudget(budget)
+      setPhase('candidate_answering')
+      setAnswerStartTime(Date.now())
+      resetTimer(budget)
+      startTimer()
+      interviewFlowLog('timer', 'timer_started', {
+        interviewId,
+        questionIndex: currentIndex,
+        budgetSeconds: budget,
+        mode: inputMode,
+      })
+      interviewStartupLog('timer_started', {
+        questionIndex: currentIndex,
+        budgetSeconds: budget,
+        mode: inputMode,
+      })
+      track('TIMER', 'timer_started', { budgetSeconds: budget, mode: inputMode, avatarReason: reason })
+      voiceDebug('question_transitioned', {
+        mode: inputMode,
+        question_index: currentIndex,
+        has_follow_up: !!pendingFollowUp,
+      })
+      if (inputMode === 'deepgram') {
+        voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'deepgram' })
+        interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_avatar_finished' })
+        void startDgListeningRef.current()
+      } else if (!useManualInputRef.current && isMicSupported) {
+        voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'web_speech' })
+        interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_avatar_finished' })
+        void startListeningRef.current()
+      } else {
+        interviewStartupLog('listening_skipped', {
+          mode: inputMode,
+          useManualInput: useManualInputRef.current,
+          micSupported: isMicSupported,
+        })
+      }
+    },
+    [
+      currentIndex,
+      inputMode,
+      interviewId,
+      isMicSupported,
+      pendingFollowUp,
+      resetTimer,
+      startTimer,
+      track,
+    ],
+  )
+
+  const avatarSpeaking = useInterviewAvatarSpeaking({
+    phase,
+    setPhase,
+    phaseRef,
+    mountedRef,
+    currentIndex,
+    currentQuestion,
+    interviewRole: interviewData?.role ?? '',
+    totalQuestions,
+    interviewerDisplayName,
+    pendingFollowUp,
+    inputMode,
+    audioUnlocked: interviewAudio.isUnlocked,
+    telemetryCtx,
+    buildIntro: buildSessionIntro,
+    speakQuestion,
+    stopSpeaking,
+    elSpeak,
+    elStop,
+    isSpeaking,
+    elIsPlaying,
+    currentWordIndex,
+    lastVoiceMeta,
+    onAvatarFinished: enterAnsweringPhase,
+  })
+
+  const handleUnlockAudioGesture = useCallback(() => {
+    interviewAudio.unlock()
+    trackAvatarTelemetry('avatar_unlock_success', telemetryCtx, { mode: inputMode })
+    track('INTERVIEW_FLOW', 'tts_gesture_unlocked', { mode: inputMode })
+    if (phase === 'awaiting_audio_unlock' || phase === 'avatar_speaking') {
+      setPhase('avatar_speaking')
+    }
+  }, [interviewAudio, phase, inputMode, track, telemetryCtx])
+
+  const {
+    spokenText,
+    awaitingAudioTap,
+    showPlaybackRecovery,
+    playbackFailureMessage,
+    continueWithoutAudio,
+    retryAudio,
+    audioActuallyStarted,
+    avatarHeaderLabel,
+  } = avatarSpeaking
+
+  const [videoRecoverTick, setVideoRecoverTick] = useState(0)
+  useInterviewPwaLifecycle({
+    phase,
+    onVisibleResume: () => setVideoRecoverTick((t) => t + 1),
+    onAvatarSpeakingResume: () => {
+      if (!audioActuallyStarted && phaseRef.current === 'avatar_speaking') {
+        retryAudio()
+      }
+    },
+  })
+
+  useEffect(() => {
+    if (phase === 'awaiting_audio_unlock') {
+      trackAvatarTelemetry('avatar_unlock_required', telemetryCtx, { mode: inputMode })
+    }
+  }, [phase, telemetryCtx, inputMode])
+
+  const voiceUi = useInterviewVoiceUi({
+    inputMode,
+    useManualInput,
+    isMicSupported,
+    permissionState,
+    recognitionState,
+    micError,
+    webSpeechActive,
+    dgListening,
+    sessionPhase: phase,
+  })
+
+  useEffect(() => {
+    installInterviewDebug(() => ({
+      phase,
+      questionIndex: currentIndex,
+      questionText: currentQuestion?.question_text ?? null,
+      audio: {
+        needsUnlock: interviewAudio.needsUnlock,
+        unlocked: interviewAudio.isUnlocked,
+        actuallyStarted: audioActuallyStarted,
+        showRecovery: showPlaybackRecovery,
+        failureMessage: showPlaybackRecovery ? playbackFailureMessage : null,
+      },
+      video: { speakingUiActive: audioActuallyStarted },
+      mic: {
+        label: voiceUi.label,
+        phase: voiceUi.phase,
+        permission: permissionState,
+        recognition: recognitionState,
+        inputMode,
+      },
+      ts: Date.now(),
+    }))
+  }, [
+    phase,
+    currentIndex,
+    currentQuestion,
+    interviewAudio.needsUnlock,
+    interviewAudio.isUnlocked,
+    audioActuallyStarted,
+    showPlaybackRecovery,
+    playbackFailureMessage,
+    voiceUi,
+    permissionState,
+    recognitionState,
+    inputMode,
+  ])
 
   const celebrationDialog = (
     <TierUnlockCelebrationDialog
@@ -969,18 +1150,18 @@ export default function InterviewSessionPage() {
     }
   }, [dgStartRecording, stopDgListening, interviewId])
 
+  useEffect(() => {
+    startDgListeningRef.current = startDgListening
+    startListeningRef.current = startListening
+  }, [startDgListening, startListening])
+
   // Cleanup Deepgram + lifecycle guards on unmount. Order matters:
   //   1. mark unmounted → every async callback already in flight bails on its
   //      next state-write attempt
-  //   2. clear the post-TTS timer → no resurrection of candidate_answering
-  //   3. tear down the Deepgram socket + mic stream
+  //   2. tear down the Deepgram socket + mic stream
   useEffect(() => {
     return () => {
       mountedRef.current = false
-      if (postTtsTimerRef.current) {
-        clearTimeout(postTtsTimerRef.current)
-        postTtsTimerRef.current = null
-      }
       dgStartInFlightRef.current = false
       const stt = dgSttRef.current
       dgSttRef.current = null
@@ -995,183 +1176,6 @@ export default function InterviewSessionPage() {
       lifecycleLog('session', 'unmounted')
     }
   }, [])
-
-  // ─── Speak current question when phase = avatar_speaking ──
-  useEffect(() => {
-    if (phase !== 'avatar_speaking' || !currentQuestion) return
-
-    // A pending orchestrator follow-up takes precedence over the static question:
-    // it's a contextual probe on the SAME question the candidate just answered.
-    const intro = pendingFollowUp
-      ? pendingFollowUp.text
-      : buildSessionIntro(
-          currentIndex,
-          currentQuestion.question_text,
-          interviewerDisplayName,
-          interviewData?.role ?? '',
-          interviewData?.questions.length ?? 0,
-        )
-
-    setSpokenText(intro)
-
-    const enteredAt = Date.now()
-    interviewStartupLog('avatar_speaking_entered', {
-      questionIndex: currentIndex,
-      introLength: intro.length,
-      mode: inputMode,
-      pendingFollowUp: !!pendingFollowUp,
-    })
-
-    // Exactly-once guard. The natural TTS `onend`, the fast-fail watchdog and
-    // the hard deadline all converge on this single resolver — whoever wins
-    // advances the phase machine, the rest become silent no-ops. Without this
-    // the iOS "no onstart no onend" failure mode either deadlocks forever
-    // (current bug) or double-transitions when the slow real onend lands.
-    let ttsResolved = false
-    const advanceToAnswering = () => {
-      // The 500ms gap is registered in a ref so any phase change (Skip, Retry,
-      // Submit, navigation) clears it before it fires. Without this, a Skip
-      // during the gap would resurrect candidate_answering after the user
-      // already advanced.
-      if (postTtsTimerRef.current) clearTimeout(postTtsTimerRef.current)
-      postTtsTimerRef.current = setTimeout(() => {
-        postTtsTimerRef.current = null
-        // Triple-validate before mutating phase: still mounted, still in the
-        // avatar_speaking phase that scheduled us, and still on the same
-        // question index. Stale completions (e.g. TTS-complete that arrives
-        // for a question the user already skipped) become silent no-ops.
-        if (!mountedRef.current) {
-          lifecycleWarn('session', 'post_tts_unmounted')
-          return
-        }
-        if (phaseRef.current !== 'avatar_speaking') {
-          lifecycleLog('session', 'post_tts_phase_changed', { current: phaseRef.current })
-          return
-        }
-        const manual = useManualInputRef.current
-        const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
-        setAnswerTimeBudget(budget)
-        setPhase('candidate_answering')
-        setAnswerStartTime(Date.now())
-        resetTimer(budget)
-        startTimer()
-        interviewStartupLog('timer_started', {
-          questionIndex: currentIndex,
-          budgetSeconds: budget,
-          mode: inputMode,
-        })
-        track('TIMER', 'timer_started', { budgetSeconds: budget, mode: inputMode })
-        // Continuous conversation: the mic auto-activates the moment the
-        // interviewer finishes — the candidate never re-enables it manually.
-        voiceDebug('question_transitioned', {
-          mode: inputMode,
-          question_index: currentIndex,
-          has_follow_up: !!pendingFollowUp,
-        })
-        if (inputMode === 'deepgram') {
-          voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'deepgram' })
-          interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_tts_auto' })
-          void startDgListening()
-        } else if (!useManualInputRef.current && isMicSupported) {
-          // Web Speech mode — start listening immediately so the UI shows
-          // "Listening…" before the candidate says anything (not after).
-          voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'web_speech' })
-          interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_tts_auto' })
-          void startListening()
-        } else {
-          interviewStartupLog('listening_skipped', {
-            mode: inputMode,
-            useManualInput: useManualInputRef.current,
-            micSupported: isMicSupported,
-          })
-        }
-      }, 500)
-    }
-
-    const safeComplete = (reason: 'natural_end' | 'fast_fail_no_start' | 'hard_deadline') => {
-      if (ttsResolved) return
-      ttsResolved = true
-      interviewStartupLog('tts_resolved', {
-        reason,
-        questionIndex: currentIndex,
-        elapsedMs: Date.now() - enteredAt,
-        ttsStarted: isSpeakingRef.current || elIsPlayingRef.current,
-      })
-      advanceToAnswering()
-    }
-
-    // ── Fast-fail watchdog ─────────────────────────────────────────────────
-    // iOS Safari + iOS PWA after route navigation: speechSynthesis.speak()
-    // and AudioContext.decodeAudioData() are silent no-ops without a fresh
-    // gesture in THIS document. No onstart, no onend, no onerror fires — the
-    // session deadlocks in `avatar_speaking` with "Preparing…" forever.
-    //
-    // If neither TTS engine has flipped to "actually playing" within 5s, give
-    // up on audio and let the user answer. Avatar/TTS are enhancements; they
-    // must NEVER block the interview.
-    const FAST_FAIL_MS = 5000
-    const fastFailTimer = setTimeout(() => {
-      if (ttsResolved) return
-      if (!isSpeakingRef.current && !elIsPlayingRef.current) {
-        interviewStartupLog('tts_never_started', {
-          questionIndex: currentIndex,
-          mode: inputMode,
-          elapsedMs: Date.now() - enteredAt,
-          likelyCause: 'ios_autoplay_block_or_silent_speech_failure',
-        })
-        safeComplete('fast_fail_no_start')
-      }
-    }, FAST_FAIL_MS)
-
-    // ── Hard deadline ──────────────────────────────────────────────────────
-    // Even if TTS DID start playing, a buggy engine may never fire `onend`
-    // (Safari has a long-text onend bug; ElevenLabs `source.onended` can be
-    // dropped if the AudioContext is suspended mid-play). Estimate natural
-    // duration from text length (~55ms/char ≈ adult speaking pace) and add
-    // 2.5s grace. Capped at 18s so the worst case is still bounded.
-    const estimatedSpeechMs = Math.min(18000, Math.max(6000, intro.length * 55 + 2500))
-    const hardDeadlineTimer = setTimeout(() => {
-      if (ttsResolved) return
-      interviewStartupLog('tts_hard_deadline_hit', {
-        questionIndex: currentIndex,
-        deadlineMs: estimatedSpeechMs,
-        ttsWasPlaying: isSpeakingRef.current || elIsPlayingRef.current,
-      })
-      safeComplete('hard_deadline')
-    }, estimatedSpeechMs)
-
-    if (inputMode === 'deepgram') {
-      // ElevenLabs TTS: follow-up tone wins; else last answer's metadata; else neutral
-      const tone: InterviewerTone =
-        pendingFollowUp?.tone ?? lastVoiceMeta?.tone ?? 'neutral'
-      void elSpeak(intro, tone, () => safeComplete('natural_end'))
-    } else {
-      speakQuestion(intro, () => safeComplete('natural_end'))
-    }
-
-    // Effect cleanup: when the avatar_speaking phase ends (Skip / Retry /
-    // Submit / Next / unmount / fast-fail watchdog), cancel the post-TTS timer
-    // AND both watchdogs AND explicitly stop any TTS engine that may still be
-    // mid-flight. iOS Safari case: when the fast-fail watchdog transitions us
-    // to candidate_answering, speechSynthesis may still have a queued (silently
-    // pending) utterance that wakes up later and fires onend — that stale
-    // onend used to call safeComplete('natural_end'), which was a no-op
-    // (already resolved), but the underlying engine could also fire onstart
-    // after we entered candidate_answering. Cancelling here keeps the engine
-    // state in lock-step with our phase machine.
-    return () => {
-      clearTimeout(fastFailTimer)
-      clearTimeout(hardDeadlineTimer)
-      if (postTtsTimerRef.current) {
-        clearTimeout(postTtsTimerRef.current)
-        postTtsTimerRef.current = null
-        lifecycleLog('session', 'post_tts_timer_cancelled_on_phase_exit')
-      }
-      try { stopSpeaking() } catch { /* */ }
-      try { elStop() } catch { /* */ }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentIndex, pendingFollowUp])
 
   // ─── Submit Answer ────────────────────────────────────────
   const handleSubmitAnswer = useCallback(async (source: 'button' | 'timer' | 'vad' | 'watchdog' = 'button') => {
@@ -1314,7 +1318,7 @@ export default function InterviewSessionPage() {
       // Cast through SessionPhase to defeat TS control-flow narrowing from
       // the entry guard above. At runtime the ref *can* mutate during the
       // await, even though the type-checker has lost that information.
-      const phaseAfterAwait = phaseRef.current as SessionPhase
+      const phaseAfterAwait = phaseRef.current as RuntimePhase
       if (!mountedRef.current) {
         lifecycleWarn('session', 'submit_response_after_unmount')
         return
@@ -1666,7 +1670,7 @@ export default function InterviewSessionPage() {
     // Re-entering avatar_speaking with pendingFollowUp set makes the speak
     // effect read the follow-up text instead of advancing the static playlist.
     if (pendingFollowUp) {
-      setPhase('avatar_speaking')
+      goToInterviewerTurn()
       return
     }
 
@@ -1678,8 +1682,8 @@ export default function InterviewSessionPage() {
     }
 
     setCurrentIndex(prev => prev + 1)
-    setPhase('avatar_speaking')
-  }, [currentIndex, interviewData, pendingFollowUp, resetTranscript, handleCompleteInterview, track])
+    goToInterviewerTurn()
+  }, [currentIndex, interviewData, pendingFollowUp, resetTranscript, handleCompleteInterview, track, goToInterviewerTurn])
 
   // Keep the ref current for the auto-flow effect (forward-reference).
   useEffect(() => { handleNextQuestionRef.current = handleNextQuestion }, [handleNextQuestion])
@@ -1707,8 +1711,8 @@ export default function InterviewSessionPage() {
     const isLast = currentIndex >= interviewData.questions.length - 1
     if (isLast) { handleCompleteInterview(); return }
     setCurrentIndex(prev => prev + 1)
-    setPhase('avatar_speaking')
-  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, elStop, stopDgListening, resetTranscript, handleCompleteInterview])
+    goToInterviewerTurn()
+  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, elStop, stopDgListening, resetTranscript, handleCompleteInterview, goToInterviewerTurn])
 
   // ─── Retry (re-speak current question) ───────────────────
   const handleRetry = useCallback(() => {
@@ -1727,8 +1731,8 @@ export default function InterviewSessionPage() {
       : TIME_PER_QUESTION
     resetTimer(budget)
     setAnswerTimeBudget(budget)
-    setPhase('avatar_speaking')
-  }, [phase, stopListening, elStop, stopDgListening, resetTranscript, stopTimer, resetTimer])
+    goToInterviewerTurn()
+  }, [phase, stopListening, elStop, stopDgListening, resetTranscript, stopTimer, resetTimer, goToInterviewerTurn])
 
   // ─── Toggle Mic ───────────────────────────────────────────
   const handleToggleMic = async () => {
@@ -1842,8 +1846,10 @@ export default function InterviewSessionPage() {
     )
   }
 
-  const totalQuestions = interviewData.questions.length
-  const progressPct = Math.round((currentIndex / totalQuestions) * 100)
+  const renderTotalQuestions = interviewData.questions.length
+  const sessionProgressPct = Math.round(
+    ((currentIndex + 1) / renderTotalQuestions) * 100,
+  )
 
   return (
     <>
@@ -1873,13 +1879,13 @@ export default function InterviewSessionPage() {
           <div className="flex items-center gap-4">
             <div className="hidden md:block w-48">
               <div className="flex justify-between text-xs text-(--text-muted) mb-1">
-                <span>Question {currentIndex + 1} of {totalQuestions}</span>
-                <span>{progressPct}%</span>
+                <span>Question {currentIndex + 1} of {renderTotalQuestions}</span>
+                <span>{sessionProgressPct}%</span>
               </div>
               <div className="h-1.5 w-full rounded-full bg-(--bg-tertiary)">
                 <div
                   className="h-full rounded-full bg-(--accent-primary) transition-all duration-500"
-                  style={{ width: `${progressPct}%` }}
+                  style={{ width: `${sessionProgressPct}%` }}
                 />
               </div>
             </div>
@@ -1914,7 +1920,7 @@ export default function InterviewSessionPage() {
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
                     AI INTERVIEWER
                   </span>
-                  {isSpeaking && (
+                  {audioActuallyStarted && (
                     <span className="flex items-center gap-1 rounded-full
                                      bg-(--accent-primary)/15 px-2 py-0.5
                                      text-[10px] font-semibold text-(--accent-primary)">
@@ -1925,22 +1931,42 @@ export default function InterviewSessionPage() {
                   )}
                 </div>
                 <span className="text-xs font-semibold text-(--text-secondary)">
-                  {progressPct}%
+                  {avatarHeaderLabel}
                 </span>
               </div>
 
+              <div className="relative">
               <AvatarPlayer
+                key={`${resolvedInterviewerId}-${videoRecoverTick}`}
                 interviewerId={resolvedInterviewerId as InterviewerId}
-                isSpeaking={isSpeaking}
+                isSpeaking={audioActuallyStarted}
+                telemetryCtx={telemetryCtx}
                 className="aspect-[4/3] w-full bg-(--bg-secondary)"
               />
+              {awaitingAudioTap && (
+                <button
+                  type="button"
+                  onClick={handleUnlockAudioGesture}
+                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3
+                             bg-black/45 px-6 text-center backdrop-blur-[2px]"
+                  aria-label="Tap to hear the interviewer ask the question"
+                >
+                  <span className="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-(--text-primary) shadow-lg">
+                    Tap to hear the question
+                  </span>
+                  <span className="max-w-[16rem] text-xs text-white/90">
+                    Required on iPhone so {resolvedInterviewer?.name ?? 'Priya'} can speak before you answer.
+                  </span>
+                </button>
+              )}
+              </div>
             </div>
             <div className="text-xs text-(--text-secondary)">
               Interviewer: {resolvedInterviewer?.name ?? 'Priya'}
             </div>
 
             {/* Avatar Caption — shown while TTS is active */}
-            {isSpeaking && currentQuestion && (
+            {audioActuallyStarted && currentQuestion && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1952,8 +1978,45 @@ export default function InterviewSessionPage() {
               </motion.div>
             )}
 
-            {/* When not speaking: show question text statically */}
-            {!isSpeaking && (
+            {awaitingAudioTap && (
+              <div className="dashboard-premium-card p-4 text-sm text-(--text-secondary)">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted) mb-2">
+                  Current Question
+                </p>
+                <p>Tap the avatar above to hear the question read aloud. The timer starts after the interviewer finishes.</p>
+              </div>
+            )}
+
+            {showPlaybackRecovery && phase === 'avatar_speaking' && (
+              <div className="dashboard-premium-card space-y-3 p-4 border border-amber-200/80 bg-amber-50/80">
+                <p className="text-sm font-medium text-amber-900">
+                  {playbackFailureMessage}
+                </p>
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={retryAudio}
+                    className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
+                  >
+                    Retry Audio
+                  </button>
+                  <button
+                    type="button"
+                    onClick={continueWithoutAudio}
+                    className="flex-1 rounded-lg bg-(--accent-primary) px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Continue Without Audio
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* After TTS: show question text for reference (not during interviewer turn) */}
+            {!audioActuallyStarted &&
+              !awaitingAudioTap &&
+              phase !== 'avatar_speaking' &&
+              phase !== 'avatar_finished' &&
+              phase !== 'awaiting_audio_unlock' && (
               <div className="dashboard-premium-card p-4 text-sm
                               leading-relaxed text-(--text-primary)">
                 <p className="text-[10px] font-semibold uppercase tracking-widest
@@ -1969,10 +2032,10 @@ export default function InterviewSessionPage() {
               <div className="flex items-center justify-between text-xs
                               text-(--text-secondary) font-semibold uppercase tracking-widest">
                 <span>PROGRESS</span>
-                <span>{currentIndex + 1}/{totalQuestions}</span>
+                <span>{currentIndex + 1}/{renderTotalQuestions}</span>
               </div>
 
-              {/* Timer — only show during candidate_answering */}
+              {/* Timer — only during candidate_answering (never during avatar turn) */}
               <div className="flex items-center justify-center py-2">
                 {phase === 'candidate_answering' ? (
                   <TimerCircle
@@ -1984,10 +2047,7 @@ export default function InterviewSessionPage() {
                   <div className="h-24 w-24 flex items-center justify-center
                                   rounded-full border-2 border-(--bg-tertiary)">
                     <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
-                      {phase === 'avatar_speaking' ? 'Preparing…'
-                       : phase === 'submitting' ? 'Scoring…'
-                       : phase === 'feedback' ? 'Done'
-                       : ''}
+                      {progressRingLabel(phase)}
                     </span>
                   </div>
                 )}
@@ -2004,7 +2064,7 @@ export default function InterviewSessionPage() {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-(--text-primary)">
-                    {totalQuestions}
+                    {renderTotalQuestions}
                   </p>
                   <p className="text-(--text-muted) uppercase tracking-wider text-[10px]">
                     Total
@@ -2325,11 +2385,11 @@ export default function InterviewSessionPage() {
                       : dgIsRecording
                         ? <><Radio size={12} className="animate-pulse" /> Connecting voice channel…</>
                         : <><Radio size={12} /> AI Voice</>
-                    : webSpeechActive
-                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Listening…</>
-                      : recognitionState === 'starting'
-                        ? <><Mic size={12} className="animate-pulse" /> Starting mic…</>
-                        : <><MicOff size={12} /> {isMicSupported ? 'Mic off' : 'Type to answer'}</>
+                    : voiceUi.showListeningIndicator
+                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> {voiceUi.label}</>
+                      : voiceUi.phase === 'starting_microphone'
+                        ? <><Mic size={12} className="animate-pulse" /> {voiceUi.label}</>
+                        : <><MicOff size={12} /> {voiceUi.label}</>
                   }
                 </div>
               </div>

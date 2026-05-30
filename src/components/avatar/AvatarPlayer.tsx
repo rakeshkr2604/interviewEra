@@ -2,21 +2,51 @@
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { useResilientVideo } from '@/hooks/useResilientVideo'
+import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
+import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
+import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-telemetry'
 import Image from 'next/image'
+import { useEffect, useRef } from 'react'
 
 interface AvatarPlayerProps {
   interviewerId: InterviewerId
   isSpeaking: boolean
   className?: string
+  telemetryCtx?: InterviewTelemetryContext
 }
 
-export function AvatarPlayer({ interviewerId, isSpeaking, className = '' }: AvatarPlayerProps) {
+export function AvatarPlayer({
+  interviewerId,
+  isSpeaking,
+  className = '',
+  telemetryCtx,
+}: AvatarPlayerProps) {
   const interviewer = getInterviewerById(interviewerId)
   const videoSrc = interviewer?.video ?? ''
   const avatarImageSrc = interviewer?.avatarImage ?? '/default-avatar.png'
 
-  const { videoRef, failed } = useResilientVideo({ active: isSpeaking, src: videoSrc })
+  const { videoRef, failed, recover } = useResilientVideo({ active: isSpeaking, src: videoSrc })
   const hasVideo = !!videoSrc && !failed
+  const wasSpeakingRef = useRef(false)
+
+  useEffect(() => {
+    if (isSpeaking && !wasSpeakingRef.current) {
+      interviewFlowLog('avatar', 'video_started', { src: videoSrc })
+      if (telemetryCtx) trackAvatarTelemetry('avatar_video_started', telemetryCtx, { src: videoSrc })
+    }
+    if (!isSpeaking && wasSpeakingRef.current) {
+      interviewFlowLog('avatar', 'video_stopped', { src: videoSrc })
+    }
+    wasSpeakingRef.current = isSpeaking
+  }, [isSpeaking, videoSrc, telemetryCtx])
+
+  useEffect(() => {
+    if (isSpeaking && failed) {
+      interviewFlowLog('avatar', 'video_failed', { src: videoSrc })
+      if (telemetryCtx) trackAvatarTelemetry('avatar_video_failed', telemetryCtx, { src: videoSrc }, 'warn')
+      recover()
+    }
+  }, [isSpeaking, failed, recover, videoSrc, telemetryCtx])
 
   return (
     <div

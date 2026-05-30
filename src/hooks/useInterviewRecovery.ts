@@ -32,7 +32,15 @@ export const ANSWERING_BACKSTOP_GRACE_MS = 12_000;
 
 export interface UseInterviewRecoveryParams {
   /** Current runtime phase. Phase changes re-arm the watchdogs from entry time. */
-  phase: 'loading' | 'avatar_speaking' | 'candidate_answering' | 'submitting' | 'feedback' | 'completed';
+  phase:
+    | 'loading'
+    | 'awaiting_audio_unlock'
+    | 'avatar_speaking'
+    | 'avatar_finished'
+    | 'candidate_answering'
+    | 'submitting'
+    | 'feedback'
+    | 'completed';
   /** A queued orchestrator follow-up auto-advances; static questions do not. */
   hasPendingFollowUp: boolean;
   /** Answer budget (seconds) for the current question — drives the backstop deadline. */

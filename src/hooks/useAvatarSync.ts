@@ -2,12 +2,13 @@
 import { useCallback, useRef, useState } from 'react'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { useTTS } from './useTTS'
+import type { PlaybackCallbacks } from '@/lib/voice/playback-callbacks'
 
 interface UseAvatarSyncReturn {
   isSpeaking: boolean
   currentWordIndex: number
   speechError: string | null
-  speakQuestion: (text: string, onComplete?: () => void) => void
+  speakQuestion: (text: string, callbacks?: PlaybackCallbacks) => void
   stopSpeaking: () => void
 }
 
@@ -16,7 +17,7 @@ export function useAvatarSync(interviewerId: InterviewerId | null): UseAvatarSyn
   const lastMatchedIndexRef = useRef(0)
   const { speak, stop, isSpeaking, error } = useTTS(interviewerId)
 
-  const speakQuestion = useCallback((text: string, onComplete?: () => void) => {
+  const speakQuestion = useCallback((text: string, callbacks?: PlaybackCallbacks) => {
     setCurrentWordIndex(0)
     lastMatchedIndexRef.current = 0
 
@@ -34,7 +35,7 @@ export function useAvatarSync(interviewerId: InterviewerId | null): UseAvatarSyn
         lastMatchedIndexRef.current = nextIndex
         setCurrentWordIndex(nextIndex)
       },
-      onComplete  // now wired through to utterance.onend
+      callbacks,
     )
   }, [speak])
 

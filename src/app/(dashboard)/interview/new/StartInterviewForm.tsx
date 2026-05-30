@@ -12,6 +12,7 @@ import {
   readDefaultDifficulty,
   readPreferredInterviewerId,
 } from '@/lib/settings/client-preferences';
+import { unlockAudioForInterview } from '@/lib/voice/audio-gesture';
 import { cn } from '@/lib/utils';
 import type { DomainPack, PlanTier } from '@/types/app.types';
 
@@ -68,6 +69,8 @@ export function StartInterviewForm({
 
   async function handleStart() {
     if (!canSubmit) return;
+    // Consume gesture token while the click is still active (helps some mobile browsers).
+    unlockAudioForInterview();
     setLoading(true);
     setError(null);
 

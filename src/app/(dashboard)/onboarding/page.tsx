@@ -16,6 +16,7 @@ import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
 import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
+import { unlockAudioForInterview } from '@/lib/voice/audio-gesture'
 
 const STEP_LABELS = ['You & goal', 'Resume & start']
 const TOTAL_STEPS = 2
@@ -514,6 +515,7 @@ export default function OnboardingPage() {
 
   const handleStartInterview = async () => {
     if (startLoading) return
+    unlockAudioForInterview()
     setStartLoading(true)
     setStartError('')
 
