@@ -31,7 +31,7 @@ import {
 } from '@/components/retention/TierUnlockCelebrationDialog'
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
-import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog } from '@/lib/voice/lifecycle-log'
+import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interviewLog } from '@/lib/voice/lifecycle-log'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 
@@ -252,6 +252,8 @@ export default function InterviewSessionPage() {
   //   Submit, unmount) so an in-flight timer cannot resurrect candidate_answering
   //   on a torn-down phase.
   const postTtsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Transcript watchdog: auto-submit if text exists but no request leaves the client.
+  const transcriptWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
@@ -367,6 +369,47 @@ export default function InterviewSessionPage() {
 
   const manualAnswerGrowEnabled = phase === 'candidate_answering' && useManualInput
   const manualAnswerRef = useAutoGrowTextarea(manualAnswer, manualAnswerGrowEnabled)
+
+  // Authoritative answer text for submit — unions voice refs, manual input, and
+  // the display mirror so a mic-error fallback to text mode cannot discard a
+  // voice transcript that never reached manualAnswer state.
+  const resolveSubmittedText = useCallback((): string => {
+    if (inputMode === 'deepgram') {
+      return (dgTranscript.trim() || dgInterim.trim())
+    }
+    const voice = getMergedTranscript().trim()
+    const manual = manualAnswer.trim()
+    const display = useManualInput
+      ? manual
+      : (transcript + ' ' + interimTranscript).trim()
+    return voice || manual || display
+  }, [
+    inputMode,
+    dgTranscript,
+    dgInterim,
+    getMergedTranscript,
+    manualAnswer,
+    useManualInput,
+    transcript,
+    interimTranscript,
+  ])
+
+  // When mic errors force manual UI, copy any voice transcript into the textarea
+  // so submit and the user see the same payload.
+  useEffect(() => {
+    if (!useManualInput) return
+    const voice = getMergedTranscript().trim()
+    if (voice && !manualAnswer.trim()) {
+      setManualAnswer(voice)
+    }
+  }, [
+    useManualInput,
+    inputMode,
+    getMergedTranscript,
+    manualAnswer,
+    transcript,
+    interimTranscript,
+  ])
 
   // ─── Load interview data ───────────────────────────────────
   useEffect(() => {
@@ -656,7 +699,9 @@ export default function InterviewSessionPage() {
   // ─── Deepgram STT helpers ─────────────────────────────────
   // Ref so startDgListening's VAD callback can call handleSubmitAnswer without
   // a forward-reference (handleSubmitAnswer is declared after startDgListening).
-  const handleSubmitAnswerRef = useRef<() => Promise<void>>(() => Promise.resolve())
+  const handleSubmitAnswerRef = useRef<
+    (source?: 'button' | 'timer' | 'vad' | 'watchdog') => Promise<void>
+  >(() => Promise.resolve())
   // Same forward-reference pattern: the auto-flow effect calls handleNextQuestion
   // which is declared further down.
   const handleNextQuestionRef = useRef<() => void>(() => {})
@@ -756,7 +801,7 @@ export default function InterviewSessionPage() {
           // VAD detected end of utterance — auto-submit if still answering.
           // Called through ref to avoid a forward-declaration error.
           if (phaseRef.current === 'candidate_answering' && mountedRef.current) {
-            queueMicrotask(() => { void handleSubmitAnswerRef.current() })
+            queueMicrotask(() => { void handleSubmitAnswerRef.current('vad') })
           }
           stopDgListening()
         },
@@ -1014,35 +1059,52 @@ export default function InterviewSessionPage() {
   }, [phase, currentIndex, pendingFollowUp])
 
   // ─── Submit Answer ────────────────────────────────────────
-  const handleSubmitAnswer = useCallback(async () => {
-    if (phaseRef.current !== 'candidate_answering') return
+  const handleSubmitAnswer = useCallback(async (source: 'button' | 'timer' | 'vad' | 'watchdog' = 'button') => {
+    if (phaseRef.current !== 'candidate_answering') {
+      interviewLog('submit_blocked', {
+        reason: 'wrong_phase',
+        phase: phaseRef.current,
+        source,
+      })
+      return
+    }
     // Synchronous double-submit guard. The Submit button, the VAD onFinal
     // callback and the timer-out effect all converge here; without this,
     // two evaluations would be billed for the same answer and the second
     // would land after setPhase('submitting') already changed the phase.
     if (submitInFlightRef.current) {
       lifecycleWarn('session', 'submit_duplicate_ignored')
+      interviewLog('submit_blocked', { reason: 'in_flight', source })
       return
     }
 
-    // Read the merged transcript BEFORE stopping the mic. getMergedTranscript()
-    // reads from refs, so we get whatever the recognizer has produced up to
-    // this microtask — including interim that hasn't been finalized yet.
+    // Read the merged transcript BEFORE stopping the mic. resolveSubmittedText()
+    // unions voice refs, manual input, and the display mirror.
     const durationSeconds = Math.round((Date.now() - answerStartTime) / 1000)
-    const submittedText = inputMode === 'deepgram'
-      ? dgTranscript.trim()
-      : useManualInput
-        ? manualAnswer.trim()
-        : getMergedTranscript()
+    const submittedText = resolveSubmittedText()
 
     // Empty-payload guard — block submission with explicit UI feedback rather
     // than sending "[No answer provided]" silently. The user can keep talking.
     if (!submittedText) {
       console.log('[speech] submit_blocked', { reason: 'empty_payload' })
+      interviewLog('submit_blocked', {
+        reason: 'empty_payload',
+        source,
+        useManualInput,
+        displayLen: answerText.length,
+        voiceLen: getMergedTranscript().length,
+        manualLen: manualAnswer.trim().length,
+      })
       setShowEmptyWarning(true)
       return
     }
 
+    interviewLog('submit_started', {
+      source,
+      payload_length: submittedText.length,
+      durationSeconds,
+      mode: inputMode,
+    })
     console.log('[speech] submitted', { payload_length: submittedText.length, durationSeconds, mode: inputMode })
 
     submitInFlightRef.current = true
@@ -1150,9 +1212,15 @@ export default function InterviewSessionPage() {
       setAnswers(prev => [...prev, record])
       setLastFeedback(result.data.feedback || '')
       setLastFillerAnalysis(fillerAnalysis)
+      interviewLog('submit_success', {
+        source,
+        questionIndex: currentIndex,
+        payload_length: finalTranscript.length,
+      })
       setPhase('feedback')
     } catch {
       if (!mountedRef.current) return
+      interviewLog('submit_failed', { source, questionIndex: currentIndex })
       setLastFeedback('Unable to evaluate this answer. Moving to next question.')
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
@@ -1165,7 +1233,8 @@ export default function InterviewSessionPage() {
     inputMode,
     useManualInput,
     manualAnswer,
-    dgTranscript,
+    answerText,
+    resolveSubmittedText,
     getMergedTranscript,
     currentIndex,
     currentQuestion,
@@ -1179,6 +1248,15 @@ export default function InterviewSessionPage() {
     stopDgListening,
   ])
 
+  const handleSubmitClick = useCallback(() => {
+    interviewLog('submit_clicked', {
+      answerLength: resolveSubmittedText().length,
+      displayLength: answerText.length,
+      phase: phaseRef.current,
+    })
+    void handleSubmitAnswer('button')
+  }, [handleSubmitAnswer, resolveSubmittedText, answerText])
+
   // Keep ref current so startDgListening's onFinal callback always calls the
   // latest version of handleSubmitAnswer (avoids stale closure + forward-ref issue).
   useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer }, [handleSubmitAnswer])
@@ -1186,10 +1264,51 @@ export default function InterviewSessionPage() {
   // ─── Timer runs out → auto submit ─────────────────────────
   useEffect(() => {
     if (timeLeft === 0 && phase === 'candidate_answering') {
-      void handleSubmitAnswer()
+      void handleSubmitAnswer('timer')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, phase])
+
+  // Emergency fallback: timer already expired but transcript arrived afterward
+  // (common on iOS when the first timer tick fires before speech results land).
+  useEffect(() => {
+    if (timeLeft !== 0 || phase !== 'candidate_answering') return
+    if (!answerText.trim()) return
+    void handleSubmitAnswer('timer')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeLeft, phase, answerText])
+
+  // Watchdog: transcript exists but no submit request leaves the client within 5s
+  // of the last transcript change.
+  useEffect(() => {
+    if (transcriptWatchdogRef.current) {
+      clearTimeout(transcriptWatchdogRef.current)
+      transcriptWatchdogRef.current = null
+    }
+    if (phase !== 'candidate_answering') return
+    const current = answerText.trim()
+    if (!current) return
+
+    transcriptWatchdogRef.current = setTimeout(() => {
+      if (phaseRef.current !== 'candidate_answering') return
+      if (submitInFlightRef.current) return
+      const payload = resolveSubmittedText().trim()
+      if (!payload) return
+      console.log('[INTERVIEW_STUCK_AFTER_TRANSCRIPT]', {
+        answerLength: payload.length,
+        questionIndex: currentIndex,
+        timeLeft,
+      })
+      void handleSubmitAnswerRef.current('watchdog')
+    }, 5000)
+
+    return () => {
+      if (transcriptWatchdogRef.current) {
+        clearTimeout(transcriptWatchdogRef.current)
+        transcriptWatchdogRef.current = null
+      }
+    }
+  }, [phase, answerText, currentIndex, timeLeft, resolveSubmittedText])
 
   // ─── Auto-flow: a pending follow-up advances itself ───────
   // No button click for follow-ups — after a brief natural pause the
@@ -1252,6 +1371,11 @@ export default function InterviewSessionPage() {
     if (!isMicSupported) return
     const startedAt = Date.now()
     const t = setTimeout(() => {
+      // If we already captured speech, keep voice mode — do not discard refs.
+      if (getMergedTranscript().trim() || hasRecentSpeech(5000)) {
+        interviewLog('mic_watchdog_suppressed', { reason: 'has_transcript' })
+        return
+      }
       // If recognition is genuinely active by now, do nothing.
       if (recognitionState === 'active') return
       // If permission is still being requested or denied, the existing UI
@@ -1276,6 +1400,10 @@ export default function InterviewSessionPage() {
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
+    interviewLog('advance_question', {
+      fromIndex: currentIndex,
+      hadFollowUp: Boolean(pendingFollowUp),
+    })
     resetTranscript()
     setManualAnswer('')
     setDgTranscript('')
@@ -1885,7 +2013,7 @@ export default function InterviewSessionPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => { void handleSubmitAnswer() }}
+                    onClick={handleSubmitClick}
                     className="flex-1 rounded-lg bg-(--accent-primary) py-2 text-xs
                                font-semibold text-white hover:bg-(--accent-hover)"
                   >
@@ -2028,8 +2156,8 @@ export default function InterviewSessionPage() {
 
                 {/* Submit */}
                 <button
-                  onClick={handleSubmitAnswer}
-                  disabled={phase !== 'candidate_answering'}
+                  onClick={handleSubmitClick}
+                  disabled={phase !== 'candidate_answering' && !answerText.trim()}
                   className="flex-1 flex items-center justify-center gap-2 rounded-xl
                              py-3 text-sm font-semibold text-white transition-all duration-200
                              disabled:opacity-40 disabled:cursor-not-allowed"

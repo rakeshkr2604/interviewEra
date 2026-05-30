@@ -146,3 +146,18 @@ export function interviewStartupLog(event: string, data?: LogData): void {
   const payload = { ...ctx, elapsedMs, ...(data ?? {}) };
   console.log(`[interview-startup] ${event}`, payload);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Always-on production voice + interview transition logs.
+// Low-volume, greppable in browser console and session replays.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function voiceLog(event: string, data?: LogData): void {
+  const payload = { ...getPlatformContext(), ...(data ?? {}) };
+  console.log(`[VOICE] ${event}`, payload);
+}
+
+export function interviewLog(event: string, data?: LogData): void {
+  const payload = { ...getPlatformContext(), ...(data ?? {}) };
+  console.log(`[INTERVIEW] ${event}`, payload);
+}

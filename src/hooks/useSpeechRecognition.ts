@@ -6,6 +6,7 @@ import {
   lifecycleLog as scopedLifecycleLog,
   lifecycleWarn as scopedLifecycleWarn,
   voiceDebug,
+  voiceLog,
   getPlatformContext,
 } from '@/lib/voice/lifecycle-log';
 
@@ -279,6 +280,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       tracks.forEach((track) => track.stop());
       setPermissionState('granted');
       voiceDebug('mic_permission_granted', {});
+      voiceLog('mic_permission_granted', {});
       micFlowLog('permission_granted', {});
       return true;
     } catch (err: unknown) {
@@ -412,6 +414,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       // onresult on the first interim/final event.
       setRecognitionState('starting');
       voiceDebug('recognition_started', { gen: myGen });
+      voiceLog('speech_started', { gen: myGen });
       micFlowLog('recognition_started', { gen: myGen });
       log('started');
     };
@@ -485,6 +488,13 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       // this stays cheap even when called every interim.
       if (changed) {
         setRecognitionState('active');
+        voiceLog('speech_result', {
+          gen: myGen,
+          has_final: Boolean(finalChunk),
+          has_interim: Boolean(interimChunk),
+          total_chars:
+            transcriptChunksRef.current.join(' ').length + interimRef.current.length,
+        });
         // Success resets the storm guard — the pipeline has just proven it
         // works, so any prior restart attempts are no longer pathological.
         restartHistoryRef.current = [];
@@ -566,6 +576,12 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
         should_listen: shouldListenRef.current,
         chunks: transcriptChunksRef.current.length,
       });
+      voiceLog('speech_ended', {
+        gen: myGen,
+        should_listen: shouldListenRef.current,
+        chunks: transcriptChunksRef.current.length,
+        had_interim: interimRef.current.length > 0,
+      });
       // Null out our reference so the visibility-resume effect can detect
       // "no live instance" and recover. Until this fix, the ref was never
       // cleared after onend, making visibility recovery dead code.
@@ -576,6 +592,17 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       // will transition idle → starting → active again — the UI gap is
       // intentional so "Listening…" never lingers during the restart window.
       setRecognitionState('idle');
+      // iOS Safari often ends the session before marking results final.
+      // Promote any in-flight interim into finalized chunks so the answer
+      // survives onend and submit() can read it from refs.
+      const pendingInterim = interimRef.current.trim();
+      if (pendingInterim) {
+        transcriptChunksRef.current.push(pendingInterim);
+        voiceDebug('interim_promoted_on_end', {
+          gen: myGen,
+          chars: pendingInterim.length,
+        });
+      }
       // CRITICAL: do NOT clear transcriptChunksRef here. The browser ends the
       // session on pause/silence/timeout, and we auto-restart below — clearing
       // would wipe the answer mid-sentence. Interim is cleared because a new
