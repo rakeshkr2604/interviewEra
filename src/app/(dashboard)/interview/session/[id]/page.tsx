@@ -31,7 +31,7 @@ import {
 } from '@/components/retention/TierUnlockCelebrationDialog'
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect-context'
-import { lifecycleLog, lifecycleWarn, voiceDebug } from '@/lib/voice/lifecycle-log'
+import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog } from '@/lib/voice/lifecycle-log'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 
@@ -267,6 +267,43 @@ export default function InterviewSessionPage() {
   const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
   const { isPlaying: elIsPlaying, error: elTtsError, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
 
+  // Live mirrors of TTS playback state — read by the startup watchdog so it
+  // can distinguish "TTS playing normally" from "TTS silently failed". On iOS
+  // Safari / PWA the `utterance.onstart` event NEVER fires when speak() is
+  // invoked after route navigation (no gesture token), so neither `isSpeaking`
+  // nor `elIsPlaying` ever flips to true — that is the signal we use to
+  // fast-fail out of avatar_speaking instead of waiting the full hard deadline.
+  const isSpeakingRef = useRef(false)
+  const elIsPlayingRef = useRef(false)
+  // Per-question one-shot guard so `tts_started` logs exactly once per
+  // question even though isSpeaking/elIsPlaying can oscillate during a single
+  // utterance (Web Speech sometimes fires onstart twice on retry).
+  const ttsStartedLoggedForIndexRef = useRef<number>(-1)
+  useEffect(() => { isSpeakingRef.current = isSpeaking }, [isSpeaking])
+  useEffect(() => { elIsPlayingRef.current = elIsPlaying }, [elIsPlaying])
+  useEffect(() => {
+    if (phase !== 'avatar_speaking') return
+    if (!(isSpeaking || elIsPlaying)) return
+    if (ttsStartedLoggedForIndexRef.current === currentIndex) return
+    ttsStartedLoggedForIndexRef.current = currentIndex
+    interviewStartupLog('tts_started', {
+      questionIndex: currentIndex,
+      engine: elIsPlaying ? 'elevenlabs' : 'browser',
+    })
+  }, [phase, isSpeaking, elIsPlaying, currentIndex])
+  // Avatar-component-ready signal: fires the first time we enter the
+  // avatar_speaking phase with hydrated interview data. Distinct from
+  // tts_started — the avatar surface is mounted and visible even when
+  // TTS itself silently fails (iOS case).
+  const avatarReadyLoggedRef = useRef(false)
+  useEffect(() => {
+    if (avatarReadyLoggedRef.current) return
+    if (phase !== 'avatar_speaking') return
+    if (!interviewData) return
+    avatarReadyLoggedRef.current = true
+    interviewStartupLog('avatar_ready', { interviewerId: resolvedInterviewerId })
+  }, [phase, interviewData, resolvedInterviewerId])
+
   // ─── Deepgram Microphone (Deepgram mode) ──────────────────
   const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
     useMicrophone()
@@ -342,6 +379,7 @@ export default function InterviewSessionPage() {
     // prematurely. Without this line the machine is stuck at
     // `fetching_interview` forever in development (and on any fast-refresh).
     mountedRef.current = true
+    interviewStartupLog('session_loaded', { interviewId })
     const loadInterview = async () => {
       // Hard deadline: if the interview data fetch stalls (slow DB, cold
       // serverless function, network issue) the candidate sees a clear error
@@ -390,6 +428,11 @@ export default function InterviewSessionPage() {
           Math.max(0, result.data.questions.length - 1)
         )
         setCurrentIndex(restoredIndex)
+        interviewStartupLog('question_loaded', {
+          interviewId,
+          questionCount: result.data.questions.length,
+          restoredIndex,
+        })
         // GATED TRANSITION 1 → 2: only advance when interview + non-empty
         // questions are present. The next step (audio init) is driven by its
         // own useEffect watching this state value.
@@ -497,11 +540,13 @@ export default function InterviewSessionPage() {
           throw new Error('Web Audio is not supported in this browser')
         }
         if (cancelled || !mountedRef.current) return
+        interviewStartupLog('tts_ready', { mode: inputMode })
         setAudioReady(true)
       } catch (err) {
         if (cancelled || !mountedRef.current) return
         const message = err instanceof Error ? err.message : 'Audio init failed'
         console.error('[startup] Audio probe failed:', message)
+        interviewStartupLog('tts_probe_failed', { error: message, mode: inputMode })
         setAudioInitError(message)
       }
     }
@@ -810,7 +855,21 @@ export default function InterviewSessionPage() {
 
     setSpokenText(intro)
 
-    const onTTSComplete = () => {
+    const enteredAt = Date.now()
+    interviewStartupLog('avatar_speaking_entered', {
+      questionIndex: currentIndex,
+      introLength: intro.length,
+      mode: inputMode,
+      pendingFollowUp: !!pendingFollowUp,
+    })
+
+    // Exactly-once guard. The natural TTS `onend`, the fast-fail watchdog and
+    // the hard deadline all converge on this single resolver — whoever wins
+    // advances the phase machine, the rest become silent no-ops. Without this
+    // the iOS "no onstart no onend" failure mode either deadlocks forever
+    // (current bug) or double-transitions when the slow real onend lands.
+    let ttsResolved = false
+    const advanceToAnswering = () => {
       // The 500ms gap is registered in a ref so any phase change (Skip, Retry,
       // Submit, navigation) clears it before it fires. Without this, a Skip
       // during the gap would resurrect candidate_answering after the user
@@ -837,6 +896,11 @@ export default function InterviewSessionPage() {
         setAnswerStartTime(Date.now())
         resetTimer(budget)
         startTimer()
+        interviewStartupLog('timer_started', {
+          questionIndex: currentIndex,
+          budgetSeconds: budget,
+          mode: inputMode,
+        })
         // Continuous conversation: the mic auto-activates the moment the
         // interviewer finishes — the candidate never re-enables it manually.
         voiceDebug('question_transitioned', {
@@ -846,31 +910,92 @@ export default function InterviewSessionPage() {
         })
         if (inputMode === 'deepgram') {
           voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'deepgram' })
+          interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_tts_auto' })
           void startDgListening()
         } else if (!useManualInputRef.current && isMicSupported) {
           // Web Speech mode — start listening immediately so the UI shows
           // "Listening…" before the candidate says anything (not after).
           voiceDebug('start_listening_triggered', { source: 'post_tts_auto', mode: 'web_speech' })
+          interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_tts_auto' })
           void startListening()
+        } else {
+          interviewStartupLog('listening_skipped', {
+            mode: inputMode,
+            useManualInput: useManualInputRef.current,
+            micSupported: isMicSupported,
+          })
         }
       }, 500)
     }
+
+    const safeComplete = (reason: 'natural_end' | 'fast_fail_no_start' | 'hard_deadline') => {
+      if (ttsResolved) return
+      ttsResolved = true
+      interviewStartupLog('tts_resolved', {
+        reason,
+        questionIndex: currentIndex,
+        elapsedMs: Date.now() - enteredAt,
+        ttsStarted: isSpeakingRef.current || elIsPlayingRef.current,
+      })
+      advanceToAnswering()
+    }
+
+    // ── Fast-fail watchdog ─────────────────────────────────────────────────
+    // iOS Safari + iOS PWA after route navigation: speechSynthesis.speak()
+    // and AudioContext.decodeAudioData() are silent no-ops without a fresh
+    // gesture in THIS document. No onstart, no onend, no onerror fires — the
+    // session deadlocks in `avatar_speaking` with "Preparing…" forever.
+    //
+    // If neither TTS engine has flipped to "actually playing" within 5s, give
+    // up on audio and let the user answer. Avatar/TTS are enhancements; they
+    // must NEVER block the interview.
+    const FAST_FAIL_MS = 5000
+    const fastFailTimer = setTimeout(() => {
+      if (ttsResolved) return
+      if (!isSpeakingRef.current && !elIsPlayingRef.current) {
+        interviewStartupLog('tts_never_started', {
+          questionIndex: currentIndex,
+          mode: inputMode,
+          elapsedMs: Date.now() - enteredAt,
+          likelyCause: 'ios_autoplay_block_or_silent_speech_failure',
+        })
+        safeComplete('fast_fail_no_start')
+      }
+    }, FAST_FAIL_MS)
+
+    // ── Hard deadline ──────────────────────────────────────────────────────
+    // Even if TTS DID start playing, a buggy engine may never fire `onend`
+    // (Safari has a long-text onend bug; ElevenLabs `source.onended` can be
+    // dropped if the AudioContext is suspended mid-play). Estimate natural
+    // duration from text length (~55ms/char ≈ adult speaking pace) and add
+    // 2.5s grace. Capped at 18s so the worst case is still bounded.
+    const estimatedSpeechMs = Math.min(18000, Math.max(6000, intro.length * 55 + 2500))
+    const hardDeadlineTimer = setTimeout(() => {
+      if (ttsResolved) return
+      interviewStartupLog('tts_hard_deadline_hit', {
+        questionIndex: currentIndex,
+        deadlineMs: estimatedSpeechMs,
+        ttsWasPlaying: isSpeakingRef.current || elIsPlayingRef.current,
+      })
+      safeComplete('hard_deadline')
+    }, estimatedSpeechMs)
 
     if (inputMode === 'deepgram') {
       // ElevenLabs TTS: follow-up tone wins; else last answer's metadata; else neutral
       const tone: InterviewerTone =
         pendingFollowUp?.tone ?? lastVoiceMeta?.tone ?? 'neutral'
-      void elSpeak(intro, tone, onTTSComplete)
+      void elSpeak(intro, tone, () => safeComplete('natural_end'))
     } else {
-      speakQuestion(intro, onTTSComplete)
+      speakQuestion(intro, () => safeComplete('natural_end'))
     }
 
     // Effect cleanup: when the avatar_speaking phase ends (Skip / Retry /
-    // Submit / Next / unmount), cancel any post-TTS timer that has not yet
-    // fired. The useVoicePlayer / useTTS hooks themselves are already
-    // cancelled by the handlers' explicit elStop()/stopSpeaking() calls — we
-    // only own the gap timer here.
+    // Submit / Next / unmount), cancel the post-TTS timer AND both watchdogs.
+    // The useVoicePlayer / useTTS hooks themselves are already cancelled by
+    // the handlers' explicit elStop()/stopSpeaking() calls.
     return () => {
+      clearTimeout(fastFailTimer)
+      clearTimeout(hardDeadlineTimer)
       if (postTtsTimerRef.current) {
         clearTimeout(postTtsTimerRef.current)
         postTtsTimerRef.current = null

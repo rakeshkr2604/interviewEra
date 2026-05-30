@@ -82,3 +82,67 @@ export function voiceDebug(event: string, data?: LogData): void {
   if (data) console.log(`[VOICE_DEBUG] ${event}`, data);
   else console.log(`[VOICE_DEBUG] ${event}`);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Interview-startup structured logger.
+//
+// Single greppable prefix `[interview-startup]` covering the full path from
+// session page mount → first answerable phase. Used to diagnose the iOS Safari
+// / iOS PWA "stuck in Preparing…" failure mode where TTS callbacks never fire
+// and the timer never starts. Auto-injects platform/browser/PWA + a wallclock
+// elapsed-ms relative to module load so log lines stand on their own.
+//
+// Always-on (these are low-volume transition events, ~6 per interview start).
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface PlatformContext {
+  platform: 'ios' | 'android' | 'desktop' | 'ssr';
+  browser: 'safari' | 'chrome' | 'firefox' | 'edge' | 'other' | 'ssr';
+  pwa: boolean;
+}
+
+let cachedPlatform: PlatformContext | null = null;
+
+export function getPlatformContext(): PlatformContext {
+  if (cachedPlatform) return cachedPlatform;
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    cachedPlatform = { platform: 'ssr', browser: 'ssr', pwa: false };
+    return cachedPlatform;
+  }
+  const ua = navigator.userAgent || '';
+  // iPadOS 13+ reports as Mac. Touch-points sniff is the standard fallback.
+  const isIOS =
+    /iPad|iPhone|iPod/.test(ua) ||
+    (ua.includes('Mac') && typeof document !== 'undefined' && 'ontouchend' in document);
+  const isAndroid = /Android/i.test(ua);
+  const isChrome = /Chrome|CriOS/.test(ua) && !/Edg|OPR/.test(ua);
+  const isEdge = /Edg/.test(ua);
+  const isFirefox = /Firefox|FxiOS/.test(ua);
+  // Safari sniff must run AFTER chrome since Chrome's UA contains "Safari".
+  const isSafari = !isChrome && !isEdge && !isFirefox && /Safari/.test(ua);
+  let pwa = false;
+  try {
+    pwa =
+      (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true;
+  } catch {
+    pwa = false;
+  }
+  cachedPlatform = {
+    platform: isIOS ? 'ios' : isAndroid ? 'android' : 'desktop',
+    browser: isSafari ? 'safari' : isChrome ? 'chrome' : isEdge ? 'edge' : isFirefox ? 'firefox' : 'other',
+    pwa,
+  };
+  return cachedPlatform;
+}
+
+const STARTUP_EPOCH = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+export function interviewStartupLog(event: string, data?: LogData): void {
+  const ctx = getPlatformContext();
+  const elapsedMs = Math.round(
+    (typeof performance !== 'undefined' ? performance.now() : Date.now()) - STARTUP_EPOCH,
+  );
+  const payload = { ...ctx, elapsedMs, ...(data ?? {}) };
+  console.log(`[interview-startup] ${event}`, payload);
+}
