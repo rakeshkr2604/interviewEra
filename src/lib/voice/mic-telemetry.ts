@@ -8,6 +8,12 @@ export type MicTelemetryEvent =
   | 'mic_session_expired'
   | 'mic_permission_lost'
   | 'mic_capture_active'
+  | 'mic_restart_requested'
+  | 'mic_restart_blocked_cooldown'
+  | 'mic_restart_blocked_state'
+  | 'mic_restart_budget_exhausted'
+  | 'mic_recovered'
+  | 'mic_failed'
 
 /** Beacon critical mic events to `/api/product-events`. */
 export function trackMicTelemetry(

@@ -4,10 +4,13 @@ import { checkTTSQuota, recordTTSUsage, enforcePerInterviewTTSLimit } from '@/li
 import { logTTSCall } from '@/lib/telemetry/voice-logger';
 import { abuseGate } from '@/lib/abuse/risk-scorer';
 
+/** Indian English–friendly voices (override via env for your ElevenLabs library). */
 const VOICE_IDS: Record<string, string> = {
-  female: '21m00Tcm4TlvDq8ikWAM', // Rachel
-  male:   'pNInz6obpgDQGcFmaJgB', // Adam
+  female: process.env.ELEVENLABS_VOICE_FEMALE_ID ?? 'pFZP5JQG7iQjIQuC4Bku',
+  male: process.env.ELEVENLABS_VOICE_MALE_ID ?? '1qEiC6qsybMkmnNbush0',
 };
+
+const TTS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_multilingual_v2';
 
 // Hard ceiling: no single TTS request may exceed this regardless of plan.
 // Prevents runaway prompts from generating 10-minute audio at full cost.
@@ -24,11 +27,11 @@ function toneToVoiceSettings(tone: string, text: string): VoiceSettings {
   const isQuestion = text.includes('?');
   switch (tone) {
     case 'encouraging':
-      return { stability: 0.32, similarity_boost: 0.62, style: isQuestion ? 0.42 : 0.50, use_speaker_boost: true };
+      return { stability: 0.28, similarity_boost: 0.72, style: isQuestion ? 0.38 : 0.45, use_speaker_boost: true };
     case 'challenging':
-      return { stability: 0.60, similarity_boost: 0.78, style: isQuestion ? 0.62 : 0.70, use_speaker_boost: true };
+      return { stability: 0.42, similarity_boost: 0.75, style: isQuestion ? 0.48 : 0.55, use_speaker_boost: true };
     default:
-      return { stability: 0.50, similarity_boost: 0.70, style: isQuestion ? 0.40 : 0.50, use_speaker_boost: true };
+      return { stability: 0.35, similarity_boost: 0.74, style: isQuestion ? 0.36 : 0.42, use_speaker_boost: true };
   }
 }
 
@@ -141,7 +144,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           text:           spokenText,
-          model_id:       'eleven_turbo_v2_5',
+          model_id:       TTS_MODEL_ID,
           voice_settings: voiceSettings,
         }),
         signal: AbortSignal.timeout(12_000), // 12s hard timeout

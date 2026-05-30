@@ -13,6 +13,8 @@ import { normalizePlaybackArg, type PlaybackCallbacks } from '@/lib/voice/playba
 
 export interface UseVoicePlayerReturn {
   isPlaying: boolean;
+  /** 0–1 progress during ElevenLabs playback (drives caption/lipsync timing). */
+  playbackProgress: number;
   error: string | null;
   speak: (
     text: string,
@@ -24,11 +26,21 @@ export interface UseVoicePlayerReturn {
 
 export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackProgress, setPlaybackProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const ttsRef = useRef<ProsodicTTS | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const progressRafRef = useRef<number | null>(null);
   const seqRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(true);
+
+  const clearProgressLoop = useCallback(() => {
+    if (progressRafRef.current !== null) {
+      cancelAnimationFrame(progressRafRef.current);
+      progressRafRef.current = null;
+    }
+    setPlaybackProgress(0);
+  }, []);
 
   function getClient(): ProsodicTTS {
     if (!ttsRef.current) {
@@ -44,13 +56,14 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
 
   const stop = useCallback(() => {
     seqRef.current += 1;
+    clearProgressLoop();
     if (sourceRef.current) {
       try { sourceRef.current.stop(); } catch { /* already stopped */ }
       sourceRef.current = null;
     }
     if (mountedRef.current) setIsPlaying(false);
     lifecycleLog('voice-player', 'stop', { seq: seqRef.current });
-  }, []);
+  }, [clearProgressLoop]);
 
   const speak = useCallback(
     async (text: string, tone: InterviewerTone, callbacksArg?: (() => void) | PlaybackCallbacks) => {
@@ -108,15 +121,34 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
             return;
           }
           if (sourceRef.current === source) sourceRef.current = null;
-          if (mountedRef.current) setIsPlaying(false);
+          clearProgressLoop();
+          if (mountedRef.current) {
+            setPlaybackProgress(1);
+            setIsPlaying(false);
+          }
           lifecycleLog('voice-player', 'speak_end', { seq: mySeq });
           callbacks.onPlaybackComplete?.();
         };
 
-        source.start();
+        const startAt = ctx.currentTime;
+        const duration = buffer.duration;
+
+        const tickProgress = () => {
+          if (mySeq !== seqRef.current || !mountedRef.current) return;
+          const elapsed = Math.max(0, ctx.currentTime - startAt);
+          const p = duration > 0 ? Math.min(1, elapsed / duration) : 0;
+          setPlaybackProgress(p);
+          if (p < 1 && sourceRef.current === source) {
+            progressRafRef.current = requestAnimationFrame(tickProgress);
+          }
+        };
+
+        source.start(0);
         if (mountedRef.current && mySeq === seqRef.current) {
           setIsPlaying(true);
-          interviewFlowLog('tts', 'elevenlabs_playback_started', { seq: mySeq });
+          setPlaybackProgress(0);
+          progressRafRef.current = requestAnimationFrame(tickProgress);
+          interviewFlowLog('tts', 'elevenlabs_playback_started', { seq: mySeq, durationSec: duration });
           callbacks.onPlaybackStarted?.();
         }
       } catch (err) {
@@ -142,7 +174,7 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
         callbacks.onPlaybackFailed?.(failMessage);
       }
     },
-    [voice, stop],
+    [voice, stop, clearProgressLoop],
   );
 
   useEffect(() => {
@@ -157,5 +189,5 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
     };
   }, []);
 
-  return { isPlaying, error, speak, stop };
+  return { isPlaying, playbackProgress, error, speak, stop };
 }

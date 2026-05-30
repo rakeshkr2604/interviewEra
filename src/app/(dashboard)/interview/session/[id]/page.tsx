@@ -44,7 +44,7 @@ import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
-import { useInterviewMicKeepalive } from '@/hooks/useInterviewMicKeepalive'
+import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
@@ -270,7 +270,13 @@ export default function InterviewSessionPage() {
 
   // ─── ElevenLabs TTS (Deepgram mode) ───────────────────────
   const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
-  const { isPlaying: elIsPlaying, error: elTtsError, speak: elSpeak, stop: elStop } = useVoicePlayer(resolvedGender)
+  const {
+    isPlaying: elIsPlaying,
+    playbackProgress: elPlaybackProgress,
+    error: elTtsError,
+    speak: elSpeak,
+    stop: elStop,
+  } = useVoicePlayer(resolvedGender)
 
   const avatarReadyLoggedRef = useRef(false)
   useEffect(() => {
@@ -825,9 +831,10 @@ export default function InterviewSessionPage() {
     }
   }, [phase, permissionState, telemetryCtx, inputMode])
 
-  useInterviewMicKeepalive({
+  const micSession = useInterviewMicSession({
     phase,
     phaseRef,
+    questionIndex: currentIndex,
     inputMode,
     userMicMutedRef,
     isMicSupported,
@@ -886,6 +893,13 @@ export default function InterviewSessionPage() {
     avatarHeaderLabel,
   } = avatarSpeaking
 
+  const captionWordIndex = useMemo(() => {
+    if (!elIsPlaying || !spokenText) return currentWordIndex
+    const words = spokenText.trim().split(/\s+/).filter(Boolean)
+    if (words.length === 0) return currentWordIndex
+    return Math.min(words.length - 1, Math.floor(elPlaybackProgress * words.length))
+  }, [elIsPlaying, elPlaybackProgress, currentWordIndex, spokenText])
+
   const [videoRecoverTick, setVideoRecoverTick] = useState(0)
   useInterviewPwaLifecycle({
     phase,
@@ -915,6 +929,8 @@ export default function InterviewSessionPage() {
     sessionPhase: phase,
     micArmed,
     userMicMuted,
+    micSessionState: micSession.micState,
+    micFailed: micSession.micFailed,
   })
 
   useEffect(() => {
@@ -936,6 +952,10 @@ export default function InterviewSessionPage() {
         permission: permissionState,
         recognition: recognitionState,
         inputMode,
+        micState: micSession.micState,
+        restartCount: micSession.restartCount,
+        lastRestartAt: micSession.lastRestartAt,
+        watchdogActive: micSession.watchdogActive,
       },
       ts: Date.now(),
     }))
@@ -952,6 +972,7 @@ export default function InterviewSessionPage() {
     permissionState,
     recognitionState,
     inputMode,
+    micSession,
   ])
 
   const celebrationDialog = (
@@ -1981,7 +2002,7 @@ export default function InterviewSessionPage() {
               >
                 <CaptionDisplay
                   fullText={spokenText || currentQuestion.question_text}
-                  currentWordIndex={currentWordIndex}
+                  currentWordIndex={captionWordIndex}
                 />
               </motion.div>
             )}
@@ -2149,7 +2170,31 @@ export default function InterviewSessionPage() {
                 </div>
               )}
 
-              {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && (
+              {phase === 'candidate_answering' && micSession.micFailed && (
+                <div className="dashboard-premium-card space-y-2 p-4 border border-amber-200/80 bg-amber-50/80">
+                  <p className="text-sm font-medium text-amber-900">
+                    Voice unavailable. Continue with typing or tap Retry.
+                  </p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      onClick={() => micSession.retryMicSession()}
+                      className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
+                    >
+                      Retry microphone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setInputMode('text')}
+                      className="flex-1 rounded-lg bg-(--accent-primary) px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      Type answer
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && !micSession.micFailed && (
                 <div className="w-full min-w-0">
                   <CandidateTranscript
                     transcript={transcript}
@@ -2354,8 +2399,7 @@ export default function InterviewSessionPage() {
                       } else {
                         setUserMicMuted(false)
                         clearStormBudgetForAnswer()
-                        trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'stuck_escape' })
-                        restartListening()
+                        micSession.retryMicSession()
                       }
                       setShowStuckEscape(false)
                     }}

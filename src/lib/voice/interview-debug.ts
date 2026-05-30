@@ -20,6 +20,10 @@ export interface InterviewDebugSnapshot {
     permission: string
     recognition: string
     inputMode: string
+    micState: string
+    restartCount: number
+    lastRestartAt: number | null
+    watchdogActive: boolean
   }
   /** Filled by installInterviewDebug() at read time if omitted. */
   platform?: ReturnType<typeof getPlatformContext>

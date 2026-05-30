@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
+import type { MicSessionState } from '@/lib/voice/mic-session'
 
 export type VoiceUiPhase =
   | 'idle'
@@ -34,6 +35,8 @@ interface UseInterviewVoiceUiParams {
   /** Mic should stay armed for the full answer window (thinking pauses OK). */
   micArmed?: boolean
   userMicMuted?: boolean
+  micSessionState?: MicSessionState
+  micFailed?: boolean
 }
 
 /**
@@ -52,6 +55,8 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     sessionPhase,
     micArmed = false,
     userMicMuted = false,
+    micSessionState,
+    micFailed = false,
   } = params
 
   return useMemo(() => {
@@ -109,7 +114,16 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       }
     }
 
-    if (micError) {
+    if (micFailed) {
+      return {
+        phase: 'error' as const,
+        label: 'Voice unavailable — tap Retry or type your answer',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
+    if (micError && !micArmed) {
       return {
         phase: 'error' as const,
         label: micError,
@@ -136,10 +150,19 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       }
     }
 
-    if (recognitionState === 'starting') {
+    if (micSessionState === 'recovering') {
       return {
         phase: 'starting_microphone' as const,
-        label: micArmed ? 'Reconnecting microphone…' : 'Starting microphone…',
+        label: 'Reconnecting microphone…',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
+    if (recognitionState === 'starting' || micSessionState === 'starting') {
+      return {
+        phase: 'starting_microphone' as const,
+        label: 'Connecting microphone…',
         canRetry: true,
         showListeningIndicator: false,
       }
@@ -158,15 +181,6 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       return {
         phase: 'permission_granted' as const,
         label: 'Mic Ready',
-        canRetry: true,
-        showListeningIndicator: false,
-      }
-    }
-
-    if (micArmed) {
-      return {
-        phase: 'starting_microphone' as const,
-        label: 'Restarting microphone…',
         canRetry: true,
         showListeningIndicator: false,
       }
@@ -199,5 +213,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     sessionPhase,
     micArmed,
     userMicMuted,
+    micSessionState,
+    micFailed,
   ])
 }

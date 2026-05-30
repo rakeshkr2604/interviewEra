@@ -1,6 +1,10 @@
 import type { Interviewer } from '@/lib/config/interviewers';
 
 function pickEnglishVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  const indian = voices.find((voice) =>
+    /en-in|india|hindi|priya|neerja|rishi/i.test(`${voice.lang} ${voice.name}`),
+  );
+  if (indian) return indian;
   return voices.find((voice) => voice.lang.toLowerCase().startsWith('en')) ?? voices[0] ?? null;
 }
 

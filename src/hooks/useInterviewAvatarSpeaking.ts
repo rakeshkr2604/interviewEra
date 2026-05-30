@@ -218,13 +218,22 @@ export function useInterviewAvatarSpeaking(
       },
     }
 
-    if (inputMode === 'deepgram') {
-      const tone: InterviewerTone =
-        pendingFollowUp?.tone ?? lastVoiceMeta?.tone ?? 'neutral'
-      void elSpeak(intro, tone, playbackCallbacks)
-    } else {
+    const tone: InterviewerTone =
+      pendingFollowUp?.tone ?? lastVoiceMeta?.tone ?? 'neutral'
+
+    const browserFallback = () => {
+      interviewFlowLog('tts', 'browser_tts_fallback', { questionIndex: currentIndex })
       speakQuestion(intro, playbackCallbacks)
     }
+
+    void elSpeak(intro, tone, {
+      ...playbackCallbacks,
+      onPlaybackFailed: (msg) => {
+        browserFallback()
+        if (phaseRef.current !== 'avatar_speaking') return
+        interviewFlowLog('tts', 'elevenlabs_failed_fallback', { message: msg })
+      },
+    })
   }, [
     buildIntro,
     currentIndex,
