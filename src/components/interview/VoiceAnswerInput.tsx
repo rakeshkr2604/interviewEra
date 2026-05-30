@@ -173,7 +173,7 @@ export function VoiceAnswerInput({
           <div className="flex flex-col items-center gap-3 py-4">
             <button
               type="button"
-              onClick={isListening ? stopListening : startListening}
+              onClick={() => (isListening ? stopListening('user_mute') : void startListening())}
               disabled={isSubmitting}
               aria-label={isListening ? 'Stop recording' : 'Start recording'}
               className={`relative flex h-20 w-20 items-center justify-center rounded-full border-4 transition-colors ${

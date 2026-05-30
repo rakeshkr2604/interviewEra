@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
 import {
   lifecycleLog as scopedLifecycleLog,
@@ -69,6 +69,23 @@ declare global {
  */
 export type SpeechRecognitionState = 'idle' | 'starting' | 'active';
 
+/** Only these reasons may disarm auto-restart during an answer window. */
+export type StopListeningReason =
+  | 'user_mute'
+  | 'answer_submitted'
+  | 'question_timeout'
+  | 'phase_change'
+  | 'permission_revoked'
+  | 'fatal_audio_error';
+
+export interface UseSpeechRecognitionOptions {
+  /**
+   * When true (candidate_answering + voice armed), restart-storm give-up must
+   * NOT set shouldListen false — thinking silence is normal.
+   */
+  keepArmedDuringAnswerRef?: RefObject<boolean>;
+}
+
 export interface UseSpeechRecognitionReturn {
   /**
    * Tri-state lifecycle flag — see SpeechRecognitionState for semantics.
@@ -90,7 +107,11 @@ export interface UseSpeechRecognitionReturn {
   permissionState: 'unknown' | 'granted' | 'prompt' | 'denied' | 'requesting';
   startListening: () => Promise<boolean>;
   retryPermission: () => Promise<boolean>;
-  stopListening: () => void;
+  stopListening: (reason?: StopListeningReason) => void;
+  /** Re-arm after browser session end without clearing transcript. */
+  restartListening: () => void;
+  /** Clear restart-storm budget when a new answer window opens. */
+  clearStormBudgetForAnswer: () => void;
   resetTranscript: () => void;
   /**
    * Snapshot of finalized chunks + interim, joined and trimmed.
@@ -150,7 +171,10 @@ function log(event: string, data?: Record<string, unknown>): void {
   }
 }
 
-export function useSpeechRecognition(): UseSpeechRecognitionReturn {
+export function useSpeechRecognition(
+  options: UseSpeechRecognitionOptions = {},
+): UseSpeechRecognitionReturn {
+  const { keepArmedDuringAnswerRef } = options;
   const [isSupported] = useState(
     () => typeof window !== 'undefined' &&
       ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
@@ -324,7 +348,25 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     }
   }, []);
 
-  const stopListening = useCallback(() => {
+  const clearStormBudgetForAnswer = useCallback(() => {
+    restartHistoryRef.current = [];
+    recoveryHistoryRef.current = [];
+    lastRecoveryAtRef.current = 0;
+    setError(null);
+  }, []);
+
+  const restartListening = useCallback(() => {
+    shouldListenRef.current = true;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    voiceDebug('restart_listening', { source: 'restartListening' });
+    log('restarted', { reason: 'explicit_restart' });
+    beginRecognitionRef.current();
+  }, []);
+
+  const stopListening = useCallback((reason: StopListeningReason = 'phase_change') => {
     // Intentional stop — disable auto-recovery so onend does NOT restart.
     // CRITICAL: do NOT clear transcriptChunksRef here. The submit handler
     // calls stopListening() then reads getMergedTranscript() — if we cleared
@@ -343,12 +385,26 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     detachRecognition(r);
     setRecognitionState('idle');
     voiceDebug('stop_listening_called', {
+      reason,
       gen: generationRef.current,
       chunks: transcriptChunksRef.current.length,
       has_interim: interimRef.current.length > 0,
     });
-    log('stopped', { chunks: transcriptChunksRef.current.length, hasInterim: interimRef.current.length > 0 });
+    log('stopped', {
+      reason,
+      chunks: transcriptChunksRef.current.length,
+      hasInterim: interimRef.current.length > 0,
+    });
   }, [detachRecognition]);
+
+  const scheduleArmedRestart = useCallback((source: string, gen: number) => {
+    voiceDebug('retry_triggered', { reason: source, gen, armed: true });
+    restartTimerRef.current = setTimeout(() => {
+      if (shouldListenRef.current && mountedRef.current) {
+        beginRecognitionRef.current();
+      }
+    }, RESTART_DELAY_MS);
+  }, []);
 
   // Build + start a fresh recognition instance. Reused for the initial start
   // AND for invisible auto-recovery when the browser ends the session. It
@@ -622,6 +678,20 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
           (t) => now - t < RESTART_STORM_WINDOW_MS,
         );
         if (restartHistoryRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
+          if (keepArmedDuringAnswerRef?.current) {
+            voiceDebug('mic_session_expired', {
+              gen: myGen,
+              recent_restart_count: restartHistoryRef.current.length,
+              armed: true,
+            });
+            console.log('[voice] mic_session_expired', {
+              gen: myGen,
+              restarts: restartHistoryRef.current.length,
+            });
+            restartHistoryRef.current = [];
+            scheduleArmedRestart('armed_auto_recovery_onend', myGen);
+            return;
+          }
           voiceDebug('restart_storm_giveup', {
             gen: myGen,
             recent_restart_count: restartHistoryRef.current.length,
@@ -639,19 +709,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
           restart_count_in_window: restartHistoryRef.current.length,
         });
         log('restarted', { reason: 'auto-recovery', chunks: transcriptChunksRef.current.length });
-        restartTimerRef.current = setTimeout(() => {
-          // Triple-gate the resurrection: shouldListenRef (intentional stop),
-          // mountedRef (component still alive), and the ref-stored callback
-          // (latest implementation).
-          if (shouldListenRef.current && mountedRef.current) {
-            beginRecognitionRef.current();
-          } else {
-            scopedLifecycleLog('speech', 'restart_timer_suppressed', {
-              shouldListen: shouldListenRef.current,
-              mounted: mountedRef.current,
-            });
-          }
-        }, RESTART_DELAY_MS);
+        scheduleArmedRestart('auto_recovery_onend', myGen);
       }
     };
 
@@ -688,6 +746,20 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       );
       restartHistoryRef.current.push(now);
       if (restartHistoryRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
+        if (keepArmedDuringAnswerRef?.current) {
+          voiceDebug('mic_session_expired', {
+            gen: myGen,
+            throw_count_in_window: restartHistoryRef.current.length,
+            armed: true,
+          });
+          console.log('[voice] mic_session_expired', {
+            gen: myGen,
+            throws: restartHistoryRef.current.length,
+          });
+          restartHistoryRef.current = [];
+          scheduleArmedRestart('armed_start_throw_recovery', myGen);
+          return;
+        }
         voiceDebug('recognition_start_storm_giveup', {
           gen: myGen,
           throw_count_in_window: restartHistoryRef.current.length,
@@ -704,16 +776,10 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       }
 
       if (shouldListenRef.current && mountedRef.current) {
-        // Slightly longer delay than RESTART_DELAY_MS — the browser needs the
-        // previous instance to fully release before start() succeeds.
-        restartTimerRef.current = setTimeout(() => {
-          if (shouldListenRef.current && mountedRef.current) {
-            beginRecognitionRef.current();
-          }
-        }, 350);
+        scheduleArmedRestart('start_throw_recovery', myGen);
       }
     }
-  }, [syncRender, detachRecognition]);
+  }, [syncRender, detachRecognition, keepArmedDuringAnswerRef, scheduleArmedRestart]);
 
   useEffect(() => {
     beginRecognitionRef.current = beginRecognition;
@@ -946,6 +1012,8 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     startListening,
     retryPermission,
     stopListening,
+    restartListening,
+    clearStormBudgetForAnswer,
     resetTranscript,
     getMergedTranscript,
     hasRecentSpeech,

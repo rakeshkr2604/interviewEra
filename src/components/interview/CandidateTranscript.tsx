@@ -29,6 +29,8 @@ interface CandidateTranscriptProps {
   permissionState: 'unknown' | 'granted' | 'prompt' | 'denied' | 'requesting'
   onToggle: () => void
   onRetry: () => void
+  /** Full answer window — mic stays armed; idle gaps are reconnects, not "off". */
+  micArmed?: boolean
 }
 
 // Heights for 8 bars — vary heights so it looks like a real waveform, not a comb
@@ -44,6 +46,7 @@ export function CandidateTranscript({
   permissionState,
   onToggle,
   onRetry,
+  micArmed = false,
 }: CandidateTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -98,10 +101,14 @@ export function CandidateTranscript({
             : active
               ? 'Listening…'
               : starting
-                ? 'Starting mic…'
+                ? micArmed
+                  ? 'Reconnecting…'
+                  : 'Starting mic…'
                 : permissionState === 'denied'
                   ? 'Permission denied'
-                  : 'Click mic to enable'}
+                  : micArmed
+                    ? 'Mic Ready'
+                    : 'Click mic to enable'}
         </button>
       </div>
 
@@ -145,9 +152,11 @@ export function CandidateTranscript({
               ? 'Start speaking — your words will appear here'
               : starting
                 ? 'Connecting microphone…'
-                : isSupported
-                  ? 'Click the mic button to start speaking'
-                  : 'Speech recognition not supported in this browser'}
+                : micArmed
+                  ? 'Take your time — start speaking when ready'
+                  : isSupported
+                    ? 'Click the mic button to start speaking'
+                    : 'Speech recognition not supported in this browser'}
           </span>
         )}
       </div>

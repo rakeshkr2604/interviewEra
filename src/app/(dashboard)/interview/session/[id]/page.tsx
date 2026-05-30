@@ -42,7 +42,9 @@ import { useInterviewPwaLifecycle } from '@/hooks/useInterviewPwaLifecycle'
 import { useInterviewVoiceUi } from '@/hooks/useInterviewVoiceUi'
 import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
+import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
+import { useInterviewMicKeepalive } from '@/hooks/useInterviewMicKeepalive'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
@@ -295,6 +297,13 @@ export default function InterviewSessionPage() {
     useTimer(TIME_PER_QUESTION)
 
   // ─── Speech Recognition ───────────────────────────────────
+  const micKeepArmedRef = useRef(false)
+  const [userMicMuted, setUserMicMuted] = useState(false)
+  const userMicMutedRef = useRef(false)
+  useEffect(() => {
+    userMicMutedRef.current = userMicMuted
+  }, [userMicMuted])
+
   const {
     transcript,
     interimTranscript,
@@ -306,10 +315,12 @@ export default function InterviewSessionPage() {
     startListening,
     retryPermission,
     stopListening,
+    restartListening,
+    clearStormBudgetForAnswer,
     resetTranscript,
     getMergedTranscript,
     hasRecentSpeech,
-  } = useSpeechRecognition()
+  } = useSpeechRecognition({ keepArmedDuringAnswerRef: micKeepArmedRef })
   // The ONLY state that may surface "Listening…" in the Web Speech path.
   // 'starting' (between onstart and first transcript) intentionally does NOT
   // qualify — that was the source of the false-positive label.
@@ -317,7 +328,19 @@ export default function InterviewSessionPage() {
   // The ONLY state that may surface "Listening…" in the Deepgram path.
   // Requires: local mic stream is up AND the Deepgram WebSocket is OPEN.
   const dgListening = dgIsRecording && dgWsOpen
-  const useManualInput = inputMode === 'text' || (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError)))
+  const useManualInput =
+    inputMode === 'text' || !isMicSupported || permissionState === 'denied'
+
+  const micArmed =
+    phase === 'candidate_answering' &&
+    (inputMode === 'voice' || inputMode === 'deepgram') &&
+    !userMicMuted &&
+    permissionState !== 'denied' &&
+    (inputMode === 'deepgram' || isMicSupported)
+
+  useEffect(() => {
+    micKeepArmedRef.current = micArmed
+  }, [micArmed])
 
   const useManualInputRef = useRef(useManualInput)
   useManualInputRef.current = useManualInput
@@ -355,10 +378,10 @@ export default function InterviewSessionPage() {
   micErrorRef.current = micError
 
   useEffect(() => {
-    if (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError))) {
-      setInputMode('text')
+    if (!isMicSupported || permissionState === 'denied') {
+      if (inputMode === 'voice') setInputMode('text')
     }
-  }, [isMicSupported, permissionState, micError, inputMode])
+  }, [isMicSupported, permissionState, inputMode])
 
   // Deepgram recording duration counter (debug + UI)
   useEffect(() => {
@@ -742,6 +765,8 @@ export default function InterviewSessionPage() {
       const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
       setAnswerTimeBudget(budget)
       setPhase('candidate_answering')
+      setUserMicMuted(false)
+      clearStormBudgetForAnswer()
       setAnswerStartTime(Date.now())
       resetTimer(budget)
       startTimer()
@@ -765,10 +790,12 @@ export default function InterviewSessionPage() {
       if (inputMode === 'deepgram') {
         voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'deepgram' })
         interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_avatar_finished' })
+        trackMicTelemetry('mic_started', telemetryCtx, { mode: 'deepgram' })
         void startDgListeningRef.current()
       } else if (!useManualInputRef.current && isMicSupported) {
         voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'web_speech' })
         interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_avatar_finished' })
+        trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech' })
         void startListeningRef.current()
       } else {
         interviewStartupLog('listening_skipped', {
@@ -787,8 +814,31 @@ export default function InterviewSessionPage() {
       resetTimer,
       startTimer,
       track,
+      clearStormBudgetForAnswer,
+      telemetryCtx,
     ],
   )
+
+  useEffect(() => {
+    if (phase === 'candidate_answering' && permissionState === 'denied') {
+      trackMicTelemetry('mic_permission_lost', telemetryCtx, { inputMode })
+    }
+  }, [phase, permissionState, telemetryCtx, inputMode])
+
+  useInterviewMicKeepalive({
+    phase,
+    phaseRef,
+    inputMode,
+    userMicMutedRef,
+    isMicSupported,
+    permissionState,
+    recognitionState,
+    dgListening,
+    telemetryCtx,
+    startListening,
+    restartListening,
+    startDgListening: () => startDgListeningRef.current(),
+  })
 
   const avatarSpeaking = useInterviewAvatarSpeaking({
     phase,
@@ -863,6 +913,8 @@ export default function InterviewSessionPage() {
     webSpeechActive,
     dgListening,
     sessionPhase: phase,
+    micArmed,
+    userMicMuted,
   })
 
   useEffect(() => {
@@ -1250,7 +1302,7 @@ export default function InterviewSessionPage() {
     setShowEmptyWarning(false)
     stopTimer()
     voiceDebug('stop_listening_triggered', { source: 'submit', mode: inputMode })
-    stopListening()
+    stopListening('answer_submitted')
     stopSpeaking()
     elStop()
     stopDgListening()
@@ -1595,58 +1647,6 @@ export default function InterviewSessionPage() {
     return () => clearInterval(iv)
   }, [phase, currentIndex, pendingFollowUp, answerText, inputMode, hasRecentSpeech])
 
-  // ─── Emergency mic-startup watchdog ───────────────────────
-  // iOS Safari / iOS PWA case: after the previous fast-fail watchdog forces
-  // phase=candidate_answering, the page synchronously calls startListening().
-  // The user grants mic permission, but webkitSpeechRecognition.start() throws
-  // every retry because the gesture token was consumed by the prompt. The
-  // restart-storm cap in useSpeechRecognition now bounds the loop AND surfaces
-  // an error — but the candidate is still in voice mode with no working mic.
-  //
-  // This effect detects: phase=candidate_answering + voice mode + permission
-  // granted + recognition still idle/starting after 5 s. When triggered we
-  // flip inputMode to 'text' so the candidate immediately gets a usable input
-  // surface and the UI stops looking like a stuck "Click mic to enable" wall.
-  // The fast-fail event is logged under [mic-flow] for telemetry.
-  useEffect(() => {
-    if (phase !== 'candidate_answering') return
-    if (inputMode !== 'voice') return
-    if (!isMicSupported) return
-    const startedAt = Date.now()
-    const t = setTimeout(() => {
-      // STALE-CLOSURE FIX (audit P1 #5): the deadline is intentionally measured
-      // from phase entry (deps exclude recognitionState/permissionState), so the
-      // checks below MUST read the live values via refs — not the captured
-      // closure values, which would be frozen at entry and cause a false
-      // text-mode flip or a missed recovery.
-      if (getMergedTranscript().trim() || hasRecentSpeech(5000)) {
-        interviewLog('mic_watchdog_suppressed', { reason: 'has_transcript' })
-        return
-      }
-      if (recognitionStateRef.current === 'active') return
-      if (permissionStateRef.current === 'requesting' || permissionStateRef.current === 'denied') return
-      console.log('[mic-flow] mic_startup_watchdog_fallback', {
-        elapsedMs: Date.now() - startedAt,
-        recognitionState: recognitionStateRef.current,
-        permissionState: permissionStateRef.current,
-        hadMicError: Boolean(micErrorRef.current),
-        questionIndex: currentIndex,
-      })
-      track('RECOVERY', 'mic_startup_fallback_text', {
-        recognitionState: recognitionStateRef.current,
-        permissionState: permissionStateRef.current,
-        hadMicError: Boolean(micErrorRef.current),
-      }, { critical: true, level: 'warn' })
-      stopListening()
-      setInputMode('text')
-    }, 5000)
-    return () => clearTimeout(t)
-    // We intentionally do NOT depend on `recognitionState` / `permissionState`
-    // so the 5 s deadline is from the moment we entered candidate_answering,
-    // not reset on every state churn. Live values are read via refs above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, currentIndex, inputMode, isMicSupported])
-
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
     interviewLog('advance_question', {
@@ -1694,7 +1694,7 @@ export default function InterviewSessionPage() {
     setSkipCount(prev => prev + 1)
     stopTimer()
     voiceDebug('stop_listening_triggered', { source: 'skip' })
-    stopListening()
+    stopListening('phase_change')
     elStop()
     stopDgListening()
     resetTranscript()
@@ -1718,7 +1718,7 @@ export default function InterviewSessionPage() {
   const handleRetry = useCallback(() => {
     if (phase !== 'candidate_answering') return
     voiceDebug('retry_triggered', { source: 'retry_question_button' })
-    stopListening()
+    stopListening('phase_change')
     elStop()
     stopDgListening()
     resetTranscript()
@@ -1740,10 +1740,14 @@ export default function InterviewSessionPage() {
     if (!isMicSupported) return
     if (isListening) {
       voiceDebug('stop_listening_triggered', { source: 'toggle_mic_off' })
-      stopListening()
+      setUserMicMuted(true)
+      stopListening('user_mute')
       return
     }
     voiceDebug('start_listening_triggered', { source: 'toggle_mic_on' })
+    setUserMicMuted(false)
+    clearStormBudgetForAnswer()
+    trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'toggle_mic_on' })
     await startListening()
   }
 
@@ -1752,6 +1756,10 @@ export default function InterviewSessionPage() {
     const ok = await retryPermission()
     if (ok) {
       setInputMode('voice')
+      setUserMicMuted(false)
+      clearStormBudgetForAnswer()
+      trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'try_voice_again' })
+      await startListening()
     }
   }
 
@@ -2151,6 +2159,7 @@ export default function InterviewSessionPage() {
                     isSupported={isMicSupported}
                     error={micError}
                     permissionState={permissionState}
+                    micArmed={micArmed}
                     onToggle={() => { void handleToggleMic() }}
                     onRetry={() => { void retryPermission() }}
                   />
@@ -2343,8 +2352,10 @@ export default function InterviewSessionPage() {
                         stopDgListening()
                         void startDgListening()
                       } else {
-                        stopListening()
-                        void startListening()
+                        setUserMicMuted(false)
+                        clearStormBudgetForAnswer()
+                        trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'stuck_escape' })
+                        restartListening()
                       }
                       setShowStuckEscape(false)
                     }}
@@ -2387,8 +2398,8 @@ export default function InterviewSessionPage() {
                         : <><Radio size={12} /> AI Voice</>
                     : voiceUi.showListeningIndicator
                       ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> {voiceUi.label}</>
-                      : voiceUi.phase === 'starting_microphone'
-                        ? <><Mic size={12} className="animate-pulse" /> {voiceUi.label}</>
+                      : voiceUi.phase === 'starting_microphone' || micArmed
+                        ? <><Mic size={12} className={voiceUi.phase === 'starting_microphone' ? 'animate-pulse' : ''} /> {voiceUi.label}</>
                         : <><MicOff size={12} /> {voiceUi.label}</>
                   }
                 </div>

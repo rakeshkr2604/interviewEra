@@ -31,6 +31,9 @@ interface UseInterviewVoiceUiParams {
   webSpeechActive: boolean
   dgListening: boolean
   sessionPhase: string
+  /** Mic should stay armed for the full answer window (thinking pauses OK). */
+  micArmed?: boolean
+  userMicMuted?: boolean
 }
 
 /**
@@ -47,6 +50,8 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     webSpeechActive,
     dgListening,
     sessionPhase,
+    micArmed = false,
+    userMicMuted = false,
   } = params
 
   return useMemo(() => {
@@ -122,16 +127,25 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       }
     }
 
-    if (recognitionState === 'starting') {
+    if (userMicMuted) {
       return {
-        phase: 'starting_microphone' as const,
-        label: 'Starting microphone…',
+        phase: 'idle' as const,
+        label: 'Microphone muted — tap mic to resume',
         canRetry: true,
         showListeningIndicator: false,
       }
     }
 
-    if (webSpeechActive) {
+    if (recognitionState === 'starting') {
+      return {
+        phase: 'starting_microphone' as const,
+        label: micArmed ? 'Reconnecting microphone…' : 'Starting microphone…',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
+    if (webSpeechActive || (inputMode === 'deepgram' && dgListening)) {
       return {
         phase: 'listening' as const,
         label: 'Listening…',
@@ -140,10 +154,28 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       }
     }
 
+    if (micArmed && permissionState === 'granted') {
+      return {
+        phase: 'permission_granted' as const,
+        label: 'Mic Ready',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
+    if (micArmed) {
+      return {
+        phase: 'starting_microphone' as const,
+        label: 'Restarting microphone…',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
     if (permissionState === 'granted' && sessionPhase === 'candidate_answering') {
       return {
         phase: 'permission_granted' as const,
-        label: 'Tap the microphone to start',
+        label: 'Mic Ready',
         canRetry: true,
         showListeningIndicator: false,
       }
@@ -151,7 +183,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
 
     return {
       phase: 'idle' as const,
-      label: 'Mic off',
+      label: 'Mic Ready',
       canRetry: sessionPhase === 'candidate_answering',
       showListeningIndicator: false,
     }
@@ -165,5 +197,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     webSpeechActive,
     dgListening,
     sessionPhase,
+    micArmed,
+    userMicMuted,
   ])
 }
