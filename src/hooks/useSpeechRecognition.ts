@@ -3,6 +3,12 @@
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
 import {
+  mergeFinalTranscript,
+  shouldPromoteInterimOnEnd,
+  sttResultEventHash,
+} from '@/lib/voice/stt-transcript';
+import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry';
+import {
   lifecycleLog as scopedLifecycleLog,
   lifecycleWarn as scopedLifecycleWarn,
   voiceDebug,
@@ -80,10 +86,12 @@ export type StopListeningReason =
 
 export interface UseSpeechRecognitionOptions {
   /**
-   * When true (candidate_answering + voice armed), restart-storm give-up must
-   * NOT set shouldListen false — thinking silence is normal.
+   * When true (candidate_answering + voice armed), thinking silence is normal —
+   * used for UI only; restart budget still applies (no infinite loops).
    */
   keepArmedDuringAnswerRef?: RefObject<boolean>;
+  /** Optional STT telemetry sink (wired from session page). */
+  onSttTelemetry?: SttTelemetryCallback;
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -110,8 +118,12 @@ export interface UseSpeechRecognitionReturn {
   stopListening: (reason?: StopListeningReason) => void;
   /** Re-arm after browser session end without clearing transcript. */
   restartListening: () => void;
-  /** Clear restart-storm budget when a new answer window opens. */
+  /** Clear restart budget + failure when a new answer window opens. */
   clearStormBudgetForAnswer: () => void;
+  /** True when auto-restart budget exhausted for this question. */
+  recognitionFailed: boolean;
+  /** Reset failure after user taps Retry Mic. */
+  clearRecognitionFailure: () => void;
   resetTranscript: () => void;
   /**
    * Snapshot of finalized chunks + interim, joined and trimmed.
@@ -132,8 +144,13 @@ export interface UseSpeechRecognitionReturn {
 // impose our own stop timer — the answer timer is purely informational UX and
 // must never terminate the mic. `onend` transparently restarts recognition
 // while the candidate is still answering.
-const RESTART_DELAY_MS = 250;
+// Minimum gap between automatic session restarts (Android reconnect storm fix).
+const RESTART_COOLDOWN_MS = 5_000;
+const RESTART_DELAY_MS = RESTART_COOLDOWN_MS;
 const DEFAULT_SILENCE_WINDOW_MS = 8_000;
+
+/** Max automatic restarts per question — then fail closed with Retry Mic. */
+const MAX_RESTARTS_PER_QUESTION = 3;
 
 // ── Failsafe-recovery / restart-storm tuning ──────────────────────────────
 // Watchdog: if `recognitionState` stays at 'active' but no transcript event
@@ -151,18 +168,6 @@ const MIN_RECOVERY_GAP_MS = 15_000;
 const MAX_RECOVERIES_PER_WINDOW = 3;
 const RECOVERY_WINDOW_MS = 60_000;
 
-// Restart-storm guard for the natural `onend` → `setTimeout` auto-restart
-// loop. The browser ending the session on silence is normal; we restart
-// every ~250 ms. But a persistently-broken audio device (USB unplug, OS
-// permission revoked mid-session) can produce a synchronous error-then-end
-// loop at the 250 ms cadence. After MAX_RESTARTS_PER_WINDOW restarts in
-// RESTART_STORM_WINDOW_MS, we bail out: shouldListen flips false, the user
-// sees the existing error UI and can click Retry. The history clears on
-// every successful transcript event (proving the pipeline is alive) and on
-// every user-initiated `startListening()`.
-const MAX_RESTARTS_PER_WINDOW = 5;
-const RESTART_STORM_WINDOW_MS = 10_000;
-
 function log(event: string, data?: Record<string, unknown>): void {
   if (data) {
     console.log(`[speech] ${event}`, data);
@@ -174,7 +179,13 @@ function log(event: string, data?: Record<string, unknown>): void {
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {},
 ): UseSpeechRecognitionReturn {
-  const { keepArmedDuringAnswerRef } = options;
+  const { keepArmedDuringAnswerRef, onSttTelemetry } = options;
+  const emitStt = useCallback(
+    (event: Parameters<SttTelemetryCallback>[0], data?: Record<string, unknown>) => {
+      onSttTelemetry?.(event, data);
+    },
+    [onSttTelemetry],
+  );
   const [isSupported] = useState(
     () => typeof window !== 'undefined' &&
       ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)
@@ -193,17 +204,15 @@ export function useSpeechRecognition(
       : 'Speech recognition not supported in this browser. Use Chrome or Edge.'
   );
   const [permissionState, setPermissionState] = useState<'unknown' | 'granted' | 'prompt' | 'denied' | 'requesting'>('unknown');
+  const [recognitionFailed, setRecognitionFailed] = useState(false);
 
-  // ── APPEND-ONLY TRANSCRIPT MODEL ────────────────────────────────────────
-  // Finalized chunks live in a ref array — append-only, never overwritten.
-  // Interim lives in a ref string — replaced on each interim event, cleared
-  // only by explicit reset or by being absorbed into a final chunk.
-  //
-  // The refs are the SOURCE OF TRUTH for submit-time reads (no stale-closure
-  // race with React state). The mirrored state below drives re-renders.
-  const transcriptChunksRef = useRef<string[]>([]);
+  // ── SINGLE-SOURCE TRANSCRIPT MODEL ─────────────────────────────────────
+  // finalTranscriptRef — authoritative finalized text (never duplicated).
+  // interimRef — current partial utterance; cleared on final or session end.
+  const finalTranscriptRef = useRef<string>('');
   const interimRef = useRef<string>('');
   const lastSpeechAtRef = useRef<number>(0);
+  const lastResultHashRef = useRef<string>('');
 
   // Render mirrors of the refs. Updated synchronously with each ref mutation
   // so the UI reflects new speech, but the refs remain authoritative for the
@@ -213,7 +222,7 @@ export function useSpeechRecognition(
 
   const syncRender = useCallback(() => {
     if (!mountedRef.current) return; // stale-event guard
-    setTranscript(transcriptChunksRef.current.join(' '));
+    setTranscript(finalTranscriptRef.current);
     setInterimTranscript(interimRef.current);
   }, []);
 
@@ -249,9 +258,10 @@ export function useSpeechRecognition(
   // new session starts with a clean slate.
   const lastRecoveryAtRef = useRef<number>(0);
   const recoveryHistoryRef = useRef<number[]>([]);
-  // Restart-storm guard state. Cleared on transcript success (the pipeline
-  // is alive) and on user-initiated startListening (manual fresh start).
-  const restartHistoryRef = useRef<number[]>([]);
+  /** Automatic restarts consumed this question (reset on clearStormBudgetForAnswer). */
+  const restartCountThisQuestionRef = useRef<number>(0);
+  const lastRestartAtRef = useRef<number>(0);
+  const pendingRestartRef = useRef<boolean>(false);
 
   // Idempotent teardown for a SpeechRecognition instance. Detaches every
   // handler BEFORE stopping so late events the browser dispatches after
@@ -267,7 +277,7 @@ export function useSpeechRecognition(
   }, []);
 
   const getMergedTranscript = useCallback((): string => {
-    const finalized = transcriptChunksRef.current.join(' ').trim();
+    const finalized = finalTranscriptRef.current.trim();
     const interim = interimRef.current.trim();
     if (!finalized && !interim) return '';
     if (!finalized) return interim;
@@ -349,22 +359,37 @@ export function useSpeechRecognition(
   }, []);
 
   const clearStormBudgetForAnswer = useCallback(() => {
-    restartHistoryRef.current = [];
+    restartCountThisQuestionRef.current = 0;
+    lastRestartAtRef.current = 0;
+    pendingRestartRef.current = false;
     recoveryHistoryRef.current = [];
     lastRecoveryAtRef.current = 0;
+    lastResultHashRef.current = '';
+    setRecognitionFailed(false);
+    setError(null);
+  }, []);
+
+  const clearRecognitionFailure = useCallback(() => {
+    restartCountThisQuestionRef.current = 0;
+    lastRestartAtRef.current = 0;
+    pendingRestartRef.current = false;
+    setRecognitionFailed(false);
     setError(null);
   }, []);
 
   const restartListening = useCallback(() => {
     shouldListenRef.current = true;
+    setRecognitionFailed(false);
     if (restartTimerRef.current) {
       clearTimeout(restartTimerRef.current);
       restartTimerRef.current = null;
     }
+    pendingRestartRef.current = false;
     voiceDebug('restart_listening', { source: 'restartListening' });
     log('restarted', { reason: 'explicit_restart' });
+    emitStt('stt_restart_attempt', { source: 'user_restartListening' });
     beginRecognitionRef.current();
-  }, []);
+  }, [emitStt]);
 
   const stopListening = useCallback((reason: StopListeningReason = 'phase_change') => {
     // Intentional stop — disable auto-recovery so onend does NOT restart.
@@ -387,24 +412,91 @@ export function useSpeechRecognition(
     voiceDebug('stop_listening_called', {
       reason,
       gen: generationRef.current,
-      chunks: transcriptChunksRef.current.length,
+      final_chars: finalTranscriptRef.current.length,
       has_interim: interimRef.current.length > 0,
     });
     log('stopped', {
       reason,
-      chunks: transcriptChunksRef.current.length,
+      final_chars: finalTranscriptRef.current.length,
       hasInterim: interimRef.current.length > 0,
     });
-  }, [detachRecognition]);
+    emitStt('stt_session_stopped', { reason, sessionId: generationRef.current });
+  }, [detachRecognition, emitStt]);
 
-  const scheduleArmedRestart = useCallback((source: string, gen: number) => {
-    voiceDebug('retry_triggered', { reason: source, gen, armed: true });
+  const markRestartBudgetExhausted = useCallback((source: string, gen: number) => {
+    pendingRestartRef.current = false;
+    shouldListenRef.current = false;
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = null;
+    }
+    setRecognitionFailed(true);
+    setRecognitionState('idle');
+    setError('Voice connection lost. Tap Retry Mic.');
+    emitStt('stt_restart_budget_exhausted', {
+      source,
+      sessionId: gen,
+      restartCount: restartCountThisQuestionRef.current,
+    });
+    voiceDebug('restart_budget_exhausted', {
+      source,
+      gen,
+      restartCount: restartCountThisQuestionRef.current,
+      armed: keepArmedDuringAnswerRef?.current ?? false,
+    });
+  }, [emitStt, keepArmedDuringAnswerRef]);
+
+  const tryScheduleAutoRestart = useCallback((source: string, gen: number): boolean => {
+    if (!shouldListenRef.current || !mountedRef.current) return false;
+
+    const now = Date.now();
+    const sinceLast = lastRestartAtRef.current ? now - lastRestartAtRef.current : Infinity;
+    if (sinceLast < RESTART_COOLDOWN_MS) {
+      emitStt('stt_restart_blocked', {
+        source,
+        reason: 'cooldown',
+        elapsedMs: sinceLast,
+        cooldownMs: RESTART_COOLDOWN_MS,
+        sessionId: gen,
+      });
+      const waitMs = RESTART_COOLDOWN_MS - sinceLast;
+      pendingRestartRef.current = true;
+      if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+      restartTimerRef.current = setTimeout(() => {
+        pendingRestartRef.current = false;
+        if (shouldListenRef.current && mountedRef.current && gen === generationRef.current) {
+          tryScheduleAutoRestart(`${source}_after_cooldown`, gen);
+        }
+      }, waitMs);
+      return false;
+    }
+
+    if (restartCountThisQuestionRef.current >= MAX_RESTARTS_PER_QUESTION) {
+      markRestartBudgetExhausted(source, gen);
+      return false;
+    }
+
+    restartCountThisQuestionRef.current += 1;
+    lastRestartAtRef.current = now;
+    pendingRestartRef.current = true;
+    emitStt('stt_restart_attempt', {
+      source,
+      sessionId: gen,
+      restartCount: restartCountThisQuestionRef.current,
+      maxRestarts: MAX_RESTARTS_PER_QUESTION,
+    });
+
+    if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
     restartTimerRef.current = setTimeout(() => {
-      if (shouldListenRef.current && mountedRef.current) {
+      pendingRestartRef.current = false;
+      if (shouldListenRef.current && mountedRef.current && gen === generationRef.current) {
         beginRecognitionRef.current();
       }
     }, RESTART_DELAY_MS);
-  }, []);
+    return true;
+  }, [emitStt, markRestartBudgetExhausted]);
+
+  // Legacy alias — visibility resume paths call beginRecognition directly.
 
   // Build + start a fresh recognition instance. Reused for the initial start
   // AND for invisible auto-recovery when the browser ends the session. It
@@ -441,7 +533,9 @@ export function useSpeechRecognition(
     recognition.interimResults = true;
     recognition.lang = 'en-IN';
 
+    lastResultHashRef.current = '';
     voiceDebug('begin_recognition', { gen: myGen });
+    emitStt('stt_session_started', { sessionId: myGen });
 
     recognition.onstart = () => {
       if (!mountedRef.current) {
@@ -476,12 +570,13 @@ export function useSpeechRecognition(
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      if (!mountedRef.current) return; // stale event on torn-down instance
+      if (!mountedRef.current) return;
       if (myGen !== generationRef.current) {
-        // Late onresult from a superseded instance. Dropping it is what keeps
-        // the transcript refs aligned with the live recognition session and
-        // prevents the previous question's audio from flipping state to
-        // 'active' for the new question.
+        emitStt('stt_stale_session_event', {
+          kind: 'onresult',
+          sessionId: myGen,
+          activeSessionId: generationRef.current,
+        });
         voiceDebug('transcript_ignored', {
           reason: 'stale_gen',
           gen: myGen,
@@ -497,63 +592,82 @@ export function useSpeechRecognition(
         else interimChunk += r[0].transcript;
       }
 
+      const eventHash = sttResultEventHash(finalChunk, interimChunk);
+      if (eventHash && eventHash === lastResultHashRef.current) {
+        emitStt('stt_duplicate_result', { sessionId: myGen, hash: eventHash });
+        voiceDebug('transcript_ignored', { reason: 'duplicate_event', gen: myGen });
+        return;
+      }
+      if (eventHash) lastResultHashRef.current = eventHash;
+
       const now = Date.now();
       let changed = false;
 
       if (finalChunk) {
         const cleaned = finalChunk.trim();
         if (cleaned) {
-          transcriptChunksRef.current.push(cleaned);
-          // A final chunk absorbs the in-flight interim — clear it so we don't
-          // render the same words twice (once italic, once final).
-          interimRef.current = '';
-          lastSpeechAtRef.current = now;
-          changed = true;
-          voiceDebug('transcript_received', {
-            gen: myGen,
-            is_final: true,
-            chars: cleaned.length,
-            chunk_count: transcriptChunksRef.current.length,
-          });
-          log('final_chunk_added', {
-            chunk: cleaned,
-            chunk_count: transcriptChunksRef.current.length,
-            total_chars: transcriptChunksRef.current.join(' ').length,
-          });
+          const merged = mergeFinalTranscript(finalTranscriptRef.current, cleaned);
+          if (merged.action === 'ignore') {
+            emitStt('stt_duplicate_result', {
+              sessionId: myGen,
+              reason: merged.reason,
+              incoming_chars: cleaned.length,
+            });
+            voiceDebug('transcript_ignored', {
+              reason: merged.reason,
+              gen: myGen,
+              is_final: true,
+            });
+          } else {
+            finalTranscriptRef.current = merged.text;
+            interimRef.current = '';
+            lastSpeechAtRef.current = now;
+            changed = true;
+            voiceDebug('transcript_received', {
+              gen: myGen,
+              is_final: true,
+              merge_action: merged.action,
+              chars: cleaned.length,
+              total_chars: finalTranscriptRef.current.length,
+            });
+            log('final_merged', {
+              merge_action: merged.action,
+              reason: merged.reason,
+              total_chars: finalTranscriptRef.current.length,
+            });
+          }
         }
       }
 
       if (interimChunk) {
         const cleaned = interimChunk.trim();
-        if (cleaned !== interimRef.current) {
-          interimRef.current = cleaned;
-          lastSpeechAtRef.current = now;
-          changed = true;
-          voiceDebug('transcript_received', {
-            gen: myGen,
-            is_final: false,
-            chars: cleaned.length,
-          });
-          log('interim_updated', { interim: cleaned });
+        if (cleaned && cleaned !== interimRef.current) {
+          const nFinal = finalTranscriptRef.current.trim().replace(/\s+/g, ' ').toLowerCase();
+          const nInterim = cleaned.replace(/\s+/g, ' ').toLowerCase();
+          const isDuplicateOfFinal =
+            nFinal.length > 0 && (nFinal === nInterim || nFinal.includes(nInterim));
+          if (!isDuplicateOfFinal) {
+            interimRef.current = cleaned;
+            lastSpeechAtRef.current = now;
+            changed = true;
+            voiceDebug('transcript_received', {
+              gen: myGen,
+              is_final: false,
+              chars: cleaned.length,
+            });
+            log('interim_updated', { interim: cleaned });
+          }
         }
       }
 
-      // Verified audio pipeline: any transcript event proves frames are flowing.
-      // Promote the lifecycle from 'starting' → 'active' so the UI is now
-      // allowed to render "Listening…". React bails on no-op state writes so
-      // this stays cheap even when called every interim.
       if (changed) {
         setRecognitionState('active');
         voiceLog('speech_result', {
           gen: myGen,
           has_final: Boolean(finalChunk),
           has_interim: Boolean(interimChunk),
-          total_chars:
-            transcriptChunksRef.current.join(' ').length + interimRef.current.length,
+          total_chars: finalTranscriptRef.current.length + interimRef.current.length,
         });
-        // Success resets the storm guard — the pipeline has just proven it
-        // works, so any prior restart attempts are no longer pathological.
-        restartHistoryRef.current = [];
         syncRender();
       }
     };
@@ -561,6 +675,12 @@ export function useSpeechRecognition(
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       if (!mountedRef.current) return; // ignore late errors after unmount
       if (myGen !== generationRef.current) {
+        emitStt('stt_stale_session_event', {
+          kind: 'onerror',
+          sessionId: myGen,
+          activeSessionId: generationRef.current,
+          error: event.error,
+        });
         voiceDebug('recognition_errored_ignored', {
           reason: 'stale_gen',
           gen: myGen,
@@ -620,6 +740,11 @@ export function useSpeechRecognition(
       // If this instance has been superseded, do NOT touch state or schedule
       // a restart — the live instance owns those transitions now.
       if (myGen !== generationRef.current) {
+        emitStt('stt_stale_session_event', {
+          kind: 'onend',
+          sessionId: myGen,
+          activeSessionId: generationRef.current,
+        });
         voiceDebug('recognition_ended_ignored', {
           reason: 'stale_gen',
           gen: myGen,
@@ -630,86 +755,50 @@ export function useSpeechRecognition(
       voiceDebug('recognition_ended', {
         gen: myGen,
         should_listen: shouldListenRef.current,
-        chunks: transcriptChunksRef.current.length,
+        final_chars: finalTranscriptRef.current.length,
       });
       voiceLog('speech_ended', {
         gen: myGen,
         should_listen: shouldListenRef.current,
-        chunks: transcriptChunksRef.current.length,
+        final_chars: finalTranscriptRef.current.length,
         had_interim: interimRef.current.length > 0,
       });
-      // Null out our reference so the visibility-resume effect can detect
-      // "no live instance" and recover. Until this fix, the ref was never
-      // cleared after onend, making visibility recovery dead code.
       if (recognitionRef.current === recognition) {
         recognitionRef.current = null;
       }
-      // Lifecycle resets to idle on every session end. Auto-restart (below)
-      // will transition idle → starting → active again — the UI gap is
-      // intentional so "Listening…" never lingers during the restart window.
       setRecognitionState('idle');
-      // iOS Safari often ends the session before marking results final.
-      // Promote any in-flight interim into finalized chunks so the answer
-      // survives onend and submit() can read it from refs.
       const pendingInterim = interimRef.current.trim();
-      if (pendingInterim) {
-        transcriptChunksRef.current.push(pendingInterim);
+      if (pendingInterim && shouldPromoteInterimOnEnd(finalTranscriptRef.current, pendingInterim)) {
+        const promoted = mergeFinalTranscript(finalTranscriptRef.current, pendingInterim);
+        if (promoted.action !== 'ignore') {
+          finalTranscriptRef.current = promoted.text;
+        }
         voiceDebug('interim_promoted_on_end', {
           gen: myGen,
           chars: pendingInterim.length,
+          merge_action: promoted.action,
+        });
+      } else if (pendingInterim) {
+        voiceDebug('interim_promotion_skipped', {
+          gen: myGen,
+          reason: 'duplicate_of_final',
         });
       }
-      // CRITICAL: do NOT clear transcriptChunksRef here. The browser ends the
-      // session on pause/silence/timeout, and we auto-restart below — clearing
-      // would wipe the answer mid-sentence. Interim is cleared because a new
-      // session starts fresh; finalized chunks persist as the answer-so-far.
       interimRef.current = '';
+      lastResultHashRef.current = '';
       syncRender();
 
       if (shouldListenRef.current) {
-        // Restart-storm guard: a pathologically broken audio device (USB
-        // unplug, OS permission revoked mid-session, audio service crash)
-        // can produce a tight onerror → onend → restart → onerror loop at
-        // the 250 ms cadence. Cap restarts in a short window; on overflow,
-        // bail out so the existing error UI can surface the manual Retry
-        // path instead of burning CPU silently.
-        const now = Date.now();
-        restartHistoryRef.current = restartHistoryRef.current.filter(
-          (t) => now - t < RESTART_STORM_WINDOW_MS,
-        );
-        if (restartHistoryRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
-          if (keepArmedDuringAnswerRef?.current) {
-            voiceDebug('mic_session_expired', {
-              gen: myGen,
-              recent_restart_count: restartHistoryRef.current.length,
-              armed: true,
-            });
-            console.log('[voice] mic_session_expired', {
-              gen: myGen,
-              restarts: restartHistoryRef.current.length,
-            });
-            restartHistoryRef.current = [];
-            scheduleArmedRestart('armed_auto_recovery_onend', myGen);
-            return;
-          }
-          voiceDebug('restart_storm_giveup', {
-            gen: myGen,
-            recent_restart_count: restartHistoryRef.current.length,
-            window_ms: RESTART_STORM_WINDOW_MS,
-          });
-          shouldListenRef.current = false;
-          setError('Microphone keeps failing. Please check your mic permissions and click Retry.');
-          return;
-        }
-        restartHistoryRef.current.push(now);
-
         voiceDebug('retry_triggered', {
           reason: 'auto_recovery_onend',
           gen: myGen,
-          restart_count_in_window: restartHistoryRef.current.length,
+          restart_count: restartCountThisQuestionRef.current,
         });
-        log('restarted', { reason: 'auto-recovery', chunks: transcriptChunksRef.current.length });
-        scheduleArmedRestart('auto_recovery_onend', myGen);
+        log('restarted', {
+          reason: 'auto-recovery',
+          final_chars: finalTranscriptRef.current.length,
+        });
+        tryScheduleAutoRestart('auto_recovery_onend', myGen);
       }
     };
 
@@ -740,46 +829,16 @@ export function useSpeechRecognition(
         recognitionRef.current = null;
       }
 
-      const now = Date.now();
-      restartHistoryRef.current = restartHistoryRef.current.filter(
-        (t) => now - t < RESTART_STORM_WINDOW_MS,
-      );
-      restartHistoryRef.current.push(now);
-      if (restartHistoryRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
-        if (keepArmedDuringAnswerRef?.current) {
-          voiceDebug('mic_session_expired', {
-            gen: myGen,
-            throw_count_in_window: restartHistoryRef.current.length,
-            armed: true,
-          });
-          console.log('[voice] mic_session_expired', {
-            gen: myGen,
-            throws: restartHistoryRef.current.length,
-          });
-          restartHistoryRef.current = [];
-          scheduleArmedRestart('armed_start_throw_recovery', myGen);
-          return;
-        }
-        voiceDebug('recognition_start_storm_giveup', {
-          gen: myGen,
-          throw_count_in_window: restartHistoryRef.current.length,
-          window_ms: RESTART_STORM_WINDOW_MS,
-        });
-        micFlowLog('recognition_start_storm_giveup', {
-          throw_count_in_window: restartHistoryRef.current.length,
-        });
-        shouldListenRef.current = false;
-        if (mountedRef.current) {
-          setError('Voice input is unavailable in this browser. Switch to text input to continue.');
-        }
-        return;
-      }
-
       if (shouldListenRef.current && mountedRef.current) {
-        scheduleArmedRestart('start_throw_recovery', myGen);
+        tryScheduleAutoRestart('start_throw_recovery', myGen);
       }
     }
-  }, [syncRender, detachRecognition, keepArmedDuringAnswerRef, scheduleArmedRestart]);
+  }, [
+    syncRender,
+    detachRecognition,
+    emitStt,
+    tryScheduleAutoRestart,
+  ]);
 
   useEffect(() => {
     beginRecognitionRef.current = beginRecognition;
@@ -800,9 +859,11 @@ export function useSpeechRecognition(
     // Fresh user-initiated session: clear the recovery / storm history so a
     // previous question's failed attempts cannot trip the rate-limit on the
     // very first restart of this new session.
-    restartHistoryRef.current = [];
+    restartCountThisQuestionRef.current = 0;
     recoveryHistoryRef.current = [];
     lastRecoveryAtRef.current = 0;
+    lastRestartAtRef.current = 0;
+    pendingRestartRef.current = false;
     // NOTE: transcript chunks are intentionally NOT cleared here — only
     // resetTranscript() (called by the page on a new question/retry) clears
     // them. This keeps the answer intact across automatic recognition restarts
@@ -848,9 +909,10 @@ export function useSpeechRecognition(
   }, [requestMicPermission, startListening]);
 
   const resetTranscript = useCallback(() => {
-    transcriptChunksRef.current = [];
+    finalTranscriptRef.current = '';
     interimRef.current = '';
     lastSpeechAtRef.current = 0;
+    lastResultHashRef.current = '';
     syncRender();
     voiceDebug('transcript_reset', {});
     log('reset');
@@ -948,14 +1010,16 @@ export function useSpeechRecognition(
         elapsed_since_speech_ms: sinceLastSpeech,
         recovery_count: recoveryHistoryRef.current.length,
       });
-      // Single, rate-limited rebuild. beginRecognitionRef bumps the
-      // generation, detaches the live instance, and constructs a fresh one
-      // — exactly the same primitive as the natural onend restart path.
-      beginRecognitionRef.current();
+      if (pendingRestartRef.current) return;
+      if (restartCountThisQuestionRef.current >= MAX_RESTARTS_PER_QUESTION) {
+        markRestartBudgetExhausted('watchdog_silent_recovery', generationRef.current);
+        return;
+      }
+      tryScheduleAutoRestart('watchdog_silent_recovery', generationRef.current);
     }, STUCK_WATCHDOG_POLL_MS);
 
     return () => clearInterval(iv);
-  }, [recognitionState]);
+  }, [recognitionState, markRestartBudgetExhausted, tryScheduleAutoRestart]);
 
   // ── StrictMode remount fix ───────────────────────────────────────────────
   // React StrictMode (dev) performs a mount → unmount → remount cycle. The
@@ -993,7 +1057,7 @@ export function useSpeechRecognition(
       // clean slate. The fresh mount's refs are new objects anyway; this
       // line is belt-and-suspenders for static analyzers that flag refs
       // surviving an unmount.
-      restartHistoryRef.current = [];
+      restartCountThisQuestionRef.current = 0;
       recoveryHistoryRef.current = [];
       lastRecoveryAtRef.current = 0;
       voiceDebug('cleanup_executed', { source: 'useSpeechRecognition_unmount' });
@@ -1014,6 +1078,8 @@ export function useSpeechRecognition(
     stopListening,
     restartListening,
     clearStormBudgetForAnswer,
+    recognitionFailed,
+    clearRecognitionFailure,
     resetTranscript,
     getMergedTranscript,
     hasRecentSpeech,

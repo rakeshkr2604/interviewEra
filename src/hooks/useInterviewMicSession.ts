@@ -186,6 +186,7 @@ export function useInterviewMicSession(
       }
 
       trackMicTelemetry('mic_restart_requested', telemetryCtx, { reason, state })
+      trackMicTelemetry('mic_watchdog_restart', telemetryCtx, { reason, state })
       console.log('[voice] watchdog_restart', { reason, state })
 
       const nextCount = restartCountRef.current + 1
@@ -254,10 +255,8 @@ export function useInterviewMicSession(
       }
 
       if (inputMode !== 'voice' || !isMicSupported) return
-      if (recognitionStateRef.current === 'active') return
-      if (recognitionStateRef.current === 'idle') {
-        requestWatchdogRestart('web_speech_idle')
-      }
+      // Web Speech auto-restarts inside useSpeechRecognition (onend + 5s cooldown).
+      // Skipping outer watchdog for voice avoids double restart storms on Android.
     }, MIC_WATCHDOG_POLL_MS)
 
     return () => window.clearInterval(interval)

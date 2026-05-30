@@ -117,7 +117,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     if (micFailed) {
       return {
         phase: 'error' as const,
-        label: 'Voice unavailable — tap Retry or type your answer',
+        label: 'Voice connection lost. Tap Retry Mic.',
         canRetry: true,
         showListeningIndicator: false,
       }

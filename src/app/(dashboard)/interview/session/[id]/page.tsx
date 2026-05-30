@@ -43,6 +43,7 @@ import { useInterviewVoiceUi } from '@/hooks/useInterviewVoiceUi'
 import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
+import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
@@ -304,6 +305,10 @@ export default function InterviewSessionPage() {
 
   // ─── Speech Recognition ───────────────────────────────────
   const micKeepArmedRef = useRef(false)
+  const sttTelemetryRef = useRef<SttTelemetryCallback | null>(null)
+  const onSttTelemetry = useCallback<SttTelemetryCallback>((event, data) => {
+    sttTelemetryRef.current?.(event, data)
+  }, [])
   const [userMicMuted, setUserMicMuted] = useState(false)
   const userMicMutedRef = useRef(false)
   useEffect(() => {
@@ -323,10 +328,12 @@ export default function InterviewSessionPage() {
     stopListening,
     restartListening,
     clearStormBudgetForAnswer,
+    recognitionFailed,
+    clearRecognitionFailure,
     resetTranscript,
     getMergedTranscript,
     hasRecentSpeech,
-  } = useSpeechRecognition({ keepArmedDuringAnswerRef: micKeepArmedRef })
+  } = useSpeechRecognition({ keepArmedDuringAnswerRef: micKeepArmedRef, onSttTelemetry })
   // The ONLY state that may surface "Listening…" in the Web Speech path.
   // 'starting' (between onstart and first transcript) intentionally does NOT
   // qualify — that was the source of the false-positive label.
@@ -359,6 +366,12 @@ export default function InterviewSessionPage() {
   // / phase / platform / browser / pwa / timestamp, and critical events beacon
   // to /api/product-events so mobile failures are visible server-side.
   const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
+
+  useEffect(() => {
+    sttTelemetryRef.current = (event, data) => {
+      track('VOICE', event, data, { critical: true })
+    }
+  }, [track])
   // Destructure for stable callback identities (each is a useCallback) so the
   // persistence / reconcile / unload-guard effects don't re-run every render.
   const {
@@ -847,6 +860,8 @@ export default function InterviewSessionPage() {
     startDgListening: () => startDgListeningRef.current(),
   })
 
+  const micFailed = micSession.micFailed || recognitionFailed
+
   const avatarSpeaking = useInterviewAvatarSpeaking({
     phase,
     setPhase,
@@ -930,7 +945,7 @@ export default function InterviewSessionPage() {
     micArmed,
     userMicMuted,
     micSessionState: micSession.micState,
-    micFailed: micSession.micFailed,
+    micFailed,
   })
 
   useEffect(() => {
@@ -2170,15 +2185,19 @@ export default function InterviewSessionPage() {
                 </div>
               )}
 
-              {phase === 'candidate_answering' && micSession.micFailed && (
+              {phase === 'candidate_answering' && micFailed && (
                 <div className="dashboard-premium-card space-y-2 p-4 border border-amber-200/80 bg-amber-50/80">
                   <p className="text-sm font-medium text-amber-900">
-                    Voice unavailable. Continue with typing or tap Retry.
+                    Voice connection lost. Tap Retry Mic or type your answer.
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => micSession.retryMicSession()}
+                      onClick={() => {
+                        clearRecognitionFailure()
+                        clearStormBudgetForAnswer()
+                        micSession.retryMicSession()
+                      }}
                       className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
                     >
                       Retry microphone
@@ -2194,7 +2213,7 @@ export default function InterviewSessionPage() {
                 </div>
               )}
 
-              {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && !micSession.micFailed && (
+              {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && !micFailed && (
                 <div className="w-full min-w-0">
                   <CandidateTranscript
                     transcript={transcript}
@@ -2398,6 +2417,7 @@ export default function InterviewSessionPage() {
                         void startDgListening()
                       } else {
                         setUserMicMuted(false)
+                        clearRecognitionFailure()
                         clearStormBudgetForAnswer()
                         micSession.retryMicSession()
                       }
