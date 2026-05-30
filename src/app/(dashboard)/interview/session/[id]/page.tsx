@@ -990,9 +990,15 @@ export default function InterviewSessionPage() {
     }
 
     // Effect cleanup: when the avatar_speaking phase ends (Skip / Retry /
-    // Submit / Next / unmount), cancel the post-TTS timer AND both watchdogs.
-    // The useVoicePlayer / useTTS hooks themselves are already cancelled by
-    // the handlers' explicit elStop()/stopSpeaking() calls.
+    // Submit / Next / unmount / fast-fail watchdog), cancel the post-TTS timer
+    // AND both watchdogs AND explicitly stop any TTS engine that may still be
+    // mid-flight. iOS Safari case: when the fast-fail watchdog transitions us
+    // to candidate_answering, speechSynthesis may still have a queued (silently
+    // pending) utterance that wakes up later and fires onend — that stale
+    // onend used to call safeComplete('natural_end'), which was a no-op
+    // (already resolved), but the underlying engine could also fire onstart
+    // after we entered candidate_answering. Cancelling here keeps the engine
+    // state in lock-step with our phase machine.
     return () => {
       clearTimeout(fastFailTimer)
       clearTimeout(hardDeadlineTimer)
@@ -1001,6 +1007,8 @@ export default function InterviewSessionPage() {
         postTtsTimerRef.current = null
         lifecycleLog('session', 'post_tts_timer_cancelled_on_phase_exit')
       }
+      try { stopSpeaking() } catch { /* */ }
+      try { elStop() } catch { /* */ }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentIndex, pendingFollowUp])
@@ -1224,6 +1232,47 @@ export default function InterviewSessionPage() {
     }, 2000)
     return () => clearInterval(iv)
   }, [phase, currentIndex, pendingFollowUp, answerText, inputMode, hasRecentSpeech])
+
+  // ─── Emergency mic-startup watchdog ───────────────────────
+  // iOS Safari / iOS PWA case: after the previous fast-fail watchdog forces
+  // phase=candidate_answering, the page synchronously calls startListening().
+  // The user grants mic permission, but webkitSpeechRecognition.start() throws
+  // every retry because the gesture token was consumed by the prompt. The
+  // restart-storm cap in useSpeechRecognition now bounds the loop AND surfaces
+  // an error — but the candidate is still in voice mode with no working mic.
+  //
+  // This effect detects: phase=candidate_answering + voice mode + permission
+  // granted + recognition still idle/starting after 5 s. When triggered we
+  // flip inputMode to 'text' so the candidate immediately gets a usable input
+  // surface and the UI stops looking like a stuck "Click mic to enable" wall.
+  // The fast-fail event is logged under [mic-flow] for telemetry.
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'voice') return
+    if (!isMicSupported) return
+    const startedAt = Date.now()
+    const t = setTimeout(() => {
+      // If recognition is genuinely active by now, do nothing.
+      if (recognitionState === 'active') return
+      // If permission is still being requested or denied, the existing UI
+      // already explains the state — don't double-handle.
+      if (permissionState === 'requesting' || permissionState === 'denied') return
+      console.log('[mic-flow] mic_startup_watchdog_fallback', {
+        elapsedMs: Date.now() - startedAt,
+        recognitionState,
+        permissionState,
+        hadMicError: Boolean(micError),
+        questionIndex: currentIndex,
+      })
+      stopListening()
+      setInputMode('text')
+    }, 5000)
+    return () => clearTimeout(t)
+    // We intentionally do NOT depend on `recognitionState` / `permissionState`
+    // so the 5 s deadline is from the moment we entered candidate_answering,
+    // not reset on every state churn.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, currentIndex, inputMode, isMicSupported])
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {

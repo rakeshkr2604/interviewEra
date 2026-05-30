@@ -6,7 +6,12 @@ import {
   lifecycleLog as scopedLifecycleLog,
   lifecycleWarn as scopedLifecycleWarn,
   voiceDebug,
+  getPlatformContext,
 } from '@/lib/voice/lifecycle-log';
+
+function micFlowLog(event: string, data?: Record<string, unknown>): void {
+  console.log(`[mic-flow] ${event}`, { ...getPlatformContext(), ...(data ?? {}) });
+}
 
 // Minimal Web Speech API typings (not present in all TS DOM lib versions)
 interface SpeechRecognitionResult {
@@ -260,6 +265,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     setPermissionState('requesting');
     hasRequestedMicRef.current = true;
     voiceDebug('mic_permission_requested', { source: 'useSpeechRecognition' });
+    micFlowLog('permission_requested', { source: 'useSpeechRecognition' });
     try {
       const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints());
       const tracks = stream.getTracks();
@@ -269,9 +275,11 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
         readyStates: tracks.map(t => t.readyState),
         muted_flags: tracks.map(t => t.muted),
       });
+      micFlowLog('stream_created', { track_count: tracks.length });
       tracks.forEach((track) => track.stop());
       setPermissionState('granted');
       voiceDebug('mic_permission_granted', {});
+      micFlowLog('permission_granted', {});
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? `${err.name}: ${err.message}` : 'Unknown error';
@@ -404,6 +412,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       // onresult on the first interim/final event.
       setRecognitionState('starting');
       voiceDebug('recognition_started', { gen: myGen });
+      micFlowLog('recognition_started', { gen: myGen });
       log('started');
     };
 
@@ -620,21 +629,53 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
     };
 
     recognitionRef.current = recognition;
+    micFlowLog('recognition_start_called', { gen: myGen });
     try {
       recognition.start();
     } catch (err) {
-      voiceDebug('recognition_start_threw', {
-        gen: myGen,
-        error: err instanceof Error ? `${err.name}: ${err.message}` : String(err),
-      });
+      const errMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      voiceDebug('recognition_start_threw', { gen: myGen, error: errMsg });
+      micFlowLog('recognition_start_threw', { gen: myGen, error: errMsg });
       // start() throws InvalidStateError if a prior instance is mid-teardown.
-      // Detach the dead instance NOW so its (still-bound) handlers can never
-      // fire, then schedule a single delayed retry. Without the detach, the
-      // dead instance could deliver onerror/onend later and pollute state.
+      // On iOS Safari / PWA, start() throws SYNCHRONOUSLY every retry because
+      // the page lost its gesture token during the permission prompt — without
+      // counting these throws toward the restart-storm budget the loop became
+      // unbounded: every 350 ms a new webkitSpeechRecognition was allocated +
+      // thrown, saturating the main thread and freezing touch events while the
+      // timer (setInterval) kept ticking. Visible symptom: "Click mic to enable"
+      // stuck idle, hamburger unclickable, page unscrollable.
+      //
+      // Fix: synchronous throws ARE part of the restart-storm budget. After
+      // MAX_RESTARTS_PER_WINDOW throws in RESTART_STORM_WINDOW_MS we stop
+      // retrying, flip shouldListenRef off (so any late onend cannot revive
+      // the loop) and surface the existing error UI — the candidate can then
+      // switch to text input.
       detachRecognition(recognition);
       if (recognitionRef.current === recognition) {
         recognitionRef.current = null;
       }
+
+      const now = Date.now();
+      restartHistoryRef.current = restartHistoryRef.current.filter(
+        (t) => now - t < RESTART_STORM_WINDOW_MS,
+      );
+      restartHistoryRef.current.push(now);
+      if (restartHistoryRef.current.length >= MAX_RESTARTS_PER_WINDOW) {
+        voiceDebug('recognition_start_storm_giveup', {
+          gen: myGen,
+          throw_count_in_window: restartHistoryRef.current.length,
+          window_ms: RESTART_STORM_WINDOW_MS,
+        });
+        micFlowLog('recognition_start_storm_giveup', {
+          throw_count_in_window: restartHistoryRef.current.length,
+        });
+        shouldListenRef.current = false;
+        if (mountedRef.current) {
+          setError('Voice input is unavailable in this browser. Switch to text input to continue.');
+        }
+        return;
+      }
+
       if (shouldListenRef.current && mountedRef.current) {
         // Slightly longer delay than RESTART_DELAY_MS — the browser needs the
         // previous instance to fully release before start() succeeds.
@@ -695,6 +736,7 @@ export function useSpeechRecognition(): UseSpeechRecognitionReturn {
       }
 
       shouldListenRef.current = true;
+      micFlowLog('listening_started', {});
       beginRecognition();
       return true;
     } finally {

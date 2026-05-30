@@ -19,6 +19,11 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
 
   // iOS body scroll lock: prevents background page rubber-banding through
   // the mobile drawer overlay on Safari/PWA. Saves + restores scroll position.
+  //
+  // [scroll-lock] logs are emitted on lock and unlock so we can rule this
+  // effect in or out when diagnosing iOS "page stops scrolling" reports —
+  // every lock MUST have a matching unlock; an orphaned lock here would
+  // exactly match those symptoms.
   useEffect(() => {
     if (typeof window === 'undefined' || !mobileOpen) return;
     const scrollY = window.scrollY;
@@ -26,12 +31,14 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
     document.body.style.position = 'fixed';
     document.body.style.top = `-${scrollY}px`;
     document.body.style.width = '100%';
+    console.log('[scroll-lock]', { action: 'lock', reason: 'mobile_drawer_open', scrollY });
     return () => {
       document.body.style.overflow = '';
       document.body.style.position = '';
       document.body.style.top = '';
       document.body.style.width = '';
       window.scrollTo(0, scrollY);
+      console.log('[scroll-lock]', { action: 'unlock', reason: 'mobile_drawer_closed', restoredScrollY: scrollY });
     };
   }, [mobileOpen])
 
