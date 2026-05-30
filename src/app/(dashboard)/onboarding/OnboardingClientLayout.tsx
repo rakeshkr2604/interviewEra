@@ -12,9 +12,17 @@ export function OnboardingClientLayout({
   children: ReactNode
   hydration: OnboardingHydration | null
 }) {
+  const providerKey = [
+    hydration?.step ?? 0,
+    hydration?.resume?.id ?? hydration?.data?.resumeId ?? 'none',
+    hydration?.draft?.updatedAt ?? 'none',
+  ].join(':')
+
   return (
     <OnboardingHydrationProvider hydration={hydration}>
-      <OnboardingProvider initialData={hydration?.data}>{children}</OnboardingProvider>
+      <OnboardingProvider key={providerKey} initialData={hydration?.data}>
+        {children}
+      </OnboardingProvider>
     </OnboardingHydrationProvider>
   )
 }

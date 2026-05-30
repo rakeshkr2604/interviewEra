@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/lib/onboarding/store'
 import { useOnboardingHydration } from '@/lib/onboarding/hydration-context'
-import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
+import {
+  resolveHydratedResumeId,
+  type OnboardingHydration,
+} from '@/lib/onboarding/load-hydration'
 import { usePersistOnboardingDraft } from '@/lib/onboarding/use-persist-onboarding-draft'
 import { OnboardingStepGoalProfile } from '@/components/onboarding/OnboardingStepGoalProfile'
 import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResume'
@@ -147,7 +150,8 @@ export default function OnboardingPage() {
         if (h.jdParseStatus) setJdParseStatus(h.jdParseStatus)
         if (h.difficulty) setDifficulty(h.difficulty)
         if (h.difficultyTouched) setDifficultyTouched(h.difficultyTouched)
-        if (h.data.resumeId) setResumeId(h.data.resumeId)
+        const resumeId = resolveHydratedResumeId(h.draft, h.resume, h.data.resumeId)
+        if (resumeId) setResumeId(resumeId)
         if (h.data.goal) setGoal(h.data.goal)
         if (h.data.role) setRole(h.data.role)
         if (h.data.experienceYears) setExperienceYears(h.data.experienceYears)
@@ -162,6 +166,31 @@ export default function OnboardingPage() {
     return () => {
       cancelled = true
     }
+  }, [
+    serverHydration,
+    setGoal,
+    setRole,
+    setExperienceYears,
+    setMode,
+    setInterviewerId,
+    setResumeId,
+  ])
+
+  /** Sync server hydration into store — draft may omit resumeId while DB resume is parsed. */
+  useEffect(() => {
+    if (!serverHydration) return
+
+    const h = serverHydration
+    if (h.data.goal) setGoal(h.data.goal)
+    if (h.data.role) setRole(h.data.role)
+    if (h.data.mode) setMode(h.data.mode)
+    if (h.data.interviewerId) setInterviewerId(h.data.interviewerId)
+    if (typeof h.data.experienceYears === 'number') {
+      setExperienceYears(h.data.experienceYears)
+    }
+
+    const resumeId = resolveHydratedResumeId(h.draft, h.resume, h.data.resumeId)
+    if (resumeId) setResumeId(resumeId)
   }, [
     serverHydration,
     setGoal,
@@ -598,16 +627,30 @@ export default function OnboardingPage() {
     }
   }
 
+  const showSuccess = resumeState === 'parsed'
+
+  const effectiveResumeId =
+    data.resumeId ??
+    resolveHydratedResumeId(
+      serverHydration?.draft ?? null,
+      serverHydration?.resume ?? null,
+      serverHydration?.data.resumeId,
+    )
+
   const handleStartInterview = async () => {
     if (startLoading) return
     unlockAudioForInterview()
     setStartLoading(true)
     setStartError('')
 
-    if (!data.resumeId || !data.goal || !data.interviewerId) {
+    if (!effectiveResumeId || !data.goal || !data.interviewerId) {
       setStartError('Missing setup data. Please complete all steps.')
       setStartLoading(false)
       return
+    }
+
+    if (!data.resumeId && effectiveResumeId) {
+      setResumeId(effectiveResumeId)
     }
 
     try {
@@ -649,7 +692,7 @@ export default function OnboardingPage() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          resumeId: data.resumeId,
+          resumeId: effectiveResumeId,
           role: data.role.trim(),
           difficulty,
           interviewerId: data.interviewerId,
@@ -695,10 +738,11 @@ export default function OnboardingPage() {
     }
   }
 
-  const showSuccess = resumeState === 'parsed'
-
   const canBegin =
-    showSuccess && data.goal !== null && data.resumeId !== null && data.interviewerId !== null
+    showSuccess &&
+    data.goal !== null &&
+    effectiveResumeId !== null &&
+    data.interviewerId !== null
 
   const interviewerName = getInterviewerById(data.interviewerId)?.name ?? resolved.interviewerName
   const voiceIsSettingsDefault = data.interviewerId === resolved.interviewerId

@@ -32,6 +32,15 @@ export type OnboardingHydration = {
   difficultyTouched: boolean
 }
 
+/** Prefer live resume row over draft snapshot (draft often lacks resumeId until re-upload). */
+export function resolveHydratedResumeId(
+  draft: OnboardingPersistedDraft | null,
+  resume: OnboardingResumeHydration | null,
+  dataResumeId?: string | null,
+): string | null {
+  return resume?.id ?? dataResumeId ?? draft?.resumeId ?? null
+}
+
 function resumeStateFromDbStatus(
   status: OnboardingResumeHydration['status'],
 ): OnboardingHydration['resumeState'] {
@@ -119,25 +128,25 @@ export async function loadOnboardingHydration(): Promise<OnboardingHydration | n
   const draft = parsePersistedDraft(profile?.onboarding_draft ?? null)
   const resume = await fetchResumeForUser(supabase, user.id, draft?.resumeId ?? null)
 
-  const resumeId = draft?.resumeId ?? resume?.id ?? null
   const resumeFileName = draft?.resumeFileName ?? null
 
   const data = draft
-    ? draftToOnboardingData({ ...draft, resumeId })
+    ? draftToOnboardingData({ ...draft, resumeId: resolveHydratedResumeId(draft, resume) })
     : {
         goal: null as InterviewGoal | null,
         role: '',
         experienceYears: 0,
         mode: 'Technical' as const,
         interviewerId: null,
-        resumeId,
+        resumeId: resolveHydratedResumeId(null, resume),
         resumeText: '',
         skills: [],
         projects: [],
         placementDate: null,
       }
 
-  if (resumeId && !data.resumeId) {
+  const resumeId = resolveHydratedResumeId(draft, resume, data.resumeId)
+  if (resumeId) {
     data.resumeId = resumeId
   }
 
