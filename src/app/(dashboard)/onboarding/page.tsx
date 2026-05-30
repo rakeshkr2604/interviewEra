@@ -4,10 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/lib/onboarding/store'
 import { useOnboardingHydration } from '@/lib/onboarding/hydration-context'
-import {
-  resolveHydratedResumeId,
-  type OnboardingHydration,
-} from '@/lib/onboarding/load-hydration'
+import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
+import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import { usePersistOnboardingDraft } from '@/lib/onboarding/use-persist-onboarding-draft'
 import { OnboardingStepGoalProfile } from '@/components/onboarding/OnboardingStepGoalProfile'
 import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResume'

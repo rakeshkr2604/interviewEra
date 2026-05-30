@@ -6,6 +6,7 @@ import {
   parsePersistedDraft,
   type OnboardingPersistedDraft,
 } from '@/lib/onboarding/persisted-draft'
+import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import type { ParsedResume, InterviewDifficulty } from '@/types/app.types'
 import type { InterviewGoal } from '@/types/onboarding.types'
 
@@ -30,15 +31,6 @@ export type OnboardingHydration = {
   jdParseStatus: 'idle' | 'parsing' | 'ready' | 'failed'
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
-}
-
-/** Prefer live resume row over draft snapshot (draft often lacks resumeId until re-upload). */
-export function resolveHydratedResumeId(
-  draft: OnboardingPersistedDraft | null,
-  resume: OnboardingResumeHydration | null,
-  dataResumeId?: string | null,
-): string | null {
-  return resume?.id ?? dataResumeId ?? draft?.resumeId ?? null
 }
 
 function resumeStateFromDbStatus(
