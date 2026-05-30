@@ -388,15 +388,57 @@ export default function OnboardingPage() {
         setResumeParseWarning(result.extractionWarning)
       }
 
-      void fetch('/api/resume/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ resumeId: result.resumeId }),
-      })
-
+      // Enter the processing state first so the poll below drives progressive
+      // status messages and remains the completion source of truth.
       setResumeState('processing')
       setStatusMessage('Analyzing your resume — usually takes 10–20 seconds…')
+
+      // Drive the parse EXPLICITLY (was fire-and-forget). `/api/resume/parse`
+      // parses synchronously and returns the authoritative outcome, so awaiting
+      // it lets us surface a parse FAILURE immediately with a retry path —
+      // instead of silently waiting out the full status-poll timeout when the
+      // parse never started (audit P1 #6: "fire-and-forget resume parse").
+      // Bounded by an AbortController so a dead mobile connection can't hang.
+      const parseController = new AbortController()
+      const parseTimeout = window.setTimeout(() => parseController.abort(), 65_000)
+      try {
+        const parseRes = await fetch('/api/resume/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ resumeId: result.resumeId }),
+          signal: parseController.signal,
+        })
+        if (!parseRes.ok) {
+          const perr = await parseResponseJsonSafe<ApiErr>(parseRes)
+          setResumeState('failed')
+          setError(
+            withRequestRef(
+              (typeof perr.userMessage === 'string' && perr.userMessage) ||
+                perr.error ||
+                'We could not analyze this resume. Try a text-based PDF, a .txt export, or paste the text directly.',
+              perr.requestId,
+            ),
+          )
+          return
+        }
+        // Success — the status poll (already running) will fetch parsed_data and
+        // any parse warning, then flip to 'parsed'.
+      } catch (parseErr) {
+        // The parse request never reached a verdict (network drop / timeout).
+        // The status poll cannot recover a parse that never ran, so fail
+        // explicitly with a retry rather than spinning until the poll cap.
+        const aborted = parseErr instanceof DOMException && parseErr.name === 'AbortError'
+        setResumeState('failed')
+        setError(
+          aborted
+            ? 'Resume analysis timed out. Please retry — a shorter resume or pasted text can help.'
+            : 'Could not start resume analysis. Check your connection and retry.',
+        )
+        return
+      } finally {
+        window.clearTimeout(parseTimeout)
+      }
     } catch (e) {
       setResumeState('failed')
       setError('Could not reach the server. Check your connection and try again.')

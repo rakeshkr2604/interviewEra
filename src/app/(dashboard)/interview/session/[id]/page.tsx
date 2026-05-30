@@ -34,6 +34,10 @@ import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect
 import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interviewLog } from '@/lib/voice/lifecycle-log'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
+import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
+import { useInterviewRecovery } from '@/hooks/useInterviewRecovery'
+import { useInterviewDraft } from '@/hooks/useInterviewDraft'
+import type { InterviewDraft, DraftPhase } from '@/lib/session/interview-draft'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -345,6 +349,35 @@ export default function InterviewSessionPage() {
   // Keep phaseRef in sync so Deepgram VAD callback reads current phase
   useEffect(() => { phaseRef.current = phase }, [phase])
 
+  // ─── Unified telemetry + draft persistence ────────────────
+  // Single observability layer: every event carries interviewId / questionIndex
+  // / phase / platform / browser / pwa / timestamp, and critical events beacon
+  // to /api/product-events so mobile failures are visible server-side.
+  const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
+  // Destructure for stable callback identities (each is a useCallback) so the
+  // persistence / reconcile / unload-guard effects don't re-run every render.
+  const {
+    persist: persistDraft,
+    clear: clearDraft,
+    reconcile: reconcileDraft,
+    setUnloadGuard: setDraftUnloadGuard,
+  } = useInterviewDraft(interviewId)
+  // Holds a reconciled draft between the load fetch and the startup→runtime
+  // handoff, so a refresh restores the in-progress answer (transcript + timer)
+  // instead of restarting the question from the server's answeredCount.
+  const pendingRestoreRef = useRef<InterviewDraft | null>(null)
+
+  // ── Stale-closure-proof mirrors (audit P1 #5: watchdog stale closures) ──
+  // The mic-startup watchdog reads these via refs so its 5s deadline is measured
+  // from phase entry yet always evaluates the LATEST recognition/permission
+  // state — no false text-mode flip from a stale closure, no missed recovery.
+  const recognitionStateRef = useRef(recognitionState)
+  const permissionStateRef = useRef(permissionState)
+  const micErrorRef = useRef(micError)
+  recognitionStateRef.current = recognitionState
+  permissionStateRef.current = permissionState
+  micErrorRef.current = micError
+
   useEffect(() => {
     if (inputMode !== 'deepgram' && (!isMicSupported || permissionState === 'denied' || Boolean(micError))) {
       setInputMode('text')
@@ -476,6 +509,31 @@ export default function InterviewSessionPage() {
           questionCount: result.data.questions.length,
           restoredIndex,
         })
+        track('INTERVIEW_FLOW', 'interview_loaded', {
+          questionCount: result.data.questions.length,
+          restoredIndex,
+        })
+        // ── Refresh recovery (audit P0) ──────────────────────────────────────
+        // If a refresh interrupted an in-progress answer for THIS question,
+        // stage the draft so the startup→runtime handoff restores the
+        // transcript + timer instead of restarting the question. Reconciliation
+        // discards drafts the server has already moved past (answer submitted
+        // before the refresh) so an answered question is never replayed.
+        const reconciliation = reconcileDraft(restoredIndex)
+        if (reconciliation.action === 'restore') {
+          pendingRestoreRef.current = reconciliation.draft
+          track('INTERVIEW_FLOW', 'draft_restore_staged', {
+            restoredIndex,
+            draftPhase: reconciliation.draft.phase,
+            transcriptLen: reconciliation.draft.transcript.length,
+            timerRemaining: reconciliation.draft.timerRemaining,
+          })
+        } else if (reconciliation.reason !== 'no_draft') {
+          track('INTERVIEW_FLOW', 'draft_discarded', {
+            reason: reconciliation.reason,
+            restoredIndex,
+          })
+        }
         // GATED TRANSITION 1 → 2: only advance when interview + non-empty
         // questions are present. The next step (audio init) is driven by its
         // own useEffect watching this state value.
@@ -501,6 +559,10 @@ export default function InterviewSessionPage() {
       }
     }
     loadInterview()
+    // Runs once per interview. `ensureQuestionsReady`, `reconcileDraft` and
+    // `track` are all stable callbacks (no identity churn), so excluding them
+    // keeps this a single-shot load without re-fetching on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [interviewId])
 
   // ─── Startup state machine: questions_ready → initializing_audio ────────────
@@ -618,8 +680,43 @@ export default function InterviewSessionPage() {
     if (startupStep !== 'speech_ready') return
     if (phase !== 'loading') return
     setStartupStep('interview_ready')
+
+    // ── Refresh restore (audit P0) ──────────────────────────────────────────
+    // A reconciled draft for the current question replays the in-progress
+    // answer directly into candidate_answering — restoring transcript and
+    // timer instead of re-speaking. We surface the recovered text in the
+    // editable answer field (works on every platform, avoids an iOS TTS
+    // re-gesture the refresh just invalidated).
+    const restore = pendingRestoreRef.current
+    if (restore && restore.questionIndex === currentIndex) {
+      pendingRestoreRef.current = null
+      const budget = restore.timerBudget > 0 ? restore.timerBudget : TIME_PER_QUESTION
+      const remaining = restore.timerRemaining > 0 ? Math.min(restore.timerRemaining, budget) : budget
+      setInputMode('text')
+      setManualAnswer(restore.transcript)
+      setSkipCount(restore.skipCount)
+      setPendingFollowUp(
+        restore.pendingFollowUp
+          ? { text: restore.pendingFollowUp.text, tone: restore.pendingFollowUp.tone as InterviewerTone }
+          : null,
+      )
+      setAnswerTimeBudget(budget)
+      resetTimer(remaining)
+      setAnswerStartTime(Date.now() - (budget - remaining) * 1000)
+      setPhase('candidate_answering')
+      startTimer()
+      track('INTERVIEW_FLOW', 'draft_restored', {
+        questionIndex: currentIndex,
+        transcriptLen: restore.transcript.length,
+        timerRemaining: remaining,
+        budget,
+      })
+      return
+    }
+
     setPhase('avatar_speaking')
-  }, [startupStep, phase])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startupStep, phase, currentIndex])
 
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
@@ -644,6 +741,10 @@ export default function InterviewSessionPage() {
     setPhase('completed')
     // Record session end time so feedback form can compute accurate duration.
     patchSessionContext({ session_ended_at: Date.now() })
+    // Interview is over — no in-progress answer to recover. Clear the draft so a
+    // reload of a finished interview never replays a stale question.
+    clearDraft()
+    track('REPORT_GENERATION', 'complete_started', {})
     try {
       const result = await api.post<{
         reportId?: string
@@ -658,10 +759,17 @@ export default function InterviewSessionPage() {
       }
       const reportId = result.data.reportId
       if (!reportId) {
+        track(
+          'REPORT_GENERATION',
+          'complete_failed',
+          { reason: 'no_report_id' },
+          { critical: true, level: 'error' },
+        )
         setFetchError(result.data.error ?? 'Report generation failed. Please try again.')
         setPhase('feedback')
         return
       }
+      track('REPORT_GENERATION', 'complete_success', { reportId })
       const href = `/report/${reportId}`
       const retention = result.data.retention ?? null
       if (
@@ -691,10 +799,16 @@ export default function InterviewSessionPage() {
       router.push(href)
     } catch {
       if (!mountedRef.current) return
+      track(
+        'REPORT_GENERATION',
+        'complete_failed',
+        { reason: 'request_failed' },
+        { critical: true, level: 'error' },
+      )
       setFetchError('Report generation failed. Please try again.')
       setPhase('feedback')
     }
-  }, [interviewId, router])
+  }, [interviewId, router, track, clearDraft])
 
   // ─── Deepgram STT helpers ─────────────────────────────────
   // Ref so startDgListening's VAD callback can call handleSubmitAnswer without
@@ -946,6 +1060,7 @@ export default function InterviewSessionPage() {
           budgetSeconds: budget,
           mode: inputMode,
         })
+        track('TIMER', 'timer_started', { budgetSeconds: budget, mode: inputMode })
         // Continuous conversation: the mic auto-activates the moment the
         // interviewer finishes — the candidate never re-enables it manually.
         voiceDebug('question_transitioned', {
@@ -1066,6 +1181,7 @@ export default function InterviewSessionPage() {
         phase: phaseRef.current,
         source,
       })
+      track('SUBMIT', 'submit_blocked', { reason: 'wrong_phase', blockedPhase: phaseRef.current, source })
       return
     }
     // Synchronous double-submit guard. The Submit button, the VAD onFinal
@@ -1075,6 +1191,7 @@ export default function InterviewSessionPage() {
     if (submitInFlightRef.current) {
       lifecycleWarn('session', 'submit_duplicate_ignored')
       interviewLog('submit_blocked', { reason: 'in_flight', source })
+      track('SUBMIT', 'submit_blocked', { reason: 'in_flight', source })
       return
     }
 
@@ -1095,6 +1212,22 @@ export default function InterviewSessionPage() {
         voiceLen: getMergedTranscript().length,
         manualLen: manualAnswer.trim().length,
       })
+      // Critical: empty-payload blocks are a top mobile completion blocker —
+      // beacon to the server so they are visible in production (Vercel only
+      // sees HTTP status, and a blocked submit makes no API call at all).
+      track(
+        'SUBMIT',
+        'submit_blocked',
+        {
+          reason: 'empty_payload',
+          source,
+          useManualInput,
+          displayLen: answerText.length,
+          voiceLen: getMergedTranscript().length,
+          manualLen: manualAnswer.trim().length,
+        },
+        { critical: true, level: 'warn' },
+      )
       setShowEmptyWarning(true)
       return
     }
@@ -1105,6 +1238,7 @@ export default function InterviewSessionPage() {
       durationSeconds,
       mode: inputMode,
     })
+    track('SUBMIT', 'submit_started', { source, payloadLength: submittedText.length, durationSeconds, mode: inputMode })
     console.log('[speech] submitted', { payload_length: submittedText.length, durationSeconds, mode: inputMode })
 
     submitInFlightRef.current = true
@@ -1123,6 +1257,16 @@ export default function InterviewSessionPage() {
     // Only allow one orchestrator-driven follow-up per static question so the
     // interview length stays bounded (no infinite probe loops).
     const followUpAllowed = followUpForIndexRef.current !== currentIndex
+
+    track('EVALUATION', 'evaluation_started', { source, mode: inputMode })
+
+    // Bound the orchestrator (process-answer) fetch. It previously had NO client
+    // timeout, so a hung mobile connection kept the evaluation Promise.all
+    // pending indefinitely — the user stuck on "Analyzing…". The scoring call
+    // already uses api.post's 60s AbortController budget; this matches the
+    // server's 55s process-answer maxDuration.
+    const orchestratorController = new AbortController()
+    const orchestratorTimeout = setTimeout(() => orchestratorController.abort(), 55_000)
 
     try {
       // Run scoring (evaluate + persist) and the orchestrator (the intelligence
@@ -1155,6 +1299,7 @@ export default function InterviewSessionPage() {
                   interview_style: currentQuestion.category === 'technical' ? 'technical' : 'behavioral',
                 },
               }),
+              signal: orchestratorController.signal,
             })
               .then(r => r.ok ? r.json() : null)
               .catch(() => null)
@@ -1217,14 +1362,35 @@ export default function InterviewSessionPage() {
         questionIndex: currentIndex,
         payload_length: finalTranscript.length,
       })
+      track('SUBMIT', 'submit_success', { source, questionIndex: currentIndex, payloadLength: finalTranscript.length })
+      track('EVALUATION', 'evaluation_succeeded', {
+        source,
+        hasFollowUp: followUpAllowed && orchestratorResult?.type === 'followup',
+      })
+      // Answer is persisted server-side — this question's in-progress work is
+      // done. Clear the draft so a refresh now uses authoritative server state.
+      clearDraft()
       setPhase('feedback')
     } catch {
       if (!mountedRef.current) return
       interviewLog('submit_failed', { source, questionIndex: currentIndex })
+      // Critical: a failed evaluation is the visible "stuck after answering"
+      // symptom — beacon it so mobile failures surface in the server log.
+      track(
+        'SUBMIT',
+        'submit_failed',
+        { source, questionIndex: currentIndex },
+        { critical: true, level: 'error' },
+      )
+      track('EVALUATION', 'evaluation_failed', { source, questionIndex: currentIndex }, { critical: true, level: 'error' })
+      // The submit path produced a (fallback) feedback turn; clear the draft so
+      // we don't replay this answer on refresh.
+      clearDraft()
       setLastFeedback('Unable to evaluate this answer. Moving to next question.')
       setLastFillerAnalysis(fillerAnalysis)
       setPhase('feedback')
     } finally {
+      clearTimeout(orchestratorTimeout)
       // Always release the in-flight flag, even on early-bail or thrown error,
       // so subsequent attempts can proceed.
       submitInFlightRef.current = false
@@ -1246,6 +1412,8 @@ export default function InterviewSessionPage() {
     stopSpeaking,
     elStop,
     stopDgListening,
+    track,
+    clearDraft,
   ])
 
   const handleSubmitClick = useCallback(() => {
@@ -1261,9 +1429,80 @@ export default function InterviewSessionPage() {
   // latest version of handleSubmitAnswer (avoids stale closure + forward-ref issue).
   useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer }, [handleSubmitAnswer])
 
+  // ─── Draft persistence (audit P0 refresh safety) ──────────
+  // Persist in-progress work while the candidate is actively answering — the
+  // only window a refresh can destroy unsaved work. `answerText` in the deps
+  // captures live transcript edits; `timeLeft` gives second-accurate timer
+  // restore. Writes are cheap (one small JSON to localStorage) and idempotent.
+  //
+  // We deliberately do NOT persist avatar_speaking / submitting / feedback: a
+  // refresh during those either re-asks the question (best UX) or — once the
+  // answer is server-persisted — is discarded by reconciliation. Restricting to
+  // candidate_answering also means clearDraft() on submit (phase → feedback) is
+  // never re-overwritten by this effect.
+  useEffect(() => {
+    if (!interviewData) return
+    if (phase !== 'candidate_answering') return
+    persistDraft({
+      interviewId,
+      questionIndex: currentIndex,
+      phase: phase as DraftPhase,
+      transcript: resolveSubmittedText(),
+      timerRemaining: timeLeft,
+      timerBudget: answerTimeBudget,
+      skipCount,
+      pendingFollowUp: pendingFollowUp
+        ? { text: pendingFollowUp.text, tone: pendingFollowUp.tone }
+        : null,
+      inputMode,
+    })
+  }, [
+    interviewData, phase, currentIndex, timeLeft, answerTimeBudget, skipCount,
+    pendingFollowUp, inputMode, answerText, resolveSubmittedText, persistDraft, interviewId,
+  ])
+
+  // beforeunload guard — only while there is genuine in-progress work, so a
+  // stray refresh/close prompts a confirmation. The draft is already saved, so
+  // even a confirmed unload is recoverable.
+  useEffect(() => {
+    const hasProgress = phase === 'candidate_answering' && answerText.trim().length > 0
+    setDraftUnloadGuard(hasProgress)
+  }, [phase, answerText, setDraftUnloadGuard])
+
+  // ─── Resilience watchdogs (audit Phase 6) ─────────────────
+  // Evaluation stall, follow-up advance stall, and answering-timer overrun all
+  // auto-recover. Callbacks are ref-mirrored inside the hook so each watchdog
+  // always invokes the latest handler with live state (no stale closures).
+  useInterviewRecovery({
+    phase,
+    hasPendingFollowUp: Boolean(pendingFollowUp),
+    answerBudgetSeconds: answerTimeBudget,
+    track,
+    onEvaluationTimeout: () => {
+      if (phaseRef.current !== 'submitting') return
+      // Unblock the user: release the in-flight guard and surface a graceful
+      // fallback so a hung / very slow evaluation cannot strand "Analyzing…".
+      submitInFlightRef.current = false
+      setPendingFollowUp(null)
+      setLastFeedback(
+        "That answer took longer than usual to score — let's keep the interview moving.",
+      )
+      setPhase('feedback')
+    },
+    onQuestionAdvanceTimeout: () => {
+      if (phaseRef.current !== 'feedback') return
+      handleNextQuestionRef.current()
+    },
+    onAnsweringTimeout: () => {
+      if (phaseRef.current !== 'candidate_answering') return
+      void handleSubmitAnswerRef.current('watchdog')
+    },
+  })
+
   // ─── Timer runs out → auto submit ─────────────────────────
   useEffect(() => {
     if (timeLeft === 0 && phase === 'candidate_answering') {
+      track('TIMER', 'timer_expired', {})
       void handleSubmitAnswer('timer')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1371,36 +1610,46 @@ export default function InterviewSessionPage() {
     if (!isMicSupported) return
     const startedAt = Date.now()
     const t = setTimeout(() => {
-      // If we already captured speech, keep voice mode — do not discard refs.
+      // STALE-CLOSURE FIX (audit P1 #5): the deadline is intentionally measured
+      // from phase entry (deps exclude recognitionState/permissionState), so the
+      // checks below MUST read the live values via refs — not the captured
+      // closure values, which would be frozen at entry and cause a false
+      // text-mode flip or a missed recovery.
       if (getMergedTranscript().trim() || hasRecentSpeech(5000)) {
         interviewLog('mic_watchdog_suppressed', { reason: 'has_transcript' })
         return
       }
-      // If recognition is genuinely active by now, do nothing.
-      if (recognitionState === 'active') return
-      // If permission is still being requested or denied, the existing UI
-      // already explains the state — don't double-handle.
-      if (permissionState === 'requesting' || permissionState === 'denied') return
+      if (recognitionStateRef.current === 'active') return
+      if (permissionStateRef.current === 'requesting' || permissionStateRef.current === 'denied') return
       console.log('[mic-flow] mic_startup_watchdog_fallback', {
         elapsedMs: Date.now() - startedAt,
-        recognitionState,
-        permissionState,
-        hadMicError: Boolean(micError),
+        recognitionState: recognitionStateRef.current,
+        permissionState: permissionStateRef.current,
+        hadMicError: Boolean(micErrorRef.current),
         questionIndex: currentIndex,
       })
+      track('RECOVERY', 'mic_startup_fallback_text', {
+        recognitionState: recognitionStateRef.current,
+        permissionState: permissionStateRef.current,
+        hadMicError: Boolean(micErrorRef.current),
+      }, { critical: true, level: 'warn' })
       stopListening()
       setInputMode('text')
     }, 5000)
     return () => clearTimeout(t)
     // We intentionally do NOT depend on `recognitionState` / `permissionState`
     // so the 5 s deadline is from the moment we entered candidate_answering,
-    // not reset on every state churn.
+    // not reset on every state churn. Live values are read via refs above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, currentIndex, inputMode, isMicSupported])
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
     interviewLog('advance_question', {
+      fromIndex: currentIndex,
+      hadFollowUp: Boolean(pendingFollowUp),
+    })
+    track('QUESTION_ADVANCE', 'advance_question', {
       fromIndex: currentIndex,
       hadFollowUp: Boolean(pendingFollowUp),
     })
@@ -1430,7 +1679,7 @@ export default function InterviewSessionPage() {
 
     setCurrentIndex(prev => prev + 1)
     setPhase('avatar_speaking')
-  }, [currentIndex, interviewData, pendingFollowUp, resetTranscript, handleCompleteInterview])
+  }, [currentIndex, interviewData, pendingFollowUp, resetTranscript, handleCompleteInterview, track])
 
   // Keep the ref current for the auto-flow effect (forward-reference).
   useEffect(() => { handleNextQuestionRef.current = handleNextQuestion }, [handleNextQuestion])
@@ -1505,7 +1754,7 @@ export default function InterviewSessionPage() {
   // ─── Loading / Error States ───────────────────────────────
   if (fetchError) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4"
+      <div className="flex min-h-dvh items-center justify-center p-4"
            style={{ background: 'var(--page-gradient)' }}>
         <div className="dashboard-premium-card max-w-md p-8 text-center">
           <p className="text-(--accent-danger) font-semibold">{fetchError}</p>
@@ -1538,7 +1787,7 @@ export default function InterviewSessionPage() {
       }
     })()
     return (
-      <div className="flex min-h-screen items-center justify-center"
+      <div className="flex min-h-dvh items-center justify-center"
            style={{ background: 'var(--page-gradient)' }}>
         <div className="text-center space-y-3">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full
@@ -1577,7 +1826,7 @@ export default function InterviewSessionPage() {
     return (
       <>
         <div
-          className="flex min-h-screen items-center justify-center"
+          className="flex min-h-dvh items-center justify-center"
           style={{ background: 'var(--page-gradient)' }}
         >
           <div className="text-center space-y-3">
@@ -1599,7 +1848,7 @@ export default function InterviewSessionPage() {
   return (
     <>
       <div
-        className="min-h-screen px-4 py-6 sm:px-6 lg:px-10"
+        className="min-h-dvh px-4 py-6 sm:px-6 lg:px-10"
         style={{ background: 'var(--page-gradient)' }}
       >
       <div className="mx-auto w-full max-w-[min(100%,1600px)]">
@@ -2050,7 +2299,12 @@ export default function InterviewSessionPage() {
             )}
 
             {/* ── Control Bar ── */}
-            <div className="dashboard-premium-card w-full min-w-0 p-4">
+            {/* Safe-area inset so the submit row clears the iOS home indicator /
+                gesture bar in Safari + standalone PWA (audit mobile issue #7). */}
+            <div
+              className="dashboard-premium-card w-full min-w-0 p-4"
+              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+            >
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => {

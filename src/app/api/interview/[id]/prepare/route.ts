@@ -8,7 +8,6 @@ import type {
   ParsedResume,
   InterviewGenerationContext,
 } from '@/types/app.types';
-import { trackProductEvent } from '@/lib/analytics/product-events';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;

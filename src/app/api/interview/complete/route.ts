@@ -101,6 +101,12 @@ async function enrichRetentionPayload(
   };
 }
 
+// Report aggregation + retention processing can take several seconds on slow
+// providers. Pin the serverless budget so a slow `/complete` is not platform-
+// killed mid-write (audit: "/complete no explicit maxDuration"). Matches the
+// client's 60s POST AbortController budget.
+export const maxDuration = 60;
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const supabase = await createClient();
