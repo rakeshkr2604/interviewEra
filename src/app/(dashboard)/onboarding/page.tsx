@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/lib/onboarding/store'
+import { useOnboardingHydration } from '@/lib/onboarding/hydration-context'
+import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
+import { usePersistOnboardingDraft } from '@/lib/onboarding/use-persist-onboarding-draft'
 import { OnboardingStepGoalProfile } from '@/components/onboarding/OnboardingStepGoalProfile'
 import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResume'
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
@@ -54,6 +57,7 @@ type JdParseStatus = 'idle' | 'parsing' | 'ready' | 'failed'
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const serverHydration = useOnboardingHydration()
   const { resolved, refresh: refreshResolvedPreferences } = useResolvedInterviewSetupPreferences()
   const {
     data,
@@ -66,26 +70,107 @@ export default function OnboardingPage() {
     setResumeData,
   } = useOnboarding()
 
-  const [step, setStep] = useState(1)
+  const [step, setStep] = useState<1 | 2>(() => serverHydration?.step ?? 1)
   const [resumeFile, setResumeFile] = useState<File | null>(null)
-  const [resumeState, setResumeState] = useState<ResumeProcessingState>('idle')
+  const [resumeFileName, setResumeFileName] = useState<string | null>(
+    () => serverHydration?.resumeFileName ?? null,
+  )
+  const [resumeState, setResumeState] = useState<ResumeProcessingState>(
+    () => serverHydration?.resumeState ?? 'idle',
+  )
   const [error, setError] = useState('')
-  const [statusMessage, setStatusMessage] = useState('')
-  const [parsedResume, setParsedResume] = useState<ParsedResume | null>(null)
+  const [statusMessage, setStatusMessage] = useState(() =>
+    serverHydration?.resumeState === 'parsed' ? 'Ready for your interview.' : '',
+  )
+  const [parsedResume, setParsedResume] = useState<ParsedResume | null>(
+    () => serverHydration?.parsedResume ?? null,
+  )
   const [resumeParseWarning, setResumeParseWarning] = useState('')
-  const [difficulty, setDifficulty] = useState<InterviewDifficulty>(() => readDefaultDifficulty())
-  const [difficultyTouched, setDifficultyTouched] = useState(false)
+  const [difficulty, setDifficulty] = useState<InterviewDifficulty>(
+    () => serverHydration?.difficulty ?? readDefaultDifficulty(),
+  )
+  const [difficultyTouched, setDifficultyTouched] = useState(
+    () => serverHydration?.difficultyTouched ?? false,
+  )
   const [startLoading, setStartLoading] = useState(false)
   const [startError, setStartError] = useState('')
-  const [jdText, setJdText] = useState('')
+  const [jdText, setJdText] = useState(() => serverHydration?.jdText ?? '')
   const [jdFile, setJdFile] = useState<File | null>(null)
   const [jdExtractLoading, setJdExtractLoading] = useState(false)
-  const [parsedJd, setParsedJd] = useState<ParsedJobDescription | null>(null)
-  const [jdParseStatus, setJdParseStatus] = useState<JdParseStatus>('idle')
+  const [parsedJd, setParsedJd] = useState<ParsedJobDescription | null>(
+    () => serverHydration?.parsedJd ?? null,
+  )
+  const [jdParseStatus, setJdParseStatus] = useState<JdParseStatus>(
+    () => serverHydration?.jdParseStatus ?? 'idle',
+  )
   const [jdParseError, setJdParseError] = useState('')
   const [jdExtractError, setJdExtractError] = useState('')
   const [jdShowRawEditor, setJdShowRawEditor] = useState(false)
   const jdParseSeq = useRef(0)
+  const hydrationApplied = useRef(false)
+
+  const persistEnabled =
+    resumeState !== 'uploading' && resumeState !== 'processing'
+
+  usePersistOnboardingDraft({
+    step,
+    data,
+    resumeFileName,
+    jdText,
+    parsedJd,
+    jdParseStatus,
+    difficulty,
+    difficultyTouched,
+    enabled: persistEnabled,
+  })
+
+  /** Client fallback: re-sync from DB after hard refresh if layout SSR missed (rare). */
+  useEffect(() => {
+    if (hydrationApplied.current || serverHydration) {
+      hydrationApplied.current = true
+      return
+    }
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await fetch('/api/onboarding/state', { credentials: 'include' })
+        if (!res.ok || cancelled) return
+        const body = (await res.json()) as { hydration?: OnboardingHydration }
+        const h = body.hydration
+        if (!h || cancelled) return
+        if (h.step) setStep(h.step)
+        if (h.resumeFileName) setResumeFileName(h.resumeFileName)
+        if (h.parsedResume) setParsedResume(h.parsedResume)
+        if (h.resumeState) setResumeState(h.resumeState)
+        if (h.jdText) setJdText(h.jdText)
+        if (h.parsedJd) setParsedJd(h.parsedJd)
+        if (h.jdParseStatus) setJdParseStatus(h.jdParseStatus)
+        if (h.difficulty) setDifficulty(h.difficulty)
+        if (h.difficultyTouched) setDifficultyTouched(h.difficultyTouched)
+        if (h.data.resumeId) setResumeId(h.data.resumeId)
+        if (h.data.goal) setGoal(h.data.goal)
+        if (h.data.role) setRole(h.data.role)
+        if (h.data.experienceYears) setExperienceYears(h.data.experienceYears)
+        if (h.data.mode) setMode(h.data.mode)
+        if (h.data.interviewerId) setInterviewerId(h.data.interviewerId)
+      } catch {
+        /* best-effort */
+      } finally {
+        if (!cancelled) hydrationApplied.current = true
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    serverHydration,
+    setGoal,
+    setRole,
+    setExperienceYears,
+    setMode,
+    setInterviewerId,
+    setResumeId,
+  ])
 
   const canProceedStep1 =
     data.goal !== null &&
@@ -384,6 +469,7 @@ export default function OnboardingPage() {
       }
 
       setResumeId(result.resumeId)
+      setResumeFileName(resumeFile.name)
       setResumeData({ resumeText: '', skills: [], projects: [] })
       if (result.extractionWarning) {
         setResumeParseWarning(result.extractionWarning)
@@ -453,17 +539,16 @@ export default function OnboardingPage() {
     setParsedResume(null)
     setResumeParseWarning('')
     setResumeState('idle')
+    setResumeFileName(null)
     setJdExtractError('')
   }
 
   const handleNext = () => {
-    if (step < TOTAL_STEPS) {
-      setStep((s) => s + 1)
-    }
+    if (step < TOTAL_STEPS) setStep(2)
   }
 
   const handleBack = () => {
-    if (step > 1) setStep((s) => s - 1)
+    if (step > 1) setStep(1)
   }
 
   const handleJdExtract = async () => {
@@ -596,6 +681,8 @@ export default function OnboardingPage() {
         return
       }
 
+      void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
+
       const prepQ = responseData.preparing ? '&preparing=1' : ''
       router.push(
         `/interview/session/${responseData.interviewId}?interviewer=${data.interviewerId}${prepQ}`,
@@ -617,7 +704,7 @@ export default function OnboardingPage() {
   const voiceIsSettingsDefault = data.interviewerId === resolved.interviewerId
 
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-5xl flex-1 flex-col gap-2 overflow-x-hidden pb-4 max-lg:pb-6 lg:max-h-full lg:max-w-6xl lg:min-h-0 lg:gap-2 lg:overflow-hidden lg:pb-0">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 overflow-x-hidden pb-4 max-lg:pb-6 lg:max-h-full lg:min-h-0 lg:max-w-6xl lg:flex-1 lg:gap-2 lg:overflow-hidden lg:pb-0">
       <div className="flex shrink-0 flex-col items-center gap-2 text-center sm:gap-2.5">
         <div className="min-w-0 max-w-lg">
           <h1 className="text-2xl font-bold tracking-tight text-(--text-primary) sm:text-3xl lg:text-xl lg:leading-snug">
@@ -656,6 +743,7 @@ export default function OnboardingPage() {
           data={data}
           interviewerName={interviewerName}
           resumeFile={resumeFile}
+          resumeFileName={resumeFileName}
           resumeState={resumeState}
           statusMessage={statusMessage}
           parsedResume={parsedResume}

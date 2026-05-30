@@ -17,6 +17,17 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')
 
+  /*
+   * Onboarding mobile scroll (BUG #1 root cause):
+   * - `h-dvh` + `overflow-hidden` on the shell column clamps height to one viewport.
+   * - Step cards used `flex-1 min-h-0 overflow-hidden` with nested `overflow-y-auto`,
+   *   creating an inner scroll trap (scrollbar inside the white card).
+   * - Touch scrolling on iOS/Android often stays trapped in that inner pane, so users
+   *   cannot reach JD, preferences, or the Start CTA without desktop mode.
+   * Fix: below `lg`, let the shell and cards grow with content; keep a single scroller
+   * on `<main>`. At `lg+`, restore viewport-fitted split-column internal scroll.
+   */
+
   // iOS body scroll lock: prevents background page rubber-banding through
   // the mobile drawer overlay on Safari/PWA. Saves + restores scroll position.
   //
@@ -70,7 +81,9 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col lg:pl-[15.25rem]',
-          isOnboarding ? 'h-dvh max-h-dvh min-h-0 overflow-hidden' : 'min-h-screen',
+          isOnboarding
+            ? 'min-h-dvh max-lg:overflow-visible lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden'
+            : 'min-h-screen',
         )}
       >
         {/* Fixed below content — avoids layout coupling to main scrollbar / inset shifts (CLS). */}
@@ -144,7 +157,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             'ie-landing-premium ie-landing-type relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
-            isOnboarding ? 'max-lg:overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
+            isOnboarding ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
           )}
           style={{
             background: 'var(--page-gradient)',

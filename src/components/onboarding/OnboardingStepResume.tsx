@@ -56,6 +56,8 @@ export interface OnboardingStepResumeProps {
 
   // Resume
   resumeFile:       File | null
+  /** Persisted display name when resumeFile is null after refresh. */
+  resumeFileName:   string | null
   resumeState:      ResumeProcessingState
   statusMessage:    string
   parsedResume:     ParsedResume | null
@@ -245,12 +247,15 @@ function ProcessingCard({ message }: { message: string }) {
 function ParsedSuccessCard({
   parsedResume,
   resumeFile,
+  resumeFileName,
   parseWarning,
 }: {
   parsedResume: ParsedResume | null
   resumeFile: File | null
+  resumeFileName: string | null
   parseWarning?: string
 }) {
+  const displayName = resumeFile?.name ?? resumeFileName
   const profile = parsedResume ? coerceParsedResume(parsedResume) : null
   const topSkills = profile?.skills.slice(0, 5) ?? []
 
@@ -268,8 +273,8 @@ function ParsedSuccessCard({
           <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-(--accent-success)" aria-hidden />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-(--accent-success)">Resume analyzed</p>
-            {resumeFile && (
-              <p className="mt-0.5 truncate text-[11px] text-(--text-muted)">{resumeFile.name}</p>
+            {displayName && (
+              <p className="mt-0.5 truncate text-[11px] text-(--text-muted)">{displayName}</p>
             )}
           </div>
         </div>
@@ -311,6 +316,7 @@ export function OnboardingStepResume({
   data,
   interviewerName,
   resumeFile,
+  resumeFileName,
   resumeState,
   statusMessage,
   parsedResume,
@@ -387,7 +393,7 @@ export function OnboardingStepResume({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
-      className="dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden"
+      className="dashboard-premium-card flex flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden"
     >
       {/* ── Card header ──────────────────────────────────────────────────────── */}
       <header className="shrink-0 border-b border-(--card-border)/80 px-5 py-3 text-center">
@@ -403,11 +409,11 @@ export function OnboardingStepResume({
       </header>
 
       {/* ── Two-column body ──────────────────────────────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain lg:overflow-hidden">
-        <div className="grid min-h-full grid-cols-1 gap-0 lg:h-full lg:grid-cols-[7fr_5fr] lg:divide-x lg:divide-(--card-border)/60">
+      <div className="max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain lg:overflow-hidden">
+        <div className="grid grid-cols-1 gap-0 max-lg:min-h-0 lg:min-h-full lg:h-full lg:grid-cols-[7fr_5fr] lg:divide-x lg:divide-(--card-border)/60">
 
           {/* ═══ LEFT: Upload + JD ══════════════════════════════════════════ */}
-          <div className="flex flex-col gap-4 overflow-y-auto overscroll-y-contain p-4 sm:p-5 lg:h-full lg:pb-6 lg:pr-5">
+          <div className="flex flex-col gap-4 p-4 sm:p-5 max-lg:overflow-visible lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:pb-6 lg:pr-5">
 
             {/* Upload section */}
             <section aria-label="Resume upload">
@@ -499,6 +505,7 @@ export function OnboardingStepResume({
                     <ParsedSuccessCard
                       parsedResume={parsedResume}
                       resumeFile={resumeFile}
+                      resumeFileName={resumeFileName}
                       parseWarning={resumeParseWarning || parsedResume?.parse_warning}
                     />
 
@@ -697,7 +704,7 @@ export function OnboardingStepResume({
           </div>
 
           {/* ═══ RIGHT: Session summary + Checklist + CTA ═══════════════════ */}
-          <div className="flex flex-col gap-4 overflow-y-auto overscroll-y-contain p-4 sm:p-5 lg:h-full lg:pb-6 lg:pl-5">
+          <div className="flex flex-col gap-4 p-4 sm:p-5 max-lg:overflow-visible lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:pb-6 lg:pl-5">
 
             {/* Session preview card */}
             <section aria-label="Session preview">

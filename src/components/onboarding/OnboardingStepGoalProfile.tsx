@@ -107,7 +107,7 @@ export function OnboardingStepGoalProfile({
   }, [role, mode])
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-[5fr_7fr] lg:items-stretch">
+    <div className="grid grid-cols-1 gap-4 max-lg:flex-none lg:min-h-0 lg:flex-1 lg:grid-cols-[5fr_7fr] lg:items-stretch">
 
       {/* ── Left: Brand Panel (desktop only) ──────────────────────────────── */}
       <div
@@ -194,7 +194,7 @@ export function OnboardingStepGoalProfile({
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="flex min-h-0 flex-col"
       >
-        <div className="dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden">
+        <div className="dashboard-premium-card flex flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden">
 
           {/* Mobile-only inline header */}
           <div className="shrink-0 border-b border-(--card-border) px-4 py-3 lg:hidden">
@@ -212,7 +212,7 @@ export function OnboardingStepGoalProfile({
           </div>
 
           {/* Scrollable form */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4 sm:p-5">
+          <div className="p-4 sm:p-5 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain">
             <div className="space-y-5">
 
               {/* Goal */}

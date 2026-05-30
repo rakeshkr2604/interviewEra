@@ -36,8 +36,14 @@ interface OnboardingContextType {
 
 const OnboardingContext = createContext<OnboardingContextType | null>(null)
 
-export function OnboardingProvider({ children }: { children: React.ReactNode }) {
-  const [data, setData] = useState<OnboardingData>(DEFAULT_STATE)
+export function OnboardingProvider({
+  children,
+  initialData,
+}: {
+  children: React.ReactNode
+  initialData?: OnboardingData
+}) {
+  const [data, setData] = useState<OnboardingData>(initialData ?? DEFAULT_STATE)
 
   const setGoal = (goal: InterviewGoal) => setData(p => ({ ...p, goal }))
   const setRole = (role: string) => setData(p => ({ ...p, role }))
