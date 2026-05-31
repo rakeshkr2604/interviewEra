@@ -43,6 +43,12 @@ import type { Skill } from './skills'
 import type { StarTopic } from './star-topics'
 import type { ProgrammaticBreadcrumb } from './types'
 import type { BreadcrumbItemInput } from '@/lib/seo/schema/jsonld'
+import {
+  isRoleIndexable,
+  isCompanyIndexable,
+  isSkillIndexable,
+  isIntersectionIndexable,
+} from './indexing'
 
 /** Bump this each January 1. Used in all programmatic page titles. */
 const PLACEMENT_YEAR = 2026
@@ -83,6 +89,10 @@ export function rolePageMetadata(role: Role): Metadata {
     description: buildRoleDescription(role),
     path,
     keywords: buildRoleKeywords(role),
+    // Gate indexing on content depth (see indexing.ts). `follow` keeps equity
+    // flowing to linked pages even when a page is held out of the index.
+    noIndex: !isRoleIndexable(role),
+    noIndexFollow: true,
   })
 }
 
@@ -90,7 +100,8 @@ function buildRoleDescription(role: Role): string {
   const fresherClause = role.fresherFriendly
     ? 'for Indian campus placements and fresher hiring'
     : 'asked at top Indian tech companies'
-  return `Top 30 ${role.label} interview questions ${fresherClause} in ${PLACEMENT_YEAR}. Covers technical, behavioral, and HR rounds with preparation tips.`
+  // Copy stays count-accurate: pages render curated banks, not a fixed "Top 30".
+  return `Frequently asked ${role.label} interview questions ${fresherClause} in ${PLACEMENT_YEAR}, with model answers and preparation tips across technical, behavioral, and HR rounds.`
 }
 
 function buildRoleKeywords(role: Role): string[] {
@@ -122,6 +133,8 @@ export function companyPageMetadata(company: Company): Metadata {
     description: buildCompanyDescription(company),
     path,
     keywords: buildCompanyKeywords(company),
+    noIndex: !isCompanyIndexable(company),
+    noIndexFollow: true,
   })
 }
 
@@ -164,6 +177,10 @@ export function intersectionPageMetadata(company: Company, role: Role): Metadata
     description: buildIntersectionDescription(company, role),
     path,
     keywords: buildIntersectionKeywords(company, role),
+    // Held out of the index until bespoke per-intersection content exists
+    // (they currently reuse the role question bank — soft duplicate).
+    noIndex: !isIntersectionIndexable(company, role),
+    noIndexFollow: true,
   })
 }
 
@@ -198,6 +215,9 @@ export function skillPageMetadata(skill: Skill): Metadata {
     description: buildSkillDescription(skill),
     path,
     keywords: buildSkillKeywords(skill),
+    // Topic pages index only once their question set is populated (indexing.ts).
+    noIndex: !isSkillIndexable(skill),
+    noIndexFollow: true,
   })
 }
 

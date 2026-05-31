@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { siteConfig } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
 // ── Link data ──────────────────────────────────────────────────────────────────
@@ -116,13 +117,13 @@ export function MarketingFooter() {
           {/* ── Brand column ───────────────────────────────────────────── */}
           <div className="md:col-span-3">
             <BrandHomeLink variant="footer" />
+            {/* Canonical brand statement — kept in sync via siteConfig.entityDefinition. */}
             <p
               className="mt-4 max-w-xs text-sm leading-relaxed"
               style={{ color: 'var(--text-secondary)' }}
             >
-              <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong> is an AI-powered
-              mock interview platform — adaptive follow-ups, resume-aware scoring, built for Indian campus
-              and early-career hiring.
+              <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong>
+              {siteConfig.entityDefinition.replace(/^InterviewEra/, '')}
             </p>
 
             {/* CTA */}

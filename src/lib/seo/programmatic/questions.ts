@@ -26,6 +26,7 @@ import type { QuestionSet, SeoQuestion } from './types'
 import type { RoleSlug } from './roles'
 import type { CompanySlug } from './companies'
 import type { SkillSlug } from './skills'
+import { SKILL_QUESTIONS } from './skill-questions'
 
 // ─── Role question registry ───────────────────────────────────────────────────
 
@@ -2757,9 +2758,12 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
 
 /**
  * Skill topic pages carry deep-dive questions for a single technology.
- * Populated by the generation script in Phase 2.
+ * Curated sets live in `skill-questions.ts` and are merged in at load time
+ * (mirrors the product-company pattern below). Topics without a set stay
+ * `noindex` via indexing.ts until populated — never ship an empty topic page.
  */
 export const SKILL_QUESTION_REGISTRY: Partial<Record<SkillSlug, QuestionSet>> = {}
+Object.assign(SKILL_QUESTION_REGISTRY, SKILL_QUESTIONS)
 
 // ─── Product-tier company additions ──────────────────────────────────────────
 // Appended here to keep the initial COMPANY_QUESTION_REGISTRY declaration

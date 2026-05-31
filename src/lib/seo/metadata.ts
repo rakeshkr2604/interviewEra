@@ -18,9 +18,13 @@ export const siteConfig = {
   url: BASE_URL,
   /** After brand in root/default Open Graph & Twitter titles: `InterviewEra | …` */
   socialDefaultHeadline: 'AI mock interviews',
-  /** One-line entity definition reused across schema + visible copy for consistency. */
+  /**
+   * Canonical one-line brand definition — the SINGLE SOURCE OF TRUTH.
+   * Reused verbatim across Organization / WebSite / SoftwareApplication JSON-LD
+   * and visible brand copy. Do not paraphrase it elsewhere; import this instead.
+   */
   entityDefinition:
-    'InterviewEra is an AI-powered mock interview platform for Indian campus hiring and early-career preparation.',
+    'InterviewEra is an AI-powered mock interview platform with adaptive follow-ups, resume-aware scoring, and structured interview preparation for campus placements and early-career hiring.',
   slogan: 'Know your interview score before the company decides.',
   defaultDescription:
     'Structured mock interviews from your CV — STAR-aligned flow, five-dimension scoring, and progress built for Indian campus hiring. Start free, no card.',

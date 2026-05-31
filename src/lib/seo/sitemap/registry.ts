@@ -21,6 +21,13 @@ import {
   getCompanyQuestionsLastUpdated,
   getSkillQuestionsLastUpdated,
 } from '@/lib/seo/programmatic/questions';
+import {
+  isRoleIndexable,
+  isCompanyIndexable,
+  isSkillIndexable,
+  isIntersectionIndexable,
+} from '@/lib/seo/programmatic/indexing';
+import { getRoleBySlug, getCompanyBySlug } from '@/lib/seo/programmatic';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
 export type SitemapSourceEntry = {
@@ -162,8 +169,11 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     priority: 0.9,
   })
 
-  // Role pages
+  // Role pages — only those that clear the content-sufficiency gate (indexing.ts).
+  // A sitemap that advertises thin/duplicate URLs degrades the whole domain's
+  // quality prior, so it must mirror the pages we actually allow Google to index.
   for (const role of ROLES) {
+    if (!isRoleIndexable(role)) continue
     const lastModified = getRoleQuestionsLastUpdated(role.slug as RoleSlug, QUESTIONS_FALLBACK_DATE)
     entries.push({
       url: canonicalUrl(roleQuestionsPath(role.slug as RoleSlug)),
@@ -175,6 +185,7 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
 
   // Company pages
   for (const company of COMPANIES) {
+    if (!isCompanyIndexable(company)) continue
     const lastModified = getCompanyQuestionsLastUpdated(
       company.slug as CompanySlug,
       QUESTIONS_FALLBACK_DATE,
@@ -187,8 +198,12 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     })
   }
 
-  // High-value intersection pages
+  // High-value intersection pages — currently held out of the index (soft
+  // duplicates of the role bank), so they must not appear in the sitemap.
   for (const pair of HIGH_VALUE_INTERSECTIONS) {
+    const company = getCompanyBySlug(pair.company)
+    const role = getRoleBySlug(pair.role)
+    if (!company || !role || !isIntersectionIndexable(company, role)) continue
     entries.push({
       url: canonicalUrl(
         intersectionQuestionsPath(pair.company as CompanySlug, pair.role as RoleSlug),
@@ -199,8 +214,9 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     })
   }
 
-  // Skill / topic pages
+  // Skill / topic pages — only populated topics (empty ones are noindex).
   for (const skill of SKILLS) {
+    if (!isSkillIndexable(skill)) continue
     const lastModified = getSkillQuestionsLastUpdated(
       skill.slug as SkillSlug,
       QUESTIONS_FALLBACK_DATE,

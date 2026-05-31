@@ -11,7 +11,6 @@ import {
   getRoleBySlug,
   highValueIntersectionParams,
   companyQuestionsPath,
-  roleQuestionsPath,
   questionsHubPath,
 } from '@/lib/seo/programmatic'
 import {
@@ -23,8 +22,7 @@ import {
   buildFaqPairs,
 } from '@/lib/seo/programmatic/questions'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
-import { TOOL_PAGE_BLOG_LINKS } from '@/lib/seo/internal-links'
-import type { SeoTextLink } from '@/lib/seo/internal-links'
+import { buildIntersectionPageLinks } from '@/lib/seo/internal-linking'
 
 export function generateStaticParams() {
   return highValueIntersectionParams()
@@ -58,16 +56,10 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
   )
   const FAQ_LD = faqPairs.length > 0 ? faqPageJsonLd(faqPairs) : null
 
-  const relatedLinks: SeoTextLink[] = [
-    {
-      href: roleQuestionsPath(role.slug),
-      label: `All ${role.label} questions`,
-    },
-    {
-      href: companyQuestionsPath(company.slug),
-      label: `All ${company.label} questions`,
-    },
-  ]
+  // Engine-driven cross-links. These pages are held noindex,follow (soft
+  // duplicate of the role bank), so dense follow links here funnel authority to
+  // the indexable role + company parents and serve users who land via internal links.
+  const linkSections = buildIntersectionPageLinks(company, role)
 
   return (
     <>
@@ -203,8 +195,13 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
         </div>
       </section>
 
-      <SeoCrossLinksSection heading="Explore more" links={relatedLinks} />
-      <SeoCrossLinksSection heading="Related guides and tools" links={TOOL_PAGE_BLOG_LINKS} />
+      {linkSections.map((section) => (
+        <SeoCrossLinksSection
+          key={section.heading}
+          heading={section.heading}
+          links={section.links}
+        />
+      ))}
     </>
   )
 }

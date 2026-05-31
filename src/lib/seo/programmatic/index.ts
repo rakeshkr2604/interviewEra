@@ -99,6 +99,15 @@ export {
   toSlug,
 } from './slugs'
 
+// ── Indexing gate (content-sufficiency) ────────────────────────────────────────
+export {
+  MIN_INDEXABLE_QUESTIONS,
+  isRoleIndexable,
+  isCompanyIndexable,
+  isSkillIndexable,
+  isIntersectionIndexable,
+} from './indexing'
+
 // ── Metadata generators ───────────────────────────────────────────────────────
 export {
   questionsHubMetadata,

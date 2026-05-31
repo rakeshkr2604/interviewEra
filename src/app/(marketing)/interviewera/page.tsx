@@ -95,7 +95,7 @@ const FAQS = [
   {
     question: 'What is InterviewEra?',
     answer:
-      'InterviewEra is an AI-powered mock interview platform for Indian campus hiring and early-career preparation. It runs resume-aware mock interviews, scores each answer against a rubric across five dimensions, and coaches behavioural answers using the STAR method.',
+      `${siteConfig.entityDefinition} It runs resume-aware mock interviews, scores each answer against a rubric across five dimensions, and coaches behavioural answers using the STAR method.`,
   },
   {
     question: 'Is InterviewEra the same as an interviewer?',
@@ -187,11 +187,14 @@ export default function InterviewEraBrandPage() {
           <h2 id="what-heading" className="text-2xl font-bold tracking-tight sm:text-3xl">
             InterviewEra in one line
           </h2>
+          {/* Canonical brand definition — single source of truth (siteConfig.entityDefinition). */}
+          <p className="mt-4 max-w-2xl text-base font-medium leading-[1.85]" style={{ color: 'var(--text-primary)' }}>
+            {siteConfig.entityDefinition}
+          </p>
           <p className="mt-4 max-w-2xl text-base leading-[1.85]" style={{ color: 'var(--text-secondary)' }}>
-            InterviewEra turns interview prep into structured, measurable practice. You upload your resume,
-            answer questions generated from what you actually wrote, and get rubric-scored feedback across five
-            dimensions — so you walk into placements knowing how you will be read, not hoping the panel fills in
-            the gaps.
+            In practice: you upload your resume, answer questions generated from what you actually wrote, and get
+            rubric-scored feedback across five dimensions — so you walk into placements knowing how you will be
+            read, not hoping the panel fills in the gaps.
           </p>
         </section>
 

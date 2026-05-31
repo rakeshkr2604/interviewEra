@@ -8,9 +8,7 @@ import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
   getSkillBySlug,
-  getRoleBySlug,
   allSkillParams,
-  roleQuestionsPath,
   questionsHubPath,
 } from '@/lib/seo/programmatic'
 import {
@@ -22,8 +20,7 @@ import {
   buildFaqPairs,
 } from '@/lib/seo/programmatic/questions'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
-import type { SeoTextLink } from '@/lib/seo/internal-links'
-import { TOOL_PAGE_BLOG_LINKS } from '@/lib/seo/internal-links'
+import { buildSkillPageLinks } from '@/lib/seo/internal-linking'
 import type { SkillSlug } from '@/lib/seo/programmatic'
 
 export function generateStaticParams() {
@@ -60,14 +57,9 @@ export default async function SkillQuestionsPage({ params }: Props) {
   const questions = getSkillQuestionsFlat(skill.slug as SkillSlug)
   const faqPairs = buildFaqPairs(questions)
 
-  // Related role links from skill.relatedRoles
-  const relatedRoleLinks: SeoTextLink[] = skill.relatedRoles
-    .flatMap((roleSlug) => {
-      const role = getRoleBySlug(roleSlug)
-      if (!role) return []
-      return [{ href: roleQuestionsPath(role.slug), label: `${role.label} questions` }]
-    })
-    .slice(0, 6)
+  // Engine-driven cross-links: roles needing this skill, related topics in the
+  // same category (topic-cluster signal), tool funnel, and hub-upward links.
+  const linkSections = buildSkillPageLinks(skill)
 
   const BREADCRUMB_LD = breadcrumbListJsonLd(skillBreadcrumbs(skill), ORIGIN)
   const FAQ_LD = faqPairs.length > 0 ? faqPageJsonLd(faqPairs) : null
@@ -193,15 +185,14 @@ export default async function SkillQuestionsPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── Related roles ─────────────────────────────────────────────────── */}
-      {relatedRoleLinks.length > 0 ? (
+      {/* ── Engine-driven cross-link sections ────────────────────────────── */}
+      {linkSections.map((section) => (
         <SeoCrossLinksSection
-          heading={`Roles that use ${skill.shortLabel}`}
-          links={relatedRoleLinks}
+          key={section.heading}
+          heading={section.heading}
+          links={section.links}
         />
-      ) : null}
-
-      <SeoCrossLinksSection heading="Related guides and tools" links={TOOL_PAGE_BLOG_LINKS} />
+      ))}
     </>
   )
 }
