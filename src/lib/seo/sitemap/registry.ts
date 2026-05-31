@@ -116,6 +116,24 @@ export const BLOG_POST_ROUTES: SitemapSourceEntry[] = [
     priority: 0.8,
     lastModified: '2026-05-01',
   },
+  {
+    path: '/blog/overcome-interview-anxiety-mock-interviews',
+    changeFrequency: 'monthly',
+    priority: 0.88,
+    lastModified: '2026-05-31',
+  },
+  {
+    path: '/blog/english-confidence-interviews',
+    changeFrequency: 'monthly',
+    priority: 0.87,
+    lastModified: '2026-05-31',
+  },
+  {
+    path: '/blog/how-to-get-internship-opportunities',
+    changeFrequency: 'monthly',
+    priority: 0.87,
+    lastModified: '2026-05-31',
+  },
 ];
 
 const origin = getCanonicalSiteOrigin();

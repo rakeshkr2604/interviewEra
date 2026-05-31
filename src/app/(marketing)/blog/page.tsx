@@ -16,6 +16,30 @@ export const revalidate = 3600;
 
 const BLOG_POSTS = [
   {
+    title: "Why Good Students Don't Get Internships (And What Actually Works)",
+    description:
+      'Good students miss internships because of weak signal, low volume, and poor interview conversion — not missing skills. Signal → Volume → Conversion explained.',
+    href: '/blog/how-to-get-internship-opportunities',
+    category: 'Career',
+    readTime: '14 min read',
+  },
+  {
+    title: "Your English Isn't Costing You the Interview. Your Delivery Is.",
+    description:
+      'Interview English is rarely the bottleneck. Learn why clarity, structure, and confidence matter more for placement interviews — and how to improve delivery.',
+    href: '/blog/english-confidence-interviews',
+    category: 'Interview Prep',
+    readTime: '11 min read',
+  },
+  {
+    title: 'Why You Freeze in Interviews — And How Mock Practice Fixes It',
+    description:
+      'Interview anxiety blocks strong answers — not knowledge. Learn why you freeze and how mock interviews retrain your brain before placements.',
+    href: '/blog/overcome-interview-anxiety-mock-interviews',
+    category: 'Interview Prep',
+    readTime: '10 min read',
+  },
+  {
     title: 'Top 10 Interview Questions for Freshers in India 2026',
     description:
       'Honest sample answers, common mistakes, and scoring tips for the fresher interview questions asked across Indian campus placements.',

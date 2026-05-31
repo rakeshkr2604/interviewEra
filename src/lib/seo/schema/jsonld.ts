@@ -61,12 +61,14 @@ export interface ArticleJsonLdInput {
   authorName: string;
   /** Organization `@id` URI (e.g. `${origin}#organization`) */
   publisherId: string;
+  /** Hero or OG image absolute URL for BlogPosting `image` */
+  imageUrl?: string;
 }
 
 export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown> {
   return {
     '@context': 'https://schema.org',
-    '@type': 'Article',
+    '@type': 'BlogPosting',
     headline: input.headline,
     description: input.description,
     mainEntityOfPage: { '@type': 'WebPage', '@id': input.canonicalUrl },
@@ -75,6 +77,7 @@ export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown
     dateModified: input.dateModified ?? input.datePublished,
     author: { '@type': 'Person', name: input.authorName },
     publisher: { '@id': input.publisherId },
+    ...(input.imageUrl ? { image: input.imageUrl } : {}),
   };
 }
 
