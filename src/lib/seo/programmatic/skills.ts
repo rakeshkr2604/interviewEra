@@ -19,6 +19,29 @@
 import type { SkillDefinition } from './types'
 
 export const SKILLS = [
+  // ── Product & Delivery ────────────────────────────────────────────────────
+  {
+    slug: 'agile',
+    label: 'Agile',
+    shortLabel: 'Agile',
+    category: 'cs-fundamentals',
+    relatedRoles: ['business-analyst', 'product-manager', 'software-engineer'],
+    sitemapPriority: 0.72,
+    fresherRelevant: true,
+    description:
+      'Agile interview questions on Scrum ceremonies, backlog grooming, estimation, user stories, acceptance criteria, and how teams ship in sprints.',
+  },
+  {
+    slug: 'jira',
+    label: 'Jira',
+    shortLabel: 'Jira',
+    category: 'cs-fundamentals',
+    relatedRoles: ['business-analyst', 'product-manager', 'software-engineer'],
+    sitemapPriority: 0.70,
+    fresherRelevant: true,
+    description:
+      'Jira interview questions on tickets, epics vs stories, workflows, sprint boards, and how teams track requirements from discovery to release.',
+  },
   // ── Frontend ───────────────────────────────────────────────────────────────
   {
     slug: 'react',

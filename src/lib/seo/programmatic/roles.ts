@@ -255,6 +255,19 @@ export const ROLES = [
     description:
       'Business Analyst interview questions on requirements gathering, process modelling, SQL, and stakeholder management.',
   },
+  {
+    slug: 'system-analyst',
+    label: 'System Analyst',
+    shortLabel: 'SA',
+    pluralLabel: 'System Analysts',
+    category: 'operations',
+    fresherFriendly: true,
+    primarySkills: ['sql', 'dbms'],
+    searchIntent: 'navigational',
+    sitemapPriority: 0.72,
+    description:
+      'System Analyst interview questions on system requirements, process flows, stakeholder alignment, and translating business needs into technical specifications.',
+  },
   // ── Design ─────────────────────────────────────────────────────────────────
   {
     slug: 'ui-ux-designer',
