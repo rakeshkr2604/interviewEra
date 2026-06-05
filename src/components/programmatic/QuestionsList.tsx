@@ -27,12 +27,15 @@ interface QuestionsListProps {
   heading?: string
   /** Show expanded answer blocks (evaluates, strategy, mistakes, follow-ups). */
   expanded?: boolean
+  /** Optional label beside the heading (e.g. hub-specific question count). */
+  metaLabel?: string
 }
 
 export function QuestionsList({
   questions,
   heading = 'Interview Questions',
   expanded = false,
+  metaLabel,
 }: QuestionsListProps) {
   if (questions.length === 0) {
     return (
@@ -68,7 +71,7 @@ export function QuestionsList({
           {heading}
         </h2>
         <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          Placement-oriented · Updated 2026
+          {metaLabel ?? 'Placement-oriented · Updated 2026'}
         </span>
       </div>
       <ol className="mt-5 list-none space-y-4 p-0" role="list">

@@ -2602,13 +2602,17 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
   },
 
   microsoft: {
-    lastUpdated: '2026-05-22',
+    lastUpdated: '2026-06-05',
     questions: [
       {
         question: 'What is the Microsoft interview process and how is the hiring manager loop structured?',
         category: 'hr',
         difficulty: 'easy',
         tip: 'Microsoft India: online assessment (LeetCode-style) → 3–4 technical rounds (DSA + coding) → hiring manager/as-appropriate round. The "as-appropriate" (partner) round is the final filter. Each round has behavioral questions tied to Microsoft values.',
+        evaluates: 'Process literacy and whether you prepare for growth-mindset behavioural depth — not only coding.',
+        strategy: 'Map each round to its signal (OA = speed + accuracy, coding = DSA narration, HM = collaboration + learning).',
+        mistakes: 'Treating hiring manager as a formality after strong technical rounds.',
+        followUps: ['What is the as-appropriate round?', 'How many coding rounds for SDE-2 at Microsoft India?'],
         keywords: ['Microsoft interview', 'as-appropriate round', 'hiring manager', 'online assessment', 'behavioral'],
       },
       {
@@ -2616,6 +2620,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'hard',
         tip: 'Use HashMap + Doubly Linked List. Map stores key → node pointer for O(1) lookup. DLL maintains access order — on get/put, move node to head; on capacity overflow, evict from tail. This is one of the most-asked Microsoft questions — practice until implementation is fluent.',
+        evaluates: 'Data structure design fluency, pointer discipline, and complexity analysis under time pressure.',
+        strategy: 'Explain HashMap + DLL design first, implement get/put/move-to-head/evict-tail, then state O(1) amortized.',
+        mistakes: 'Broken pointer links, forgetting to update map on node moves, or O(n) eviction scan.',
+        followUps: ['How would you make this thread-safe?', 'What if cache size is unbounded?'],
         keywords: ['LRU cache', 'HashMap', 'doubly linked list', 'O(1)', 'cache eviction'],
       },
       {
@@ -2623,6 +2631,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'hr',
         difficulty: 'easy',
         tip: "Satya Nadella's 'growth mindset' shift: from 'know-it-all' to 'learn-it-all'. In interviews: show you embraced failure as learning, sought feedback, and grew. Don't pretend to know things you don't — saying 'I'm not sure, but I'd reason through it like this' impresses Microsoft more than bluffing.",
+        evaluates: 'Self-awareness, learning agility, and honest reflection — not defensive expertise.',
+        strategy: 'Give one failure story with what you changed; contrast know-it-all vs learn-it-all behaviour explicitly.',
+        mistakes: 'Buzzword answers with no personal example, or claiming you never fail.',
+        followUps: ['Tell me about a time feedback changed your approach.', 'How do you stay current with new technology?'],
         keywords: ['growth mindset', 'Satya Nadella', 'learning', 'Microsoft culture', 'failure'],
       },
       {
@@ -2630,6 +2642,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'medium',
         tip: 'Sliding window + HashMap: expand right pointer, shrink left when duplicate found. O(n) time, O(min(m,n)) space where m is charset size. Classic Microsoft question. Variant: longest substring with at most k distinct characters — same approach with a counter map.',
+        evaluates: 'Sliding window pattern recognition, clean implementation, and edge-case handling.',
+        strategy: 'Clarify charset constraints, narrate window expand/shrink logic, track last-seen index in a map.',
+        mistakes: 'Off-by-one window bounds, not resetting map on shrink, or skipping empty string edge case.',
+        followUps: ['Solve for at most k distinct characters.', 'What changes for Unicode input?'],
         keywords: ['sliding window', 'substring', 'no repeating characters', 'O(n)', 'HashMap'],
       },
       {
@@ -2637,6 +2653,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'medium',
         tip: 'S: Single Responsibility. O: Open/Closed (open for extension, closed for modification). L: Liskov Substitution (subclasses must be substitutable for base class). I: Interface Segregation. D: Dependency Inversion (depend on abstractions, not concretions). Microsoft codebases are heavily SOLID — know concrete code examples.',
+        evaluates: 'OOP design maturity and whether you can cite real refactoring examples — not textbook recitation.',
+        strategy: 'One sentence per principle plus a micro code example showing violation vs fix.',
+        mistakes: 'Mixing up Liskov and Interface Segregation, or no concrete example from your projects.',
+        followUps: ['Which principle did you violate recently and how did you fix it?', 'How does DI help testability?'],
         keywords: ['SOLID', 'OOP', 'Single Responsibility', 'Open/Closed', 'Dependency Inversion'],
       },
       {
@@ -2644,6 +2664,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'medium',
         tip: 'AKS: managed control plane (Microsoft manages etcd, API server, scheduler), automated upgrades, integrated Azure AD, Azure Monitor. Manual: you manage everything including HA of control plane — significant ops burden. For interviews, show you understand what "managed" means and its trade-offs.',
+        evaluates: 'Cloud platform understanding and trade-off reasoning for managed vs self-hosted infrastructure.',
+        strategy: 'Compare control plane ownership, upgrade burden, observability integration, and cost/complexity trade-offs.',
+        mistakes: 'Treating AKS as “just hosted VMs” without explaining managed control plane benefits.',
+        followUps: ['When would you choose self-managed K8s?', 'How do you handle secrets in AKS?'],
         keywords: ['AKS', 'Azure Kubernetes', 'managed Kubernetes', 'control plane', 'Azure AD'],
       },
       {
@@ -2651,6 +2675,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'easy',
         tip: 'Iterative: maintain a dummy head, compare heads of both lists, advance the smaller one. O(m+n) time, O(1) space. Recursive: compare heads, the smaller head\'s next = recursive call on remainder. Microsoft asks this to verify pointer manipulation fluency.',
+        evaluates: 'Linked list pointer fluency and ability to implement iteratively or recursively cleanly.',
+        strategy: 'Use dummy head for iterative solution; state base case clearly for recursive variant.',
+        mistakes: 'Losing tail reference, returning wrong head, or stack overflow on deep recursive chains.',
+        followUps: ['Merge k sorted lists.', 'Do it in-place without extra nodes?'],
         keywords: ['linked list', 'merge sorted', 'O(m+n)', 'dummy head', 'recursive'],
       },
       {
@@ -2658,6 +2686,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'medium',
         tip: 'Blob: unstructured object storage (images, videos, backups) — accessed via REST. Azure Files: managed SMB/NFS file shares — mountable by VMs. Disk Storage: block storage for VM OS disks and data disks. Microsoft interviews for cloud roles test this taxonomy.',
+        evaluates: 'Storage service selection judgment for real workloads — not memorized definitions alone.',
+        strategy: 'Match each service to access pattern (REST object, file share mount, block disk) with one use case each.',
+        mistakes: 'Using Blob for POSIX file share needs, or Disk Storage for static asset delivery.',
+        followUps: ['When would you pick Azure Files over Blob?', 'How does redundancy differ across tiers?'],
         keywords: ['Azure Blob', 'Azure Files', 'Azure Disk', 'storage', 'SMB', 'object storage'],
       },
       {
@@ -2665,6 +2697,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'behavioral',
         difficulty: 'medium',
         tip: 'Structure: problem context → hypothesis formation → systematic isolation (narrowing down) → fix → validation → prevention. Microsoft values methodical debugging over lucky guesses. Show you wrote a test to reproduce the bug before fixing it.',
+        evaluates: 'Methodical problem-solving, hypothesis-driven debugging, and prevention mindset.',
+        strategy: 'STAR format with reproduction test, bisection/isolation steps, fix validation, and guardrail added.',
+        mistakes: 'Lucky guess fixes, no reproduction steps, or skipping post-incident prevention.',
+        followUps: ['What hypothesis failed first?', 'How did you prevent recurrence?'],
         keywords: ['debugging', 'problem-solving', 'methodology', 'root cause', 'hypothesis'],
       },
       {
@@ -2672,6 +2708,10 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         category: 'technical',
         difficulty: 'medium',
         tip: 'Start from top-right corner. If current > target, move left. If current < target, move down. O(m+n) time, O(1) space. Naive binary search on each row is O(m log n) — the corner-start trick is what Microsoft interviewers look for to test your pattern-recognition.',
+        evaluates: 'Pattern recognition on sorted structures and ability to optimize beyond brute force.',
+        strategy: 'Explain why top-right corner works, walk through one example, then code the two-pointer move logic.',
+        mistakes: 'Starting from wrong corner, infinite loops, or defaulting to row-by-row binary search without justification.',
+        followUps: ['What if only rows are sorted?', 'How would you handle duplicate values?'],
         keywords: ['2D matrix search', 'sorted matrix', 'O(m+n)', 'top-right corner', 'binary search'],
       },
     ] satisfies readonly SeoQuestion[],

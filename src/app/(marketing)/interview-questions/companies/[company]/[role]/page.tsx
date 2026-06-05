@@ -8,6 +8,7 @@ import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
 import { schemaIds } from '@/lib/seo/metadata'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
 import { AmazonSeHubArticle } from '@/components/programmatic/AmazonSeHubArticle'
+import { MicrosoftSeHubArticle } from '@/components/programmatic/MicrosoftSeHubArticle'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
   getCompanyBySlug,
@@ -42,6 +43,22 @@ import {
   AMAZON_SE_PROCESS_PATH,
   AMAZON_SE_PROCESS_WIDTH,
 } from '@/lib/seo/programmatic/amazon-se-hub'
+import {
+  MICROSOFT_FAQ_ITEMS,
+  MICROSOFT_SE_HERO_ALT,
+  MICROSOFT_SE_HERO_HEIGHT,
+  MICROSOFT_SE_HERO_PATH,
+  MICROSOFT_SE_HERO_WIDTH,
+  MICROSOFT_SE_LAST_UPDATED,
+  MICROSOFT_SE_PUBLISHED_DATE,
+  MICROSOFT_SE_AUTHOR_NAME,
+  MICROSOFT_SE_REVIEWED_DATE,
+  MICROSOFT_SE_REVIEWER_NAME,
+  MICROSOFT_SE_PROCESS_ALT,
+  MICROSOFT_SE_PROCESS_HEIGHT,
+  MICROSOFT_SE_PROCESS_PATH,
+  MICROSOFT_SE_PROCESS_WIDTH,
+} from '@/lib/seo/programmatic/microsoft-se-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildIntersectionPageLinks } from '@/lib/seo/internal-linking'
 import '../../../../blog/blog.css'
@@ -54,6 +71,10 @@ type Props = { params: Promise<{ company: string; role: string }> }
 
 function isAmazonSoftwareEngineerHub(companySlug: string, roleSlug: string): boolean {
   return companySlug === 'amazon' && roleSlug === 'software-engineer'
+}
+
+function isMicrosoftSoftwareEngineerHub(companySlug: string, roleSlug: string): boolean {
+  return companySlug === 'microsoft' && roleSlug === 'software-engineer'
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -81,12 +102,33 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     })
   }
 
+  if (isMicrosoftSoftwareEngineerHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
+      description:
+        'Microsoft SDE interview guide for India 2026 with top 10 curated questions: Online Assessment, coding interviews, system design, growth mindset, hiring manager prep, 4-week roadmap, and expert answers.',
+      path: intersectionQuestionsPath(company.slug, role.slug),
+      keywords: [
+        'Microsoft software engineer interview questions',
+        'top 10 Microsoft SDE interview questions',
+        'Microsoft SDE interview 2026',
+        'Microsoft growth mindset interview',
+        'Microsoft online assessment SDE',
+        'Microsoft system design interview',
+        'Microsoft hiring manager round India',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
   return intersectionPageMetadata(company, role)
 }
 
 const ORIGIN = getCanonicalSiteOrigin()
 const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
-const AMAZON_SHELL_CLASS =
+const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
+const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
 export default async function IntersectionQuestionsPage({ params }: Props) {
@@ -96,9 +138,13 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
   if (!company || !role) notFound()
 
   const isAmazonHub = isAmazonSoftwareEngineerHub(company.slug, role.slug)
+  const isMicrosoftHub = isMicrosoftSoftwareEngineerHub(company.slug, role.slug)
+  const isEditorialHub = isAmazonHub || isMicrosoftHub
   const questions = isAmazonHub
     ? getCompanyQuestionsFlat('amazon')
-    : getRoleQuestionsFlat(role.slug)
+    : isMicrosoftHub
+      ? getCompanyQuestionsFlat('microsoft')
+      : getRoleQuestionsFlat(role.slug)
   const faqPairs = buildFaqPairs(questions)
 
   const BREADCRUMB_LD = breadcrumbListJsonLd(
@@ -107,9 +153,11 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
   )
   const FAQ_LD = isAmazonHub
     ? faqPageJsonLd([...AMAZON_FAQ_ITEMS])
-    : faqPairs.length > 0
-      ? faqPageJsonLd(faqPairs)
-      : null
+    : isMicrosoftHub
+      ? faqPageJsonLd([...MICROSOFT_FAQ_ITEMS])
+      : faqPairs.length > 0
+        ? faqPageJsonLd(faqPairs)
+        : null
 
   const AMAZON_PAGE_LD = isAmazonHub
     ? {
@@ -189,14 +237,94 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
+  const MICROSOFT_PAGE_LD = isMicrosoftHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#microsoft-se-author`,
+            name: MICROSOFT_SE_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#microsoft-se-reviewer`,
+            name: MICROSOFT_SE_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${MICROSOFT_SE_HERO_PATH}#image`,
+            url: `${ORIGIN}${MICROSOFT_SE_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${MICROSOFT_SE_HERO_PATH}`,
+            caption: MICROSOFT_SE_HERO_ALT,
+            width: MICROSOFT_SE_HERO_WIDTH,
+            height: MICROSOFT_SE_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${MICROSOFT_SE_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${MICROSOFT_SE_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${MICROSOFT_SE_PROCESS_PATH}`,
+            caption: MICROSOFT_SE_PROCESS_ALT,
+            width: MICROSOFT_SE_PROCESS_WIDTH,
+            height: MICROSOFT_SE_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(MICROSOFT_CANONICAL_PATH),
+            url: canonicalUrl(MICROSOFT_CANONICAL_PATH),
+            name: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${MICROSOFT_SE_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(MICROSOFT_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(MICROSOFT_CANONICAL_PATH)}#article`,
+            headline: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
+            description:
+              'Microsoft SDE interview guide for India 2026 with top 10 curated questions: Online Assessment, coding interviews, system design, growth mindset, hiring manager prep, 4-week roadmap, and expert answers.',
+            mainEntityOfPage: { '@id': canonicalUrl(MICROSOFT_CANONICAL_PATH) },
+            url: canonicalUrl(MICROSOFT_CANONICAL_PATH),
+            datePublished: MICROSOFT_SE_PUBLISHED_DATE,
+            dateModified: MICROSOFT_SE_LAST_UPDATED,
+            dateReviewed: MICROSOFT_SE_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#microsoft-se-author` },
+            reviewedBy: { '@id': `${ORIGIN}#microsoft-se-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${MICROSOFT_SE_HERO_PATH}#image` },
+          },
+        ],
+      }
+    : null
+
   const ITEM_LIST_LD =
-    isAmazonHub && questions.length > 0
+    isEditorialHub && questions.length > 0
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
           itemListOrder: 'https://schema.org/ItemListOrderAscending',
-          name: 'Amazon Software Engineer interview questions',
-          url: canonicalUrl(AMAZON_CANONICAL_PATH),
+          name: isMicrosoftHub
+            ? `Top 10 ${company.label} ${role.label} curated interview questions`
+            : `${company.label} ${role.label} interview questions`,
+          url: canonicalUrl(intersectionQuestionsPath(company.slug, role.slug)),
           numberOfItems: questions.length,
           itemListElement: questions.map((q, idx) => ({
             '@type': 'ListItem',
@@ -214,9 +342,12 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       {FAQ_LD ? <JsonLdScript id="intersection-faq-ld" data={FAQ_LD} /> : null}
       {ITEM_LIST_LD ? <JsonLdScript id="intersection-itemlist-ld" data={ITEM_LIST_LD} /> : null}
       {AMAZON_PAGE_LD ? <JsonLdScript id="intersection-amazon-page-ld" data={AMAZON_PAGE_LD} /> : null}
+      {MICROSOFT_PAGE_LD ? <JsonLdScript id="intersection-microsoft-page-ld" data={MICROSOFT_PAGE_LD} /> : null}
 
       {isAmazonHub ? (
         <AmazonSeHubArticle company={company} role={role} questions={questions} />
+      ) : isMicrosoftHub ? (
+        <MicrosoftSeHubArticle company={company} role={role} questions={questions} />
       ) : (
         <>
           <section
@@ -280,14 +411,14 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       )}
 
       <section
-        className={isAmazonHub ? 'border-y py-8 md:py-12' : `${CONTENT_SECTION} border-y`}
+        className={isEditorialHub ? 'border-y py-8 md:py-12' : `${CONTENT_SECTION} border-y`}
         style={{
           borderColor: 'var(--card-border)',
           background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
         }}
       >
-        <div className={isAmazonHub ? AMAZON_SHELL_CLASS : `${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          <div className={isAmazonHub ? 'ie-blog-interview-anxiety-content' : undefined}>
+        <div className={isEditorialHub ? HUB_SHELL_CLASS : `${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
+          <div className={isEditorialHub ? 'ie-blog-interview-anxiety-content' : undefined}>
             <h2 className="max-w-xl text-xl font-bold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
               Practice answering, not just reading
             </h2>
