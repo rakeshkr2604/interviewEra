@@ -66,6 +66,7 @@ export function isSkillIndexable(skill: Skill): boolean {
  * to `getIntersectionQuestionsFlat(company, role).length >= MIN_INDEXABLE_QUESTIONS`.
  */
 export function isIntersectionIndexable(company: Company, role: Role): boolean {
+  if (company.slug === 'infosys' && role.slug === 'java-developer') return true
   if (role.slug !== 'software-engineer') return false
   return company.slug === 'amazon' || company.slug === 'microsoft'
 }

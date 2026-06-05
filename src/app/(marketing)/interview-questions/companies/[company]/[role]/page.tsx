@@ -9,6 +9,7 @@ import { schemaIds } from '@/lib/seo/metadata'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
 import { AmazonSeHubArticle } from '@/components/programmatic/AmazonSeHubArticle'
 import { MicrosoftSeHubArticle } from '@/components/programmatic/MicrosoftSeHubArticle'
+import { InfosysJavaHubArticle } from '@/components/programmatic/InfosysJavaHubArticle'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
   getCompanyBySlug,
@@ -59,6 +60,22 @@ import {
   MICROSOFT_SE_PROCESS_PATH,
   MICROSOFT_SE_PROCESS_WIDTH,
 } from '@/lib/seo/programmatic/microsoft-se-hub'
+import {
+  INFOSYS_FAQ_ITEMS,
+  INFOSYS_JAVA_HERO_ALT,
+  INFOSYS_JAVA_HERO_HEIGHT,
+  INFOSYS_JAVA_HERO_PATH,
+  INFOSYS_JAVA_HERO_WIDTH,
+  INFOSYS_JAVA_LAST_UPDATED,
+  INFOSYS_JAVA_PUBLISHED_DATE,
+  INFOSYS_JAVA_AUTHOR_NAME,
+  INFOSYS_JAVA_REVIEWED_DATE,
+  INFOSYS_JAVA_REVIEWER_NAME,
+  INFOSYS_JAVA_PROCESS_ALT,
+  INFOSYS_JAVA_PROCESS_HEIGHT,
+  INFOSYS_JAVA_PROCESS_PATH,
+  INFOSYS_JAVA_PROCESS_WIDTH,
+} from '@/lib/seo/programmatic/infosys-java-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildIntersectionPageLinks } from '@/lib/seo/internal-linking'
 import '../../../../blog/blog.css'
@@ -75,6 +92,10 @@ function isAmazonSoftwareEngineerHub(companySlug: string, roleSlug: string): boo
 
 function isMicrosoftSoftwareEngineerHub(companySlug: string, roleSlug: string): boolean {
   return companySlug === 'microsoft' && roleSlug === 'software-engineer'
+}
+
+function isInfosysJavaDeveloperHub(companySlug: string, roleSlug: string): boolean {
+  return companySlug === 'infosys' && roleSlug === 'java-developer'
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -96,6 +117,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'Amazon Bar Raiser interview',
         'Amazon online assessment SDE',
         'Amazon technical interview India',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
+  if (isInfosysJavaDeveloperHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: 'Infosys Java Developer Interview Questions and Answers (2026)',
+      description:
+        'Infosys Java Developer interview guide for India 2026: InfyTQ, HackWithInfy, Core Java, Spring Boot, microservices, coding round strategy, 4-week roadmap, and expert answers.',
+      path: intersectionQuestionsPath(company.slug, role.slug),
+      keywords: [
+        'Infosys Java Developer interview questions',
+        'Infosys Java interview 2026',
+        'Infosys InfyTQ Java',
+        'Infosys Spring Boot interview',
+        'Infosys coding round Java',
+        'Infosys Java fresher interview',
       ],
       openGraphType: 'article',
       noIndex: false,
@@ -128,6 +168,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const ORIGIN = getCanonicalSiteOrigin()
 const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
 const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
+const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -139,12 +180,15 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
 
   const isAmazonHub = isAmazonSoftwareEngineerHub(company.slug, role.slug)
   const isMicrosoftHub = isMicrosoftSoftwareEngineerHub(company.slug, role.slug)
-  const isEditorialHub = isAmazonHub || isMicrosoftHub
+  const isInfosysJavaHub = isInfosysJavaDeveloperHub(company.slug, role.slug)
+  const isEditorialHub = isAmazonHub || isMicrosoftHub || isInfosysJavaHub
   const questions = isAmazonHub
     ? getCompanyQuestionsFlat('amazon')
     : isMicrosoftHub
       ? getCompanyQuestionsFlat('microsoft')
-      : getRoleQuestionsFlat(role.slug)
+      : isInfosysJavaHub
+        ? getRoleQuestionsFlat('java-developer')
+        : getRoleQuestionsFlat(role.slug)
   const faqPairs = buildFaqPairs(questions)
 
   const BREADCRUMB_LD = breadcrumbListJsonLd(
@@ -155,9 +199,11 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
     ? faqPageJsonLd([...AMAZON_FAQ_ITEMS])
     : isMicrosoftHub
       ? faqPageJsonLd([...MICROSOFT_FAQ_ITEMS])
-      : faqPairs.length > 0
-        ? faqPageJsonLd(faqPairs)
-        : null
+      : isInfosysJavaHub
+        ? faqPageJsonLd([...INFOSYS_FAQ_ITEMS])
+        : faqPairs.length > 0
+          ? faqPageJsonLd(faqPairs)
+          : null
 
   const AMAZON_PAGE_LD = isAmazonHub
     ? {
@@ -315,6 +361,84 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
+  const INFOSYS_JAVA_PAGE_LD = isInfosysJavaHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#infosys-java-author`,
+            name: INFOSYS_JAVA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#infosys-java-reviewer`,
+            name: INFOSYS_JAVA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}#image`,
+            url: `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}`,
+            caption: INFOSYS_JAVA_HERO_ALT,
+            width: INFOSYS_JAVA_HERO_WIDTH,
+            height: INFOSYS_JAVA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${INFOSYS_JAVA_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${INFOSYS_JAVA_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${INFOSYS_JAVA_PROCESS_PATH}`,
+            caption: INFOSYS_JAVA_PROCESS_ALT,
+            width: INFOSYS_JAVA_PROCESS_WIDTH,
+            height: INFOSYS_JAVA_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
+            url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
+            name: 'Infosys Java Developer Interview Questions and Answers (2026)',
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article`,
+            headline: 'Infosys Java Developer Interview Questions and Answers (2026)',
+            description:
+              'Infosys Java Developer interview guide for India 2026: InfyTQ, HackWithInfy, Core Java, Spring Boot, microservices, coding round strategy, 4-week roadmap, and expert answers.',
+            mainEntityOfPage: { '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH) },
+            url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
+            datePublished: INFOSYS_JAVA_PUBLISHED_DATE,
+            dateModified: INFOSYS_JAVA_LAST_UPDATED,
+            dateReviewed: INFOSYS_JAVA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#infosys-java-author` },
+            reviewedBy: { '@id': `${ORIGIN}#infosys-java-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}#image` },
+          },
+        ],
+      }
+    : null
+
   const ITEM_LIST_LD =
     isEditorialHub && questions.length > 0
       ? {
@@ -343,11 +467,14 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       {ITEM_LIST_LD ? <JsonLdScript id="intersection-itemlist-ld" data={ITEM_LIST_LD} /> : null}
       {AMAZON_PAGE_LD ? <JsonLdScript id="intersection-amazon-page-ld" data={AMAZON_PAGE_LD} /> : null}
       {MICROSOFT_PAGE_LD ? <JsonLdScript id="intersection-microsoft-page-ld" data={MICROSOFT_PAGE_LD} /> : null}
+      {INFOSYS_JAVA_PAGE_LD ? <JsonLdScript id="intersection-infosys-java-page-ld" data={INFOSYS_JAVA_PAGE_LD} /> : null}
 
       {isAmazonHub ? (
         <AmazonSeHubArticle company={company} role={role} questions={questions} />
       ) : isMicrosoftHub ? (
         <MicrosoftSeHubArticle company={company} role={role} questions={questions} />
+      ) : isInfosysJavaHub ? (
+        <InfosysJavaHubArticle company={company} role={role} questions={questions} />
       ) : (
         <>
           <section
