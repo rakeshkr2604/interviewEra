@@ -9,8 +9,8 @@ export const INFOSYS_JAVA_PROCESS_ALT =
 export const INFOSYS_JAVA_PROCESS_WIDTH = 1672
 export const INFOSYS_JAVA_PROCESS_HEIGHT = 941
 export const INFOSYS_JAVA_EDITORIAL_NOTE =
-  'Content reviewed and updated for current Infosys Java Developer hiring patterns — InfyTQ, HackWithInfy, technical and HR rounds, Spring Boot depth, hiring process diagram, and fresher placement expectations in India.'
-export const INFOSYS_JAVA_READING_TIME = '24 min read'
+  'Content reviewed and updated for current Infosys Java Developer hiring patterns — InfyTQ, HackWithInfy, JVM internals, Spring Boot layered architecture, microservices topology, hiring process diagram, and fresher placement expectations in India.'
+export const INFOSYS_JAVA_READING_TIME = '28 min read'
 export const INFOSYS_JAVA_PUBLISHED_DATE = '2026-05-28'
 export const INFOSYS_JAVA_LAST_UPDATED = '2026-06-05'
 export const INFOSYS_JAVA_REVIEWED_DATE = '2026-06-05'
@@ -21,8 +21,11 @@ export const INFOSYS_JAVA_TOC_SECTIONS = [
   { id: 'infosys-why-different', label: 'Why Infosys Java Interviews Are Different' },
   { id: 'infosys-hiring-process', label: 'Infosys Hiring Process' },
   { id: 'infosys-java-skills', label: 'Java Skills Infosys Evaluates' },
+  { id: 'infosys-jvm-internals', label: 'JVM Internals' },
   { id: 'infosys-spring-boot', label: 'Spring Boot Questions' },
+  { id: 'infosys-spring-architecture', label: 'Spring Boot Project Architecture' },
   { id: 'infosys-microservices', label: 'Microservices Questions' },
+  { id: 'infosys-microservices-arch', label: 'Microservices Architecture' },
   { id: 'infosys-coding-strategy', label: 'Coding Round Strategy' },
   { id: 'infosys-resume-examples', label: 'Resume Examples' },
   { id: 'infosys-vs-tcs', label: 'Infosys vs TCS' },
@@ -105,6 +108,84 @@ export const INFOSYS_JAVA_SKILL_CARDS = [
     evaluates: 'Generational GC model, minor vs major GC, and why most objects die young — relevant for performance questions.',
     mistakes: 'Calling `System.gc()` as a fix, or confusing GC with manual memory management from C++.',
     tips: 'Explain Eden → Survivor → Old Gen flow. Know G1GC as default in modern Java and when tuning matters.',
+  },
+] as const
+
+export const INFOSYS_JVM_INTERNALS_CARDS = [
+  {
+    title: 'Heap',
+    detail: 'Stores object instances and arrays at runtime. Divided into Young Gen (Eden + Survivor) and Old Gen. OutOfMemoryError on heap usually means leaks or undersized `-Xmx`.',
+  },
+  {
+    title: 'Stack',
+    detail: 'Per-thread memory for method frames, local primitives, and references. StackOverflowError from deep recursion; each thread has its own stack — not shared like heap.',
+  },
+  {
+    title: 'Metaspace',
+    detail: 'Holds class metadata (replaced PermGen in Java 8+). Grows with loaded classes; classloader leaks can exhaust metaspace in long-running Spring apps.',
+  },
+  {
+    title: 'Class Loader',
+    detail: 'Loads `.class` bytecode into JVM — Bootstrap → Extension → Application loaders. Interviewers probe parent-delegation model and why duplicate class loading causes `LinkageError`.',
+  },
+  {
+    title: 'Garbage Collection',
+    detail: 'Reclaims unreachable heap objects. Minor GC in Young Gen is frequent and fast; major GC in Old Gen is costlier. G1GC is default in modern Java for predictable pauses.',
+  },
+  {
+    title: 'JIT Compiler',
+    detail: 'HotSpot compiles hot bytecode to native machine code after profiling. Explains why Java can match C++ on long-running services — cold start differs from steady-state throughput.',
+  },
+] as const
+
+export const INFOSYS_SPRING_ARCHITECTURE_LAYERS = [
+  'Client',
+  'Controller',
+  'Service',
+  'Repository',
+  'Database',
+] as const
+
+export const INFOSYS_SPRING_ARCHITECTURE_PATTERNS = [
+  {
+    title: 'Dependency Injection',
+    detail: 'Spring IoC container injects `@Service` and `@Repository` beans into `@RestController` via constructor injection — loose coupling and testability without `new` in controllers.',
+  },
+  {
+    title: 'DTO Pattern',
+    detail: 'Separate request/response DTOs from JPA entities so API contracts stay stable and you never expose persistence fields or lazy-loading proxies to clients.',
+  },
+  {
+    title: 'Validation',
+    detail: '`@Valid` on controller parameters triggers Bean Validation (`@NotNull`, `@Size`). Invalid input returns 400 with field-level errors before service layer executes.',
+  },
+  {
+    title: 'Exception Handling',
+    detail: '`@ControllerAdvice` maps exceptions to consistent HTTP responses — `ResourceNotFoundException` → 404, validation errors → 400, unhandled → 500 with safe message body.',
+  },
+] as const
+
+export const INFOSYS_MICROSERVICES_ARCH_SERVICES = [
+  'API Gateway',
+  'Auth Service',
+  'User Service',
+  'Order Service',
+  'Notification Service',
+  'Database',
+] as const
+
+export const INFOSYS_MICROSERVICES_ARCH_EXPLAINS = [
+  {
+    title: 'Service communication',
+    detail: 'Services talk over REST or async messaging (Kafka/RabbitMQ). API Gateway routes external requests; internal calls use service discovery — not hard-coded hostnames.',
+  },
+  {
+    title: 'Scalability',
+    detail: 'Scale stateless services (Auth, User, Order) horizontally behind load balancers. Database becomes the bottleneck — use read replicas, caching, and partition-aware schemas.',
+  },
+  {
+    title: 'Fault isolation',
+    detail: 'A failure in Notification Service must not crash Order Service. Circuit breakers, timeouts, retries with backoff, and async queues contain blast radius.',
   },
 ] as const
 
@@ -225,6 +306,7 @@ export const INFOSYS_PREP_RESOURCE_LINKS = [
   { href: '/interview-questions/companies/tcs/java-developer', label: 'TCS Java Developer Questions' },
   { href: '/interview-questions/companies/wipro/java-developer', label: 'Wipro Java Developer Questions' },
   { href: '/interview-questions/topics/system-design', label: 'System Design Questions' },
+  { href: '/interview-questions/topics/rest-api', label: 'REST API Interview Questions' },
   { href: '/blog/hr-interview-answer-tips-and-tricks', label: 'HR Interview Questions' },
 ] as const
 
@@ -316,7 +398,7 @@ export const INFOSYS_FAQ_ITEMS = [
 
 /**
  * Audit status (2026-06-05):
- * PRODUCTION READY — editorial hub, hero + process assets, expanded questions, E-E-A-T aside.
- * SEO READY — canonical, index/follow, Article/FAQPage/BreadcrumbList/ItemList/@graph JSON-LD, 15+ internal links.
+ * PRODUCTION READY — JVM internals, Spring Boot layered architecture, microservices topology, hero + process assets, E-E-A-T aside.
+ * SEO READY — canonical, index/follow, Article/FAQPage/BreadcrumbList/ItemList/@graph JSON-LD, 21+ contextual internal links.
  * INDEXING READY — isIntersectionIndexable(infosys, java-developer); sitemap + IndexNow eligible.
  */

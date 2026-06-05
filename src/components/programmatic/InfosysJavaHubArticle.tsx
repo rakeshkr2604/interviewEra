@@ -21,7 +21,12 @@ import {
   INFOSYS_JAVA_AUTHOR_NAME,
   INFOSYS_JAVA_SKILL_CARDS,
   INFOSYS_JAVA_TOC_SECTIONS,
+  INFOSYS_JVM_INTERNALS_CARDS,
+  INFOSYS_MICROSERVICES_ARCH_EXPLAINS,
+  INFOSYS_MICROSERVICES_ARCH_SERVICES,
   INFOSYS_MICROSERVICES_TOPICS,
+  INFOSYS_SPRING_ARCHITECTURE_LAYERS,
+  INFOSYS_SPRING_ARCHITECTURE_PATTERNS,
   INFOSYS_JAVA_PROCESS_ALT,
   INFOSYS_JAVA_PROCESS_HEIGHT,
   INFOSYS_JAVA_PROCESS_PATH,
@@ -260,6 +265,32 @@ export function InfosysJavaHubArticle({
               </section>
             ))}
           </div>
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+            Deepen JVM answers with the internals section below and cross-reference{' '}
+            <Link href="/interview-questions/topics/mysql" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+              MySQL interview questions
+            </Link>{' '}
+            for persistence-layer follow-ups.
+          </p>
+        </section>
+
+        <section aria-labelledby="infosys-jvm-internals">
+          <h2 id="infosys-jvm-internals" className="text-xl font-bold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
+            JVM Internals
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+            Infosys technical panels often probe JVM memory areas beyond textbook GC definitions — especially when your
+            resume mentions performance tuning or production debugging. Master these six internals before OutOfMemoryError
+            and multithreading follow-ups.
+          </p>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {INFOSYS_JVM_INTERNALS_CARDS.map((card) => (
+              <section key={card.title} className="rounded-xl border p-4" style={cardStyle}>
+                <h3 className="m-0 text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>{card.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{card.detail}</p>
+              </section>
+            ))}
+          </div>
         </section>
 
         <section aria-labelledby="infosys-spring-boot">
@@ -279,6 +310,53 @@ export function InfosysJavaHubArticle({
               <section key={topic.title} className="rounded-xl border p-4" style={cardStyle}>
                 <h3 className="m-0 text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>{topic.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{topic.detail}</p>
+              </section>
+            ))}
+          </div>
+        </section>
+
+        <section aria-labelledby="infosys-spring-architecture">
+          <h2 id="infosys-spring-architecture" className="text-xl font-bold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
+            Real Spring Boot Project Architecture
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+            When interviewers ask about your Spring Boot project, they expect a clear request flow — not a folder list.
+            Narrate the layered architecture below and tie each pattern to a decision you made. Review{' '}
+            <Link href="/interview-questions/topics/rest-api" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+              REST API interview questions
+            </Link>{' '}
+            for HTTP-layer depth.
+          </p>
+          <figure className="mt-4">
+            <div
+              className="mx-auto w-full max-w-md rounded-[20px] border p-5 sm:p-6"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--card-bg) 90%, transparent)',
+                boxShadow: '0 14px 36px color-mix(in srgb, #000 12%, transparent)',
+              }}
+            >
+              <figcaption className="mb-4 text-center text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Spring Boot layered request flow
+              </figcaption>
+              <ol className="ie-role-amazon-process-flow list-none p-0" aria-label="Spring Boot project architecture layers">
+                {INFOSYS_SPRING_ARCHITECTURE_LAYERS.map((layer, index) => (
+                  <li key={layer} className="ie-role-amazon-process-flow__step">
+                    <span className="ie-role-amazon-process-flow__marker" aria-hidden>{index + 1}</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{layer}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <p className="mt-3 text-center text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Client → Controller → Service → Repository → Database
+            </p>
+          </figure>
+          <div className="mt-4 grid gap-4 md:grid-cols-2">
+            {INFOSYS_SPRING_ARCHITECTURE_PATTERNS.map((pattern) => (
+              <section key={pattern.title} className="rounded-xl border p-4" style={cardStyle}>
+                <h3 className="m-0 text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>{pattern.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{pattern.detail}</p>
               </section>
             ))}
           </div>
@@ -310,6 +388,57 @@ export function InfosysJavaHubArticle({
               system design questions
             </Link>{' '}
             for senior-track depth.
+          </p>
+        </section>
+
+        <section aria-labelledby="infosys-microservices-arch">
+          <h2 id="infosys-microservices-arch" className="text-xl font-bold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
+            Microservices Architecture
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+            Fresher candidates are not expected to build production microservices — but drawing this topology aloud
+            shows architectural literacy Infosys digital teams value. Walk gateway → services → data store, then explain
+            communication, scale, and failure containment.
+          </p>
+          <figure className="mt-4">
+            <div
+              className="mx-auto w-full max-w-lg rounded-[20px] border p-5 sm:p-6"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--card-bg) 90%, transparent)',
+                boxShadow: '0 14px 36px color-mix(in srgb, #000 12%, transparent)',
+              }}
+            >
+              <figcaption className="mb-4 text-center text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                Reference microservices topology
+              </figcaption>
+              <ol className="ie-role-amazon-process-flow list-none p-0" aria-label="Microservices architecture components">
+                {INFOSYS_MICROSERVICES_ARCH_SERVICES.map((node, index) => (
+                  <li key={node} className="ie-role-amazon-process-flow__step">
+                    <span className="ie-role-amazon-process-flow__marker" aria-hidden>{index + 1}</span>
+                    <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{node}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <p className="mt-3 text-center text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              API Gateway → Auth, User, Order, and Notification services → shared or per-service databases
+            </p>
+          </figure>
+          <div className="mt-4 grid gap-4 md:grid-cols-3">
+            {INFOSYS_MICROSERVICES_ARCH_EXPLAINS.map((item) => (
+              <section key={item.title} className="rounded-xl border p-4" style={cardStyle}>
+                <h3 className="m-0 text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{item.detail}</p>
+              </section>
+            ))}
+          </div>
+          <p className="mt-4 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+            Compare distributed patterns on{' '}
+            <Link href="/interview-questions/backend-developer" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+              backend developer interview questions
+            </Link>{' '}
+            before senior-track Infosys project discussions.
           </p>
         </section>
 
