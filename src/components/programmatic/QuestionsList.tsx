@@ -25,9 +25,15 @@ interface QuestionsListProps {
   questions: readonly SeoQuestion[]
   /** Heading rendered above the list. */
   heading?: string
+  /** Show expanded answer blocks (evaluates, strategy, mistakes, follow-ups). */
+  expanded?: boolean
 }
 
-export function QuestionsList({ questions, heading = 'Interview Questions' }: QuestionsListProps) {
+export function QuestionsList({
+  questions,
+  heading = 'Interview Questions',
+  expanded = false,
+}: QuestionsListProps) {
   if (questions.length === 0) {
     return (
       <section aria-label="Interview questions">
@@ -67,14 +73,22 @@ export function QuestionsList({ questions, heading = 'Interview Questions' }: Qu
       </div>
       <ol className="mt-5 list-none space-y-4 p-0" role="list">
         {questions.map((q, index) => (
-          <QuestionCard key={`${q.question}-${index}`} question={q} number={index + 1} />
+          <QuestionCard key={`${q.question}-${index}`} question={q} number={index + 1} expanded={expanded} />
         ))}
       </ol>
     </section>
   )
 }
 
-function QuestionCard({ question, number }: { question: SeoQuestion; number: number }) {
+function QuestionCard({
+  question,
+  number,
+  expanded,
+}: {
+  question: SeoQuestion
+  number: number
+  expanded: boolean
+}) {
   return (
     <li
       className="rounded-xl border p-4"
@@ -109,10 +123,43 @@ function QuestionCard({ question, number }: { question: SeoQuestion; number: num
           style={{ color: 'var(--text-secondary)' }}
         >
           <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-            Tip:{' '}
+            {expanded ? 'Expert answer: ' : 'Tip: '}
           </span>
           {question.tip}
         </p>
+      ) : null}
+
+      {expanded ? (
+        <div className="mt-3 space-y-2 pl-8">
+          {question.evaluates ? (
+            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What interviewers evaluate: </span>
+              {question.evaluates}
+            </p>
+          ) : null}
+          {question.strategy ? (
+            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Answer strategy: </span>
+              {question.strategy}
+            </p>
+          ) : null}
+          {question.mistakes ? (
+            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Common mistakes: </span>
+              {question.mistakes}
+            </p>
+          ) : null}
+          {question.followUps && question.followUps.length > 0 ? (
+            <div>
+              <p className="m-0 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Follow-up questions:</p>
+              <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                {question.followUps.map((followUp) => (
+                  <li key={followUp}>{followUp}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
       ) : null}
     </li>
   )

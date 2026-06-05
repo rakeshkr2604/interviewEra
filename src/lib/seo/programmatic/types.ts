@@ -159,6 +159,14 @@ export interface SeoQuestion {
    * 1–2 sentences only.
    */
   readonly tip?: string
+  /** What the interviewer is grading (hub pages with expanded answers). */
+  readonly evaluates?: string
+  /** How to structure a strong answer. */
+  readonly strategy?: string
+  /** Common mistakes that weaken the response. */
+  readonly mistakes?: string
+  /** Typical follow-up probes from the panel. */
+  readonly followUps?: readonly string[]
   /**
    * Keywords used to construct `acceptedAnswer` text in FAQ schema.
    * If absent, the tip is used as the answer; if both absent, question is

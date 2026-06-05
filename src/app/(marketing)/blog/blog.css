@@ -982,6 +982,10 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   margin-bottom: 0.5rem;
 }
 
+.ie-landing-premium .ie-role-ba-shell .ie-blog-interview-anxiety-content {
+  max-width: 920px;
+}
+
 .ie-landing-premium .ie-role-ba-shell .ie-blog-interview-anxiety-content h2 {
   scroll-margin-top: 5.5rem;
 }
@@ -1063,6 +1067,44 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   font-size: 0.875rem;
   line-height: 1.5;
   color: var(--text-secondary);
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--5col {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__th,
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__cell,
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__dim {
+  padding: 0.75rem 0.625rem;
+  font-size: 0.8125rem;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
+  hyphens: auto;
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__dim {
+  width: 15%;
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__th:not(.ie-role-ba-compare-table__th--dim),
+.ie-landing-premium .ie-role-ba-compare-table--5col .ie-role-ba-compare-table__cell {
+  width: 21.25%;
+}
+
+.ie-landing-premium .ie-role-ba-table-wrap--fluid {
+  overflow-x: visible;
+}
+
+@media (max-width: 639px) {
+  .ie-landing-premium .ie-role-ba-table-wrap--fluid {
+    overflow-x: auto;
+  }
+
+  .ie-landing-premium .ie-role-ba-compare-table--5col {
+    min-width: 0;
+  }
 }
 
 .ie-landing-premium .ie-role-ba-compare-table__th {
@@ -1190,6 +1232,48 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
 
 .ie-landing-premium .ie-role-ba-salary-tier--senior .ie-role-ba-salary-tier__label {
   color: var(--accent-primary);
+}
+
+/* Amazon SDE hub — vertical hiring process flow */
+.ie-landing-premium .ie-role-amazon-process-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ie-landing-premium .ie-role-amazon-process-flow__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.75rem 0;
+}
+
+.ie-landing-premium .ie-role-amazon-process-flow__step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 0.9375rem;
+  top: 2.5rem;
+  bottom: -0.25rem;
+  width: 2px;
+  background: color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+}
+
+.ie-landing-premium .ie-role-amazon-process-flow__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.875rem;
+  height: 1.875rem;
+  flex-shrink: 0;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent-primary);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-primary) 14%, transparent);
 }
 
 /* Long-form blog: avoid the global *-transition on hundreds of article nodes. */

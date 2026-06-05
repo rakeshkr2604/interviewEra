@@ -65,6 +65,6 @@ export function isSkillIndexable(skill: Skill): boolean {
  * Promotion path: add a dedicated intersection question registry and flip this
  * to `getIntersectionQuestionsFlat(company, role).length >= MIN_INDEXABLE_QUESTIONS`.
  */
-export function isIntersectionIndexable(_company: Company, _role: Role): boolean {
-  return false
+export function isIntersectionIndexable(company: Company, role: Role): boolean {
+  return company.slug === 'amazon' && role.slug === 'software-engineer'
 }
