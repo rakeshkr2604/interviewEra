@@ -5,13 +5,13 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { SignupForm } from './SignupForm';
-import { authPageMetadata } from '@/lib/seo/metadata';
+import { generateMetadata } from '@/lib/seo/metadata';
 
 interface SignupPageProps {
   searchParams: Promise<{ next?: string; email?: string }>;
 }
 
-export const metadata = authPageMetadata({
+export const metadata = generateMetadata({
   title: 'Sign up',
   description:
     'Create your InterviewEra account — AI mock interviews personalized to your resume. Start with free credits.',

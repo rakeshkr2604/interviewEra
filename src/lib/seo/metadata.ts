@@ -167,6 +167,7 @@ export function privatePageMetadata(input: Omit<PageSeoParams, 'noIndex'>): Meta
 /**
  * Auth / recovery flows — `noindex` so they do not compete in search, `follow` so equity
  * still flows to linked marketing pages (Google still recommends crawlable auth when thin).
+ * Exception: `/signup` uses `generateMetadata()` directly — primary conversion page, indexable.
  */
 export function authPageMetadata(input: Omit<PageSeoParams, 'noIndex' | 'noIndexFollow'>): Metadata {
   return generateMetadata({ ...input, noIndex: true, noIndexFollow: true })
