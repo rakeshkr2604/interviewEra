@@ -53,6 +53,9 @@ import {
   MICROSOFT_SE_HERO_HEIGHT,
   MICROSOFT_SE_HERO_PATH,
   MICROSOFT_SE_HERO_WIDTH,
+  MICROSOFT_SE_META_TITLE,
+  MICROSOFT_SE_DESCRIPTION,
+  MICROSOFT_SE_CANONICAL_PATH,
   MICROSOFT_SE_LAST_UPDATED,
   MICROSOFT_SE_PUBLISHED_DATE,
   MICROSOFT_SE_AUTHOR_NAME,
@@ -234,10 +237,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (isMicrosoftSoftwareEngineerHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
-      title: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
-      description:
-        'Microsoft SDE interview guide for India 2026 with top 10 curated questions: Online Assessment, coding interviews, system design, growth mindset, hiring manager prep, 4-week roadmap, and expert answers.',
-      path: intersectionQuestionsPath(company.slug, role.slug),
+      title: MICROSOFT_SE_META_TITLE,
+      description: MICROSOFT_SE_DESCRIPTION,
+      path: MICROSOFT_SE_CANONICAL_PATH,
       keywords: [
         'Microsoft software engineer interview questions',
         'top 10 Microsoft SDE interview questions',
@@ -257,7 +259,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 const ORIGIN = getCanonicalSiteOrigin()
 const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
-const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -432,22 +433,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(MICROSOFT_CANONICAL_PATH),
-            url: canonicalUrl(MICROSOFT_CANONICAL_PATH),
-            name: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
+            '@id': canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
+            url: canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
+            name: MICROSOFT_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${MICROSOFT_SE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(MICROSOFT_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${canonicalUrl(MICROSOFT_SE_CANONICAL_PATH)}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(MICROSOFT_CANONICAL_PATH)}#article`,
-            headline: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
-            description:
-              'Microsoft SDE interview guide for India 2026 with top 10 curated questions: Online Assessment, coding interviews, system design, growth mindset, hiring manager prep, 4-week roadmap, and expert answers.',
-            mainEntityOfPage: { '@id': canonicalUrl(MICROSOFT_CANONICAL_PATH) },
-            url: canonicalUrl(MICROSOFT_CANONICAL_PATH),
+            '@id': `${canonicalUrl(MICROSOFT_SE_CANONICAL_PATH)}#article`,
+            headline: MICROSOFT_SE_META_TITLE,
+            description: MICROSOFT_SE_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(MICROSOFT_SE_CANONICAL_PATH) },
+            url: canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
             datePublished: MICROSOFT_SE_PUBLISHED_DATE,
             dateModified: MICROSOFT_SE_LAST_UPDATED,
             dateReviewed: MICROSOFT_SE_REVIEWED_DATE,

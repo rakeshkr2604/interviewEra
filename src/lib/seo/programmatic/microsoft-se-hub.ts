@@ -9,6 +9,10 @@ export const MICROSOFT_SE_PROCESS_ALT =
   'Microsoft Software Engineer interview process flow 2026: Application, Recruiter Screen, Online Assessment, Coding Rounds, System Design, Hiring Manager, and Offer'
 export const MICROSOFT_SE_PROCESS_WIDTH = 1672
 export const MICROSOFT_SE_PROCESS_HEIGHT = 941
+export const MICROSOFT_SE_META_TITLE = 'Microsoft SDE Interview Questions (2026)'
+export const MICROSOFT_SE_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
+export const MICROSOFT_SE_DESCRIPTION =
+  'Microsoft SDE interview prep for India 2026: Online Assessment, coding, system design, growth mindset, hiring manager round, and model answers.'
 export const MICROSOFT_SE_EDITORIAL_NOTE =
   'Content reviewed and updated for current Microsoft SDE hiring patterns, OA formats, growth mindset evaluation, and hiring manager round expectations in India. Includes top 10 curated interview questions with expanded expert answers.'
 export const MICROSOFT_SE_READING_TIME = '28 min read'
