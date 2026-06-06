@@ -37,6 +37,9 @@ import {
   AMAZON_SE_HERO_HEIGHT,
   AMAZON_SE_HERO_PATH,
   AMAZON_SE_HERO_WIDTH,
+  AMAZON_SE_META_TITLE,
+  AMAZON_SE_DESCRIPTION,
+  AMAZON_SE_CANONICAL_PATH,
   AMAZON_SE_LAST_UPDATED,
   AMAZON_SE_PUBLISHED_DATE,
   AMAZON_SE_AUTHOR_NAME,
@@ -163,10 +166,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (isAmazonSoftwareEngineerHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
-      title: 'Amazon Software Engineer Interview Questions and Answers (2026)',
-      description:
-        'Amazon SDE interview guide for India 2026: OA, technical rounds, Leadership Principles, STAR method, Bar Raiser prep, 4-week roadmap, and expert answers.',
-      path: intersectionQuestionsPath(company.slug, role.slug),
+      title: AMAZON_SE_META_TITLE,
+      description: AMAZON_SE_DESCRIPTION,
+      path: AMAZON_SE_CANONICAL_PATH,
       keywords: [
         'Amazon software engineer interview questions',
         'Amazon SDE interview 2026',
@@ -258,7 +260,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 const ORIGIN = getCanonicalSiteOrigin()
-const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -355,22 +356,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(AMAZON_CANONICAL_PATH),
-            url: canonicalUrl(AMAZON_CANONICAL_PATH),
-            name: 'Amazon Software Engineer Interview Questions and Answers (2026)',
+            '@id': canonicalUrl(AMAZON_SE_CANONICAL_PATH),
+            url: canonicalUrl(AMAZON_SE_CANONICAL_PATH),
+            name: AMAZON_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${AMAZON_SE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(AMAZON_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${canonicalUrl(AMAZON_SE_CANONICAL_PATH)}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(AMAZON_CANONICAL_PATH)}#article`,
-            headline: 'Amazon Software Engineer Interview Questions and Answers (2026)',
-            description:
-              'Amazon SDE interview guide for India 2026: OA, technical rounds, Leadership Principles, STAR method, Bar Raiser prep, 4-week roadmap, and expert answers.',
-            mainEntityOfPage: { '@id': canonicalUrl(AMAZON_CANONICAL_PATH) },
-            url: canonicalUrl(AMAZON_CANONICAL_PATH),
+            '@id': `${canonicalUrl(AMAZON_SE_CANONICAL_PATH)}#article`,
+            headline: AMAZON_SE_META_TITLE,
+            description: AMAZON_SE_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(AMAZON_SE_CANONICAL_PATH) },
+            url: canonicalUrl(AMAZON_SE_CANONICAL_PATH),
             datePublished: AMAZON_SE_PUBLISHED_DATE,
             dateModified: AMAZON_SE_LAST_UPDATED,
             dateReviewed: AMAZON_SE_REVIEWED_DATE,

@@ -8,6 +8,10 @@ export const AMAZON_SE_PROCESS_ALT =
   'Amazon Software Engineer interview process flow 2026: Application, Recruiter Screen, Online Assessment, Technical Rounds, Behavioural Round, Bar Raiser, and Offer'
 export const AMAZON_SE_PROCESS_WIDTH = 1728
 export const AMAZON_SE_PROCESS_HEIGHT = 910
+export const AMAZON_SE_META_TITLE = 'Amazon SDE Interview Questions (2026)'
+export const AMAZON_SE_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
+export const AMAZON_SE_DESCRIPTION =
+  'Amazon SDE interview prep for India 2026: OA, Leadership Principles, STAR method, Bar Raiser, technical rounds, and model answers.'
 export const AMAZON_SE_EDITORIAL_NOTE =
   'Content reviewed and updated for current Amazon SDE hiring patterns, OA formats, and Bar Raiser evaluation trends in India.'
 export const AMAZON_SE_READING_TIME = '26 min read'
