@@ -25,6 +25,10 @@ interface QuestionsListProps {
   questions: readonly SeoQuestion[]
   /** Heading rendered above the list. */
   heading?: string
+  /** Anchor id for the section wrapper (hub TOC targets). */
+  sectionId?: string
+  /** Anchor id for the H2 (defaults to sectionId when set). */
+  headingId?: string
   /** Show expanded answer blocks (evaluates, strategy, mistakes, follow-ups). */
   expanded?: boolean
   /** Optional label beside the heading (e.g. hub-specific question count). */
@@ -34,9 +38,12 @@ interface QuestionsListProps {
 export function QuestionsList({
   questions,
   heading = 'Interview Questions',
+  sectionId,
+  headingId,
   expanded = false,
   metaLabel,
 }: QuestionsListProps) {
+  const h2Id = headingId ?? sectionId
   if (questions.length === 0) {
     return (
       <section aria-label="Interview questions">
@@ -62,9 +69,14 @@ export function QuestionsList({
   }
 
   return (
-    <section aria-label="Interview questions">
+    <section
+      id={sectionId}
+      aria-label={sectionId ? undefined : 'Interview questions'}
+      aria-labelledby={h2Id}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2
+          id={h2Id}
           className="text-xl font-bold tracking-tight sm:text-2xl"
           style={{ color: 'var(--text-primary)' }}
         >

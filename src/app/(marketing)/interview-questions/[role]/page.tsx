@@ -9,6 +9,7 @@ import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
 import { BaCompanyProcessSection } from '@/components/programmatic/BaCompanyProcessSection'
 import { BaTableOfContents } from '@/components/programmatic/BaTableOfContents'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
+import { AndroidDeveloperHubArticle } from '@/components/programmatic/AndroidDeveloperHubArticle'
 import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
 import { schemaIds } from '@/lib/seo/metadata'
 import {
@@ -26,6 +27,35 @@ import {
 } from '@/lib/seo/programmatic/questions'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildRolePageLinks, buildRoleSkillLinks } from '@/lib/seo/internal-linking'
+import {
+  ANDROID_AUTHOR_NAME,
+  ANDROID_CANONICAL_PATH,
+  ANDROID_DESCRIPTION,
+  ANDROID_DEVELOPER_QUESTIONS,
+  ANDROID_FAQ_ITEMS,
+  ANDROID_HERO_ALT,
+  ANDROID_HERO_HEIGHT,
+  ANDROID_HERO_PATH,
+  ANDROID_HERO_WIDTH,
+  ANDROID_LAST_UPDATED,
+  ANDROID_META_TITLE,
+  ANDROID_PROCESS_ALT,
+  ANDROID_PROCESS_HEIGHT,
+  ANDROID_PROCESS_PATH,
+  ANDROID_PROCESS_WIDTH,
+  ANDROID_PUBLISHED_DATE,
+  ANDROID_REVIEWED_DATE,
+  ANDROID_REVIEWER_NAME,
+  ANDROID_ROADMAP_ALT,
+  ANDROID_ROADMAP_HEIGHT,
+  ANDROID_ROADMAP_PATH,
+  ANDROID_ROADMAP_WIDTH,
+  ANDROID_MVVM_ARCHITECTURE_ALT,
+  ANDROID_MVVM_ARCHITECTURE_HEIGHT,
+  ANDROID_MVVM_ARCHITECTURE_PATH,
+  ANDROID_MVVM_ARCHITECTURE_WIDTH,
+  isAndroidDeveloperHub,
+} from '@/lib/seo/programmatic/android-developer-hub'
 import '../../blog/blog.css'
 
 export function generateStaticParams() {
@@ -55,6 +85,26 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'requirements gathering interview questions',
         'SQL for business analyst interview',
         'stakeholder management interview questions',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+  if (isAndroidDeveloperHub(role.slug)) {
+    return baseGenerateMetadata({
+      title: ANDROID_META_TITLE,
+      description: ANDROID_DESCRIPTION,
+      path: ANDROID_CANONICAL_PATH,
+      ogImage: `${getCanonicalSiteOrigin()}${ANDROID_HERO_PATH}`,
+      keywords: [
+        'Android developer interview questions',
+        'Android interview questions 2026',
+        'Kotlin Android interview',
+        'Jetpack Compose interview questions',
+        'MVVM Android interview',
+        'Android coroutines interview',
+        'Android system design interview',
+        'Android hiring process India',
       ],
       openGraphType: 'article',
       noIndex: false,
@@ -126,7 +176,11 @@ export default async function RoleQuestionsPage({ params }: Props) {
   const role = getRoleBySlug(roleSlug)
   if (!role) notFound()
 
+  const isAndroidHub = isAndroidDeveloperHub(role.slug)
+  const isEditorialHub = role.slug === 'business-analyst' || isAndroidHub
+
   const questions = getRoleQuestionsFlat(role.slug)
+  const hubQuestions = isAndroidHub ? ANDROID_DEVELOPER_QUESTIONS : questions
   const faqPairs = buildFaqPairs(questions)
 
   const skillLinks = buildRoleSkillLinks(role)
@@ -136,20 +190,22 @@ export default async function RoleQuestionsPage({ params }: Props) {
   const FAQ_LD =
     role.slug === 'business-analyst'
       ? faqPageJsonLd([...BA_FAQ_ITEMS])
-      : faqPairs.length > 0
-        ? faqPageJsonLd(faqPairs)
-        : null
+      : isAndroidHub
+        ? faqPageJsonLd([...ANDROID_FAQ_ITEMS])
+        : faqPairs.length > 0
+          ? faqPageJsonLd(faqPairs)
+          : null
 
   const ITEM_LIST_LD =
-    role.slug === 'business-analyst' && questions.length > 0
+    isEditorialHub && hubQuestions.length > 0
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
           itemListOrder: 'https://schema.org/ItemListOrderAscending',
-          name: 'Business Analyst interview questions',
+          name: `${role.label} interview questions`,
           url: canonicalUrl(`/interview-questions/${role.slug}`),
-          numberOfItems: questions.length,
-          itemListElement: questions.map((q, idx) => ({
+          numberOfItems: hubQuestions.length,
+          itemListElement: hubQuestions.map((q, idx) => ({
             '@type': 'ListItem',
             position: idx + 1,
             name: q.question,
@@ -233,15 +289,120 @@ export default async function RoleQuestionsPage({ params }: Props) {
         }
       : null
 
+  const ANDROID_PAGE_LD = isAndroidHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#android-author`,
+            name: ANDROID_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#android-reviewer`,
+            name: ANDROID_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${ANDROID_HERO_PATH}#image`,
+            url: `${ORIGIN}${ANDROID_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${ANDROID_HERO_PATH}`,
+            caption: ANDROID_HERO_ALT,
+            width: ANDROID_HERO_WIDTH,
+            height: ANDROID_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${ANDROID_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${ANDROID_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${ANDROID_PROCESS_PATH}`,
+            caption: ANDROID_PROCESS_ALT,
+            width: ANDROID_PROCESS_WIDTH,
+            height: ANDROID_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${ANDROID_ROADMAP_PATH}#image`,
+            url: `${ORIGIN}${ANDROID_ROADMAP_PATH}`,
+            contentUrl: `${ORIGIN}${ANDROID_ROADMAP_PATH}`,
+            caption: ANDROID_ROADMAP_ALT,
+            width: ANDROID_ROADMAP_WIDTH,
+            height: ANDROID_ROADMAP_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${ANDROID_MVVM_ARCHITECTURE_PATH}#image`,
+            url: `${ORIGIN}${ANDROID_MVVM_ARCHITECTURE_PATH}`,
+            contentUrl: `${ORIGIN}${ANDROID_MVVM_ARCHITECTURE_PATH}`,
+            caption: ANDROID_MVVM_ARCHITECTURE_ALT,
+            width: ANDROID_MVVM_ARCHITECTURE_WIDTH,
+            height: ANDROID_MVVM_ARCHITECTURE_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(ANDROID_CANONICAL_PATH),
+            url: canonicalUrl(ANDROID_CANONICAL_PATH),
+            name: ANDROID_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${ANDROID_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(ANDROID_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(ANDROID_CANONICAL_PATH)}#article`,
+            headline: ANDROID_META_TITLE,
+            description: ANDROID_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(ANDROID_CANONICAL_PATH) },
+            url: canonicalUrl(ANDROID_CANONICAL_PATH),
+            datePublished: ANDROID_PUBLISHED_DATE,
+            dateModified: ANDROID_LAST_UPDATED,
+            dateReviewed: ANDROID_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#android-author` },
+            reviewedBy: { '@id': `${ORIGIN}#android-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: [
+              { '@id': `${ORIGIN}${ANDROID_HERO_PATH}#image` },
+              { '@id': `${ORIGIN}${ANDROID_PROCESS_PATH}#image` },
+              { '@id': `${ORIGIN}${ANDROID_ROADMAP_PATH}#image` },
+              { '@id': `${ORIGIN}${ANDROID_MVVM_ARCHITECTURE_PATH}#image` },
+            ],
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: ['h1', '#android-hiring-process', '#android-architecture-flow', '#android-questions'],
+            },
+          },
+        ],
+      }
+    : null
+
   return (
     <>
       <JsonLdScript id="role-breadcrumb-ld" data={BREADCRUMB_LD} />
       {FAQ_LD ? <JsonLdScript id="role-faq-ld" data={FAQ_LD} /> : null}
       {ITEM_LIST_LD ? <JsonLdScript id="role-question-itemlist-ld" data={ITEM_LIST_LD} /> : null}
       {BA_PAGE_LD ? <JsonLdScript id="role-ba-page-ld" data={BA_PAGE_LD} /> : null}
+      {ANDROID_PAGE_LD ? <JsonLdScript id="role-android-page-ld" data={ANDROID_PAGE_LD} /> : null}
 
-      {/* ── Hero (non-BA roles) ──────────────────────────────────────────── */}
-      {role.slug !== 'business-analyst' ? (
+      {/* ── Hero (non-editorial roles) ───────────────────────────────────── */}
+      {!isEditorialHub ? (
         <section
           className={`${CONTENT_SECTION} border-b`}
           style={{ borderColor: 'var(--card-border)' }}
@@ -1442,8 +1603,12 @@ export default async function RoleQuestionsPage({ params }: Props) {
         </article>
       ) : null}
 
+      {isAndroidHub ? (
+        <AndroidDeveloperHubArticle role={role} questions={ANDROID_DEVELOPER_QUESTIONS} />
+      ) : null}
+
       {/* ── Questions ────────────────────────────────────────────────────── */}
-      {role.slug !== 'business-analyst' ? (
+      {!isEditorialHub ? (
         <section className={CONTENT_SECTION}>
           <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
             <QuestionsList questions={questions} heading={`${role.pluralLabel} Interview Questions`} />
@@ -1453,15 +1618,15 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
       {/* ── Key skill topics (pill badges) ───────────────────────────────── */}
       {skillLinks.length > 0 ? (
-        <section className={role.slug === 'business-analyst' ? 'py-8 md:py-12' : CONTENT_SECTION}>
+        <section className={isEditorialHub ? 'py-8 md:py-12' : CONTENT_SECTION}>
           <div
             className={
-              role.slug === 'business-analyst'
+              isEditorialHub
                 ? BA_SHELL_CLASS
                 : `${LANDING_PAGE_CONTAINER} px-4 sm:px-5`
             }
           >
-            <div className={role.slug === 'business-analyst' ? BA_CONTENT_CLASS : undefined}>
+            <div className={isEditorialHub ? BA_CONTENT_CLASS : undefined}>
               <h2
                 className="text-xl font-bold tracking-tight sm:text-2xl"
                 style={{ color: 'var(--text-primary)' }}
@@ -1493,7 +1658,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
       {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section
-        className={role.slug === 'business-analyst' ? 'border-y py-8 md:py-12' : `${CONTENT_SECTION} border-y`}
+        className={isEditorialHub ? 'border-y py-8 md:py-12' : `${CONTENT_SECTION} border-y`}
         style={{
           borderColor: 'var(--card-border)',
           background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
@@ -1501,12 +1666,12 @@ export default async function RoleQuestionsPage({ params }: Props) {
       >
         <div
           className={
-            role.slug === 'business-analyst'
+            isEditorialHub
               ? BA_SHELL_CLASS
               : `${LANDING_PAGE_CONTAINER} px-4 sm:px-5`
           }
         >
-          <div className={role.slug === 'business-analyst' ? BA_CONTENT_CLASS : undefined}>
+          <div className={isEditorialHub ? BA_CONTENT_CLASS : undefined}>
             <p
               className="text-xs font-bold uppercase tracking-[0.14em]"
               style={{ color: 'var(--accent-primary)' }}
@@ -1548,7 +1713,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
       {/* ── Engine-driven cross-link sections ────────────────────────────── */}
       {linkSections.map((section) =>
-        role.slug === 'business-analyst' ? (
+        isEditorialHub ? (
           <div key={section.heading} className={BA_SHELL_CLASS}>
             <div className={BA_CONTENT_CLASS}>
               <SeoCrossLinksSection heading={section.heading} links={section.links} />

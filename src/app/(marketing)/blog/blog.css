@@ -617,6 +617,12 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   .ie-landing-premium .ie-blog-article-h1--single {
     text-wrap: nowrap;
   }
+
+  .ie-landing-premium .ie-blog-article-h1--single .ie-blog-article-h1__line,
+  .ie-landing-premium .ie-blog-article-h1--single .ie-blog-article-h1__accent {
+    display: inline;
+    margin-top: 0;
+  }
 }
 
 @media (min-width: 640px) {

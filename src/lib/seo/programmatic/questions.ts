@@ -1034,7 +1034,7 @@ export const ROLE_QUESTION_REGISTRY: Partial<Record<RoleSlug, QuestionSet>> = {
   },
 
   'android-developer': {
-    lastUpdated: '2026-05-21',
+    lastUpdated: '2026-06-06',
     questions: [
       {
         question: 'What are the four main components of an Android application?',
