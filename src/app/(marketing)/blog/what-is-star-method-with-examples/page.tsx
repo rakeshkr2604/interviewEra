@@ -8,7 +8,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const STAR_META_TITLE = 'What Is the STAR Method? With Examples for Indian Students';
+const STAR_META_TITLE = 'STAR Method: Examples for Students';
 const STAR_CANONICAL_PATH = '/blog/what-is-star-method-with-examples';
 const STAR_DATE = '2026-05-01';
 const ORIGIN = getCanonicalSiteOrigin();

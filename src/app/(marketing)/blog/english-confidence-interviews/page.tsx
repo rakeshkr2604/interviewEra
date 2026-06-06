@@ -13,7 +13,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const META_TITLE = "Your English Isn't Costing You the Interview. Your Delivery Is.";
+const META_TITLE = 'English Confidence in Interviews';
 const META_DESCRIPTION =
   'Interview English is rarely the bottleneck. Build communication, clarity, and spoken confidence for placement interviews — without memorizing scripts.';
 const ARTICLE_DESCRIPTION =

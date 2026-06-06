@@ -29,6 +29,10 @@ import {
 } from '@/lib/seo/programmatic/indexing';
 import { getRoleBySlug, getCompanyBySlug } from '@/lib/seo/programmatic';
 import { FRESHWORKS_FE_LAST_UPDATED } from '@/lib/seo/programmatic/freshworks-fe-hub';
+import { AMAZON_SE_LAST_UPDATED } from '@/lib/seo/programmatic/amazon-se-hub';
+import { MICROSOFT_SE_LAST_UPDATED } from '@/lib/seo/programmatic/microsoft-se-hub';
+import { INFOSYS_SE_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-se-hub';
+import { INFOSYS_JAVA_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-java-hub';
 import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
@@ -162,6 +166,15 @@ export const CHILD_SITEMAP_LOCS = {
 /** Fallback lastModified date for programmatic pages without question data yet. */
 const QUESTIONS_FALLBACK_DATE = '2026-05-21';
 
+/** Editorial hub lastmod dates — bump when hub content or metadata ships. */
+const EDITORIAL_INTERSECTION_LASTMOD: Partial<Record<string, string>> = {
+  'freshworks:frontend-developer': FRESHWORKS_FE_LAST_UPDATED,
+  'amazon:software-engineer': AMAZON_SE_LAST_UPDATED,
+  'microsoft:software-engineer': MICROSOFT_SE_LAST_UPDATED,
+  'infosys:software-engineer': INFOSYS_SE_LAST_UPDATED,
+  'infosys:java-developer': INFOSYS_JAVA_LAST_UPDATED,
+}
+
 export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = []
 
@@ -210,9 +223,7 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (!company || !role || !isIntersectionIndexable(company, role)) continue
     const intersectionKey = `${pair.company}:${pair.role}`
     const lastModified =
-      intersectionKey === 'freshworks:frontend-developer'
-        ? FRESHWORKS_FE_LAST_UPDATED
-        : QUESTIONS_FALLBACK_DATE
+      EDITORIAL_INTERSECTION_LASTMOD[intersectionKey] ?? QUESTIONS_FALLBACK_DATE
     entries.push({
       url: canonicalUrl(
         intersectionQuestionsPath(pair.company as CompanySlug, pair.role as RoleSlug),

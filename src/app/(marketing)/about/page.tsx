@@ -8,7 +8,7 @@ import { generateMetadata, schemaIds, siteConfig, siteOrganizationStructured } f
 import { cn } from '@/lib/utils';
 
 const ABOUT_PAGE_DESCRIPTION =
-  'InterviewEra is an AI-powered mock interview platform for Indian campus and early-career hiring: resume-aware sessions, rubric-scored feedback, and structured practice you can repeat.';
+  'InterviewEra is an AI mock interview platform for Indian campus and early-career hiring: resume-aware sessions, rubric-scored feedback, and structured practice.';
 
 export const metadata: Metadata = generateMetadata({
   title: 'About',

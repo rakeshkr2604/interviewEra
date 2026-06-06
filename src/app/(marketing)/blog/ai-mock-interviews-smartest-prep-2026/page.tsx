@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import { BRAND_ICON_192_PATH, brandArticleOgTitle, siteConfig } from '@/lib/seo/metadata';
+import { BRAND_ICON_192_PATH, brandArticleOgTitle, generateMetadata, siteConfig } from '@/lib/seo/metadata';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { AiMockBlogReadingProgress } from '@/components/blog/AiMockBlogReadingProgress';
 
@@ -38,12 +38,17 @@ const RELATED_POSTS = [
 const CTA_FOCUS =
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6C47FF] rounded-lg';
 
-const AI_MOCK_META_TITLE = 'Why AI Mock Interviews Are the Smartest Way to Prepare in 2026';
+const AI_MOCK_META_TITLE = 'AI Mock Interviews for 2026';
+const AI_MOCK_DESCRIPTION =
+  'Why AI mock interviews beat YouTube and friend practice — real feedback, zero judgment, and 24/7 availability for Indian campus prep.';
+const AI_MOCK_OG_IMAGE = `${siteConfig.url}/blog/ai-mock-interviews-smartest-prep-2026/roadblock-visual.png`;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = generateMetadata({
   title: AI_MOCK_META_TITLE,
-  description:
-    'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
+  description: AI_MOCK_DESCRIPTION,
+  path: CANONICAL_PATH,
+  ogImage: AI_MOCK_OG_IMAGE,
+  socialTitle: brandArticleOgTitle(AI_MOCK_META_TITLE),
   keywords: [
     'AI mock interview',
     'interview preparation for freshers India',
@@ -51,35 +56,8 @@ export const metadata: Metadata = {
     'AI interview feedback',
     'how to practice for job interviews',
   ],
-  metadataBase: new URL(siteConfig.url),
-  alternates: { canonical: `${siteConfig.url}${CANONICAL_PATH}` },
-  openGraph: {
-    title: brandArticleOgTitle(AI_MOCK_META_TITLE),
-    description:
-      'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
-    url: `${siteConfig.url}${CANONICAL_PATH}`,
-    siteName: siteConfig.name,
-    locale: siteConfig.locale,
-    type: 'article',
-    publishedTime: `${PUBLISHED_ISO}T00:00:00.000Z`,
-    authors: ['InterviewEra Team'],
-    images: [
-      {
-        url: `${siteConfig.url}/blog/ai-mock-interviews-smartest-prep-2026/roadblock-visual.png`,
-        width: 816,
-        height: 570,
-        alt: 'Why traditional interview prep fails - YouTube limitations, friend mock interview bias, lack of availability, fear of judgment',
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: brandArticleOgTitle(AI_MOCK_META_TITLE),
-    description:
-      'Struggling with interview prep? Discover why AI mock interviews beat YouTube tutorials and friend practice — with real feedback, zero judgment, and 24/7 availability.',
-    images: [`${siteConfig.url}/blog/ai-mock-interviews-smartest-prep-2026/roadblock-visual.png`],
-  },
-};
+  openGraphType: 'article',
+});
 
 const IMG_BASE = '/blog/ai-mock-interviews-smartest-prep-2026';
 const DASHBOARD_URL = `${siteConfig.url}/dashboard`;

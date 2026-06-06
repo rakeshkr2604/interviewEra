@@ -9,7 +9,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const HR_META_TITLE = 'HR Interview Answer Tips & Tricks (With Framework Visuals)';
+const HR_META_TITLE = 'HR Interview Tips & Tricks (2026)';
 const HR_CANONICAL_PATH = '/blog/hr-interview-answer-tips-and-tricks';
 const HR_DATE = '2026-05-01';
 const ORIGIN = getCanonicalSiteOrigin();

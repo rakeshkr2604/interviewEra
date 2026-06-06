@@ -61,8 +61,8 @@ const PLACEMENT_YEAR = 2026
  */
 export function questionsHubMetadata(): Metadata {
   return generateMetadata({
-    title: `Interview Questions for Indian Placements ${PLACEMENT_YEAR}`,
-    description: `Browse 300+ curated interview questions for 20 roles, 29 companies, and 35 skills. Prepared for Indian campus placements and tech hiring in ${PLACEMENT_YEAR}.`,
+    title: `Interview Questions India ${PLACEMENT_YEAR}`,
+    description: `Browse 300+ curated interview questions for 20 roles, 29 companies, and 35 skills. Campus and tech hiring prep for India in ${PLACEMENT_YEAR}.`,
     path: questionsHubPath(),
     keywords: [
       'interview questions India',
@@ -82,10 +82,9 @@ export function questionsHubMetadata(): Metadata {
  */
 export function rolePageMetadata(role: Role): Metadata {
   const path = roleQuestionsPath(role.slug)
-  const fresherSuffix = role.fresherFriendly ? ' for Freshers' : ''
 
   return generateMetadata({
-    title: `${role.label} Interview Questions${fresherSuffix} ${PLACEMENT_YEAR}`,
+    title: `${role.label} Interview Qs ${PLACEMENT_YEAR}`,
     description: buildRoleDescription(role),
     path,
     keywords: buildRoleKeywords(role),
@@ -98,10 +97,9 @@ export function rolePageMetadata(role: Role): Metadata {
 
 function buildRoleDescription(role: Role): string {
   const fresherClause = role.fresherFriendly
-    ? 'for Indian campus placements and fresher hiring'
+    ? 'for campus placements and fresher hiring'
     : 'asked at top Indian tech companies'
-  // Copy stays count-accurate: pages render curated banks, not a fixed "Top 30".
-  return `Frequently asked ${role.label} interview questions ${fresherClause} in ${PLACEMENT_YEAR}, with model answers and preparation tips across technical, behavioral, and HR rounds.`
+  return `${role.label} interview questions ${fresherClause} in ${PLACEMENT_YEAR}. Model answers and prep tips for technical, behavioral, and HR rounds.`
 }
 
 function buildRoleKeywords(role: Role): string[] {
@@ -139,7 +137,7 @@ export function companyPageMetadata(company: Company): Metadata {
 }
 
 function buildCompanyDescription(company: Company): string {
-  return `${company.label} interview questions and placement process for ${PLACEMENT_YEAR}. ${company.interviewStyle}. Average package ${company.avgPackageRange}.`
+  return `${company.label} interview questions and placement process for ${PLACEMENT_YEAR}. ${company.interviewStyle}. Package range ${company.avgPackageRange}.`
 }
 
 function buildCompanyKeywords(company: Company): string[] {
@@ -173,7 +171,7 @@ export function intersectionPageMetadata(company: Company, role: Role): Metadata
   const path = intersectionQuestionsPath(company.slug, role.slug)
 
   return generateMetadata({
-    title: `${company.label} ${role.label} Interview Questions ${PLACEMENT_YEAR}`,
+    title: `${company.label} ${role.shortLabel} Qs ${PLACEMENT_YEAR}`,
     description: buildIntersectionDescription(company, role),
     path,
     keywords: buildIntersectionKeywords(company, role),
@@ -186,9 +184,9 @@ export function intersectionPageMetadata(company: Company, role: Role): Metadata
 
 function buildIntersectionDescription(company: Company, role: Role): string {
   const fresherNote = company.fresherHiring && role.fresherFriendly
-    ? ' Covers the full placement drive for freshers.'
+    ? ' Covers fresher placement drives.'
     : ''
-  return `${company.label} ${role.label} interview questions for ${PLACEMENT_YEAR}. Process: ${company.interviewStyle}.${fresherNote} Preparation tips and sample answers included.`
+  return `${company.label} ${role.label} interview questions for ${PLACEMENT_YEAR}. Process: ${company.interviewStyle}.${fresherNote} Prep tips and sample answers.`
 }
 
 function buildIntersectionKeywords(company: Company, role: Role): string[] {
@@ -251,8 +249,8 @@ export function toolVariantRoleMetadata(role: Role): Metadata {
   const path = toolVariantRolePath(role.slug)
 
   return generateMetadata({
-    title: `Free ${role.label} Interview Question Generator`,
-    description: `Generate AI-powered ${role.label} interview questions instantly. Tailored for Indian campus placements in ${PLACEMENT_YEAR}. No signup required — free to use.`,
+    title: `${role.shortLabel} Question Generator`,
+    description: `Generate AI ${role.label} interview questions for Indian campus placements in ${PLACEMENT_YEAR}. Free — no signup required.`,
     path,
     keywords: [
       `${role.label} interview question generator`,
@@ -271,8 +269,8 @@ export function toolQGenCompanyMetadata(company: Company): Metadata {
   const path = toolVariantCompanyPath(company.slug)
 
   return generateMetadata({
-    title: `Free ${company.label} Interview Question Generator`,
-    description: `Generate AI-powered ${company.label} interview questions instantly. Covers all ${company.typicalRounds} interview rounds. Tailored for ${PLACEMENT_YEAR} placements — free, no sign-up required.`,
+    title: `${company.label} Question Generator`,
+    description: `Generate ${company.label} interview questions for ${PLACEMENT_YEAR} placements. Covers ${company.typicalRounds} rounds — free, no sign-up.`,
     path,
     keywords: [
       `${company.label} interview question generator`,
@@ -292,8 +290,8 @@ export function toolAtsRoleMetadata(role: Role): Metadata {
   const path = toolAtsRolePath(role.slug)
 
   return generateMetadata({
-    title: `Free ATS Resume Checker for ${role.label}s`,
-    description: `Check if your ${role.label} resume passes ATS screening. Get an instant compatibility score, missing keyword analysis, and formatting fixes — free, no sign-up required.`,
+    title: `ATS Resume Check: ${role.shortLabel}`,
+    description: `Check if your ${role.label} resume passes ATS screening. Instant score, keyword gaps, and formatting fixes — free, no sign-up.`,
     path,
     keywords: [
       `${role.label} ATS resume checker`,
@@ -313,8 +311,8 @@ export function toolStarTopicMetadata(topic: StarTopic): Metadata {
   const path = toolStarTopicPath(topic.slug)
 
   return generateMetadata({
-    title: `STAR Method: ${topic.label} Interview Answer Example`,
-    description: `${topic.description} Free STAR answer builder with a worked example, scoring rubric, and preparation tips.`,
+    title: `STAR: ${topic.label} Answer Example`,
+    description: `${topic.description} Free STAR builder with a worked example, scoring rubric, and prep tips.`,
     path,
     keywords: [
       `STAR method ${topic.label.toLowerCase()} example`,

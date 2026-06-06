@@ -22,11 +22,11 @@ import type { SeoTextLink } from '@/lib/seo/internal-links';
 
 const PAGE_PATH = '/how-it-works';
 const PAGE_DESCRIPTION =
-  'How InterviewEra works: upload your resume, run a realistic voice-based mock interview with adaptive follow-up questions and live captions, and get rubric-based scoring on every answer — built for Indian campus placements.';
+  'How InterviewEra works: upload your resume, run a voice mock interview with adaptive follow-ups and live captions, and get rubric-based scoring — built for Indian campus placements.';
 
 export const metadata: Metadata = generateMetadata({
   title: 'How It Works',
-  documentTitleAbsolute: 'How InterviewEra Works — Realistic, Adaptive, Scored Mock Interviews',
+  documentTitleAbsolute: 'How InterviewEra Works — Adaptive Mock Interviews',
   socialTitle: 'How InterviewEra Works',
   description: PAGE_DESCRIPTION,
   path: PAGE_PATH,

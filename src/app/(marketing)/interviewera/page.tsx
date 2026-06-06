@@ -28,7 +28,7 @@ import type { SeoTextLink } from '@/lib/seo/internal-links';
 const PAGE_PATH = '/interviewera';
 
 const PAGE_DESCRIPTION =
-  'What is InterviewEra? InterviewEra (also written Interview Era) is an AI-powered mock interview platform for Indian campus hiring — resume-aware sessions, rubric-based scoring, and STAR-method coaching, founded by Rakesh Kumar.';
+  'What is InterviewEra? An AI mock interview platform for Indian campus hiring — resume-aware sessions, rubric scoring, and STAR coaching, founded by Rakesh Kumar.';
 
 export const metadata: Metadata = {
   ...generateMetadata({

@@ -77,13 +77,57 @@ export const siteOrganizationStructured = {
   },
 } as const
 
+/** Bing / Google SERP — full `<title>` including brand prefix from root layout template. */
+export const SEO_MAX_DOCUMENT_TITLE = 60 as const
+/** Max chars for the `%s` segment in `InterviewEra | %s` (15-char prefix). */
+export const SEO_MAX_TITLE_SEGMENT = SEO_MAX_DOCUMENT_TITLE - `${BRAND} | `.length
+export const SEO_MAX_DESCRIPTION = 160 as const
+
+/** Trim meta description at a word boundary (Bing Webmaster ≤160 chars). */
+export function clampMetaDescription(text: string, max = SEO_MAX_DESCRIPTION): string {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const sp = cut.lastIndexOf(' ')
+  return (sp > max * 0.55 ? cut.slice(0, sp) : cut) + '…'
+}
+
+/** Trim page title segment before the root layout brand template is applied. */
+export function clampTitleSegment(text: string, max = SEO_MAX_TITLE_SEGMENT): string {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const sp = cut.lastIndexOf(' ')
+  return sp > max * 0.5 ? cut.slice(0, sp) : cut
+}
+
+function clampAbsoluteDocumentTitle(text: string, max = SEO_MAX_DOCUMENT_TITLE): string {
+  if (text.length <= max) return text
+  const cut = text.slice(0, max - 1)
+  const sp = cut.lastIndexOf(' ')
+  return sp > max * 0.5 ? cut.slice(0, sp) : cut
+}
+
+/** Clamp a fully composed brand-first or brand-last social title. */
+function clampSocialTitle(text: string): string {
+  if (text.length <= SEO_MAX_DOCUMENT_TITLE) return text
+  const brandFirst = `${BRAND} | `
+  if (text.startsWith(brandFirst)) {
+    return brandFirst + clampTitleSegment(text.slice(brandFirst.length), SEO_MAX_DOCUMENT_TITLE - brandFirst.length)
+  }
+  const brandLast = ` | ${BRAND}`
+  if (text.endsWith(brandLast)) {
+    const seg = text.slice(0, -brandLast.length)
+    return clampTitleSegment(seg, SEO_MAX_DOCUMENT_TITLE - brandLast.length) + brandLast
+  }
+  return clampAbsoluteDocumentTitle(text)
+}
+
 export function brandPageTitle(pageTitle: string): string {
-  return `${BRAND} | ${pageTitle}`
+  return clampSocialTitle(`${BRAND} | ${pageTitle}`)
 }
 
 /** Open Graph / Twitter title for articles (brand-last). */
 export function brandArticleOgTitle(postTitle: string): string {
-  return `${postTitle} | ${BRAND}`
+  return clampSocialTitle(`${postTitle} | ${BRAND}`)
 }
 
 interface PageSeoParams {
@@ -118,7 +162,13 @@ export function generateMetadata({
   keywords,
   openGraphType = 'website',
 }: PageSeoParams): Metadata {
-  const promoTitle = socialTitle ?? brandPageTitle(title)
+  const titleSegment = clampTitleSegment(title)
+  const safeTitle =
+    documentTitleAbsolute !== undefined
+      ? clampAbsoluteDocumentTitle(documentTitleAbsolute)
+      : titleSegment
+  const safeDescription = clampMetaDescription(description)
+  const promoTitle = clampSocialTitle(socialTitle ?? brandPageTitle(titleSegment))
   const url = canonicalUrl(path)
   const image = ogImage || `${BASE_URL}/og/default.png`
 
@@ -135,15 +185,15 @@ export function generateMetadata({
   return {
     title:
       documentTitleAbsolute !== undefined
-        ? { absolute: documentTitleAbsolute }
-        : title,
-    description,
+        ? { absolute: safeTitle }
+        : titleSegment,
+    description: safeDescription,
     ...(keywords !== undefined ? { keywords } : {}),
     alternates: { canonical: url },
     robots: robotsBlock,
     openGraph: {
       title: promoTitle,
-      description,
+      description: safeDescription,
       url,
       siteName: BRAND,
       images: [{ url: image, width: 1200, height: 630, alt: promoTitle }],
@@ -153,7 +203,7 @@ export function generateMetadata({
     twitter: {
       card: 'summary_large_image',
       title: promoTitle,
-      description,
+      description: safeDescription,
       images: [image],
     },
   }
@@ -176,11 +226,10 @@ export function authPageMetadata(input: Omit<PageSeoParams, 'noIndex' | 'noIndex
 export const PAGE_SEO = {
   home: generateMetadata({
     title: 'AI Mock Interviews',
-    // Pair the brand with its category so search engines learn the entity, not just the word.
-    documentTitleAbsolute: `${BRAND} — AI Mock Interview Platform for Campus Placements`,
-    socialTitle: brandPageTitle('AI Mock Interview Platform for Campus Placements'),
+    documentTitleAbsolute: `${BRAND} — AI Mock Interviews for Campus Placements`,
+    socialTitle: brandPageTitle('AI Mock Interviews for Campus Placements'),
     description:
-      'InterviewEra is an AI-powered mock interview platform for Indian campus placements. Upload your resume, get rubric-scored feedback across five dimensions, and track your improvement. Free to start.',
+      'AI mock interviews for Indian campus placements. Upload your resume, get rubric-scored feedback across five dimensions, and track improvement. Free to start.',
     path: '/',
   }),
   dashboard: generateMetadata({

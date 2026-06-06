@@ -13,7 +13,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const META_TITLE = "Why Good Students Don't Get Internships (And What Actually Works)";
+const META_TITLE = 'How to Get Internships in India';
 const META_DESCRIPTION =
   'Good students miss internships from weak signal and low applications — not missing skills. A guide to applications and interview preparation.';
 const ARTICLE_DESCRIPTION =

@@ -8,7 +8,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const SWE_META_TITLE = 'Top Interview Questions for Software Engineers (2026)';
+const SWE_META_TITLE = 'Top SWE Interview Questions (2026)';
 const SWE_CANONICAL_PATH = '/blog/top-interview-questions-for-software-engineers';
 const SWE_DATE = '2026-05-01';
 const ORIGIN = getCanonicalSiteOrigin();

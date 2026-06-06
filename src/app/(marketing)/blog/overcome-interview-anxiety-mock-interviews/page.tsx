@@ -13,7 +13,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { articleJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 
-const META_TITLE = 'Why You Freeze in Interviews — And How Mock Practice Fixes It';
+const META_TITLE = 'Beat Interview Anxiety with Mock Practice';
 const ARTICLE_DESCRIPTION =
   'Interview anxiety blocks strong answers — not knowledge. Learn why you freeze, how mock interviews retrain your brain, common mistakes to avoid, and a 7-day confidence plan.';
 const CANONICAL_PATH = '/blog/overcome-interview-anxiety-mock-interviews';

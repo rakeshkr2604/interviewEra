@@ -3,9 +3,9 @@ export const TOP_DSA_HERO_ALT =
   'Top DSA interview questions and topic map — arrays, hashing, trees, graphs, dynamic programming, and preparation roadmap for coding interviews in India'
 export const TOP_DSA_HERO_WIDTH = 1536
 export const TOP_DSA_HERO_HEIGHT = 1024
-export const TOP_DSA_META_TITLE = 'Top DSA Interview Questions & Topic Map (2026)'
+export const TOP_DSA_META_TITLE = 'Top DSA Interview Questions (2026)'
 export const TOP_DSA_DESCRIPTION =
-  'Complete DSA interview preparation guide for India 2026 — topic map, company-wise expectations, top 50 must-know problems, patterns, roadmap, and communication tips for campus and product company OAs.'
+  'DSA interview prep guide for India 2026 — topic map, company expectations, top 50 problems, patterns, roadmap, and communication tips for campus OAs.'
 export const TOP_DSA_CANONICAL_PATH = '/blog/top-dsa-interview-questions'
 export const TOP_DSA_PUBLISHED_DATE = '2026-05-01'
 export const TOP_DSA_LAST_UPDATED = '2026-06-06'

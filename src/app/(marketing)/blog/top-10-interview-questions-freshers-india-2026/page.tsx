@@ -10,7 +10,7 @@ import {
   siteConfig,
 } from '@/lib/seo/metadata';
 
-const TITLE = 'Top 10 Interview Questions for Freshers in India 2026 (With Sample Answers)';
+const TITLE = 'Top 10 Fresher Interview Questions (2026)';
 const DESCRIPTION =
   'Preparing for campus placements? Top 10 fresher interview questions with honest sample answers, common mistakes, and scoring tips.';
 const CANONICAL_PATH = '/blog/top-10-interview-questions-freshers-india-2026';
