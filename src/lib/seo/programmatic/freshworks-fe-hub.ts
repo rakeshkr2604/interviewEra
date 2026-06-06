@@ -10,6 +10,10 @@ export const FRESHWORKS_FE_PROCESS_ALT =
   'Freshworks Frontend Developer hiring process flow 2026: Application, Online Coding, Frontend Round 1, Frontend Round 2, HR Interview, and Offer'
 export const FRESHWORKS_FE_PROCESS_WIDTH = 1672
 export const FRESHWORKS_FE_PROCESS_HEIGHT = 941
+export const FRESHWORKS_FE_META_TITLE = 'Freshworks Frontend Interview Questions (2026)'
+export const FRESHWORKS_FE_CANONICAL_PATH = '/interview-questions/companies/freshworks/frontend-developer'
+export const FRESHWORKS_FE_DESCRIPTION =
+  'Freshworks frontend interview prep for India 2026: JavaScript, React, browser internals, CSS, performance, product thinking, hiring process, and model answers.'
 export const FRESHWORKS_FE_EDITORIAL_NOTE =
   'Content reviewed and updated for current Freshworks Frontend Developer hiring patterns — JavaScript depth, React component design, browser internals, CSS architecture, performance optimization, product thinking, and Chennai/Bengaluru product engineering expectations in India.'
 export const FRESHWORKS_FE_READING_TIME = '26 min read'

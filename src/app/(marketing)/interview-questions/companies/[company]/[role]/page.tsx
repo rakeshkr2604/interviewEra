@@ -102,6 +102,9 @@ import {
   FRESHWORKS_FE_HERO_PATH,
   FRESHWORKS_FE_HERO_WIDTH,
   FRESHWORKS_FE_LAST_UPDATED,
+  FRESHWORKS_FE_META_TITLE,
+  FRESHWORKS_FE_DESCRIPTION,
+  FRESHWORKS_FE_CANONICAL_PATH,
   FRESHWORKS_FE_PUBLISHED_DATE,
   FRESHWORKS_FE_AUTHOR_NAME,
   FRESHWORKS_FE_REVIEWED_DATE,
@@ -209,10 +212,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (isFreshworksFeHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
-      title: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
-      description:
-        'Freshworks Frontend Developer interview guide for India 2026: JavaScript, React, browser internals, CSS, performance optimization, product thinking, hiring process, 4-week roadmap, and expert answers.',
-      path: intersectionQuestionsPath(company.slug, role.slug),
+      title: FRESHWORKS_FE_META_TITLE,
+      description: FRESHWORKS_FE_DESCRIPTION,
+      path: FRESHWORKS_FE_CANONICAL_PATH,
       keywords: [
         'Freshworks Frontend Developer interview questions',
         'Freshworks frontend interview 2026',
@@ -254,7 +256,6 @@ const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-en
 const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
 const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
 const INFOSYS_SE_CANONICAL_PATH = '/interview-questions/companies/infosys/software-engineer'
-const FRESHWORKS_FE_CANONICAL_PATH = '/interview-questions/companies/freshworks/frontend-developer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -665,7 +666,7 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
             '@type': 'WebPage',
             '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
             url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
-            name: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
+            name: FRESHWORKS_FE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}#image` },
             mainEntity: { '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article` },
@@ -674,9 +675,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           {
             '@type': 'Article',
             '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article`,
-            headline: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
-            description:
-              'Freshworks Frontend Developer interview guide for India 2026: JavaScript, React, browser internals, CSS, performance optimization, product thinking, hiring process, 4-week roadmap, and expert answers.',
+            headline: FRESHWORKS_FE_META_TITLE,
+            description: FRESHWORKS_FE_DESCRIPTION,
             mainEntityOfPage: { '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH) },
             url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
             datePublished: FRESHWORKS_FE_PUBLISHED_DATE,
