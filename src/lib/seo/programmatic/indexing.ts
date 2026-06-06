@@ -69,6 +69,9 @@ export function isIntersectionIndexable(company: Company, role: Role): boolean {
   if (company.slug === 'infosys' && (role.slug === 'java-developer' || role.slug === 'software-engineer')) {
     return true
   }
+  if (company.slug === 'freshworks' && role.slug === 'frontend-developer') {
+    return true
+  }
   if (role.slug !== 'software-engineer') return false
   return company.slug === 'amazon' || company.slug === 'microsoft'
 }

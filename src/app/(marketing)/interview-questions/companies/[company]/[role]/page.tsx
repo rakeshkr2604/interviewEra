@@ -11,6 +11,7 @@ import { AmazonSeHubArticle } from '@/components/programmatic/AmazonSeHubArticle
 import { MicrosoftSeHubArticle } from '@/components/programmatic/MicrosoftSeHubArticle'
 import { InfosysJavaHubArticle } from '@/components/programmatic/InfosysJavaHubArticle'
 import { InfosysSeHubArticle } from '@/components/programmatic/InfosysSeHubArticle'
+import { FreshworksFeHubArticle } from '@/components/programmatic/FreshworksFeHubArticle'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
   getCompanyBySlug,
@@ -93,6 +94,24 @@ import {
   INFOSYS_SE_REVIEWED_DATE,
   INFOSYS_SE_REVIEWER_NAME,
 } from '@/lib/seo/programmatic/infosys-se-hub'
+import {
+  FRESHWORKS_FAQ_ITEMS,
+  FRESHWORKS_FE_HERO_ALT,
+  FRESHWORKS_FE_HERO_HEIGHT,
+  FRESHWORKS_FE_HERO_PATH,
+  FRESHWORKS_FE_HERO_WIDTH,
+  FRESHWORKS_FE_LAST_UPDATED,
+  FRESHWORKS_FE_PUBLISHED_DATE,
+  FRESHWORKS_FE_AUTHOR_NAME,
+  FRESHWORKS_FE_REVIEWED_DATE,
+  FRESHWORKS_FE_REVIEWER_NAME,
+  FRESHWORKS_FE_PROCESS_ALT,
+  FRESHWORKS_FE_PROCESS_HEIGHT,
+  FRESHWORKS_FE_PROCESS_PATH,
+  FRESHWORKS_FE_PROCESS_WIDTH,
+  FRESHWORKS_FE_QUESTIONS,
+  isFreshworksFrontendDeveloperHub,
+} from '@/lib/seo/programmatic/freshworks-fe-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildIntersectionPageLinks } from '@/lib/seo/internal-linking'
 import '../../../../blog/blog.css'
@@ -117,6 +136,10 @@ function isInfosysJavaDeveloperHub(companySlug: string, roleSlug: string): boole
 
 function isInfosysSoftwareEngineerHub(companySlug: string, roleSlug: string): boolean {
   return companySlug === 'infosys' && roleSlug === 'software-engineer'
+}
+
+function isFreshworksFeHub(companySlug: string, roleSlug: string): boolean {
+  return isFreshworksFrontendDeveloperHub(companySlug, roleSlug)
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -183,6 +206,25 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     })
   }
 
+  if (isFreshworksFeHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
+      description:
+        'Freshworks Frontend Developer interview guide for India 2026: JavaScript, React, browser internals, CSS, performance optimization, product thinking, hiring process, 4-week roadmap, and expert answers.',
+      path: intersectionQuestionsPath(company.slug, role.slug),
+      keywords: [
+        'Freshworks Frontend Developer interview questions',
+        'Freshworks frontend interview 2026',
+        'Freshworks React interview',
+        'Freshworks JavaScript interview',
+        'Freshworks frontend hiring process',
+        'Freshworks frontend developer India',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
   if (isMicrosoftSoftwareEngineerHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
       title: 'Microsoft Software Engineer Interview Questions and Answers (2026) — Top 10 Curated',
@@ -211,6 +253,7 @@ const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-en
 const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
 const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
 const INFOSYS_SE_CANONICAL_PATH = '/interview-questions/companies/infosys/software-engineer'
+const FRESHWORKS_FE_CANONICAL_PATH = '/interview-questions/companies/freshworks/frontend-developer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -224,7 +267,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
   const isMicrosoftHub = isMicrosoftSoftwareEngineerHub(company.slug, role.slug)
   const isInfosysJavaHub = isInfosysJavaDeveloperHub(company.slug, role.slug)
   const isInfosysSeHub = isInfosysSoftwareEngineerHub(company.slug, role.slug)
-  const isEditorialHub = isAmazonHub || isMicrosoftHub || isInfosysJavaHub || isInfosysSeHub
+  const isFreshworksFeHubPage = isFreshworksFeHub(company.slug, role.slug)
+  const isEditorialHub = isAmazonHub || isMicrosoftHub || isInfosysJavaHub || isInfosysSeHub || isFreshworksFeHubPage
   const questions = isAmazonHub
     ? getCompanyQuestionsFlat('amazon')
     : isMicrosoftHub
@@ -233,7 +277,9 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
         ? getCompanyQuestionsFlat('infosys')
         : isInfosysJavaHub
           ? getRoleQuestionsFlat('java-developer')
-          : getRoleQuestionsFlat(role.slug)
+          : isFreshworksFeHubPage
+            ? FRESHWORKS_FE_QUESTIONS
+            : getRoleQuestionsFlat(role.slug)
   const faqPairs = buildFaqPairs(questions)
 
   const BREADCRUMB_LD = breadcrumbListJsonLd(
@@ -248,7 +294,9 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
         ? faqPageJsonLd([...INFOSYS_SE_FAQ_ITEMS])
         : isInfosysJavaHub
           ? faqPageJsonLd([...INFOSYS_FAQ_ITEMS])
-          : faqPairs.length > 0
+          : isFreshworksFeHubPage
+            ? faqPageJsonLd([...FRESHWORKS_FAQ_ITEMS])
+            : faqPairs.length > 0
           ? faqPageJsonLd(faqPairs)
           : null
 
@@ -564,6 +612,84 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
+  const FRESHWORKS_FE_PAGE_LD = isFreshworksFeHubPage
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#freshworks-fe-author`,
+            name: FRESHWORKS_FE_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#freshworks-fe-reviewer`,
+            name: FRESHWORKS_FE_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}#image`,
+            url: `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}`,
+            caption: FRESHWORKS_FE_HERO_ALT,
+            width: FRESHWORKS_FE_HERO_WIDTH,
+            height: FRESHWORKS_FE_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${FRESHWORKS_FE_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${FRESHWORKS_FE_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${FRESHWORKS_FE_PROCESS_PATH}`,
+            caption: FRESHWORKS_FE_PROCESS_ALT,
+            width: FRESHWORKS_FE_PROCESS_WIDTH,
+            height: FRESHWORKS_FE_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
+            url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
+            name: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article`,
+            headline: 'Freshworks Frontend Developer Interview Questions and Answers (2026)',
+            description:
+              'Freshworks Frontend Developer interview guide for India 2026: JavaScript, React, browser internals, CSS, performance optimization, product thinking, hiring process, 4-week roadmap, and expert answers.',
+            mainEntityOfPage: { '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH) },
+            url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
+            datePublished: FRESHWORKS_FE_PUBLISHED_DATE,
+            dateModified: FRESHWORKS_FE_LAST_UPDATED,
+            dateReviewed: FRESHWORKS_FE_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#freshworks-fe-author` },
+            reviewedBy: { '@id': `${ORIGIN}#freshworks-fe-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}#image` },
+          },
+        ],
+      }
+    : null
+
   const ITEM_LIST_LD =
     isEditorialHub && questions.length > 0
       ? {
@@ -594,6 +720,7 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       {MICROSOFT_PAGE_LD ? <JsonLdScript id="intersection-microsoft-page-ld" data={MICROSOFT_PAGE_LD} /> : null}
       {INFOSYS_JAVA_PAGE_LD ? <JsonLdScript id="intersection-infosys-java-page-ld" data={INFOSYS_JAVA_PAGE_LD} /> : null}
       {INFOSYS_SE_PAGE_LD ? <JsonLdScript id="intersection-infosys-se-page-ld" data={INFOSYS_SE_PAGE_LD} /> : null}
+      {FRESHWORKS_FE_PAGE_LD ? <JsonLdScript id="intersection-freshworks-fe-page-ld" data={FRESHWORKS_FE_PAGE_LD} /> : null}
 
       {isAmazonHub ? (
         <AmazonSeHubArticle company={company} role={role} questions={questions} />
@@ -603,6 +730,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
         <InfosysSeHubArticle company={company} role={role} questions={questions} />
       ) : isInfosysJavaHub ? (
         <InfosysJavaHubArticle company={company} role={role} questions={questions} />
+      ) : isFreshworksFeHubPage ? (
+        <FreshworksFeHubArticle company={company} role={role} questions={questions} />
       ) : (
         <>
           <section

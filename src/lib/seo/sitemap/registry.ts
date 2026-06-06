@@ -28,6 +28,7 @@ import {
   isIntersectionIndexable,
 } from '@/lib/seo/programmatic/indexing';
 import { getRoleBySlug, getCompanyBySlug } from '@/lib/seo/programmatic';
+import { FRESHWORKS_FE_LAST_UPDATED } from '@/lib/seo/programmatic/freshworks-fe-hub';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
 export type SitemapSourceEntry = {
@@ -204,11 +205,16 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     const company = getCompanyBySlug(pair.company)
     const role = getRoleBySlug(pair.role)
     if (!company || !role || !isIntersectionIndexable(company, role)) continue
+    const intersectionKey = `${pair.company}:${pair.role}`
+    const lastModified =
+      intersectionKey === 'freshworks:frontend-developer'
+        ? FRESHWORKS_FE_LAST_UPDATED
+        : QUESTIONS_FALLBACK_DATE
     entries.push({
       url: canonicalUrl(
         intersectionQuestionsPath(pair.company as CompanySlug, pair.role as RoleSlug),
       ),
-      lastModified: QUESTIONS_FALLBACK_DATE,
+      lastModified,
       changeFrequency: 'monthly',
       priority: 0.78,
     })
