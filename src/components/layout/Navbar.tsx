@@ -81,12 +81,6 @@ const PRODUCT_ITEMS = [
     desc: 'Adaptive interview, live captions, scoring',
   },
   {
-    icon: Building2,
-    label: 'Campus Placements',
-    href: '/campus',
-    desc: 'Batch training + T&P analytics',
-  },
-  {
     icon: TrendingUp,
     label: 'Resume-aware Scoring',
     href: '/about',
@@ -144,6 +138,12 @@ const TOOLS_ITEMS = [
 
 const RESOURCES_ITEMS = [
   {
+    icon: Layers,
+    label: 'All Resources',
+    href: '/resources',
+    desc: 'Central guide and hub directory',
+  },
+  {
     icon: BookOpen,
     label: 'Blog',
     href: '/blog',
@@ -166,6 +166,30 @@ const RESOURCES_ITEMS = [
     label: 'Help Center',
     href: '/help-center',
     desc: 'Guides, FAQs, and support',
+  },
+  {
+    icon: Code2,
+    label: 'DSA Topic Map',
+    href: '/blog/top-dsa-interview-questions',
+    desc: 'Patterns, roadmap, and top 50 problems',
+  },
+  {
+    icon: Code2,
+    label: 'Software Engineer Guide',
+    href: '/interview-questions/software-engineer',
+    desc: 'SWE questions and prep hub',
+  },
+  {
+    icon: Monitor,
+    label: 'Android Guide',
+    href: '/interview-questions/android-developer',
+    desc: 'Kotlin, Compose, MVVM prep hub',
+  },
+  {
+    icon: Monitor,
+    label: 'Frontend Guide',
+    href: '/interview-questions/frontend-developer',
+    desc: 'React and JavaScript interviews',
   },
 ] as const;
 
@@ -260,10 +284,12 @@ function NavHoverMenu({
   label,
   items,
   onNavigate,
+  columns = 1,
 }: {
   label: string;
   items: readonly DropItem[];
   onNavigate?: () => void;
+  columns?: 1 | 2;
 }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -278,6 +304,42 @@ function NavHoverMenu({
   }, []);
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
+
+  const menuItem = ({ icon: Icon, label: itemLabel, href, desc }: DropItem) => (
+    <Link
+      key={href + itemLabel}
+      href={href}
+      role="menuitem"
+      onClick={() => {
+        setOpen(false);
+        onNavigate?.();
+      }}
+      className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]"
+    >
+      <span
+        className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg"
+        style={{
+          background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+          color: 'var(--accent-primary)',
+        }}
+        aria-hidden
+      >
+        <Icon className="size-3.5" />
+      </span>
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+          {itemLabel}
+        </span>
+        <span className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
+          {desc}
+        </span>
+      </span>
+    </Link>
+  );
+
+  const splitAt = columns === 2 ? Math.ceil(items.length / 2) : items.length;
+  const leftItems = items.slice(0, splitAt);
+  const rightItems = columns === 2 ? items.slice(splitAt) : [];
 
   return (
     <div
@@ -309,7 +371,8 @@ function NavHoverMenu({
         role="menu"
         aria-label={`${label} menu`}
         className={cn(
-          'absolute left-0 top-[calc(100%+6px)] z-50 min-w-71 rounded-xl border p-1.5 shadow-xl',
+          'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border p-1.5 shadow-xl',
+          columns === 2 ? 'flex min-w-[36rem] gap-0.5' : 'min-w-71',
           'transition-[opacity,transform] duration-150 ease-out',
           open
             ? 'pointer-events-auto opacity-100 translate-y-0'
@@ -322,37 +385,19 @@ function NavHoverMenu({
           WebkitBackdropFilter: 'blur(20px)',
         }}
       >
-        {items.map(({ icon: Icon, label: itemLabel, href, desc }) => (
-          <Link
-            key={href + itemLabel}
-            href={href}
-            role="menuitem"
-            onClick={() => {
-              setOpen(false);
-              onNavigate?.();
-            }}
-            className="group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]"
-          >
-            <span
-              className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg"
-              style={{
-                background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-                color: 'var(--accent-primary)',
-              }}
+        {columns === 2 ? (
+          <>
+            <div className="min-w-0 flex-1">{leftItems.map(menuItem)}</div>
+            <div
+              className="mx-0.5 w-px shrink-0 self-stretch"
+              style={{ background: 'var(--card-border)' }}
               aria-hidden
-            >
-              <Icon className="size-3.5" />
-            </span>
-            <span className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                {itemLabel}
-              </span>
-              <span className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
-                {desc}
-              </span>
-            </span>
-          </Link>
-        ))}
+            />
+            <div className="min-w-0 flex-1">{rightItems.map(menuItem)}</div>
+          </>
+        ) : (
+          items.map(menuItem)
+        )}
       </div>
     </div>
   );
@@ -536,6 +581,8 @@ function AnonymousNav() {
 
   const MOBILE_LINKS = [
     { href: '/how-it-works', label: 'How It Works' },
+    { href: '/campus', label: 'Campus' },
+    { href: '/resources', label: 'Resources' },
     { href: '/interview-questions', label: 'Interview Questions' },
     { href: '/tools/question-generator', label: 'Tools' },
     { href: '/blog', label: 'Blog' },
@@ -548,12 +595,18 @@ function AnonymousNav() {
       {/* Logo */}
       <BrandHomeLink variant="navbar" className="mr-2 shrink-0" />
 
-      {/* Desktop: Product / Interview Questions / Tools / Resources / Pricing */}
+      {/* Desktop: Product / Campus / Interview Questions / Tools / Resources / Pricing */}
       <div className="hidden items-center gap-0.5 md:flex">
         <NavHoverMenu label="Product" items={PRODUCT_ITEMS} />
+        <Link
+          href="/campus"
+          className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-(--text-secondary) transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] hover:text-(--text-primary)"
+        >
+          Campus
+        </Link>
         <NavHoverMenu label="Interview Questions" items={INTERVIEW_QUESTIONS_ITEMS} />
         <NavHoverMenu label="Tools" items={TOOLS_ITEMS} />
-        <NavHoverMenu label="Resources" items={RESOURCES_ITEMS} />
+        <NavHoverMenu label="Resources" items={RESOURCES_ITEMS} columns={2} />
         <Link
           href="/pricing"
           className="flex h-9 items-center rounded-lg px-3 text-sm font-medium text-(--text-secondary) transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] hover:text-(--text-primary)"
@@ -604,13 +657,16 @@ function AnonymousNav() {
           </SheetTrigger>
           <SheetContent
             side="right"
-            className="w-[min(100%,20rem)] gap-0 border-l border-border p-0 sm:max-w-sm"
+            className="flex w-[min(100%,20rem)] max-h-[100dvh] flex-col gap-0 overflow-hidden border-l border-border p-0 sm:max-w-sm"
           >
-            <SheetHeader className="border-b border-border px-4 py-4 text-left">
+            <SheetHeader className="shrink-0 border-b border-border px-4 py-4 text-left">
               <SheetTitle className="sr-only">Navigation menu</SheetTitle>
               <BrandHomeLink variant="navbar" compact wordmarkClassName="text-base" />
             </SheetHeader>
-            <nav aria-label="Mobile navigation" className="flex flex-col p-2">
+            <nav
+              aria-label="Mobile navigation"
+              className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-2 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            >
               {MOBILE_LINKS.map(({ href, label }) => (
                 <Link
                   key={href}

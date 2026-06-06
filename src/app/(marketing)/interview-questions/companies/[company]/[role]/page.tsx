@@ -7,6 +7,7 @@ import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
 import { schemaIds } from '@/lib/seo/metadata'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
+import { RelatedGuidesSection } from '@/components/content/RelatedGuidesSection'
 import { AmazonSeHubArticle } from '@/components/programmatic/AmazonSeHubArticle'
 import { MicrosoftSeHubArticle } from '@/components/programmatic/MicrosoftSeHubArticle'
 import { InfosysJavaHubArticle } from '@/components/programmatic/InfosysJavaHubArticle'
@@ -829,6 +830,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           </div>
         </div>
       </section>
+
+      <RelatedGuidesSection path={intersectionQuestionsPath(company.slug, role.slug)} />
 
       {linkSections.map((section) => (
         <SeoCrossLinksSection

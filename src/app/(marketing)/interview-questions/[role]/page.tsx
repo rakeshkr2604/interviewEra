@@ -6,6 +6,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript'
 import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld'
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
+import { RelatedGuidesSection } from '@/components/content/RelatedGuidesSection'
 import { BaCompanyProcessSection } from '@/components/programmatic/BaCompanyProcessSection'
 import { BaTableOfContents } from '@/components/programmatic/BaTableOfContents'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
@@ -1712,6 +1713,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
       </section>
 
       {/* ── Engine-driven cross-link sections ────────────────────────────── */}
+      <RelatedGuidesSection path={`/interview-questions/${role.slug}`} />
       {linkSections.map((section) =>
         isEditorialHub ? (
           <div key={section.heading} className={BA_SHELL_CLASS}>

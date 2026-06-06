@@ -2,6 +2,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import {
+  FOOTER_INTERVIEW_QUESTIONS_LINKS,
+  FOOTER_RESOURCES_LINKS,
+} from '@/lib/seo/content/nav';
 import { siteConfig } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
@@ -20,20 +24,9 @@ const TOOLS_LINKS = [
   { href: '/tools/star-builder', label: 'STAR Answer Builder' },
 ] as const;
 
-const QUESTIONS_LINKS = [
-  { href: '/interview-questions', label: 'Browse All Questions' },
-  { href: '/interview-questions/software-engineer', label: 'Software Engineer' },
-  { href: '/interview-questions/companies/tcs', label: 'TCS Questions' },
-  { href: '/interview-questions/topics/react', label: 'React Questions' },
-] as const;
+const QUESTIONS_LINKS = FOOTER_INTERVIEW_QUESTIONS_LINKS;
 
-const RESOURCES_LINKS = [
-  { href: '/blog', label: 'Blog' },
-  { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
-  { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },
-  { href: '/blog/top-10-interview-questions-freshers-india-2026', label: 'Fresher Interview Tips' },
-  { href: '/help', label: 'FAQ' },
-] as const;
+const RESOURCES_LINKS = FOOTER_RESOURCES_LINKS;
 
 /** Company column — rendered separately so the Razorpay trust chip can sit inline under Pricing. */
 const COMPANY_LINKS = [
