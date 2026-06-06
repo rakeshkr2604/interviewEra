@@ -69,6 +69,9 @@ import {
   INFOSYS_JAVA_HERO_HEIGHT,
   INFOSYS_JAVA_HERO_PATH,
   INFOSYS_JAVA_HERO_WIDTH,
+  INFOSYS_JAVA_META_TITLE,
+  INFOSYS_JAVA_DESCRIPTION,
+  INFOSYS_JAVA_CANONICAL_PATH,
   INFOSYS_JAVA_LAST_UPDATED,
   INFOSYS_JAVA_PUBLISHED_DATE,
   INFOSYS_JAVA_AUTHOR_NAME,
@@ -195,10 +198,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (isInfosysJavaDeveloperHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
-      title: 'Infosys Java Developer Interview Questions and Answers (2026)',
-      description:
-        'Infosys Java Developer interview guide for India 2026: InfyTQ, HackWithInfy, Core Java, Spring Boot, microservices, coding round strategy, 4-week roadmap, and expert answers.',
-      path: intersectionQuestionsPath(company.slug, role.slug),
+      title: INFOSYS_JAVA_META_TITLE,
+      description: INFOSYS_JAVA_DESCRIPTION,
+      path: INFOSYS_JAVA_CANONICAL_PATH,
       keywords: [
         'Infosys Java Developer interview questions',
         'Infosys Java interview 2026',
@@ -256,7 +258,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 const ORIGIN = getCanonicalSiteOrigin()
 const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
 const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
-const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -511,7 +512,7 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
             '@type': 'WebPage',
             '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
             url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
-            name: 'Infosys Java Developer Interview Questions and Answers (2026)',
+            name: INFOSYS_JAVA_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}#image` },
             mainEntity: { '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article` },
@@ -520,9 +521,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           {
             '@type': 'Article',
             '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article`,
-            headline: 'Infosys Java Developer Interview Questions and Answers (2026)',
-            description:
-              'Infosys Java Developer interview guide for India 2026: InfyTQ, HackWithInfy, Core Java, Spring Boot, microservices, coding round strategy, 4-week roadmap, and expert answers.',
+            headline: INFOSYS_JAVA_META_TITLE,
+            description: INFOSYS_JAVA_DESCRIPTION,
             mainEntityOfPage: { '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH) },
             url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
             datePublished: INFOSYS_JAVA_PUBLISHED_DATE,

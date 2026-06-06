@@ -8,6 +8,10 @@ export const INFOSYS_JAVA_PROCESS_ALT =
   'Infosys Java Developer interview process flow 2026: Application, InfyTQ, Coding Assessment, Technical Round, HR Round, and Offer'
 export const INFOSYS_JAVA_PROCESS_WIDTH = 1672
 export const INFOSYS_JAVA_PROCESS_HEIGHT = 941
+export const INFOSYS_JAVA_META_TITLE = 'Infosys Java Developer Questions (2026)'
+export const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
+export const INFOSYS_JAVA_DESCRIPTION =
+  'Infosys Java interview prep for India 2026: InfyTQ, Core Java, Spring Boot, microservices, coding strategy, and expert model answers.'
 export const INFOSYS_JAVA_EDITORIAL_NOTE =
   'Content reviewed and updated for current Infosys Java Developer hiring patterns — InfyTQ, HackWithInfy, JVM internals, Spring Boot layered architecture, microservices topology, hiring process diagram, and fresher placement expectations in India.'
 export const INFOSYS_JAVA_READING_TIME = '28 min read'
