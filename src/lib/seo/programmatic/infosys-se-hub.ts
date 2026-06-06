@@ -8,6 +8,10 @@ export const INFOSYS_SE_PROCESS_ALT =
   'Infosys Software Engineer interview process flow 2026: Application, InfyTQ, Coding Assessment, Technical Interview, HR Round, and Offer'
 export const INFOSYS_SE_PROCESS_WIDTH = 1672
 export const INFOSYS_SE_PROCESS_HEIGHT = 941
+export const INFOSYS_SE_META_TITLE = 'Infosys Software Engineer Questions (2026)'
+export const INFOSYS_SE_CANONICAL_PATH = '/interview-questions/companies/infosys/software-engineer'
+export const INFOSYS_SE_DESCRIPTION =
+  'Infosys SE interview prep for India 2026: InfyTQ, HackWithInfy, aptitude, DSA, technical rounds, HR prep, and expert model answers.'
 export const INFOSYS_SE_EDITORIAL_NOTE =
   'Content reviewed and updated for current Infosys Software Engineer hiring patterns — InfyTQ, HackWithInfy, fresher selection criteria, project discussion depth, aptitude and coding assessments, Core CS technical rounds, hiring process diagram, HR evaluation, and placement expectations in India.'
 export const INFOSYS_SE_READING_TIME = '28 min read'

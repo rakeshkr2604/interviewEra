@@ -89,6 +89,9 @@ import {
   INFOSYS_SE_PROCESS_HEIGHT,
   INFOSYS_SE_PROCESS_PATH,
   INFOSYS_SE_PROCESS_WIDTH,
+  INFOSYS_SE_META_TITLE,
+  INFOSYS_SE_DESCRIPTION,
+  INFOSYS_SE_CANONICAL_PATH,
   INFOSYS_SE_LAST_UPDATED,
   INFOSYS_SE_PUBLISHED_DATE,
   INFOSYS_SE_AUTHOR_NAME,
@@ -173,10 +176,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   if (isInfosysSoftwareEngineerHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
-      title: 'Infosys Software Engineer Interview Questions and Answers (2026)',
-      description:
-        'Infosys Software Engineer interview guide for India 2026: InfyTQ, HackWithInfy, aptitude, DSA, Core CS technical rounds, HR prep, 4-week roadmap, and expert answers.',
-      path: intersectionQuestionsPath(company.slug, role.slug),
+      title: INFOSYS_SE_META_TITLE,
+      description: INFOSYS_SE_DESCRIPTION,
+      path: INFOSYS_SE_CANONICAL_PATH,
       keywords: [
         'Infosys Software Engineer interview questions',
         'Infosys SE interview 2026',
@@ -255,7 +257,6 @@ const ORIGIN = getCanonicalSiteOrigin()
 const AMAZON_CANONICAL_PATH = '/interview-questions/companies/amazon/software-engineer'
 const MICROSOFT_CANONICAL_PATH = '/interview-questions/companies/microsoft/software-engineer'
 const INFOSYS_JAVA_CANONICAL_PATH = '/interview-questions/companies/infosys/java-developer'
-const INFOSYS_SE_CANONICAL_PATH = '/interview-questions/companies/infosys/software-engineer'
 const HUB_SHELL_CLASS =
   'ie-blog-prose ie-blog-prose--interview-anxiety ie-role-ba-shell mx-auto w-full px-4 sm:px-5'
 
@@ -588,7 +589,7 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
             '@type': 'WebPage',
             '@id': canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
             url: canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
-            name: 'Infosys Software Engineer Interview Questions and Answers (2026)',
+            name: INFOSYS_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${INFOSYS_SE_HERO_PATH}#image` },
             mainEntity: { '@id': `${canonicalUrl(INFOSYS_SE_CANONICAL_PATH)}#article` },
@@ -597,9 +598,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           {
             '@type': 'Article',
             '@id': `${canonicalUrl(INFOSYS_SE_CANONICAL_PATH)}#article`,
-            headline: 'Infosys Software Engineer Interview Questions and Answers (2026)',
-            description:
-              'Infosys Software Engineer interview guide for India 2026: InfyTQ, HackWithInfy, aptitude, DSA, Core CS technical rounds, HR prep, 4-week roadmap, and expert answers.',
+            headline: INFOSYS_SE_META_TITLE,
+            description: INFOSYS_SE_DESCRIPTION,
             mainEntityOfPage: { '@id': canonicalUrl(INFOSYS_SE_CANONICAL_PATH) },
             url: canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
             datePublished: INFOSYS_SE_PUBLISHED_DATE,
