@@ -12,10 +12,10 @@ export const ANDROID_PROCESS_ALT =
 export const ANDROID_PROCESS_WIDTH = 1774
 export const ANDROID_PROCESS_HEIGHT = 887
 
-export const ANDROID_META_TITLE = 'Android Developer Interview Questions and Answers (2026)'
+export const ANDROID_META_TITLE = 'Android Developer Interview Questions (2026)'
 export const ANDROID_CANONICAL_PATH = '/interview-questions/android-developer'
 export const ANDROID_DESCRIPTION =
-  'Complete Android interview preparation guide for India 2026 — hiring process, Kotlin, Jetpack Compose, MVVM, coroutines, system design, project discussion, 4-week roadmap, and expert answers.'
+  'Android interview prep for India 2026: Kotlin, Jetpack Compose, MVVM, coroutines, system design, hiring process, 4-week roadmap, and expert model answers.'
 export const ANDROID_PUBLISHED_DATE = '2026-05-21'
 export const ANDROID_LAST_UPDATED = '2026-06-06'
 export const ANDROID_REVIEWED_DATE = '2026-06-06'
