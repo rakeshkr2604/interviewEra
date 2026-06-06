@@ -17,7 +17,8 @@ export function BlogEditorialHeader({
   titleAccent?: string;
   /** Single-line H1 when not using split lines */
   singleTitle?: string;
-  description: string;
+  /** Omitted when hero image already carries the deck copy. */
+  description?: string;
   readTime: string;
   updatedLabel: string;
   heroSrc: string;
@@ -32,7 +33,7 @@ export function BlogEditorialHeader({
         >
           {category}
         </p>
-        <h1 className="ie-blog-article-h1">
+        <h1 className={`ie-blog-article-h1${singleTitle ? ' ie-blog-article-h1--single' : ''}`}>
           {singleTitle ? (
             singleTitle
           ) : (
@@ -42,7 +43,7 @@ export function BlogEditorialHeader({
             </>
           )}
         </h1>
-        <p className="ie-blog-article-deck">{description}</p>
+        {description ? <p className="ie-blog-article-deck">{description}</p> : null}
         <div
           className="ie-blog-article-meta flex flex-wrap gap-2 text-sm"
           style={{ color: 'var(--text-muted)' }}
@@ -61,13 +62,16 @@ export function BlogEditorialHeader({
 
 export function BlogEditorialToc({
   sections,
+  twoColumnList = false,
 }: {
   sections: readonly { id: string; label: string }[];
+  /** Split link list into two columns on sm+ (wider TOCs). */
+  twoColumnList?: boolean;
 }) {
   return (
     <nav className="ie-blog-toc-compact" aria-label="Quick navigation">
       <p className="ie-blog-toc-compact__label">Quick Navigation</p>
-      <ul className="ie-blog-toc-compact__list">
+      <ul className={`ie-blog-toc-compact__list${twoColumnList ? ' ie-blog-toc-compact__list--2col' : ''}`}>
         {sections.map(({ id, label }) => (
           <li key={id}>
             <a href={`#${id}`} className="ie-blog-inline-link">

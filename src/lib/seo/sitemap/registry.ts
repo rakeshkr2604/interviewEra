@@ -29,6 +29,7 @@ import {
 } from '@/lib/seo/programmatic/indexing';
 import { getRoleBySlug, getCompanyBySlug } from '@/lib/seo/programmatic';
 import { FRESHWORKS_FE_LAST_UPDATED } from '@/lib/seo/programmatic/freshworks-fe-hub';
+import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
 export type SitemapSourceEntry = {
@@ -98,7 +99,7 @@ export const BLOG_POST_ROUTES: SitemapSourceEntry[] = [
     path: '/blog/top-dsa-interview-questions',
     changeFrequency: 'monthly',
     priority: 0.8,
-    lastModified: '2026-05-01',
+    lastModified: TOP_DSA_LAST_UPDATED,
   },
   {
     path: '/blog/hr-interview-answer-tips-and-tricks',
