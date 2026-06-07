@@ -5,6 +5,7 @@ import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import {
   FOOTER_INTERVIEW_QUESTIONS_LINKS,
   FOOTER_RESOURCES_LINKS,
+  NAV_TOOLS_LINKS,
 } from '@/lib/seo/content/nav';
 import { siteConfig } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
@@ -18,11 +19,7 @@ const PRODUCT_LINKS = [
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 
-const TOOLS_LINKS = [
-  { href: '/tools/question-generator', label: 'Question Generator' },
-  { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
-  { href: '/tools/star-builder', label: 'STAR Answer Builder' },
-] as const;
+const TOOLS_LINKS = NAV_TOOLS_LINKS;
 
 const QUESTIONS_LINKS = FOOTER_INTERVIEW_QUESTIONS_LINKS;
 

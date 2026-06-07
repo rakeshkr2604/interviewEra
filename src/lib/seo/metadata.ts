@@ -253,7 +253,7 @@ export const PAGE_SEO = {
   questionGenerator: generateMetadata({
     title: 'Free Interview Question Generator',
     description:
-      'Generate role-specific interview questions instantly. Free tool for placement preparation — no signup required.',
+      'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. No sign-up.',
     path: '/tools/question-generator',
   }),
   atsChecker: generateMetadata({

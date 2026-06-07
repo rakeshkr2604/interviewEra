@@ -50,6 +50,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { NAV_TOOLS_ITEMS, NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
 import { cn } from '@/lib/utils';
 import type { PlanTier } from '@/types/app.types';
 
@@ -115,26 +116,14 @@ const INTERVIEW_QUESTIONS_ITEMS = [
   },
 ] as const;
 
-const TOOLS_ITEMS = [
-  {
-    icon: Sparkles,
-    label: 'Question Generator',
-    href: '/tools/question-generator',
-    desc: 'Role-specific questions in seconds',
-  },
-  {
-    icon: Shield,
-    label: 'ATS Resume Checker',
-    href: '/tools/ats-checker',
-    desc: 'Score your resume against job roles',
-  },
-  {
-    icon: Award,
-    label: 'STAR Answer Builder',
-    href: '/tools/star-builder',
-    desc: 'Structure behavioral answers clearly',
-  },
-] as const;
+const TOOL_ICONS = [Sparkles, Shield, Award] as const;
+
+const TOOLS_ITEMS = NAV_TOOLS_ITEMS.map((item, index) => ({
+  icon: TOOL_ICONS[index],
+  label: item.label,
+  href: item.href,
+  desc: item.desc,
+})) as readonly DropItem[];
 
 const RESOURCES_ITEMS = [
   {
@@ -584,7 +573,7 @@ function AnonymousNav() {
     { href: '/campus', label: 'Campus' },
     { href: '/resources', label: 'Resources' },
     { href: '/interview-questions', label: 'Interview Questions' },
-    { href: '/tools/question-generator', label: 'Tools' },
+    ...NAV_TOOLS_LINKS,
     { href: '/blog', label: 'Blog' },
     { href: '/help-center', label: 'Help Center' },
     { href: '/pricing', label: 'Pricing' },

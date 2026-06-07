@@ -11,7 +11,7 @@ export type SeoTextLink = {
 export const HOME_MONEY_PAGE_LINKS: SeoTextLink[] = [
   { href: '/pricing', label: 'Pricing & credits' },
   { href: '/campus', label: 'Campus placements' },
-  { href: '/tools/question-generator', label: 'Free question generator' },
+  { href: '/tools/question-generator', label: 'Interview Question Generator' },
   { href: '/tools/ats-checker', label: 'ATS resume checker' },
   { href: '/tools/star-builder', label: 'STAR answer builder' },
   { href: '/blog', label: 'Interview prep blog' },

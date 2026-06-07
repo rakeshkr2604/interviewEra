@@ -16,6 +16,7 @@ import {
   ANDROID_HERO_HEIGHT,
   ANDROID_HERO_PATH,
   ANDROID_HERO_WIDTH,
+  ANDROID_HERO_LEAD,
   ANDROID_HIRING_STEPS,
   ANDROID_JETPACK_TOPICS,
   ANDROID_KOTLIN_TOPICS,
@@ -125,6 +126,25 @@ export function AndroidDeveloperHubArticle({
             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
               Updated 2026 · {ANDROID_READING_TIME}
             </span>
+          </div>
+          <p className="mt-5 max-w-3xl text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
+            {ANDROID_HERO_LEAD}
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3 lg:justify-start">
+            <Link
+              href="#android-questions"
+              className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
+              style={{ background: 'var(--accent-primary)', color: '#fff' }}
+            >
+              Browse {questions.length} interview questions
+            </Link>
+            <Link
+              href="/tools/question-generator/android-developer"
+              className="inline-flex items-center justify-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
+              style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+            >
+              Generate Android questions free
+            </Link>
           </div>
         </div>
 
@@ -565,7 +585,7 @@ export function AndroidDeveloperHubArticle({
           sectionId="android-questions"
           headingId="android-questions"
           questions={questions}
-          heading={`${role.label} Interview Questions`}
+          heading={`${role.label} Interview Questions with Answers`}
           expanded
           metaLabel={`${questions.length} curated · Kotlin & Jetpack · Updated 2026`}
         />

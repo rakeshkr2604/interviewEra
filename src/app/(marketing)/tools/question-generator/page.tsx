@@ -3,21 +3,33 @@ import Link from 'next/link';
 import { Sparkles, Zap, ShieldCheck, ListChecks } from 'lucide-react';
 import { generateMetadata, brandPageTitle, schemaIds } from '@/lib/seo/metadata';
 import { JsonLdScript } from '@/components/seo/JsonLdScript';
-import { webApplicationJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { webApplicationJsonLd, breadcrumbListJsonLd, faqPageJsonLd, howToJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 import { QuestionGeneratorForm } from './QuestionGeneratorForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
+import {
+  QGEN_FAQ_ITEMS,
+  QuestionGeneratorSeoSections,
+} from './QuestionGeneratorSeoSections';
 
 const QGEN_OG_TITLE = 'Free Interview Question Generator';
 
 export const metadata: Metadata = generateMetadata({
   title: QGEN_OG_TITLE,
   description:
-    'Get 10 role-specific interview questions in 10 seconds — no sign-up required. Tailored by role, experience level, and domain.',
+    'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. No sign-up.',
   path: '/tools/question-generator',
   socialTitle: brandPageTitle(QGEN_OG_TITLE),
-  keywords:
-    'interview question generator, free interview questions, placement interview questions, technical interview questions, HR interview questions, mock interview preparation',
+  keywords: [
+    'interview question generator',
+    'interview questions generator',
+    'random interview question generator',
+    'free interview questions',
+    'placement interview questions',
+    'technical interview questions',
+    'HR interview questions',
+    'mock interview preparation',
+  ],
 });
 
 const ORIGIN = getCanonicalSiteOrigin();
@@ -37,6 +49,31 @@ const QGEN_BREADCRUMB_LD = breadcrumbListJsonLd(
     { name: 'Interview Question Generator', path: '/tools/question-generator' },
   ],
   ORIGIN,
+);
+
+const QGEN_FAQ_LD = faqPageJsonLd([...QGEN_FAQ_ITEMS]);
+
+const QGEN_HOWTO_LD = howToJsonLd(
+  'How to use the free interview question generator',
+  'Generate random or role-specific interview questions in seconds — free, no sign-up required.',
+  [
+    {
+      name: 'Pick your role',
+      text: 'Enter a job title or choose from popular roles like Software Engineer or Android Developer.',
+    },
+    {
+      name: 'Set experience and domain',
+      text: 'Optional filters sharpen technical vs behavioral mix for your target interview.',
+    },
+    {
+      name: 'Generate 10 questions',
+      text: 'Get a fresh set of interview questions in under 10 seconds.',
+    },
+    {
+      name: 'Practise your answers',
+      text: 'Work through each question aloud using STAR for behavioral prompts.',
+    },
+  ],
 );
 
 const BULLETS = [
@@ -62,11 +99,13 @@ export default function QuestionGeneratorPage() {
     <>
       <JsonLdScript id="qgen-webapp-ld" data={QGEN_WEBAPP_LD} />
       <JsonLdScript id="qgen-breadcrumb-ld" data={QGEN_BREADCRUMB_LD} />
+      <JsonLdScript id="qgen-faq-ld" data={QGEN_FAQ_LD} />
+      <JsonLdScript id="qgen-howto-ld" data={QGEN_HOWTO_LD} />
       <FreeToolPageLayout
         eyebrow="Free tool · no sign-up"
         eyebrowIcon={Sparkles}
-        title="Interview questions built for your exact role"
-        description="Enter a role, pick experience and domain, and get ten ready-to-practice questions in seconds — no sign-up."
+        title="Free Interview Question Generator"
+        description="Generate random or role-specific interview questions in seconds — tailored by role, experience level, and domain. No sign-up required."
         bullets={BULLETS}
         footerSlot={
           <p
@@ -94,6 +133,7 @@ export default function QuestionGeneratorPage() {
       >
         <QuestionGeneratorForm />
       </FreeToolPageLayout>
+      <QuestionGeneratorSeoSections />
     </>
   );
 }

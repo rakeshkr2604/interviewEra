@@ -10,6 +10,30 @@ export type NavResourceItem = {
   desc: string
 }
 
+export const NAV_TOOLS_LINKS: readonly SeoTextLink[] = [
+  { href: '/tools/question-generator', label: 'Interview Question Generator' },
+  { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
+  { href: '/tools/star-builder', label: 'STAR Answer Builder' },
+] as const
+
+export const NAV_TOOLS_ITEMS: readonly NavResourceItem[] = [
+  {
+    label: 'Interview Question Generator',
+    href: '/tools/question-generator',
+    desc: 'Role-specific questions in seconds',
+  },
+  {
+    label: 'ATS Resume Checker',
+    href: '/tools/ats-checker',
+    desc: 'Score your resume against job roles',
+  },
+  {
+    label: 'STAR Answer Builder',
+    href: '/tools/star-builder',
+    desc: 'Structure behavioral answers clearly',
+  },
+] as const
+
 export const NAV_RESOURCE_ITEMS: readonly NavResourceItem[] = [
   { label: 'All Resources', href: '/resources', desc: 'Central guide and hub directory' },
   { label: 'Blog', href: '/blog', desc: 'Interview prep articles and guides' },

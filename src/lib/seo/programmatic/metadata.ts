@@ -249,7 +249,7 @@ export function toolVariantRoleMetadata(role: Role): Metadata {
   const path = toolVariantRolePath(role.slug)
 
   return generateMetadata({
-    title: `${role.shortLabel} Question Generator`,
+    title: `${role.shortLabel} Interview Question Generator`,
     description: `Generate AI ${role.label} interview questions for Indian campus placements in ${PLACEMENT_YEAR}. Free — no signup required.`,
     path,
     keywords: [
@@ -269,7 +269,7 @@ export function toolQGenCompanyMetadata(company: Company): Metadata {
   const path = toolVariantCompanyPath(company.slug)
 
   return generateMetadata({
-    title: `${company.label} Question Generator`,
+    title: `${company.label} Interview Question Generator`,
     description: `Generate ${company.label} interview questions for ${PLACEMENT_YEAR} placements. Covers ${company.typicalRounds} rounds — free, no sign-up.`,
     path,
     keywords: [
@@ -382,7 +382,7 @@ export function skillBreadcrumbs(skill: Skill): BreadcrumbItemInput[] {
 export function toolQGenRoleBreadcrumbs(role: Role): BreadcrumbItemInput[] {
   return programmaticBreadcrumbs([
     { label: 'Home', path: '/' },
-    { label: 'Question Generator', path: '/tools/question-generator' },
+    { label: 'Interview Question Generator', path: '/tools/question-generator' },
     { label: role.label, path: toolVariantRolePath(role.slug) },
   ])
 }
@@ -390,7 +390,7 @@ export function toolQGenRoleBreadcrumbs(role: Role): BreadcrumbItemInput[] {
 export function toolQGenCompanyBreadcrumbs(company: Company): BreadcrumbItemInput[] {
   return programmaticBreadcrumbs([
     { label: 'Home', path: '/' },
-    { label: 'Question Generator', path: '/tools/question-generator' },
+    { label: 'Interview Question Generator', path: '/tools/question-generator' },
     { label: company.label, path: toolVariantCompanyPath(company.slug) },
   ])
 }

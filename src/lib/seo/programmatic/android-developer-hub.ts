@@ -15,7 +15,9 @@ export const ANDROID_PROCESS_HEIGHT = 887
 export const ANDROID_META_TITLE = 'Android Developer Interview Questions (2026)'
 export const ANDROID_CANONICAL_PATH = '/interview-questions/android-developer'
 export const ANDROID_DESCRIPTION =
-  'Android interview prep for India 2026: Kotlin, Jetpack Compose, MVVM, coroutines, system design, hiring process, 4-week roadmap, and expert model answers.'
+  'Android developer interview questions with expert answers for India 2026 — Kotlin, Jetpack Compose, MVVM, coroutines, system design, hiring process, and a 4-week prep roadmap.'
+export const ANDROID_HERO_LEAD =
+  'Curated Android developer interview questions with model answers, follow-ups, and prep tips — covering Kotlin, Jetpack Compose, MVVM, coroutines, and mobile system design for India 2026 hiring loops.'
 export const ANDROID_PUBLISHED_DATE = '2026-05-21'
 export const ANDROID_LAST_UPDATED = '2026-06-06'
 export const ANDROID_REVIEWED_DATE = '2026-06-06'
@@ -453,7 +455,7 @@ export const ANDROID_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/infosys/software-engineer', label: 'Infosys SWE Questions' },
   { href: '/blog/hr-interview-answer-tips-and-tricks', label: 'HR Interview Questions' },
   { href: '/blog/overcome-interview-anxiety-mock-interviews', label: 'Mock Interview Guide' },
-  { href: '/tools/question-generator/android-developer', label: 'Android Question Generator' },
+  { href: '/tools/question-generator/android-developer', label: 'Android Interview Question Generator' },
 ] as const
 
 export const ANDROID_DEVELOPER_QUESTIONS: readonly SeoQuestion[] = [
@@ -592,6 +594,11 @@ export const ANDROID_DEVELOPER_QUESTIONS: readonly SeoQuestion[] = [
 ] as const
 
 export const ANDROID_FAQ_ITEMS = [
+  {
+    question: 'What are the most common Android developer interview questions?',
+    answer:
+      'Panels typically ask Activity lifecycle, Kotlin fundamentals, MVVM or Clean Architecture, coroutines vs threads, Jetpack Compose basics, Room/Retrofit integration, and a project or system design walkthrough. This guide lists curated questions with model answers, follow-ups, and mistakes to avoid.',
+  },
   {
     question: 'How many rounds are in a typical Android Developer interview in India?',
     answer: 'Most loops have 4–6 stages after resume screening: online assessment, 1–2 technical Android rounds, project discussion, and HR. Product companies may add a system design or architecture round; service firms often emphasize OA DSA and Core Java/Kotlin.',

@@ -100,7 +100,7 @@ export default async function QGenRolePage({ params }: Props) {
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
           <nav className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }} aria-label="Breadcrumb">
             <Link href="/tools/question-generator" className="hover:underline" style={{ color: 'var(--text-muted)' }}>
-              Question Generator
+              Interview Question Generator
             </Link>
             <span aria-hidden className="mx-1.5">›</span>
             <span>{role.label}</span>

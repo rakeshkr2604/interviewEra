@@ -15,6 +15,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
 import { cn } from '@/lib/utils';
 
 type DropdownKey = 'tools' | 'questions' | 'resources';
@@ -23,11 +24,7 @@ const NAV_DROPDOWNS = [
   {
     key: 'tools' as DropdownKey,
     label: 'Tools',
-    items: [
-      { href: '/tools/question-generator', label: 'Question Generator' },
-      { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
-      { href: '/tools/star-builder', label: 'STAR Answer Builder' },
-    ],
+    items: [...NAV_TOOLS_LINKS],
   },
   {
     key: 'questions' as DropdownKey,

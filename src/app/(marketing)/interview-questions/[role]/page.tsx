@@ -99,8 +99,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ogImage: `${getCanonicalSiteOrigin()}${ANDROID_HERO_PATH}`,
       keywords: [
         'Android developer interview questions',
+        'Android developer interview questions and answers',
         'Android interview questions 2026',
-        'Kotlin Android interview',
+        'Android interview questions and answers',
+        'Kotlin Android interview questions',
         'Jetpack Compose interview questions',
         'MVVM Android interview',
         'Android coroutines interview',
