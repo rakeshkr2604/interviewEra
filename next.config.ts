@@ -113,11 +113,11 @@ const nextConfig: NextConfig = {
     const ga4Connect =
       'https://www.google-analytics.com https://region1.google-analytics.com';
 
-    // Clarity: inline init loads tag from scripts.clarity.ms; beacons/img to c.clarity.ms.
+    // Clarity: tag from scripts.clarity.ms; collect beacons to v.clarity.ms; pixels via c.bing.com.
     const clarityScript = 'https://www.clarity.ms https://scripts.clarity.ms';
     const clarityConnect =
-      'https://www.clarity.ms https://y.clarity.ms https://c.clarity.ms';
-    const clarityImg = 'https://c.clarity.ms';
+      'https://www.clarity.ms https://y.clarity.ms https://c.clarity.ms https://v.clarity.ms';
+    const clarityImg = 'https://c.clarity.ms https://c.bing.com';
 
     /** Embed only from Vercel dashboard origins (no `self`; avoids same-origin nesting edge cases). */
     const FRAME_ANCESTORS_PREVIEW =
