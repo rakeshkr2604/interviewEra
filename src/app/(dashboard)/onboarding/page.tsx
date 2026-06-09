@@ -20,6 +20,7 @@ import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
 import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
+import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
 import { unlockAudioForInterview } from '@/lib/voice/audio-gesture'
 
 const STEP_LABELS = ['You & goal', 'Resume & start']
@@ -496,6 +497,7 @@ export default function OnboardingPage() {
       }
 
       setResumeId(result.resumeId)
+      trackResumeUploadedGa4(result.resumeId, { source: 'onboarding' })
       setResumeFileName(resumeFile.name)
       setResumeData({ resumeText: '', skills: [], projects: [] })
       if (result.extractionWarning) {

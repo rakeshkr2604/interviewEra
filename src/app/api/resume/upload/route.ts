@@ -21,6 +21,7 @@ import { normalizeExtractedDocumentText } from '@/lib/utils/normalize-extracted-
 import { runLayeredTextExtraction } from '@/lib/resume/extraction-pipeline';
 import { isObviouslyGarbage, scoreExtractedText } from '@/lib/resume/extraction-quality';
 import { RESUME_HARD_FAIL_MESSAGES, resumeUserError } from '@/lib/resume/parse-outcome';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import {
   isUploadDiagnosticsEnabled,
@@ -603,6 +604,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       extraction_warning: uploadExtractionWarning ?? null,
       total_upload_ms: Date.now() - uploadStarted,
     });
+
+    trackFunnelEvent(
+      'resume_uploaded',
+      {
+        userId: user.id,
+        resumeId: resume.id,
+        source: 'api_resume_upload',
+      },
+      { ga4: false },
+    );
+
     return jsonWithReq(
       {
         success: true,

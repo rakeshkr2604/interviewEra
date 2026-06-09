@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { verifyWebhookSignature, PLAN_ACTIVATION_CREDITS } from '@/lib/razorpay/client';
+import {
+  verifyWebhookSignature,
+  PLAN_ACTIVATION_CREDITS,
+  PLAN_AMOUNTS_PAISE,
+} from '@/lib/razorpay/client';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 
 // Razorpay webhook payload shapes (minimal — only fields we use)
 interface RazorpaySubscriptionEntity {
@@ -75,6 +80,28 @@ function resolvePlanKey(plan: string, billingCycle: string): string {
   return billingCycle === 'annual' ? `${plan}_annual` : plan;
 }
 
+function trackPaymentCompletedWebhook(params: {
+  userId: string;
+  plan: 'starter' | 'pro';
+  billingCycle: string;
+  paymentId: string;
+  amount: number;
+  source: string;
+}): void {
+  const planKey = resolvePlanKey(params.plan, params.billingCycle);
+  trackFunnelEvent(
+    'payment_completed',
+    {
+      userId: params.userId,
+      plan: planKey,
+      amount: params.amount,
+      paymentId: params.paymentId,
+      source: params.source,
+    },
+    { ga4: false },
+  );
+}
+
 async function handleActivated(
   supabase: ReturnType<typeof createServiceClient>,
   event: RazorpayWebhookPayload,
@@ -130,6 +157,19 @@ async function handleActivated(
     reason: `Subscription activated: ${sub.id}`,
     created_at: now,
   });
+
+  const payment = event.payload.payment?.entity;
+  // When Razorpay includes payment on activation, subscription.charged will emit payment_completed.
+  if (!payment?.id) {
+    trackPaymentCompletedWebhook({
+      userId,
+      plan,
+      billingCycle,
+      paymentId: sub.id,
+      amount: PLAN_AMOUNTS_PAISE[planKey] ?? 0,
+      source: 'razorpay_webhook_activated',
+    });
+  }
 }
 
 async function handleCharged(
@@ -183,6 +223,15 @@ async function handleCharged(
     amount: credits,
     reason: `Monthly charge: ${payment.id}`,
     created_at: new Date().toISOString(),
+  });
+
+  trackPaymentCompletedWebhook({
+    userId,
+    plan,
+    billingCycle,
+    paymentId: payment.id,
+    amount: payment.amount,
+    source: 'razorpay_webhook_charged',
   });
 }
 

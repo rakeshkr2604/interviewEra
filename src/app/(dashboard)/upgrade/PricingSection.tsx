@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { AppPricingGrid } from '@/components/pricing/PricingTierGrid';
 import { BillingCycleToggle, type BillingCycle } from '@/components/pricing/BillingCycleToggle';
 import type { PlanTier } from '@/types/app.types';
+import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 
 interface PricingSectionProps {
   currentPlan: PlanTier;
@@ -18,6 +19,7 @@ export function PricingSection({ currentPlan, userEmail }: PricingSectionProps) 
 
   return (
     <div className="dashboard-premium-card overflow-visible">
+      <PricingPageViewTracker sourcePage="/upgrade" authenticated />
       {/* Billing toggle — TEMPORARILY HIDDEN (2026-05-14) — annual plans still supported in backend */}
       {false && (
         <div

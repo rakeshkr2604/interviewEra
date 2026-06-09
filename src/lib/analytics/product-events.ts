@@ -14,6 +14,12 @@ export type ProductEventName =
   | 'interview_generation_completed'
   | 'interview_generation_fallback'
   | 'interview_completed'
+  | 'signup_completed'
+  | 'resume_uploaded'
+  | 'mock_interview_started'
+  | 'payment_started'
+  | 'payment_completed'
+  | 'pricing_page_viewed'
   | 'streak_extended'
   | 'streak_broken';
 

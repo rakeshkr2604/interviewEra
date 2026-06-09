@@ -381,6 +381,7 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                   userEmail={userEmail}
                   plan="starter"
                   billingCycle={billingCycle}
+                  source="upgrade"
                   label={starterCheckoutLabel(billingCycle)}
                   className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
                   style={upgradeCtaStyle}
@@ -442,6 +443,7 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                   userEmail={userEmail}
                   plan="pro"
                   billingCycle={billingCycle}
+                  source="upgrade"
                   label={proCheckoutLabel(billingCycle)}
                   className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
                   style={upgradeCtaStyle}

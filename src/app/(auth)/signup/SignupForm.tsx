@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { displayNameSchema } from '@/lib/validations/schemas';
 
 const MONTHS = [
@@ -130,6 +131,14 @@ export function SignupForm({ next }: SignupFormProps) {
         const monthIndex = MONTHS.indexOf(placementMonth as (typeof MONTHS)[number]) + 1;
         const dateStr = `${placementYear}-${monthIndex.toString().padStart(2, '0')}-01`;
         await supabase.from('users').update({ placement_date: dateStr }).eq('id', data.user.id);
+      }
+
+      if (data.user) {
+        trackFunnelEvent('signup_completed', {
+          userId: data.user.id,
+          source: 'email',
+          method: data.session ? 'email' : 'email_confirm_pending',
+        });
       }
 
       if (data.session) {

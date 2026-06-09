@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -14,10 +15,20 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (code) {
     const supabase = await createClient();
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      const response = NextResponse.redirect(`${origin}${next}`);
-      // Clear the oauth_next cookie
+      const userId = data.user?.id;
+      trackFunnelEvent(
+        'signup_completed',
+        { userId, source: 'oauth', method: 'oauth' },
+        { ga4: false },
+      );
+
+      const redirectUrl = new URL(next, origin);
+      redirectUrl.searchParams.set('funnel', 'signup_completed');
+      redirectUrl.searchParams.set('funnel_source', 'oauth');
+
+      const response = NextResponse.redirect(redirectUrl);
       response.cookies.set('oauth_next', '', { path: '/', maxAge: 0 });
       return response;
     }

@@ -11,6 +11,8 @@ import {
   TierUnlockCelebrationDialog,
   type TierCelebrationPayload,
 } from '@/components/retention/TierUnlockCelebrationDialog';
+import { trackMockInterviewCompletedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
+import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge';
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention';
 
 type SessionState =
@@ -62,6 +64,7 @@ export function InterviewSession({
         reportId?: string;
         error?: string;
         retention?: InterviewCompleteRetentionPayload | null;
+        funnelComplete?: FunnelCompleteGa4Payload;
       };
 
       if (!res.ok || !data.reportId) {
@@ -73,6 +76,10 @@ export function InterviewSession({
       }
 
       const reportHref = `/report/${data.reportId}`;
+
+      if (data.funnelComplete) {
+        void trackMockInterviewCompletedGa4(data.funnelComplete);
+      }
 
       if (
         typeof window !== 'undefined' &&

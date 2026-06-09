@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { BILLING_AMOUNTS } from '@/lib/pricing/tiers';
+import {
+  trackPaymentCompletedGa4Backup,
+  trackPaymentStartedOnce,
+} from '@/lib/analytics/funnel-ga4-bridge';
 
 interface RazorpayOptions {
   key: string;
@@ -51,9 +55,15 @@ interface CheckoutButtonProps {
   plan: 'starter' | 'pro';
   billingCycle: 'monthly' | 'annual';
   label: string;
+  /** Analytics source for payment_started / payment_completed (e.g. upgrade, pricing). */
+  source?: string;
   className?: string;
   style?: CSSProperties;
   variant?: ButtonVariant;
+}
+
+function resolvePlanKey(plan: 'starter' | 'pro', billingCycle: 'monthly' | 'annual'): string {
+  return billingCycle === 'annual' ? `${plan}_annual` : plan;
 }
 
 function buildDescription(plan: 'starter' | 'pro', billingCycle: 'monthly' | 'annual'): string {
@@ -75,6 +85,7 @@ export function CheckoutButton({
   plan,
   billingCycle,
   label,
+  source = 'upgrade',
   className,
   style,
   variant = 'default',
@@ -118,6 +129,28 @@ export function CheckoutButton({
         key: string;
       };
 
+      let userId: string | undefined;
+      try {
+        const { createClient } = await import('@/lib/supabase/client');
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        userId = user?.id;
+      } catch {
+        /* best-effort */
+      }
+
+      const planKey = resolvePlanKey(plan, billingCycle);
+
+      trackPaymentStartedOnce({
+        subscriptionId: data.subscriptionId,
+        userId,
+        plan: planKey,
+        amount: data.amount,
+        source,
+      });
+
       const rzp = new window.Razorpay({
         key: data.key,
         subscription_id: data.subscriptionId,
@@ -125,7 +158,14 @@ export function CheckoutButton({
         description: buildDescription(plan, billingCycle),
         prefill: { email: userEmail },
         theme: { color: '#4F46E5' },
-        handler: () => {
+        handler: (response: { razorpay_payment_id: string; razorpay_subscription_id: string }) => {
+          trackPaymentCompletedGa4Backup({
+            paymentId: response.razorpay_payment_id,
+            userId,
+            plan: planKey,
+            amount: data.amount,
+            source: 'checkout_success_handler',
+          });
           router.push(`/dashboard?upgraded=${plan}`);
         },
         modal: {

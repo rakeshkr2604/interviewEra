@@ -21,6 +21,7 @@ import {
   roundToTwo,
 } from './scoring';
 import { buildCompletionReinforcement } from './completion-reinforcement';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 
 const PG_UNIQUE_VIOLATION = '23505';
@@ -212,7 +213,7 @@ export async function processInterviewRetention(
 
   const { data: interview, error: intErr } = await supabase
     .from('interviews')
-    .select('id, question_count, started_at')
+    .select('id, question_count, started_at, role')
     .eq('id', interviewId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -385,13 +386,26 @@ export async function processInterviewRetention(
     trackProductEvent({ event: 'streak_broken', userId, interviewId, streak: streakResult.newStreak });
   }
 
-  trackProductEvent({
-    event: 'interview_completed',
-    userId,
-    interviewId,
-    qualityMet,
-    sessionScore: agg.sessionScore,
-  });
+  const { data: userRow } = await supabase
+    .from('users')
+    .select('plan_tier')
+    .eq('id', userId)
+    .maybeSingle();
+
+  trackFunnelEvent(
+    'mock_interview_completed',
+    {
+      userId,
+      interviewId,
+      role: typeof interview.role === 'string' ? interview.role : undefined,
+      plan: typeof userRow?.plan_tier === 'string' ? userRow.plan_tier : undefined,
+      source: 'interview_complete',
+      qualityMet,
+      sessionScore: agg.sessionScore,
+      score: agg.sessionScore,
+    },
+    { ga4: false },
+  );
 
   const { data: afterUnlockProg } = await supabase
     .from('user_progress')

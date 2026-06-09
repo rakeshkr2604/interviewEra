@@ -10,7 +10,7 @@ export const razorpay = new Razorpay({
 });
 
 // Amount in paise (100 paise = ₹1)
-const PLAN_AMOUNTS: Record<string, number> = {
+export const PLAN_AMOUNTS_PAISE: Record<string, number> = {
   starter: 14900,         // ₹149/mo
   pro: 39900,             // ₹399/mo
   starter_annual: 79900,  // ₹799/yr
@@ -51,7 +51,7 @@ export async function createSubscriptionOrder(
 
   return {
     subscriptionId: subscription.id,
-    amount: PLAN_AMOUNTS[planKey],
+    amount: PLAN_AMOUNTS_PAISE[planKey],
     currency: 'INR',
     // Must match the key used server-side; avoid NEXT_PUBLIC_* drift on Vercel (causes checkout 401).
     key: keyId,

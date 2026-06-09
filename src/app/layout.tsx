@@ -12,6 +12,7 @@ import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
 import { DeferredWebManifest } from "@/components/shared/DeferredWebManifest";
 import { Clarity } from "@/components/Clarity";
+import { FunnelQueryCapture } from "@/components/analytics/FunnelQueryCapture";
 import { GoogleAnalyticsPageView } from "@/components/analytics/GoogleAnalyticsPageView";
 import { GA_MEASUREMENT_ID } from "@/lib/analytics/gtag";
 import { siteConfig } from "@/lib/seo/metadata";
@@ -167,6 +168,9 @@ export default function RootLayout({
         </ThemeProvider>
         <DeferredWebManifest />
         <DeferredVercelMetrics />
+        <Suspense fallback={null}>
+          <FunnelQueryCapture />
+        </Suspense>
         {process.env.NODE_ENV === "production" && GA_MEASUREMENT_ID ? (
           <>
             <Script

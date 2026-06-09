@@ -11,6 +11,7 @@ import {
   PRO_FEATURES,
 } from '@/lib/pricing/tiers';
 import { PRICING_FAQ } from '@/lib/landing/home-content';
+import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 
 const T = {
   bg:     'var(--bg-primary)',
@@ -87,6 +88,7 @@ export function PricingPageClient() {
 
   return (
     <div style={{ color: 'var(--text-primary)', background: '#ffffff' }}>
+      <PricingPageViewTracker sourcePage="/pricing" />
       {/* ─── Responsive + cross-browser styles ─── */}
       <style>{`
         /* Base resets for cross-browser consistency */

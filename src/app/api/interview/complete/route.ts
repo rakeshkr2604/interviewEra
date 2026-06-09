@@ -8,6 +8,8 @@ import {
 } from '@/lib/retention/format-progress-message';
 import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention';
 import type { InterviewRetentionClientPayload } from '@/lib/retention/process-interview-complete';
+import { buildFunnelCompleteGa4Payload } from '@/lib/analytics/funnel-server';
+import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge';
 import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete';
 import type { UserProgressRow } from '@/lib/retention/types';
 import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity';
@@ -167,12 +169,20 @@ export async function POST(request: Request): Promise<NextResponse> {
           console.error('[interview/complete] retention (idempotent path):', retentionErr);
         }
 
+        const funnelComplete = await buildFunnelCompleteGa4Payload(
+          serviceClient,
+          user.id,
+          interviewId,
+        );
+
         const body: {
           reportId: string;
           retention?: RetentionResponsePayload;
           badgesUnlocked?: string[];
+          funnelComplete?: FunnelCompleteGa4Payload;
         } = {
           reportId: existingReport.id as string,
+          funnelComplete,
         };
         attachRetentionToBody(body, retentionPayload);
         return NextResponse.json(body);
@@ -301,11 +311,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error('[interview/complete] retention:', retentionErr);
     }
 
+    const funnelComplete = await buildFunnelCompleteGa4Payload(
+      serviceClient,
+      user.id,
+      interviewId,
+    );
+
     const body: {
       reportId: string;
       retention?: RetentionResponsePayload;
       badgesUnlocked?: string[];
-    } = { reportId };
+      funnelComplete?: FunnelCompleteGa4Payload;
+    } = { reportId, funnelComplete };
     attachRetentionToBody(body, retentionPayload);
 
     return NextResponse.json(body);

@@ -6,6 +6,7 @@ import { motion, useReducedMotion } from 'motion/react';
 import { FileUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
 
 interface LandingUploadZoneProps {
@@ -71,6 +72,11 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
         const data = await parseResponseJsonSafe<{ error?: string }>(res);
         setError(data.error ?? 'Upload failed. Please try again.');
         return;
+      }
+
+      const data = await parseResponseJsonSafe<{ resumeId?: string }>(res);
+      if (data.resumeId) {
+        trackResumeUploadedGa4(data.resumeId, { source: 'landing_upload_zone' });
       }
 
       router.push('/interview/new');

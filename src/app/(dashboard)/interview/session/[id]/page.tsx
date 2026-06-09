@@ -48,6 +48,9 @@ import { releaseAudioForMicCapture } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
+import { trackFunnelEvent } from '@/lib/analytics/funnel'
+import { trackMockInterviewCompletedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
+import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
 import { useInterviewRecovery } from '@/hooks/useInterviewRecovery'
@@ -259,6 +262,7 @@ export default function InterviewSessionPage() {
   const dgStartInFlightRef = useRef<boolean>(false)
   // Transcript watchdog: auto-submit if text exists but no request leaves the client.
   const transcriptWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const mockInterviewStartedRef = useRef(false)
 
   const resolvedInterviewerId = interviewData?.interviewerId ?? null
   const resolvedInterviewer = getInterviewerById(resolvedInterviewerId)
@@ -750,6 +754,36 @@ export default function InterviewSessionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startupStep, phase, currentIndex])
 
+  // ─── Funnel: mock_interview_started (once per session) ─────
+  useEffect(() => {
+    if (phase === 'loading' || phase === 'completed') return
+    if (mockInterviewStartedRef.current) return
+    if (!interviewId || !interviewData) return
+
+    mockInterviewStartedRef.current = true
+
+    void (async () => {
+      let userId: string | undefined
+      try {
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+        userId = user?.id
+      } catch {
+        /* best-effort */
+      }
+
+      trackFunnelEvent('mock_interview_started', {
+        userId,
+        interviewId,
+        role: interviewData.role,
+        source: 'live_session',
+      })
+    })()
+  }, [phase, interviewId, interviewData])
+
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
   const totalQuestions = interviewData?.questions.length ?? 0
@@ -1029,6 +1063,7 @@ export default function InterviewSessionPage() {
         reportId?: string
         error?: string
         retention?: InterviewCompleteRetentionPayload | null
+        funnelComplete?: FunnelCompleteGa4Payload
       }>('/api/interview/complete', { interviewId })
       // The user can navigate away during /api/interview/complete (it generates
       // a report — can take 3-8 s on slow providers). Bail if the page is gone.
@@ -1049,6 +1084,9 @@ export default function InterviewSessionPage() {
         return
       }
       track('REPORT_GENERATION', 'complete_success', { reportId })
+      if (result.data.funnelComplete) {
+        void trackMockInterviewCompletedGa4(result.data.funnelComplete)
+      }
       const href = `/report/${reportId}`
       const retention = result.data.retention ?? null
       if (
