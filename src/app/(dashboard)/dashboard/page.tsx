@@ -9,6 +9,7 @@ import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressC
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
+import { formatDateEnIn } from '@/lib/datetime/ist'
 import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
 import type { UserProgressRow } from '@/lib/retention/types'
 
@@ -81,13 +82,7 @@ export default async function DashboardPage() {
   const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
   const completedCount = rows.filter((i) => i.status === 'completed').length
 
-  const memberSince = userData?.created_at
-    ? new Date(userData.created_at).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
-    : ''
+  const memberSince = userData?.created_at ? formatDateEnIn(userData.created_at) : ''
 
   const creditsRemaining = userData?.credits_remaining ?? 0
   const displayName = userData?.name || user.email?.split('@')[0] || 'Student'

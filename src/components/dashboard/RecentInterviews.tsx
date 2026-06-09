@@ -1,5 +1,6 @@
 'use client'
 import Link from 'next/link'
+import { formatDateEnIn } from '@/lib/datetime/ist'
 
 interface Interview {
   id: string
@@ -30,9 +31,7 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
     <div className="space-y-2">
       {interviews.map((interview) => {
         const isCompleted = interview.status === 'completed'
-        const date = new Date(interview.started_at).toLocaleDateString('en-IN', {
-          day: 'numeric', month: 'short', year: 'numeric',
-        })
+        const date = formatDateEnIn(interview.started_at)
 
         return (
           <Link

@@ -1,5 +1,7 @@
 'use client'
 
+import { daysUntilIstCalendarDate } from '@/lib/datetime/ist'
+
 interface PlacementCountdownProps {
   placementDate: string
   interviewsCompleted: number
@@ -9,13 +11,7 @@ export function PlacementCountdown({
   placementDate,
   interviewsCompleted,
 }: PlacementCountdownProps) {
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const placement = new Date(placementDate)
-  placement.setHours(0, 0, 0, 0)
-  const daysLeft = Math.ceil(
-    (placement.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-  )
+  const daysLeft = daysUntilIstCalendarDate(placementDate)
 
   if (daysLeft < 0) return null
 

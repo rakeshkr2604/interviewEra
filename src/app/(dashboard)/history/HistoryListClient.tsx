@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
+import { formatDateEnIn } from '@/lib/datetime/ist'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
@@ -73,8 +74,10 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
         ) : (
           filteredItems.map((interview) => {
             const isCompleted = interview.status === 'completed'
-            const date = new Date(interview.startedAt).toLocaleDateString('en-IN', {
-              day: 'numeric', month: 'numeric', year: 'numeric',
+            const date = formatDateEnIn(interview.startedAt, {
+              day: 'numeric',
+              month: 'numeric',
+              year: 'numeric',
             })
             const reportHref =
               isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
