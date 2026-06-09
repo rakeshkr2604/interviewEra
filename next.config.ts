@@ -108,10 +108,16 @@ const nextConfig: NextConfig = {
     const razorpayConnect =
       'https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
 
-    // Clarity: inline init snippet (covered by 'unsafe-inline') dynamically loads
-    // the tag script from www.clarity.ms; session data is sent to y.clarity.ms.
-    const clarityScript = 'https://www.clarity.ms';
-    const clarityConnect = 'https://www.clarity.ms https://y.clarity.ms';
+    // Google Analytics 4: gtag.js from googletagmanager.com; beacons to google-analytics.com.
+    const ga4Script = 'https://www.googletagmanager.com';
+    const ga4Connect =
+      'https://www.google-analytics.com https://region1.google-analytics.com';
+
+    // Clarity: inline init loads tag from scripts.clarity.ms; beacons/img to c.clarity.ms.
+    const clarityScript = 'https://www.clarity.ms https://scripts.clarity.ms';
+    const clarityConnect =
+      'https://www.clarity.ms https://y.clarity.ms https://c.clarity.ms';
+    const clarityImg = 'https://c.clarity.ms';
 
     /** Embed only from Vercel dashboard origins (no `self`; avoids same-origin nesting edge cases). */
     const FRAME_ANCESTORS_PREVIEW =
@@ -123,12 +129,12 @@ const nextConfig: NextConfig = {
 
     const cspDirectives = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} ${razorpayScript} ${clarityScript} https://va.vercel-scripts.com`,
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} ${razorpayScript} ${ga4Script} ${clarityScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com https://checkout-static-next.razorpay.com`,
-      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co`,
+      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg}`,
       "media-src 'self' blob:",
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${clarityConnect} https://va.vercel-scripts.com`,
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${ga4Connect} ${clarityConnect} https://va.vercel-scripts.com`,
       "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "child-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "worker-src 'self' blob:",
