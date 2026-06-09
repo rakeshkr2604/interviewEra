@@ -1,5 +1,9 @@
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import {
+  getAttributionFromRequest,
+  parseAttributionFromSearchParams,
+} from '@/lib/analytics/attribution';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -18,10 +22,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
       const userId = data.user?.id;
+      const attribution = {
+        ...getAttributionFromRequest(request),
+        ...parseAttributionFromSearchParams(searchParams),
+      };
+
       trackFunnelEvent(
         'signup_completed',
         { userId, source: 'oauth', method: 'oauth' },
-        { ga4: false },
+        { ga4: false, attribution },
       );
 
       const redirectUrl = new URL(next, origin);

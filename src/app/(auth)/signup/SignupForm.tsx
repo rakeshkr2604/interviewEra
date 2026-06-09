@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
+import { trackLandingCtaClicked } from '@/lib/analytics/cta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { displayNameSchema } from '@/lib/validations/schemas';
 
@@ -93,6 +95,14 @@ export function SignupForm({ next }: SignupFormProps) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    trackLandingCtaClicked({
+      ctaKey: CTA_KEYS.SIGN_UP,
+      ctaText: 'Create account',
+      section: 'signup_form',
+      authenticated: false,
+    });
+
     setFeedback(null);
     setLoading(true);
 

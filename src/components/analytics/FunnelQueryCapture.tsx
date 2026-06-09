@@ -6,6 +6,7 @@ import { trackFunnelEvent } from "@/lib/analytics/funnel";
 
 const FUNNEL_PARAM = "funnel";
 const SOURCE_PARAM = "funnel_source";
+const GA4_DEDUPE_PREFIX = "ie_funnel_ga4:";
 
 /**
  * Fires one-shot funnel events encoded in the URL (e.g. OAuth signup_completed).
@@ -25,6 +26,15 @@ export function FunnelQueryCapture() {
     const source = searchParams.get(SOURCE_PARAM) ?? "oauth";
     const dedupeKey = `${event}:${source}:${pathname}`;
     if (handledRef.current === dedupeKey) return;
+
+    const storageKey = `${GA4_DEDUPE_PREFIX}signup_completed:${pathname}:${source}`;
+    try {
+      if (sessionStorage.getItem(storageKey)) return;
+      sessionStorage.setItem(storageKey, "1");
+    } catch {
+      /* private mode */
+    }
+
     handledRef.current = dedupeKey;
 
     void (async () => {

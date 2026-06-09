@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { Check, X } from 'lucide-react';
 import { BillingCycleToggle, type BillingCycle } from '@/components/pricing/BillingCycleToggle';
 import {
@@ -279,7 +281,9 @@ export function PricingPageClient() {
                   <FeatureRow key={f.text} text={f.text} included={f.included} />
                 ))}
               </div>
-              <Link href="/signup" className="pr-btn pr-btn--ghost">Get started free</Link>
+              <TrackedCtaLink href="/signup" ctaKey={CTA_KEYS.GET_STARTED} ctaText="Get started free" section="pricing_grid" className="pr-btn pr-btn--ghost">
+                Get started free
+              </TrackedCtaLink>
             </div>
 
             {/* Starter */}
@@ -294,9 +298,15 @@ export function PricingPageClient() {
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, marginBottom: 20, listStyle: 'none', padding: 0, margin: '0 0 20px 0' }}>
                 {STARTER_FEATURES.map((f) => <PaidFeatureRow key={f} text={f} />)}
               </ul>
-              <Link href={`/signup?plan=starter&cycle=${cycle}`} className="pr-btn pr-btn--accent">
+              <TrackedCtaLink
+                href={`/signup?plan=starter&cycle=${cycle}`}
+                ctaKey={CTA_KEYS.PRICING_CTA}
+                ctaText={cycle === 'annual' ? 'Start Starter — annual' : 'Start Starter'}
+                section="pricing_grid"
+                className="pr-btn pr-btn--accent"
+              >
                 {cycle === 'annual' ? 'Start Starter — annual' : 'Start Starter'}
-              </Link>
+              </TrackedCtaLink>
             </div>
 
             {/* Pro */}
@@ -312,9 +322,15 @@ export function PricingPageClient() {
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, marginBottom: 20, listStyle: 'none', padding: 0, margin: '0 0 20px 0' }}>
                 {PRO_FEATURES.map((f) => <PaidFeatureRow key={f} text={f} />)}
               </ul>
-              <Link href={`/signup?plan=pro&cycle=${cycle}`} className="pr-btn pr-btn--accent">
+              <TrackedCtaLink
+                href={`/signup?plan=pro&cycle=${cycle}`}
+                ctaKey={CTA_KEYS.PRICING_CTA}
+                ctaText={cycle === 'annual' ? 'Get Pro — annual' : 'Get Pro'}
+                section="pricing_grid"
+                className="pr-btn pr-btn--accent"
+              >
                 {cycle === 'annual' ? 'Get Pro — annual' : 'Get Pro'}
-              </Link>
+              </TrackedCtaLink>
             </div>
           </div>
 
@@ -354,9 +370,15 @@ export function PricingPageClient() {
             Run a scored mock from your actual resume. Walk into every company process knowing your number — not hoping for the best.
           </p>
           <div className="pr-cta-actions">
-            <Link href="/signup" className="pr-cta-link">
+            <TrackedCtaLink
+              href="/signup"
+              ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
+              ctaText="Start a scored interview — it's free →"
+              section="pricing_bottom"
+              className="pr-cta-link"
+            >
               Start a scored interview — it&apos;s free →
-            </Link>
+            </TrackedCtaLink>
           </div>
         </div>
       </div>

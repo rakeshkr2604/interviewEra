@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import {
-  verifyWebhookSignature,
-  PLAN_ACTIVATION_CREDITS,
-  PLAN_AMOUNTS_PAISE,
-} from '@/lib/razorpay/client';
+import { verifyWebhookSignature, PLAN_ACTIVATION_CREDITS } from '@/lib/razorpay/client';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 
 // Razorpay webhook payload shapes (minimal — only fields we use)
@@ -157,19 +153,6 @@ async function handleActivated(
     reason: `Subscription activated: ${sub.id}`,
     created_at: now,
   });
-
-  const payment = event.payload.payment?.entity;
-  // When Razorpay includes payment on activation, subscription.charged will emit payment_completed.
-  if (!payment?.id) {
-    trackPaymentCompletedWebhook({
-      userId,
-      plan,
-      billingCycle,
-      paymentId: sub.id,
-      amount: PLAN_AMOUNTS_PAISE[planKey] ?? 0,
-      source: 'razorpay_webhook_activated',
-    });
-  }
 }
 
 async function handleCharged(
@@ -225,13 +208,15 @@ async function handleCharged(
     created_at: new Date().toISOString(),
   });
 
+  // Authoritative payment_completed — one product event per Razorpay payment.id
+  // (idempotent via credit_transactions reason above).
   trackPaymentCompletedWebhook({
     userId,
     plan,
     billingCycle,
     paymentId: payment.id,
     amount: payment.amount,
-    source: 'razorpay_webhook_charged',
+    source: 'razorpay_subscription_charged',
   });
 }
 

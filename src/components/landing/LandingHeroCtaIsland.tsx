@@ -1,15 +1,19 @@
 'use client';
 
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 
 /**
  * Minimal client island so the homepage stays static (better bfcache): primary CTA href
  * upgrades from /signup → /dashboard after idle Supabase check.
  */
+const HERO_PRIMARY_CTA = 'Start a scored interview — free →';
+
 export default function LandingHeroCtaIsland() {
   const [primaryHref, setPrimaryHref] = useState<'/signup' | '/dashboard'>('/signup');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,9 +37,16 @@ export default function LandingHeroCtaIsland() {
           const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
           await signOutIfStaleAuth(supabase, error);
         }
-        if (!cancelled) setPrimaryHref(user && !error ? '/dashboard' : '/signup');
+        const authed = !!(user && !error);
+        if (!cancelled) {
+          setPrimaryHref(authed ? '/dashboard' : '/signup');
+          setIsAuthenticated(authed);
+        }
         const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (!cancelled) setPrimaryHref(session?.user ? '/dashboard' : '/signup');
+          if (!cancelled) {
+            setPrimaryHref(session?.user ? '/dashboard' : '/signup');
+            setIsAuthenticated(!!session?.user);
+          }
         });
         unsub = () => sub.subscription.unsubscribe();
       } catch {
@@ -62,8 +73,12 @@ export default function LandingHeroCtaIsland() {
 
   return (
     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
-      <Link
+      <TrackedCtaLink
         href={primaryHref}
+        ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
+        ctaText={HERO_PRIMARY_CTA}
+        section="hero"
+        authenticated={isAuthenticated}
         className="v3-btn-primary"
         style={{
           display: 'inline-flex',
@@ -80,10 +95,14 @@ export default function LandingHeroCtaIsland() {
           whiteSpace: 'nowrap',
         }}
       >
-        Start a scored interview — free →
-      </Link>
-      <Link
+        {HERO_PRIMARY_CTA}
+      </TrackedCtaLink>
+      <TrackedCtaLink
         href="/how-it-works"
+        ctaKey={CTA_KEYS.SEE_HOW_IT_WORKS}
+        ctaText="See how it works"
+        section="hero_secondary"
+        authenticated={isAuthenticated}
         className="v3-btn-secondary"
         style={{
           display: 'inline-flex',
@@ -102,7 +121,7 @@ export default function LandingHeroCtaIsland() {
         }}
       >
         See how it works
-      </Link>
+      </TrackedCtaLink>
     </div>
   );
 }

@@ -1,6 +1,9 @@
+'use client';
+
 import type { CSSProperties, ReactNode } from 'react';
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
 
 interface FreeToolFormCardProps {
@@ -75,11 +78,13 @@ export function FreeToolCtaBlock({
   body,
   href,
   ctaLabel,
+  section = 'tool_cta',
 }: {
   title: string;
   body: string;
   href: string;
   ctaLabel: string;
+  section?: string;
 }) {
   return (
     <div
@@ -97,8 +102,11 @@ export function FreeToolCtaBlock({
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
         {body}
       </p>
-      <Link
+      <TrackedCtaLink
         href={href}
+        ctaKey={CTA_KEYS.TOOL_CTA}
+        ctaText={ctaLabel}
+        section={section}
         className="landing-cta-lift mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-[12px] px-6 text-sm font-semibold text-white sm:h-12 sm:px-8 sm:text-base"
         style={{
           background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
@@ -107,7 +115,7 @@ export function FreeToolCtaBlock({
       >
         {ctaLabel}
         <ArrowRight className="size-4" aria-hidden />
-      </Link>
+      </TrackedCtaLink>
     </div>
   );
 }

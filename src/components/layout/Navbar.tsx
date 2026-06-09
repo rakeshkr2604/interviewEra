@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Award,
@@ -614,8 +616,11 @@ function AnonymousNav() {
         >
           Login
         </Link>
-        <Link
+        <TrackedCtaLink
           href="/signup"
+          ctaKey={CTA_KEYS.SIGN_UP}
+          ctaText="Start Free"
+          section="navbar"
           className="inline-flex h-9 items-center rounded-lg px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           style={{
             background: 'var(--accent-primary)',
@@ -624,7 +629,7 @@ function AnonymousNav() {
           }}
         >
           Start Free
-        </Link>
+        </TrackedCtaLink>
       </div>
 
       {/* Mobile: Theme / Hamburger */}
@@ -674,8 +679,11 @@ function AnonymousNav() {
               >
                 Login
               </Link>
-              <Link
+              <TrackedCtaLink
                 href="/signup"
+                ctaKey={CTA_KEYS.SIGN_UP}
+                ctaText="Start Free"
+                section="navbar_mobile"
                 onClick={() => setMobileOpen(false)}
                 className="mx-2 mt-1 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
                 style={{
@@ -685,7 +693,7 @@ function AnonymousNav() {
                 }}
               >
                 Start Free
-              </Link>
+              </TrackedCtaLink>
             </nav>
           </SheetContent>
         </Sheet>

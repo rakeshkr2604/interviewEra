@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import Image from 'next/image';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
@@ -117,8 +119,11 @@ export function MarketingFooter() {
             </p>
 
             {/* CTA */}
-            <Link
+            <TrackedCtaLink
               href="/signup"
+              ctaKey={CTA_KEYS.START_MOCK_INTERVIEW}
+              ctaText="Start Mock Interview"
+              section="footer"
               className="mt-5 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:-translate-y-px"
               style={{
                 background: 'var(--accent-primary)',
@@ -126,7 +131,7 @@ export function MarketingFooter() {
               }}
             >
               Start Mock Interview
-            </Link>
+            </TrackedCtaLink>
 
             {/* Social icons */}
             <div className="mt-5 flex items-center gap-3">

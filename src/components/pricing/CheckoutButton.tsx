@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { BILLING_AMOUNTS } from '@/lib/pricing/tiers';
+import { trackLandingCtaClicked } from '@/lib/analytics/cta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import {
   trackPaymentCompletedGa4Backup,
   trackPaymentStartedOnce,
@@ -107,6 +109,14 @@ export function CheckoutButton({
 
   async function handleCheckout() {
     if (!scriptLoaded) return;
+
+    trackLandingCtaClicked({
+      ctaKey: CTA_KEYS.UPGRADE_CTA,
+      ctaText: label,
+      section: 'upgrade_grid',
+      authenticated: true,
+    });
+
     setLoading(true);
 
     try {

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { Check, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -163,8 +165,11 @@ export function MarketingPricingSection() {
                 <MarketingFeatureRow key={f.text} text={f.text} included={f.included} />
               ))}
             </div>
-            <Link
+            <TrackedCtaLink
               href="/signup"
+              ctaKey={CTA_KEYS.GET_STARTED}
+              ctaText="Get started free"
+              section="pricing_grid"
               className="block rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold shadow-sm transition-all duration-300 hover:shadow-md"
               style={{
                 borderColor: 'var(--card-border)',
@@ -173,7 +178,7 @@ export function MarketingPricingSection() {
               }}
             >
               Get started free
-            </Link>
+            </TrackedCtaLink>
           </CardContent>
         </Card>
 
@@ -199,12 +204,15 @@ export function MarketingPricingSection() {
                 <MarketingPaidFeatureRow key={f} text={f} />
               ))}
             </ul>
-            <Link
+            <TrackedCtaLink
               href={marketingSignupHref('starter', cycle)}
+              ctaKey={CTA_KEYS.PRICING_CTA}
+              ctaText={cycle === 'annual' ? 'Start Starter — annual' : MARKETING_PRICING_CARDS[1].ctaLabel}
+              section="pricing_grid"
               className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
             >
               {cycle === 'annual' ? 'Start Starter — annual' : MARKETING_PRICING_CARDS[1].ctaLabel}
-            </Link>
+            </TrackedCtaLink>
           </CardContent>
         </Card>
 
@@ -238,12 +246,15 @@ export function MarketingPricingSection() {
                 <MarketingPaidFeatureRow key={f} text={f} />
               ))}
             </ul>
-            <Link
+            <TrackedCtaLink
               href={marketingSignupHref('pro', cycle)}
+              ctaKey={CTA_KEYS.PRICING_CTA}
+              ctaText={cycle === 'annual' ? 'Get Pro — annual' : MARKETING_PRICING_CARDS[2].ctaLabel}
+              section="pricing_grid"
               className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
             >
               {cycle === 'annual' ? 'Get Pro — annual' : MARKETING_PRICING_CARDS[2].ctaLabel}
-            </Link>
+            </TrackedCtaLink>
           </CardContent>
         </Card>
       </div>

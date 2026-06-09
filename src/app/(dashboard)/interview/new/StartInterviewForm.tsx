@@ -13,6 +13,8 @@ import {
   readPreferredInterviewerId,
 } from '@/lib/settings/client-preferences';
 import { unlockAudioForInterview } from '@/lib/voice/audio-gesture';
+import { trackLandingCtaClicked } from '@/lib/analytics/cta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
 import type { DomainPack, PlanTier } from '@/types/app.types';
 
@@ -69,6 +71,14 @@ export function StartInterviewForm({
 
   async function handleStart() {
     if (!canSubmit) return;
+
+    trackLandingCtaClicked({
+      ctaKey: CTA_KEYS.START_MOCK_INTERVIEW,
+      ctaText: 'Start Interview (uses 1 credit)',
+      section: 'interview_new',
+      authenticated: true,
+    });
+
     // Consume gesture token while the click is still active (helps some mobile browsers).
     unlockAudioForInterview();
     setLoading(true);

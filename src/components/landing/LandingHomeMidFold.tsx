@@ -3,6 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
+import { trackLandingCtaClicked } from '@/lib/analytics/cta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 
 function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
@@ -218,7 +220,20 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
 }
 
 function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
-  const cards = [
+  const cards: Array<{
+    icon: string;
+    level: string;
+    levelColor: string;
+    title: string;
+    body: string;
+    cta: string;
+    ctaKey: (typeof CTA_KEYS)[keyof typeof CTA_KEYS];
+    ctaColor: string;
+    href: string;
+    outcome: string;
+    outcomeStrong: string;
+    recommended: boolean;
+  }> = [
     {
       icon: '🌱',
       level: 'Building from scratch',
@@ -226,6 +241,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
       title: 'Follow the scoring roadmap',
       body: "You haven't done structured prep before. Start with the HR Behavioural track — module by module, scored at each step. Build your baseline first, then close the gaps.",
       cta: 'Start HR Basics →',
+      ctaKey: CTA_KEYS.GET_STARTED,
       ctaColor: T.ok,
       href: isLoggedIn ? '/dashboard' : '/signup',
       outcome: "You'll have a",
@@ -239,6 +255,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
       title: 'Score your own questions',
       body: "You have a resume. Upload it, get questions built from your actual background, and practice until every answer scores above 7. No generic prep — just yours.",
       cta: 'Upload resume + get scored →',
+      ctaKey: CTA_KEYS.GET_STARTED,
       ctaColor: T.acc2,
       href: isLoggedIn ? '/dashboard' : '/signup',
       outcome: "You'll have a",
@@ -252,6 +269,7 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
       title: 'Run a full mock right now',
       body: "No time for modules. Run a full scored session and benchmark yourself against the same rubric you see after each answer — before a real panel does.",
       cta: 'Start full mock interview →',
+      ctaKey: CTA_KEYS.START_MOCK_INTERVIEW,
       ctaColor: T.warn,
       href: isLoggedIn ? '/dashboard' : '/signup',
       outcome: "You'll know",
@@ -306,6 +324,14 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
             <Reveal key={card.title} delay={i * 0.07}>
               <Link
                 href={card.href}
+                onClick={() => {
+                  trackLandingCtaClicked({
+                    ctaKey: card.ctaKey,
+                    ctaText: card.cta,
+                    section: 'home_midfold',
+                    authenticated: isLoggedIn,
+                  });
+                }}
                 className={card.recommended ? 'ie-card-premium ie-card-premium--accent' : 'ie-card-premium'}
                 style={{
                   display: 'flex',

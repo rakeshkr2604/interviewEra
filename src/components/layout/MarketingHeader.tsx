@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { ChevronDown, Menu } from 'lucide-react';
 import type { User } from '@supabase/supabase-js';
 import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
@@ -234,13 +236,17 @@ export function MarketingHeader() {
                 >
                   Login
                 </Link>
-                <Link
+                <TrackedCtaLink
                   href="/signup"
+                  ctaKey={CTA_KEYS.SIGN_UP}
+                  ctaText="Sign up free"
+                  section="header"
+                  authenticated={false}
                   className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
                   style={ctaStyle}
                 >
                   Sign up free
-                </Link>
+                </TrackedCtaLink>
               </div>
             )}
           </div>
@@ -352,14 +358,18 @@ export function MarketingHeader() {
                       >
                         Login
                       </Link>
-                      <Link
+                      <TrackedCtaLink
                         href="/signup"
+                        ctaKey={CTA_KEYS.SIGN_UP}
+                        ctaText="Sign up free"
+                        section="header_mobile"
+                        authenticated={false}
                         onClick={() => setMobileOpen(false)}
                         className="mx-2 mt-1 rounded-xl px-4 py-3.5 text-center text-base font-semibold text-white"
                         style={ctaStyle}
                       >
                         Sign up free
-                      </Link>
+                      </TrackedCtaLink>
                     </>
                   )}
                 </nav>
