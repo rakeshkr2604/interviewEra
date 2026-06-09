@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono, Instrument_Serif } from "next/font/google";
 import Script from "next/script";
+import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { NavbarSlot } from "@/components/layout/NavbarSlot";
@@ -11,6 +12,8 @@ import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
 import { DeferredWebManifest } from "@/components/shared/DeferredWebManifest";
 import { Clarity } from "@/components/Clarity";
+import { GoogleAnalyticsPageView } from "@/components/analytics/GoogleAnalyticsPageView";
+import { GA_MEASUREMENT_ID } from "@/lib/analytics/gtag";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -164,6 +167,30 @@ export default function RootLayout({
         </ThemeProvider>
         <DeferredWebManifest />
         <DeferredVercelMetrics />
+        {process.env.NODE_ENV === "production" && GA_MEASUREMENT_ID ? (
+          <>
+            <Script
+              id="google-analytics-gtag"
+              strategy="afterInteractive"
+              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
+            />
+            <Script
+              id="google-analytics-init"
+              strategy="afterInteractive"
+              dangerouslySetInnerHTML={{
+                __html: `
+                  window.dataLayer = window.dataLayer || [];
+                  function gtag(){dataLayer.push(arguments);}
+                  gtag('js', new Date());
+                  gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
+                `,
+              }}
+            />
+            <Suspense fallback={null}>
+              <GoogleAnalyticsPageView />
+            </Suspense>
+          </>
+        ) : null}
         <Clarity />
       </body>
     </html>
