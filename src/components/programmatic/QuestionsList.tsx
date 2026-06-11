@@ -5,6 +5,8 @@
  */
 
 import Link from 'next/link'
+import { QuestionInsight, hasQuestionInsightContent } from '@/components/programmatic/QuestionInsight'
+import { mergeQuestionInsights } from '@/lib/seo/programmatic/question-insights'
 import type { SeoQuestion } from '@/lib/seo/programmatic/types'
 
 const CATEGORY_LABELS: Record<SeoQuestion['category'], string> = {
@@ -29,7 +31,7 @@ interface QuestionsListProps {
   sectionId?: string
   /** Anchor id for the H2 (defaults to sectionId when set). */
   headingId?: string
-  /** Show expanded answer blocks (evaluates, strategy, mistakes, follow-ups). */
+  /** Hub pages: collapsible expert-answer cards with full insight sections. */
   expanded?: boolean
   /** Optional label beside the heading (e.g. hub-specific question count). */
   metaLabel?: string
@@ -88,7 +90,12 @@ export function QuestionsList({
       </div>
       <ol className="mt-5 list-none space-y-4 p-0" role="list">
         {questions.map((q, index) => (
-          <QuestionCard key={`${q.question}-${index}`} question={q} number={index + 1} expanded={expanded} />
+          <QuestionCard
+            key={`${q.question}-${index}`}
+            question={mergeQuestionInsights(q)}
+            number={index + 1}
+            expanded={expanded}
+          />
         ))}
       </ol>
     </section>
@@ -104,6 +111,8 @@ function QuestionCard({
   number: number
   expanded: boolean
 }) {
+  const showInsight = expanded && hasQuestionInsightContent(question)
+
   return (
     <li
       className="rounded-xl border p-4"
@@ -112,7 +121,6 @@ function QuestionCard({
         background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
       }}
     >
-      {/* Question row */}
       <div className="flex items-start gap-3">
         <span
           className="mt-0.5 shrink-0 text-sm font-bold tabular-nums"
@@ -125,56 +133,20 @@ function QuestionCard({
         </p>
       </div>
 
-      {/* Badge row */}
       <div className="mt-2.5 flex flex-wrap gap-1.5 pl-8">
         <Badge label={CATEGORY_LABELS[question.category]} variant="category" />
         <Badge label={DIFFICULTY_LABELS[question.difficulty]} variant={question.difficulty} />
       </div>
 
-      {/* Tip */}
-      {question.tip ? (
-        <p
-          className="mt-2 pl-8 text-sm leading-relaxed"
-          style={{ color: 'var(--text-secondary)' }}
-        >
+      {showInsight ? (
+        <QuestionInsight question={question} />
+      ) : question.tip ? (
+        <p className="mt-2 pl-8 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-            {expanded ? 'Expert answer: ' : 'Tip: '}
+            Tip:{' '}
           </span>
           {question.tip}
         </p>
-      ) : null}
-
-      {expanded ? (
-        <div className="mt-3 space-y-2 pl-8">
-          {question.evaluates ? (
-            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>What interviewers evaluate: </span>
-              {question.evaluates}
-            </p>
-          ) : null}
-          {question.strategy ? (
-            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Answer strategy: </span>
-              {question.strategy}
-            </p>
-          ) : null}
-          {question.mistakes ? (
-            <p className="m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Common mistakes: </span>
-              {question.mistakes}
-            </p>
-          ) : null}
-          {question.followUps && question.followUps.length > 0 ? (
-            <div>
-              <p className="m-0 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Follow-up questions:</p>
-              <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                {question.followUps.map((followUp) => (
-                  <li key={followUp}>{followUp}</li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-        </div>
       ) : null}
     </li>
   )

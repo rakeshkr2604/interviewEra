@@ -32,7 +32,7 @@ import { SKILL_QUESTIONS } from './skill-questions'
 
 export const ROLE_QUESTION_REGISTRY: Partial<Record<RoleSlug, QuestionSet>> = {
   'software-engineer': {
-    lastUpdated: '2026-05-21',
+    lastUpdated: '2026-06-11',
     questions: [
       {
         question: 'What is the difference between a stack and a queue? Where would you use each?',
@@ -4364,12 +4364,17 @@ export function buildFaqPairs(
   maxItems = 10,
 ): Array<{ question: string; answer: string }> {
   return questions
-    .filter((q) => q.tip !== undefined || (q.keywords && q.keywords.length > 0))
+    .filter(
+      (q) =>
+        q.expertAnswer !== undefined ||
+        q.tip !== undefined ||
+        (q.keywords && q.keywords.length > 0),
+    )
     .slice(0, maxItems)
     .map((q) => ({
       question: q.question,
       // Prefer tip as the human-readable answer; fall back to keywords joined.
-      answer: q.tip ?? (q.keywords ? `Key concepts: ${q.keywords.join(', ')}.` : ''),
+      answer: q.expertAnswer ?? q.tip ?? (q.keywords ? `Key concepts: ${q.keywords.join(', ')}.` : ''),
     }))
 }
 

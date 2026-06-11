@@ -11,6 +11,7 @@ import { BaCompanyProcessSection } from '@/components/programmatic/BaCompanyProc
 import { BaTableOfContents } from '@/components/programmatic/BaTableOfContents'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import { AndroidDeveloperHubArticle } from '@/components/programmatic/AndroidDeveloperHubArticle'
+import { SoftwareEngineerHubArticle } from '@/components/programmatic/SoftwareEngineerHubArticle'
 import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
 import { schemaIds } from '@/lib/seo/metadata'
 import {
@@ -57,6 +58,30 @@ import {
   ANDROID_MVVM_ARCHITECTURE_WIDTH,
   isAndroidDeveloperHub,
 } from '@/lib/seo/programmatic/android-developer-hub'
+import {
+  SOFTWARE_ENGINEER_AUTHOR_NAME,
+  SOFTWARE_ENGINEER_CANONICAL_PATH,
+  SOFTWARE_ENGINEER_DESCRIPTION,
+  SOFTWARE_ENGINEER_FAQ_ITEMS,
+  SOFTWARE_ENGINEER_HERO_ALT,
+  SOFTWARE_ENGINEER_HERO_HEIGHT,
+  SOFTWARE_ENGINEER_HERO_PATH,
+  SOFTWARE_ENGINEER_HERO_WIDTH,
+  SOFTWARE_ENGINEER_LAST_UPDATED,
+  SOFTWARE_ENGINEER_META_TITLE,
+  SOFTWARE_ENGINEER_PROCESS_ALT,
+  SOFTWARE_ENGINEER_PROCESS_HEIGHT,
+  SOFTWARE_ENGINEER_PROCESS_PATH,
+  SOFTWARE_ENGINEER_PROCESS_WIDTH,
+  SOFTWARE_ENGINEER_PUBLISHED_DATE,
+  SOFTWARE_ENGINEER_REVIEWED_DATE,
+  SOFTWARE_ENGINEER_REVIEWER_NAME,
+  SOFTWARE_ENGINEER_ROADMAP_ALT,
+  SOFTWARE_ENGINEER_ROADMAP_HEIGHT,
+  SOFTWARE_ENGINEER_ROADMAP_PATH,
+  SOFTWARE_ENGINEER_ROADMAP_WIDTH,
+  isSoftwareEngineerHub,
+} from '@/lib/seo/programmatic/software-engineer-hub'
 import '../../blog/blog.css'
 
 export function generateStaticParams() {
@@ -108,6 +133,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         'Android coroutines interview',
         'Android system design interview',
         'Android hiring process India',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+  if (isSoftwareEngineerHub(role.slug)) {
+    return baseGenerateMetadata({
+      title: SOFTWARE_ENGINEER_META_TITLE,
+      description: SOFTWARE_ENGINEER_DESCRIPTION,
+      path: SOFTWARE_ENGINEER_CANONICAL_PATH,
+      ogImage: `${getCanonicalSiteOrigin()}${SOFTWARE_ENGINEER_HERO_PATH}`,
+      keywords: [
+        'software engineer interview questions',
+        'software engineer interview questions India 2026',
+        'software engineer interview questions and answers',
+        'SWE interview preparation India',
+        'DSA interview questions software engineer',
+        'system design interview software engineer',
+        'campus placement software engineer questions',
+        'OOPs interview questions',
+        'software engineer hiring process India',
+        'software engineer mock interview',
       ],
       openGraphType: 'article',
       noIndex: false,
@@ -180,7 +227,8 @@ export default async function RoleQuestionsPage({ params }: Props) {
   if (!role) notFound()
 
   const isAndroidHub = isAndroidDeveloperHub(role.slug)
-  const isEditorialHub = role.slug === 'business-analyst' || isAndroidHub
+  const isSweHub = isSoftwareEngineerHub(role.slug)
+  const isEditorialHub = role.slug === 'business-analyst' || isAndroidHub || isSweHub
 
   const questions = getRoleQuestionsFlat(role.slug)
   const hubQuestions = isAndroidHub ? ANDROID_DEVELOPER_QUESTIONS : questions
@@ -195,7 +243,9 @@ export default async function RoleQuestionsPage({ params }: Props) {
       ? faqPageJsonLd([...BA_FAQ_ITEMS])
       : isAndroidHub
         ? faqPageJsonLd([...ANDROID_FAQ_ITEMS])
-        : faqPairs.length > 0
+        : isSweHub
+          ? faqPageJsonLd([...SOFTWARE_ENGINEER_FAQ_ITEMS])
+          : faqPairs.length > 0
           ? faqPageJsonLd(faqPairs)
           : null
 
@@ -396,6 +446,100 @@ export default async function RoleQuestionsPage({ params }: Props) {
       }
     : null
 
+  const SWE_PAGE_LD = isSweHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#swe-author`,
+            name: SOFTWARE_ENGINEER_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#swe-reviewer`,
+            name: SOFTWARE_ENGINEER_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}#image`,
+            url: `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}`,
+            caption: SOFTWARE_ENGINEER_HERO_ALT,
+            width: SOFTWARE_ENGINEER_HERO_WIDTH,
+            height: SOFTWARE_ENGINEER_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${SOFTWARE_ENGINEER_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${SOFTWARE_ENGINEER_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${SOFTWARE_ENGINEER_PROCESS_PATH}`,
+            caption: SOFTWARE_ENGINEER_PROCESS_ALT,
+            width: SOFTWARE_ENGINEER_PROCESS_WIDTH,
+            height: SOFTWARE_ENGINEER_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${SOFTWARE_ENGINEER_ROADMAP_PATH}#image`,
+            url: `${ORIGIN}${SOFTWARE_ENGINEER_ROADMAP_PATH}`,
+            contentUrl: `${ORIGIN}${SOFTWARE_ENGINEER_ROADMAP_PATH}`,
+            caption: SOFTWARE_ENGINEER_ROADMAP_ALT,
+            width: SOFTWARE_ENGINEER_ROADMAP_WIDTH,
+            height: SOFTWARE_ENGINEER_ROADMAP_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
+            url: canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
+            name: SOFTWARE_ENGINEER_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH)}#article`,
+            headline: SOFTWARE_ENGINEER_META_TITLE,
+            description: SOFTWARE_ENGINEER_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH) },
+            url: canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
+            datePublished: SOFTWARE_ENGINEER_PUBLISHED_DATE,
+            dateModified: SOFTWARE_ENGINEER_LAST_UPDATED,
+            dateReviewed: SOFTWARE_ENGINEER_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#swe-author` },
+            reviewedBy: { '@id': `${ORIGIN}#swe-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: [
+              { '@id': `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}#image` },
+              { '@id': `${ORIGIN}${SOFTWARE_ENGINEER_PROCESS_PATH}#image` },
+              { '@id': `${ORIGIN}${SOFTWARE_ENGINEER_ROADMAP_PATH}#image` },
+            ],
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: ['h1', '#swe-hiring-process', '#swe-topic-importance', '#swe-questions'],
+            },
+          },
+        ],
+      }
+    : null
+
   return (
     <>
       <JsonLdScript id="role-breadcrumb-ld" data={BREADCRUMB_LD} />
@@ -403,6 +547,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
       {ITEM_LIST_LD ? <JsonLdScript id="role-question-itemlist-ld" data={ITEM_LIST_LD} /> : null}
       {BA_PAGE_LD ? <JsonLdScript id="role-ba-page-ld" data={BA_PAGE_LD} /> : null}
       {ANDROID_PAGE_LD ? <JsonLdScript id="role-android-page-ld" data={ANDROID_PAGE_LD} /> : null}
+      {SWE_PAGE_LD ? <JsonLdScript id="role-swe-page-ld" data={SWE_PAGE_LD} /> : null}
 
       {/* ── Hero (non-editorial roles) ───────────────────────────────────── */}
       {!isEditorialHub ? (
@@ -1608,6 +1753,10 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
       {isAndroidHub ? (
         <AndroidDeveloperHubArticle role={role} questions={ANDROID_DEVELOPER_QUESTIONS} />
+      ) : null}
+
+      {isSweHub ? (
+        <SoftwareEngineerHubArticle role={role} questions={questions} />
       ) : null}
 
       {/* ── Questions ────────────────────────────────────────────────────── */}

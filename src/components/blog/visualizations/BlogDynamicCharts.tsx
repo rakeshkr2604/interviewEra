@@ -12,6 +12,11 @@ export const DsaTopicFrequencyChart = dynamic(
   { ssr: false }
 );
 
+export const SweTopicImportanceChart = dynamic(
+  () => import('./SweTopicImportanceChart').then((mod) => mod.SweTopicImportanceChart),
+  { ssr: false }
+);
+
 export const HrAnswerFlowDiagram = dynamic(
   () => import('./HrAnswerFlowDiagram').then((mod) => mod.HrAnswerFlowDiagram),
   { ssr: false }

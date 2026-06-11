@@ -159,6 +159,8 @@ export interface SeoQuestion {
    * 1–2 sentences only.
    */
   readonly tip?: string
+  /** Model answer for hub pages (50–120 words). Preferred over `tip` in expanded cards and FAQ schema. */
+  readonly expertAnswer?: string
   /** What the interviewer is grading (hub pages with expanded answers). */
   readonly evaluates?: string
   /** How to structure a strong answer. */
