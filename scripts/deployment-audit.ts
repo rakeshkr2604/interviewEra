@@ -33,6 +33,7 @@ const REQUIRED_ROUTES = [
   '/interview-questions/frontend-developer',
   '/interview-questions/java-developer',
   '/interview-questions/software-engineer',
+  '/interview-questions/topics/react',
   '/blog/top-dsa-interview-questions',
   '/blog/how-to-prepare-for-placement-interviews',
   '/blog/what-is-star-method-with-examples',
@@ -47,6 +48,9 @@ const HERO_IMAGES = [
   '/blog/android-developer-process-2026.png',
   '/blog/android-developer-roadmap-2026.png',
   '/blog/android-developer-mvvm-architecture-2026.png',
+  '/blog/react-interview-hero.webp',
+  '/blog/react-learning-roadmap-premium-2026.webp',
+  '/blog/react-architecture-premium-2026.webp',
 ] as const
 
 type AuditResult = {

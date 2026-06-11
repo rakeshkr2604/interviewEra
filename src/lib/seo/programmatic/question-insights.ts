@@ -354,6 +354,70 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
     mistakes: 'Saying they are interchangeable, or unable to explain any coercion example.',
     followUps: ['What is `Object.is` used for?', 'How does `typeof null` behave?'],
   },
+  'What is the virtual DOM and how does reconciliation work?': {
+    expertAnswer:
+      'The virtual DOM is React’s in-memory tree of UI elements. When state changes, React builds a new tree and diffs it against the previous snapshot — this process is reconciliation. It then applies the minimal set of real DOM mutations rather than repainting the whole page. Keys help React match list items across renders so state stays attached to the correct row. I also note that virtual DOM is not automatic speed for every case — component design, batching, and avoiding unnecessary renders still matter in production.',
+    evaluates: 'React mental model depth beyond JSX — reconciliation, diffing, and update strategy.',
+    strategy: 'Define virtual DOM, explain diff-and-patch flow, mention keys for list identity, note performance depends on design.',
+    mistakes: 'Claiming virtual DOM always makes React faster than vanilla JS, or conflating reconciliation with full page reload.',
+    followUps: ['Why do list keys matter?', 'What triggers a React re-render?'],
+  },
+  'Explain the useEffect hook and its dependency array.': {
+    expertAnswer:
+      'useEffect runs side effects after paint — data fetching, subscriptions, timers, and DOM sync. The dependency array controls re-runs: omitting it runs after every render, `[]` runs once on mount, and `[dep]` re-runs when `dep` changes. Return a cleanup function to unsubscribe or clear timers on unmount or before the next effect run. Missing dependencies cause stale closures — I follow exhaustive-deps lint and explain why. In interviews I contrast effects that sync with external systems vs derived state that belongs in render.',
+    evaluates: 'Side-effect lifecycle understanding and whether you avoid common stale-closure bugs.',
+    strategy: 'Explain timing (after paint), dependency array cases, cleanup pattern, and stale-deps pitfall with lint rule.',
+    mistakes: 'Using useEffect for derived state, omitting cleanup on subscriptions, or ignoring dependency array intentionally.',
+    followUps: ['When should you not use useEffect?', 'What is useLayoutEffect for?'],
+  },
+  'What is the difference between useMemo, useCallback, and React.memo?': {
+    expertAnswer:
+      'useMemo caches a computed value between renders when dependencies are unchanged. useCallback caches a function reference — `useCallback(fn, deps)` is equivalent to `useMemo(() => fn, deps)`. React.memo wraps a component and skips re-render when props are shallow-equal. I apply all three only after profiling shows unnecessary work — premature memoization adds complexity and can hurt performance. In interviews I give one example: memoizing a heavy filter on a large list vs memoizing every inline callback.',
+    evaluates: 'Performance optimization judgment — measurement-first vs blanket memoization.',
+    strategy: 'Define each API, state referential equality purpose, emphasize profile-first usage with one concrete example.',
+    mistakes: 'Memoizing everything by default, or unable to explain shallow compare limits of React.memo.',
+    followUps: ['When does useMemo hurt performance?', 'What is a stale closure in useCallback?'],
+  },
+  'Why do React lists need a key, and why is index a poor key?': {
+    expertAnswer:
+      'Keys give each list element a stable identity across renders so reconciliation can match the correct DOM node when the list reorders, inserts, or deletes items. Using the array index as key breaks when order changes — React reuses the wrong DOM nodes and state or controlled inputs attach to the wrong row. I use stable unique ids from the data model. In interviews I connect keys to reconciliation efficiency and correct component state preservation.',
+    evaluates: 'Reconciliation mechanics and practical list-rendering hygiene.',
+    strategy: 'Explain identity across renders, show reorder bug with index keys, recommend stable unique ids.',
+    mistakes: 'Using index keys on sortable/filterable lists, or saying keys are only for performance not correctness.',
+    followUps: ['What if ids are not unique?', 'How do keys affect React.memo children?'],
+  },
+  'What are controlled vs uncontrolled components?': {
+    expertAnswer:
+      'Controlled components keep form value in React state via `value` and `onChange` — single source of truth, easy validation and multi-step flows. Uncontrolled components let the DOM hold state, read with refs — useful for file inputs or simple one-off fields. I prefer controlled for product forms with validation and analytics. Mixing controlled and uncontrolled on the same input causes warnings and inconsistent behavior. Interviewers check whether you know when refs are appropriate.',
+    evaluates: 'Form state architecture and React data-flow understanding.',
+    strategy: 'Contrast state ownership (React vs DOM), give when to use each, warn against mixing on same field.',
+    mistakes: 'Treating all forms as uncontrolled, or not knowing file inputs typically need refs.',
+    followUps: ['How do you validate controlled fields?', 'When would you use react-hook-form?'],
+  },
+  "What problem do useState's functional updates and immutability solve?": {
+    expertAnswer:
+      'React detects state changes by reference — mutating objects or arrays in place does not trigger re-renders. Immutability means returning new references via spread, map, or filter. Functional updates `setCount(c => c + 1)` read the latest state from React’s queue, avoiding stale values when multiple updates batch in the same event. This matters in rapid clicks, intervals, and concurrent features. I demonstrate both patterns in live coding answers.',
+    evaluates: 'State update mechanics, batching awareness, and immutability habits.',
+    strategy: 'Explain reference equality detection, show functional update for batched events, contrast mutation bug.',
+    mistakes: 'Mutating state directly, or using current state variable when functional form is required.',
+    followUps: ['How does React 18 batching affect setState?', 'When use useReducer instead?'],
+  },
+  'How does the Context API work and when does it cause performance issues?': {
+    expertAnswer:
+      'Context lets you pass values through the tree without prop drilling — a Provider supplies a value and consumers read it via useContext. Every consumer re-renders when the provider value changes, so a new object literal each render re-renders the entire subtree. I memoise provider values with useMemo, split contexts by concern (theme vs auth), or move high-frequency state to Zustand/Redux with selectors. For interview answers I explain when Context fits (theme, locale) vs when a store fits (frequent updates).',
+    evaluates: 'Global state architecture judgment and re-render cost awareness.',
+    strategy: 'Describe provider/consumer flow, explain all-consumers-rerender rule, give split-context and memo fixes.',
+    mistakes: 'Putting entire app state in one Context, or not knowing selector libraries reduce re-renders.',
+    followUps: ['Context vs Redux — when to choose each?', 'How do you debug Context re-renders?'],
+  },
+  'What are the rules of hooks and why do they exist?': {
+    expertAnswer:
+      'Hooks must be called at the top level — never inside conditions, loops, or nested functions — and only from React function components or custom hooks. React stores hook state in a linked list keyed by call order per component. Conditional calls would shift that order between renders and corrupt state. eslint-plugin-react-hooks enforces this. Custom hooks let you reuse stateful logic while obeying the same rules. I mention this when discussing why early returns before hooks are invalid.',
+    evaluates: 'Fundamental React execution model — not just memorizing the rules list.',
+    strategy: 'State the two rules, explain call-order linked list model, mention eslint and custom hooks.',
+    mistakes: 'Calling hooks conditionally, or unable to explain why order matters beyond “the docs say so”.',
+    followUps: ['How do custom hooks work internally?', 'Can hooks be used in class components?'],
+  },
   "What is the virtual DOM in React and why does it exist?": {
     expertAnswer:
       'Virtual DOM is React’s in-memory representation of UI structure. On state changes, React compares previous and new trees, then applies minimal updates to the real DOM. This model improves developer ergonomics and can reduce costly direct DOM mutations, especially in complex interfaces. I also mention that virtual DOM is not magic speed for every case—component design and rendering patterns still matter. In interviews, I connect reconciliation, keys, and render batching for a complete explanation.',

@@ -22,6 +22,11 @@ export const FrontendTopicImportanceChart = dynamic(
   { ssr: false }
 );
 
+export const ReactTopicImportanceChart = dynamic(
+  () => import('./ReactTopicImportanceChart').then((mod) => mod.ReactTopicImportanceChart),
+  { ssr: false },
+);
+
 export const TcsTopicImportanceChart = dynamic(
   () => import('./TcsTopicImportanceChart').then((mod) => mod.TcsTopicImportanceChart),
   { ssr: false }

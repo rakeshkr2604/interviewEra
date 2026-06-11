@@ -80,6 +80,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: '/interview-questions/topics/react-js',
+        destination: '/interview-questions/topics/react',
+        permanent: true,
+      },
+      {
         source: '/:path*',
         has: [{ type: 'host', value: 'www.interviewera.com' }],
         destination: 'https://interviewera.com/:path*',

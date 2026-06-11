@@ -395,7 +395,7 @@ export const SKILL_QUESTIONS: Partial<Record<SkillSlug, QuestionSet>> = {
   },
 
   react: {
-    lastUpdated: '2026-05-31',
+    lastUpdated: '2026-06-11',
     questions: [
       {
         question: 'What is the virtual DOM and how does reconciliation work?',

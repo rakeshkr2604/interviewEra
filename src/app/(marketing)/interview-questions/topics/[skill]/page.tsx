@@ -2,8 +2,9 @@ import { notFound } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
+import { ReactHubArticle } from '@/components/programmatic/ReactHubArticle'
 import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld'
-import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
@@ -19,9 +20,36 @@ import {
   getSkillQuestionsFlat,
   buildFaqPairs,
 } from '@/lib/seo/programmatic/questions'
+import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
+import { schemaIds } from '@/lib/seo/metadata'
+import {
+  REACT_AUTHOR_NAME,
+  REACT_CANONICAL_PATH,
+  REACT_DESCRIPTION,
+  REACT_FAQ_ITEMS,
+  REACT_HERO_ALT,
+  REACT_HERO_HEIGHT,
+  REACT_HERO_PATH,
+  REACT_HERO_WIDTH,
+  REACT_ARCHITECTURE_ALT,
+  REACT_ARCHITECTURE_HEIGHT,
+  REACT_ARCHITECTURE_PATH,
+  REACT_ARCHITECTURE_WIDTH,
+  REACT_LAST_UPDATED,
+  REACT_META_TITLE,
+  REACT_PUBLISHED_DATE,
+  REACT_REVIEWED_DATE,
+  REACT_REVIEWER_NAME,
+  REACT_ROADMAP_ALT,
+  REACT_ROADMAP_HEIGHT,
+  REACT_ROADMAP_PATH,
+  REACT_ROADMAP_WIDTH,
+  isReactHub,
+} from '@/lib/seo/programmatic/react-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildSkillPageLinks } from '@/lib/seo/internal-linking'
 import type { SkillSlug } from '@/lib/seo/programmatic'
+import '../../../blog/blog.css'
 
 export function generateStaticParams() {
   return allSkillParams()
@@ -33,6 +61,29 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { skill: skillSlug } = await params
   const skill = getSkillBySlug(skillSlug)
   if (!skill) return {}
+
+  if (isReactHub(skill.slug)) {
+    const ORIGIN = getCanonicalSiteOrigin()
+    return baseGenerateMetadata({
+      title: REACT_META_TITLE,
+      description: REACT_DESCRIPTION,
+      path: REACT_CANONICAL_PATH,
+      ogImage: `${ORIGIN}${REACT_HERO_PATH}`,
+      keywords: [
+        'React interview questions',
+        'React.js interview questions 2026',
+        'React hooks interview questions',
+        'React interview questions India',
+        'React Context API interview',
+        'React state management interview',
+        'React performance interview questions',
+        'React mock interview',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
   return skillPageMetadata(skill)
 }
 
@@ -55,12 +106,142 @@ export default async function SkillQuestionsPage({ params }: Props) {
   if (!skill) notFound()
 
   const questions = getSkillQuestionsFlat(skill.slug as SkillSlug)
-  const faqPairs = buildFaqPairs(questions)
-
-  // Engine-driven cross-links: roles needing this skill, related topics in the
-  // same category (topic-cluster signal), tool funnel, and hub-upward links.
   const linkSections = buildSkillPageLinks(skill)
 
+  if (isReactHub(skill.slug)) {
+    const BREADCRUMB_LD = breadcrumbListJsonLd(skillBreadcrumbs(skill), ORIGIN)
+    const FAQ_LD = faqPageJsonLd([...REACT_FAQ_ITEMS])
+
+    const ITEM_LIST_LD =
+      questions.length > 0
+        ? {
+            '@context': 'https://schema.org',
+            '@type': 'ItemList',
+            itemListOrder: 'https://schema.org/ItemListOrderAscending',
+            name: `${skill.label} interview questions`,
+            url: canonicalUrl(REACT_CANONICAL_PATH),
+            numberOfItems: questions.length,
+            itemListElement: questions.map((q, idx) => ({
+              '@type': 'ListItem',
+              position: idx + 1,
+              name: q.question,
+            })),
+          }
+        : null
+
+    const REACT_PAGE_LD = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': `${ORIGIN}#website`,
+          url: ORIGIN,
+          name: 'InterviewEra',
+          publisher: { '@id': schemaIds.organization },
+          inLanguage: 'en-IN',
+        },
+        {
+          '@type': 'Organization',
+          '@id': schemaIds.organization,
+          name: 'InterviewEra',
+          url: ORIGIN,
+        },
+        {
+          '@type': 'Person',
+          '@id': `${ORIGIN}#react-author`,
+          name: REACT_AUTHOR_NAME,
+          worksFor: { '@id': schemaIds.organization },
+        },
+        {
+          '@type': 'Person',
+          '@id': `${ORIGIN}#react-reviewer`,
+          name: REACT_REVIEWER_NAME,
+          worksFor: { '@id': schemaIds.organization },
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${ORIGIN}${REACT_HERO_PATH}#image`,
+          url: `${ORIGIN}${REACT_HERO_PATH}`,
+          contentUrl: `${ORIGIN}${REACT_HERO_PATH}`,
+          caption: REACT_HERO_ALT,
+          width: REACT_HERO_WIDTH,
+          height: REACT_HERO_HEIGHT,
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image`,
+          url: `${ORIGIN}${REACT_ROADMAP_PATH}`,
+          contentUrl: `${ORIGIN}${REACT_ROADMAP_PATH}`,
+          caption: REACT_ROADMAP_ALT,
+          width: REACT_ROADMAP_WIDTH,
+          height: REACT_ROADMAP_HEIGHT,
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image`,
+          url: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
+          contentUrl: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
+          caption: REACT_ARCHITECTURE_ALT,
+          width: REACT_ARCHITECTURE_WIDTH,
+          height: REACT_ARCHITECTURE_HEIGHT,
+        },
+        {
+          '@type': 'WebPage',
+          '@id': canonicalUrl(REACT_CANONICAL_PATH),
+          url: canonicalUrl(REACT_CANONICAL_PATH),
+          name: REACT_META_TITLE,
+          isPartOf: { '@id': `${ORIGIN}#website` },
+          primaryImageOfPage: { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
+          mainEntity: { '@id': `${canonicalUrl(REACT_CANONICAL_PATH)}#article` },
+          inLanguage: 'en-IN',
+        },
+        {
+          '@type': 'Article',
+          '@id': `${canonicalUrl(REACT_CANONICAL_PATH)}#article`,
+          headline: REACT_META_TITLE,
+          description: REACT_DESCRIPTION,
+          mainEntityOfPage: { '@id': canonicalUrl(REACT_CANONICAL_PATH) },
+          url: canonicalUrl(REACT_CANONICAL_PATH),
+          datePublished: REACT_PUBLISHED_DATE,
+          dateModified: REACT_LAST_UPDATED,
+          dateReviewed: REACT_REVIEWED_DATE,
+          author: { '@id': `${ORIGIN}#react-author` },
+          reviewedBy: { '@id': `${ORIGIN}#react-reviewer` },
+          publisher: { '@id': schemaIds.organization },
+          image: [
+            { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
+            { '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image` },
+            { '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image` },
+          ],
+          speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: ['h1', '#react-roadmap', '#react-topic-importance', '#react-questions'],
+          },
+        },
+      ],
+    }
+
+    return (
+      <>
+        <JsonLdScript id="react-breadcrumb-ld" data={BREADCRUMB_LD} />
+        <JsonLdScript id="react-faq-ld" data={FAQ_LD} />
+        {ITEM_LIST_LD ? <JsonLdScript id="react-question-itemlist-ld" data={ITEM_LIST_LD} /> : null}
+        <JsonLdScript id="react-page-ld" data={REACT_PAGE_LD} />
+
+        <ReactHubArticle skill={skill} questions={questions} />
+
+        {linkSections.map((section) => (
+          <SeoCrossLinksSection
+            key={section.heading}
+            heading={section.heading}
+            links={section.links}
+          />
+        ))}
+      </>
+    )
+  }
+
+  const faqPairs = buildFaqPairs(questions)
   const BREADCRUMB_LD = breadcrumbListJsonLd(skillBreadcrumbs(skill), ORIGIN)
   const FAQ_LD = faqPairs.length > 0 ? faqPageJsonLd(faqPairs) : null
 
@@ -69,13 +250,11 @@ export default async function SkillQuestionsPage({ params }: Props) {
       <JsonLdScript id="skill-breadcrumb-ld" data={BREADCRUMB_LD} />
       {FAQ_LD ? <JsonLdScript id="skill-faq-ld" data={FAQ_LD} /> : null}
 
-      {/* ── Hero ─────────────────────────────────────────────────────────── */}
       <section
         className={`${CONTENT_SECTION} border-b`}
         style={{ borderColor: 'var(--card-border)' }}
       >
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          {/* Breadcrumb */}
           <nav className="mb-4 flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }} aria-label="Breadcrumb">
             <Link href={questionsHubPath()} className="hover:underline" style={{ color: 'var(--text-muted)' }}>
               Interview Questions
@@ -108,7 +287,6 @@ export default async function SkillQuestionsPage({ params }: Props) {
             {skill.description}
           </p>
 
-          {/* Meta badges */}
           <div className="mt-5 flex flex-wrap gap-2">
             <span
               className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium"
@@ -134,7 +312,6 @@ export default async function SkillQuestionsPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── Questions ────────────────────────────────────────────────────── */}
       <section className={CONTENT_SECTION}>
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
           <QuestionsList
@@ -144,7 +321,6 @@ export default async function SkillQuestionsPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── CTA ──────────────────────────────────────────────────────────── */}
       <section
         className={`${CONTENT_SECTION} border-y`}
         style={{
@@ -185,7 +361,6 @@ export default async function SkillQuestionsPage({ params }: Props) {
         </div>
       </section>
 
-      {/* ── Engine-driven cross-link sections ────────────────────────────── */}
       {linkSections.map((section) => (
         <SeoCrossLinksSection
           key={section.heading}
