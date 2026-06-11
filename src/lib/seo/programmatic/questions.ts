@@ -189,7 +189,7 @@ export const ROLE_QUESTION_REGISTRY: Partial<Record<RoleSlug, QuestionSet>> = {
   },
 
   'frontend-developer': {
-    lastUpdated: '2026-05-21',
+    lastUpdated: '2026-06-11',
     questions: [
       {
         question: "What is the difference between `==` and `===` in JavaScript?",

@@ -349,42 +349,82 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
   "What is the difference between `==` and `===` in JavaScript?": {
     expertAnswer:
       '`==` compares values after type coercion, while `===` compares both value and type without coercion. In production frontend code, I default to `===` to avoid surprising conversions like `0 == "0"` or `"" == false`. I can still explain rare intentional uses of `==`, such as checking `null` and `undefined` together. In interviews, giving concrete coercion examples and stating a clear coding standard shows stronger JavaScript fundamentals than a one-line definition.',
+    evaluates: 'JavaScript type system fundamentals and whether you write predictable production code.',
+    strategy: 'Define both operators, give 2 coercion examples, state your team standard (`===` default), mention null-check exception.',
+    mistakes: 'Saying they are interchangeable, or unable to explain any coercion example.',
+    followUps: ['What is `Object.is` used for?', 'How does `typeof null` behave?'],
   },
   "What is the virtual DOM in React and why does it exist?": {
     expertAnswer:
       'Virtual DOM is React’s in-memory representation of UI structure. On state changes, React compares previous and new trees, then applies minimal updates to the real DOM. This model improves developer ergonomics and can reduce costly direct DOM mutations, especially in complex interfaces. I also mention that virtual DOM is not magic speed for every case—component design and rendering patterns still matter. In interviews, I connect reconciliation, keys, and render batching for a complete explanation.',
+    evaluates: 'React mental model depth beyond JSX syntax — reconciliation and update strategy.',
+    strategy: 'Define virtual DOM, explain diff-and-patch flow, mention keys and that performance still depends on component design.',
+    mistakes: 'Claiming virtual DOM always makes React faster than vanilla JS, or skipping reconciliation entirely.',
+    followUps: ['Why do list keys matter?', 'What triggers a React re-render?'],
   },
   "Explain CSS specificity. Which rule wins: an ID selector or a class selector?": {
     expertAnswer:
       'CSS specificity determines which rule wins when multiple rules target the same element. An ID selector has higher specificity than a class selector, so ID wins unless overridden by `!important` or inline styles in specific contexts. I explain specificity numerically and also mention source order as tiebreaker when specificity is equal. In frontend interviews, I pair this with maintainability advice: avoid overusing IDs and `!important`, and prefer predictable architecture like utility classes or scoped systems.',
+    evaluates: 'CSS debugging ability and whether you can explain cascade conflicts in real codebases.',
+    strategy: 'State ID beats class, explain specificity weights (inline > ID > class > element), add maintainability note.',
+    mistakes: 'Wrong ordering, ignoring source order tiebreaker, or over-relying on `!important` in answers.',
+    followUps: ['What beats an inline style?', 'How do pseudo-classes affect specificity?'],
   },
   "What is event bubbling in JavaScript? How do you stop it?": {
     expertAnswer:
       'Event bubbling means an event triggered on a child element propagates upward through ancestor elements. I stop propagation using `event.stopPropagation()` when parent handlers should not run. I also distinguish `preventDefault()`, which blocks default browser action but does not stop bubbling. In real apps, I use delegation intentionally for performance on large lists, then selectively stop bubbling for nested interactive controls. Interviewers usually check that you understand phases and practical handling choices.',
+    evaluates: 'DOM event model knowledge and practical handler design in interactive UIs.',
+    strategy: 'Define bubbling, show stopPropagation vs preventDefault, mention event delegation use case.',
+    mistakes: 'Confusing preventDefault with stopPropagation, or not knowing capture vs bubble phases.',
+    followUps: ['What is event capturing?', 'When is event delegation useful?'],
   },
   "What are the differences between `let`, `const`, and `var`?": {
     expertAnswer:
       '`var` is function-scoped and hoisted with undefined initialization, which can cause subtle bugs. `let` and `const` are block-scoped and respect temporal dead zone before declaration. `const` prevents reassignment of the binding but does not make objects deeply immutable. In modern JavaScript, I default to `const`, use `let` when reassignment is needed, and avoid `var` in new code. A strong interview answer includes scope examples and common loop-related pitfalls.',
+    evaluates: 'Core JavaScript scoping and hoisting — foundational for debugging async and closure bugs.',
+    strategy: 'Compare scope, hoisting, and reassignment rules; recommend const-first modern style with examples.',
+    mistakes: 'Saying const makes objects immutable, or unable to explain temporal dead zone.',
+    followUps: ['What is the temporal dead zone?', 'How does hoisting affect function declarations?'],
   },
   "What is the difference between controlled and uncontrolled components in React?": {
     expertAnswer:
       'Controlled components keep form state inside React using `value` and `onChange`, giving predictable validation and multi-step workflow control. Uncontrolled components rely on DOM state and refs, useful for simple fields or file inputs. In product UIs like Freshworks-style admin forms, controlled inputs are usually preferred for validation, analytics, and dynamic logic. I also mention not mixing both styles on the same field to avoid warnings and inconsistent behavior during rerenders.',
+    evaluates: 'Form state architecture judgment and React data-flow understanding.',
+    strategy: 'Contrast state ownership (React vs DOM), give when to use each, warn against mixing on same input.',
+    mistakes: 'Treating all forms as uncontrolled, or not knowing file inputs often need refs.',
+    followUps: ['How do you validate controlled form fields?', 'When would you use react-hook-form?'],
   },
   "How do you optimise the performance of a React application?": {
     expertAnswer:
       'I start with profiling, not guesswork. Then I optimize high-impact areas: avoid unnecessary rerenders with memoization where proven useful, split heavy route bundles, virtualize long lists, and reduce expensive synchronous work on render paths. I also improve network and asset performance with lazy loading, caching strategy, and image optimization. In interviews, I present one before/after metric example because measurable impact is stronger than listing techniques without prioritization.',
+    evaluates: 'Performance engineering maturity — measurement-first optimization vs random memoization.',
+    strategy: 'Lead with profiling, prioritize bundle/network/render bottlenecks, cite one metric-driven fix.',
+    mistakes: 'Sprinkling React.memo everywhere without profiling, or listing techniques with no prioritization.',
+    followUps: ['When does useMemo hurt performance?', 'How do you analyze bundle size?'],
   },
   "How do you ensure cross-browser compatibility in your CSS and JavaScript?": {
     expertAnswer:
       'I use a layered approach: check feature support with caniuse data, transpile JavaScript with Babel targets, add CSS prefixes via Autoprefixer, and rely on progressive enhancement for advanced APIs. I test critical flows on Chrome, Firefox, Safari, and mobile browsers, with focused fallback paths for unsupported features. I prefer feature detection over user-agent sniffing. In product-company interviews, showing a repeatable compatibility process is more valuable than naming isolated browser quirks.',
+    evaluates: 'Production readiness and systematic QA habits for diverse browser environments.',
+    strategy: 'Describe toolchain (Babel, Autoprefixer), testing matrix, progressive enhancement, avoid UA sniffing.',
+    mistakes: 'Only testing Chrome, or relying on polyfills without understanding bundle cost.',
+    followUps: ['What is progressive enhancement?', 'How do you test Safari-specific issues?'],
   },
   "Tell me about a frontend component or feature you built that you are most proud of.": {
     expertAnswer:
       'I usually discuss a ticket-management table I built with server-side pagination, column filters, keyboard accessibility, and optimistic updates. The hardest part was balancing performance with UX for large datasets. I profiled render bottlenecks, introduced row virtualization, and reduced unnecessary rerenders through stable props and memoized selectors. As a result, interaction latency dropped and adoption improved among internal support agents. I conclude with one improvement area to show reflection, not just self-promotion.',
+    evaluates: 'Project ownership depth, technical trade-offs, and ability to communicate impact with specifics.',
+    strategy: 'Use STAR: situation, your technical decisions, measurable outcome, one lesson learned.',
+    mistakes: 'Generic tutorial projects, no metrics, or claiming sole credit without explaining your role.',
+    followUps: ['What would you refactor if you rebuilt it?', 'How did you handle error states?'],
   },
   "How would you approach building a fully responsive design from a desktop Figma mockup?": {
     expertAnswer:
       'I do not shrink desktop blindly. I define core user tasks, then design mobile-first layouts with content-driven breakpoints. I use fluid spacing/type scales, Flexbox/Grid combinations, and responsive image strategy for performance. I verify edge states—long text, empty states, form errors, and localization. I also sync quickly with designers on ambiguous interactions before implementation drifts. In interviews, this workflow shows practical execution from design handoff to production-ready responsive behavior.',
+    evaluates: 'Design-to-code workflow, responsive CSS craft, and collaboration with designers.',
+    strategy: 'Mobile-first plan, content-driven breakpoints, layout primitives, edge-case checklist, designer sync.',
+    mistakes: 'Fixed pixel breakpoints only, ignoring touch targets, or skipping empty/error states.',
+    followUps: ['How do you handle responsive images?', 'When do you use container queries?'],
   },
 }
 

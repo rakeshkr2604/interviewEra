@@ -12,6 +12,7 @@ import { BaTableOfContents } from '@/components/programmatic/BaTableOfContents'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import { AndroidDeveloperHubArticle } from '@/components/programmatic/AndroidDeveloperHubArticle'
 import { SoftwareEngineerHubArticle } from '@/components/programmatic/SoftwareEngineerHubArticle'
+import { FrontendDeveloperHubArticle } from '@/components/programmatic/FrontendDeveloperHubArticle'
 import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
 import { schemaIds } from '@/lib/seo/metadata'
 import {
@@ -82,6 +83,30 @@ import {
   SOFTWARE_ENGINEER_ROADMAP_WIDTH,
   isSoftwareEngineerHub,
 } from '@/lib/seo/programmatic/software-engineer-hub'
+import {
+  FRONTEND_AUTHOR_NAME,
+  FRONTEND_CANONICAL_PATH,
+  FRONTEND_DESCRIPTION,
+  FRONTEND_FAQ_ITEMS,
+  FRONTEND_HERO_ALT,
+  FRONTEND_HERO_HEIGHT,
+  FRONTEND_HERO_PATH,
+  FRONTEND_HERO_WIDTH,
+  FRONTEND_LAST_UPDATED,
+  FRONTEND_META_TITLE,
+  FRONTEND_PROCESS_ALT,
+  FRONTEND_PROCESS_HEIGHT,
+  FRONTEND_PROCESS_PATH,
+  FRONTEND_PROCESS_WIDTH,
+  FRONTEND_PUBLISHED_DATE,
+  FRONTEND_REVIEWED_DATE,
+  FRONTEND_REVIEWER_NAME,
+  FRONTEND_ROADMAP_ALT,
+  FRONTEND_ROADMAP_HEIGHT,
+  FRONTEND_ROADMAP_PATH,
+  FRONTEND_ROADMAP_WIDTH,
+  isFrontendDeveloperHub,
+} from '@/lib/seo/programmatic/frontend-developer-hub'
 import '../../blog/blog.css'
 
 export function generateStaticParams() {
@@ -160,6 +185,28 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       noIndex: false,
     })
   }
+  if (isFrontendDeveloperHub(role.slug)) {
+    return baseGenerateMetadata({
+      title: FRONTEND_META_TITLE,
+      description: FRONTEND_DESCRIPTION,
+      path: FRONTEND_CANONICAL_PATH,
+      ogImage: `${getCanonicalSiteOrigin()}${FRONTEND_HERO_PATH}`,
+      keywords: [
+        'frontend developer interview questions',
+        'frontend developer interview questions India 2026',
+        'frontend developer interview questions and answers',
+        'React interview questions frontend',
+        'JavaScript interview questions',
+        'CSS interview questions',
+        'TypeScript frontend interview',
+        'frontend hiring process India',
+        'frontend developer mock interview',
+        'React vs Angular interview',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
   return rolePageMetadata(role)
 }
 
@@ -228,7 +275,8 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
   const isAndroidHub = isAndroidDeveloperHub(role.slug)
   const isSweHub = isSoftwareEngineerHub(role.slug)
-  const isEditorialHub = role.slug === 'business-analyst' || isAndroidHub || isSweHub
+  const isFeHub = isFrontendDeveloperHub(role.slug)
+  const isEditorialHub = role.slug === 'business-analyst' || isAndroidHub || isSweHub || isFeHub
 
   const questions = getRoleQuestionsFlat(role.slug)
   const hubQuestions = isAndroidHub ? ANDROID_DEVELOPER_QUESTIONS : questions
@@ -245,7 +293,9 @@ export default async function RoleQuestionsPage({ params }: Props) {
         ? faqPageJsonLd([...ANDROID_FAQ_ITEMS])
         : isSweHub
           ? faqPageJsonLd([...SOFTWARE_ENGINEER_FAQ_ITEMS])
-          : faqPairs.length > 0
+          : isFeHub
+            ? faqPageJsonLd([...FRONTEND_FAQ_ITEMS])
+            : faqPairs.length > 0
           ? faqPageJsonLd(faqPairs)
           : null
 
@@ -540,6 +590,100 @@ export default async function RoleQuestionsPage({ params }: Props) {
       }
     : null
 
+  const FE_PAGE_LD = isFeHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#fe-author`,
+            name: FRONTEND_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#fe-reviewer`,
+            name: FRONTEND_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${FRONTEND_HERO_PATH}#image`,
+            url: `${ORIGIN}${FRONTEND_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${FRONTEND_HERO_PATH}`,
+            caption: FRONTEND_HERO_ALT,
+            width: FRONTEND_HERO_WIDTH,
+            height: FRONTEND_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${FRONTEND_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${FRONTEND_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${FRONTEND_PROCESS_PATH}`,
+            caption: FRONTEND_PROCESS_ALT,
+            width: FRONTEND_PROCESS_WIDTH,
+            height: FRONTEND_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${FRONTEND_ROADMAP_PATH}#image`,
+            url: `${ORIGIN}${FRONTEND_ROADMAP_PATH}`,
+            contentUrl: `${ORIGIN}${FRONTEND_ROADMAP_PATH}`,
+            caption: FRONTEND_ROADMAP_ALT,
+            width: FRONTEND_ROADMAP_WIDTH,
+            height: FRONTEND_ROADMAP_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(FRONTEND_CANONICAL_PATH),
+            url: canonicalUrl(FRONTEND_CANONICAL_PATH),
+            name: FRONTEND_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${FRONTEND_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(FRONTEND_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(FRONTEND_CANONICAL_PATH)}#article`,
+            headline: FRONTEND_META_TITLE,
+            description: FRONTEND_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(FRONTEND_CANONICAL_PATH) },
+            url: canonicalUrl(FRONTEND_CANONICAL_PATH),
+            datePublished: FRONTEND_PUBLISHED_DATE,
+            dateModified: FRONTEND_LAST_UPDATED,
+            dateReviewed: FRONTEND_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#fe-author` },
+            reviewedBy: { '@id': `${ORIGIN}#fe-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: [
+              { '@id': `${ORIGIN}${FRONTEND_HERO_PATH}#image` },
+              { '@id': `${ORIGIN}${FRONTEND_PROCESS_PATH}#image` },
+              { '@id': `${ORIGIN}${FRONTEND_ROADMAP_PATH}#image` },
+            ],
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: ['h1', '#fe-hiring-process', '#fe-topic-importance', '#fe-questions'],
+            },
+          },
+        ],
+      }
+    : null
+
   return (
     <>
       <JsonLdScript id="role-breadcrumb-ld" data={BREADCRUMB_LD} />
@@ -548,6 +692,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
       {BA_PAGE_LD ? <JsonLdScript id="role-ba-page-ld" data={BA_PAGE_LD} /> : null}
       {ANDROID_PAGE_LD ? <JsonLdScript id="role-android-page-ld" data={ANDROID_PAGE_LD} /> : null}
       {SWE_PAGE_LD ? <JsonLdScript id="role-swe-page-ld" data={SWE_PAGE_LD} /> : null}
+      {FE_PAGE_LD ? <JsonLdScript id="role-fe-page-ld" data={FE_PAGE_LD} /> : null}
 
       {/* ── Hero (non-editorial roles) ───────────────────────────────────── */}
       {!isEditorialHub ? (
@@ -1757,6 +1902,10 @@ export default async function RoleQuestionsPage({ params }: Props) {
 
       {isSweHub ? (
         <SoftwareEngineerHubArticle role={role} questions={questions} />
+      ) : null}
+
+      {isFeHub ? (
+        <FrontendDeveloperHubArticle role={role} questions={questions} />
       ) : null}
 
       {/* ── Questions ────────────────────────────────────────────────────── */}
