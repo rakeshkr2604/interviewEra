@@ -33,7 +33,7 @@ const NAV_DROPDOWNS = [
     label: 'Interview Questions',
     items: [
       { href: '/interview-questions', label: 'By Role' },
-      { href: '/interview-questions/companies/tcs', label: 'By Company' },
+      { href: '/interview-questions/tcs', label: 'By Company' },
       { href: '/interview-questions/topics/react', label: 'By Topic' },
     ],
   },

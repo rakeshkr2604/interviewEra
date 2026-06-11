@@ -54,7 +54,9 @@ function buildProgrammaticRoleEntries(): ContentEntry[] {
 }
 
 function buildProgrammaticCompanyEntries(): ContentEntry[] {
-  return COMPANIES.filter(isCompanyIndexable).map((company) => ({
+  return COMPANIES.filter(isCompanyIndexable)
+    .filter((company) => !EDITORIAL_PATHS.has(companyQuestionsPath(company.slug)))
+    .map((company) => ({
     id: `company-${company.slug}`,
     path: companyQuestionsPath(company.slug),
     title: `${company.label} Interview Questions`,

@@ -22,6 +22,11 @@ export const FrontendTopicImportanceChart = dynamic(
   { ssr: false }
 );
 
+export const TcsTopicImportanceChart = dynamic(
+  () => import('./TcsTopicImportanceChart').then((mod) => mod.TcsTopicImportanceChart),
+  { ssr: false }
+);
+
 export const HrAnswerFlowDiagram = dynamic(
   () => import('./HrAnswerFlowDiagram').then((mod) => mod.HrAnswerFlowDiagram),
   { ssr: false }

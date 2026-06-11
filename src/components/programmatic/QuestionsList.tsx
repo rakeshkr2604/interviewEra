@@ -111,7 +111,7 @@ function QuestionCard({
   number: number
   expanded: boolean
 }) {
-  const showInsight = expanded && hasQuestionInsightContent(question)
+  const showInsight = expanded
 
   return (
     <li
@@ -139,7 +139,9 @@ function QuestionCard({
       </div>
 
       {showInsight ? (
-        <QuestionInsight question={question} />
+        hasQuestionInsightContent(question) ? (
+          <QuestionInsight question={question} />
+        ) : null
       ) : question.tip ? (
         <p className="mt-2 pl-8 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>

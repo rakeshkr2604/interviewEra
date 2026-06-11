@@ -1013,6 +1013,359 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   height: auto;
 }
 
+/* Company interview hub — shared layout (reference: TCS) */
+.ie-landing-premium .ie-company-hub-article-body > * + * {
+  margin-top: 2.5rem;
+}
+
+@media (min-width: 768px) {
+  .ie-landing-premium .ie-company-hub-article-body > * + * {
+    margin-top: 3rem;
+  }
+}
+
+.ie-company-hub-touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.ie-company-hub-related-link,
+.ie-tcs-related-link {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+}
+
+/* TCS hub — campus roadmap hero (complements H1, no duplicate title) */
+.ie-tcs-hero-visual {
+  margin: 0;
+  width: 100%;
+}
+
+.ie-tcs-hero-visual__inner {
+  padding: 1.5rem 1.25rem 1.35rem;
+  border-radius: 20px;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 0%, color-mix(in srgb, #06b6d4 22%, transparent), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 90% 100%, color-mix(in srgb, var(--accent-primary) 24%, transparent), transparent 50%),
+    linear-gradient(155deg, #1a1033 0%, #12102a 42%, #0d1224 100%);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #fff 6%, transparent);
+}
+
+.ie-tcs-hero-visual__title {
+  margin: 0 0 1.1rem;
+  text-align: center;
+  font-size: clamp(1rem, 2.4vw, 1.3rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: #f1f5f9;
+}
+
+.ie-tcs-hero-visual__roadmap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ie-tcs-hero-visual__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.ie-tcs-hero-visual__step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, #06b6d4 18%, #1e1b4b);
+  color: #a5f3fc;
+  flex-shrink: 0;
+}
+
+.ie-tcs-hero-visual__step-label {
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: #e2e8f0;
+  max-width: 5.5rem;
+}
+
+.ie-tcs-hero-visual__arrow {
+  margin: 0 0.1rem;
+  font-size: 0.75rem;
+  color: color-mix(in srgb, #06b6d4 70%, #94a3b8);
+  user-select: none;
+}
+
+.ie-tcs-hero-visual__tracks {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 1rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid color-mix(in srgb, #fff 8%, transparent);
+}
+
+.ie-tcs-hero-visual__track {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.55rem 0.3rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #fff 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--track-accent) 35%, transparent);
+}
+
+.ie-tcs-hero-visual__track-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #fff;
+  background: var(--track-accent);
+}
+
+.ie-tcs-hero-visual__track-name {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.ie-tcs-hero-visual__topics {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.85rem;
+}
+
+.ie-tcs-hero-visual__topic {
+  padding: 0.22rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #ddd6fe;
+  background: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent);
+}
+
+@media (min-width: 640px) {
+  .ie-tcs-hero-visual__inner {
+    padding: 1.75rem 1.5rem 1.5rem;
+  }
+
+  .ie-tcs-hero-visual__step-label {
+    font-size: 0.72rem;
+    max-width: none;
+  }
+
+  .ie-tcs-hero-visual__track-name {
+    font-size: 0.72rem;
+  }
+
+  .ie-tcs-hero-visual__topic {
+    font-size: 0.66rem;
+  }
+}
+
+/* TCS hub — responsive data tables (desktop table / mobile cards) */
+.ie-tcs-data-table--themed .ie-tcs-data-table__table {
+  min-width: 0;
+}
+
+.ie-tcs-data-table__mobile {
+  display: none;
+}
+
+.ie-tcs-data-table__table {
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .ie-tcs-data-table__desktop {
+    display: none;
+  }
+
+  .ie-tcs-data-table__mobile {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .ie-tcs-data-table__card {
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+    border: 1px solid var(--card-border);
+    background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+    box-shadow: var(--card-shadow);
+  }
+
+  .ie-tcs-data-table__card-title {
+    margin: 0 0 0.65rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.3;
+    color: var(--text-primary);
+  }
+
+  .ie-tcs-data-table__card-dl {
+    margin: 0;
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .ie-tcs-data-table__card-row {
+    display: grid;
+    gap: 0.15rem;
+  }
+
+  .ie-tcs-data-table__card-row dt {
+    margin: 0;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .ie-tcs-data-table__card-row dd {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+
+  .ie-tcs-data-table__card--da {
+    border-color: color-mix(in srgb, var(--accent-success) 35%, var(--card-border));
+    background: color-mix(in srgb, var(--v3-okdim) 40%, var(--card-bg));
+  }
+
+  .ie-tcs-data-table__card--pm {
+    border-color: color-mix(in srgb, var(--accent-warning) 35%, var(--card-border));
+    background: color-mix(in srgb, var(--accent-warning) 6%, var(--card-bg));
+  }
+
+  .ie-tcs-data-table__card-row--da dt {
+    color: var(--accent-success);
+  }
+
+  .ie-tcs-data-table__card-row--pm dt {
+    color: var(--accent-warning);
+  }
+
+  .ie-tcs-data-table__card-row--da dd {
+    background: color-mix(in srgb, var(--v3-okdim) 50%, transparent);
+    border-radius: 8px;
+    padding: 0.35rem 0.5rem;
+  }
+
+  .ie-tcs-data-table__card-row--pm dd {
+    background: color-mix(in srgb, var(--accent-warning) 8%, transparent);
+    border-radius: 8px;
+    padding: 0.35rem 0.5rem;
+  }
+
+  .ie-tcs-data-table__card--ba {
+    border-color: color-mix(in srgb, var(--accent-primary) 35%, var(--card-border));
+    background: color-mix(in srgb, var(--v3-accdim) 40%, var(--card-bg));
+  }
+
+  .ie-tcs-data-table__card-row--ba dt {
+    color: var(--accent-primary);
+  }
+
+  .ie-tcs-data-table__card-row--ba dd {
+    background: color-mix(in srgb, var(--v3-accdim) 50%, transparent);
+    border-radius: 8px;
+    padding: 0.35rem 0.5rem;
+  }
+
+}
+
+/* TCS hub — score target cards */
+.ie-tcs-score-target {
+  min-height: 44px;
+}
+
+/* TCS hub — FAQ accordion (content remains in DOM for SEO) */
+.ie-landing-premium .ie-blog-faq-stack--accordion .ie-blog-faq-item--accordion {
+  padding: 0;
+  overflow: hidden;
+}
+
+.ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__question {
+  margin: 0;
+  padding: 1rem 1.25rem;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__question::-webkit-details-marker {
+  display: none;
+}
+
+.ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__question::before {
+  content: '▸';
+  margin-right: 0.5rem;
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.ie-landing-premium .ie-blog-faq-item--accordion[open] .ie-blog-faq-item__question::before {
+  content: '▾';
+}
+
+.ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__answer {
+  padding: 0 1.25rem 1.15rem;
+}
+
+@media (min-width: 640px) {
+  .ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__question {
+    padding: 1.15rem 1.5rem;
+  }
+
+  .ie-landing-premium .ie-blog-faq-item--accordion .ie-blog-faq-item__answer {
+    padding: 0 1.5rem 1.25rem;
+  }
+}
+
+/* TCS hub — process flow mobile */
+@media (max-width: 767px) {
+  .ie-tcs-process-flow__item {
+    grid-template-columns: 2rem 1fr;
+    grid-template-rows: auto auto auto;
+  }
+
+  .ie-tcs-process-flow__duration {
+    grid-row: 2;
+    grid-column: 2;
+    justify-self: start;
+    margin-top: 0.15rem;
+  }
+
+  .ie-tcs-process-flow__arrow {
+    grid-column: 1 / -1;
+  }
+}
+
 /* Software Engineer hub — career roadmap hero (complements page H1, no duplicate copy) */
 .ie-swe-hero-visual {
   margin: 0;
@@ -1368,6 +1721,100 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   border: 1px solid color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
+/* TCS hub — vertical hiring process flow */
+.ie-tcs-process-flow {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ie-tcs-process-flow__item {
+  display: grid;
+  grid-template-columns: 2.25rem 1fr auto;
+  grid-template-rows: auto auto;
+  gap: 0.35rem 0.65rem;
+  align-items: center;
+  padding: 0.55rem 0;
+  position: relative;
+}
+
+.ie-tcs-process-flow__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-primary) 22%, #1e1b4b);
+  color: #c4b5fd;
+  grid-row: 1;
+  grid-column: 1;
+}
+
+.ie-tcs-process-flow__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  grid-row: 1;
+  grid-column: 2;
+  min-width: 0;
+}
+
+.ie-tcs-process-flow__label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #f1f5f9;
+}
+
+.ie-tcs-process-flow__signal {
+  font-size: 0.62rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #94a3b8;
+}
+
+.ie-tcs-process-flow__duration {
+  grid-row: 1;
+  grid-column: 3;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #a5f3fc;
+  background: color-mix(in srgb, #06b6d4 14%, transparent);
+  border: 1px solid color-mix(in srgb, #06b6d4 28%, transparent);
+  white-space: nowrap;
+}
+
+.ie-tcs-process-flow__arrow {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  text-align: center;
+  font-size: 1rem;
+  line-height: 1;
+  color: #6366f1;
+  padding: 0.1rem 0 0.15rem;
+}
+
+@media (min-width: 640px) {
+  .ie-tcs-process-flow__label {
+    font-size: 0.88rem;
+  }
+
+  .ie-tcs-process-flow__signal {
+    font-size: 0.65rem;
+  }
+
+  .ie-tcs-process-flow__duration {
+    font-size: 0.62rem;
+  }
+}
+
 /* Frontend Developer hub — 30-day roadmap week hierarchy */
 .ie-fe-roadmap-grid {
   display: grid;
@@ -1636,6 +2083,7 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   border-left: 1px solid color-mix(in srgb, var(--accent-warning) 28%, transparent);
 }
 
+
 .ie-landing-premium .ie-role-ba-compare-table__dim {
   padding: 0.875rem 1rem;
   font-weight: 600;
@@ -1666,6 +2114,51 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
 .ie-landing-premium .ie-role-ba-compare-table__cell--pm {
   background: color-mix(in srgb, var(--accent-warning) 7%, transparent);
   border-left: 1px solid color-mix(in srgb, var(--accent-warning) 22%, transparent);
+}
+
+.ie-landing-premium .ie-role-ba-compare-table__dim--ba {
+  border-left: 3px solid var(--accent-primary);
+}
+
+.ie-landing-premium .ie-role-ba-compare-table__dim--da {
+  border-left: 3px solid var(--accent-success);
+}
+
+.ie-landing-premium .ie-role-ba-compare-table__dim--pm {
+  border-left: 3px solid var(--accent-warning);
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--2col {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--2col .ie-role-ba-compare-table__th,
+.ie-landing-premium .ie-role-ba-compare-table--2col .ie-role-ba-compare-table__cell,
+.ie-landing-premium .ie-role-ba-compare-table--2col .ie-role-ba-compare-table__dim,
+.ie-landing-premium .ie-role-ba-compare-table--3col .ie-role-ba-compare-table__th,
+.ie-landing-premium .ie-role-ba-compare-table--3col .ie-role-ba-compare-table__cell,
+.ie-landing-premium .ie-role-ba-compare-table--3col .ie-role-ba-compare-table__dim {
+  padding: 0.875rem 1rem;
+  overflow-wrap: break-word;
+}
+
+.ie-landing-premium .ie-role-ba-compare-table--3col {
+  min-width: 0;
+  table-layout: fixed;
+}
+
+/* TCS themed tables — stronger column tints (Digital green / Prime amber) */
+.ie-tcs-data-table--themed .ie-role-ba-compare-table__cell--da {
+  background: color-mix(in srgb, var(--v3-okdim) 72%, transparent);
+}
+
+.ie-tcs-data-table--themed .ie-role-ba-compare-table__cell--pm {
+  background: color-mix(in srgb, var(--accent-warning) 11%, transparent);
+}
+
+.ie-tcs-data-table--themed .ie-role-ba-compare-table__cell--ba {
+  background: color-mix(in srgb, var(--v3-accdim) 65%, transparent);
 }
 
 .ie-landing-premium .ie-role-ba-compare-table tbody tr:hover .ie-role-ba-compare-table__cell,
@@ -1775,6 +2268,9 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
 
 /* Hub question cards — collapsible expert-answer insight (native details, zero CLS) */
 .ie-landing-premium .ie-question-insight__summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
   list-style: none;
 }
 

@@ -24,13 +24,13 @@ export const COMPANIES = [
     fullName: 'Tata Consultancy Services',
     tier: 'service',
     headquartersCity: 'Mumbai',
-    avgPackageRange: '3.5–7 LPA',
+    avgPackageRange: '7.09–11.80 LPA',
     typicalRounds: 3,
     interviewStyle: 'Online Test (NQT) → Technical → HR',
     sitemapPriority: 0.88,
     fresherHiring: true,
     description:
-      "India's largest IT employer. TCS interviews freshers via the National Qualifier Test (NQT) followed by technical and HR rounds.",
+      "India's largest IT employer. TCS interviews freshers via the National Qualifier Test (NQT) followed by technical and HR rounds — Digital and Prime bands offer ₹7–12 LPA CTC for 2026 campus drives.",
   },
   {
     slug: 'infosys',

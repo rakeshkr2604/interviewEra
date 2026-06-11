@@ -270,7 +270,7 @@ export const TOP_DSA_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/google/software-engineer', label: 'Google SWE Questions' },
   { href: '/interview-questions/companies/freshworks/software-engineer', label: 'Freshworks SWE Questions' },
   { href: '/interview-questions/companies/freshworks/frontend-developer', label: 'Freshworks Frontend Questions' },
-  { href: '/interview-questions/companies/tcs', label: 'TCS Interview Questions' },
+  { href: '/interview-questions/tcs', label: 'TCS Interview Questions' },
   { href: '/interview-questions/companies/tcs/software-engineer', label: 'TCS SWE Questions' },
   { href: '/interview-questions/companies/wipro', label: 'Wipro Interview Questions' },
   { href: '/interview-questions/companies/accenture', label: 'Accenture Interview Questions' },

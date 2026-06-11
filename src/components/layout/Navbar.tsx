@@ -107,7 +107,7 @@ const INTERVIEW_QUESTIONS_ITEMS = [
   {
     icon: Building2,
     label: 'TCS Interview Questions',
-    href: '/interview-questions/companies/tcs',
+    href: '/interview-questions/tcs',
     desc: 'NQT + technical + HR rounds',
   },
   {

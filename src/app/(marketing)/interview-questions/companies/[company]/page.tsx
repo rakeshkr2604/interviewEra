@@ -1,4 +1,4 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
@@ -42,6 +42,10 @@ export default async function CompanyQuestionsPage({ params }: Props) {
   const { company: companySlug } = await params
   const company = getCompanyBySlug(companySlug)
   if (!company) notFound()
+
+  if (company.slug === 'tcs') {
+    redirect('/interview-questions/tcs')
+  }
 
   const questions = getCompanyQuestionsFlat(company.slug as CompanySlug)
   const faqPairs = buildFaqPairs(questions)

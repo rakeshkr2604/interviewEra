@@ -55,8 +55,9 @@ export function roleQuestionsPath(slug: RoleSlug): string {
   return `${PATHS.roleBase}/${slug}`
 }
 
-/** /interview-questions/companies/tcs */
+/** /interview-questions/tcs (pillar hub) or /interview-questions/companies/{slug} */
 export function companyQuestionsPath(slug: CompanySlug): string {
+  if (slug === 'tcs') return '/interview-questions/tcs'
   return `${PATHS.companyBase}/${slug}`
 }
 

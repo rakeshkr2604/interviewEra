@@ -426,6 +426,139 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
     mistakes: 'Fixed pixel breakpoints only, ignoring touch targets, or skipping empty/error states.',
     followUps: ['How do you handle responsive images?', 'When do you use container queries?'],
   },
+
+  'What is the TCS NQT and what sections does it cover?': {
+    expertAnswer:
+      'TCS National Qualifier Test is the primary online screening for campus and off-campus TCS hiring in India. It typically has four scored sections: Verbal Ability, Reasoning Ability, Numerical Ability, and Programming Logic — with an additional coding section for Digital and Prime track aspirants. Your composite percentile and section-wise cutoffs determine whether you qualify for Digital (UG ₹7.09–8.04 LPA) or Prime (UG ₹9.09–9.30 LPA; PG up to ₹11.80 LPA) bands. I treat NQT as a gate: clearing the top band unlocks higher package tracks and tougher downstream technical rounds.',
+    evaluates:
+      'Whether you understand TCS entry mechanics, NQT section structure, and how scores map to offer bands — not vague “aptitude test” answers.',
+    strategy:
+      'Define NQT, list all five areas (verbal, reasoning, numerical, programming logic, coding), then connect percentile bands to Digital/Prime/Ninja tracks.',
+    mistakes:
+      'Omitting Programming Logic, confusing NQT with only aptitude, or unable to explain how track selection works.',
+    followUps: ['What percentile do you need for Digital vs Prime?', 'How do you balance aptitude vs coding prep for NQT?'],
+  },
+  'What is the difference between TCS Digital and TCS Prime? Which one should you target?': {
+    expertAnswer:
+      'TCS Prime (UG ₹9.09–9.30 LPA; PG ₹11.50–11.80 LPA) is the premium fresher band for top NQT performers — roles focus on technical specialist tracks, lead projects, and mentorship. TCS Digital (UG ₹7.09–8.04 LPA; PG ₹7.39–8.04 LPA) targets solid aptitude and basic OOP/CS fundamentals with roles in full stack, cloud, AI/ML, and big data. I target Prime only if mock NQT scores and timed coding practice consistently hit Digital/Prime cutoffs; otherwise I optimize for Digital to avoid overcommitting to DSA at the expense of aptitude.',
+    evaluates:
+      'Realistic self-assessment, awareness of package bands, and a prep strategy aligned to your current skill level.',
+    strategy:
+      'State UG/PG CTC bands for Digital and Prime, contrast target roles (full stack/cloud vs technical specialist), and give a decision rule based on mock scores.',
+    mistakes:
+      'Quoting outdated ₹4.5/₹7 LPA figures, claiming Prime without coding evidence, or ignoring aptitude weight in NQT.',
+    followUps: ['What coding difficulty appears in Prime technical rounds?', 'Can you move from Digital to Prime after joining?'],
+  },
+  'Explain the concept of polymorphism with a real-world example.': {
+    expertAnswer:
+      'Polymorphism means one interface, many implementations. Compile-time polymorphism is method overloading — same method name, different parameters. Runtime polymorphism is method overriding — a subclass provides its own version of a parent method. A practical example: a PaymentProcessor interface with processPayment() implemented by CreditCardPayment, UpiPayment, and NetBankingPayment. The billing service calls processPayment() without knowing the concrete type — new payment methods can be added without changing client code. This is how TCS interviewers expect you to connect OOP theory to extensible system design.',
+    evaluates:
+      'OOP fundamentals with clarity on compile-time vs runtime polymorphism and a concrete, production-style example.',
+    strategy:
+      'Define both polymorphism types briefly, then walk through payment-gateway or notification-dispatcher example with interface + overrides.',
+    mistakes:
+      'Only giving animal/dog/cat analogy, confusing overloading with overriding, or skipping real-world mapping.',
+    followUps: ['Difference between abstraction and polymorphism?', 'When is composition preferred over inheritance?'],
+  },
+  'Write a program to find the second largest element in an array without sorting.': {
+    expertAnswer:
+      'I use a single-pass approach with two variables: max and secondMax, both initialized to negative infinity (or first two elements handled explicitly). For each element, if it exceeds max, shift old max to secondMax and update max; else if it is greater than secondMax and not equal to max, update secondMax. Time O(n), space O(1). Edge cases: array length < 2, all elements equal (no second largest), duplicates where max appears multiple times. I narrate the logic aloud while coding — TCS panels value clean edge-case handling over clever one-liners.',
+    evaluates:
+      'Array traversal fluency, complexity awareness, and disciplined edge-case handling under interview pressure.',
+    strategy:
+      'State O(n)/O(1) upfront, write the two-variable loop, then verbally list edge cases before the interviewer asks.',
+    mistakes:
+      'Sorting first (O(n log n)), mishandling duplicates, or crashing on arrays with fewer than two distinct values.',
+    followUps: ['Find the k-th largest element.', 'What if the array has negative numbers?'],
+  },
+  'What is a deadlock? How would you prevent it in a multi-threaded application?': {
+    expertAnswer:
+      'Deadlock occurs when two or more threads block forever, each waiting for a resource held by another. All four Coffman conditions must hold: mutual exclusion, hold-and-wait, no preemption, and circular wait. Prevention strategies: acquire locks in a global consistent order, use tryLock with timeouts, minimize lock granularity, and prefer higher-level concurrency utilities (java.util.concurrent) over raw synchronized blocks. In Java services, I also avoid nested locks on different objects and use thread dumps to diagnose circular wait in production incidents.',
+    evaluates:
+      'Concurrency literacy — can you name Coffman conditions and give practical prevention, not just a textbook definition.',
+    strategy:
+      'Define deadlock → list four conditions → give two prevention tactics (lock ordering + timeout) with a brief Java example.',
+    mistakes:
+      'Missing one Coffman condition, suggesting “just use more threads,” or no concrete prevention mechanism.',
+    followUps: ['Difference between deadlock and livelock?', 'How do you detect deadlock in Java?'],
+  },
+  'What are the main differences between SQL and NoSQL databases? When would you use each?': {
+    expertAnswer:
+      'SQL databases are relational, schema-first, and ACID-compliant — ideal for structured data with joins and transactional integrity (banking, orders, HR records). NoSQL databases (document, key-value, column, graph) trade strict schema and joins for horizontal scalability and flexible payloads — useful for session stores, logs, catalogs, and high-write telemetry. I choose SQL when consistency and complex queries matter; NoSQL when scale, schema evolution speed, or denormalized access patterns dominate. TCS interviewers often follow up with a scenario: “Would you store user profiles in MongoDB or PostgreSQL?” — justify with access pattern, not hype.',
+    evaluates:
+      'Data modeling judgment and ability to match database type to workload requirements.',
+    strategy:
+      'Contrast schema, consistency, scaling model; give one SQL use case and one NoSQL use case with reasoning.',
+    mistakes:
+      'Claiming NoSQL is always faster, ignoring ACID needs, or unable to name a concrete use case for each.',
+    followUps: ['What is CAP theorem?', 'When would you use Redis vs PostgreSQL?'],
+  },
+  'Tell me about a time you worked under a tight deadline and how you managed it.': {
+    expertAnswer:
+      'During my final-year major project, our demo date moved up by four days after a scope change. I listed all deliverables, classified them as must-have vs nice-to-have with my team lead, and focused on a thin vertical slice: login, core workflow, and one report. I sent progress updates every evening, escalated a blocker on API integration on day one, and paired with a teammate on testing. We shipped the demo on time with zero critical bugs and deferred analytics to the next sprint. TCS values structured prioritization and proactive communication — not heroics or last-minute all-nighters alone.',
+    evaluates:
+      'STAR storytelling, prioritization under pressure, and team communication maturity.',
+    strategy:
+      'Use STAR with specific timeline, your prioritization framework, stakeholder updates, and measurable outcome.',
+    mistakes:
+      'Vague team stories, no trade-offs mentioned, or framing success as working overnight without a plan.',
+    followUps: ['What did you deprioritize and why?', 'How would you handle the same situation with a larger team?'],
+  },
+  'What is the difference between process and thread? How does context switching work?': {
+    expertAnswer:
+      'A process is an independent program execution unit with its own virtual memory space, file descriptors, and OS resources tracked in a PCB. A thread is a lighter execution unit within a process that shares the process heap and open files but has its own stack and registers (TCB). Context switching saves CPU register state and switches execution; for threads it is faster because address space does not change — only thread-local state is swapped. Multithreading improves throughput for I/O-bound work but introduces race conditions requiring synchronization.',
+    evaluates:
+      'OS fundamentals — memory isolation, shared state risks, and context-switch cost reasoning.',
+    strategy:
+      'Contrast memory model first, explain PCB vs TCB, then why thread context switch is cheaper than process switch.',
+    mistakes:
+      'Saying threads have separate memory spaces, or describing context switch without mentioning saved register state.',
+    followUps: ['What is a race condition?', 'When would you prefer multiprocessing over multithreading?'],
+  },
+  'Why do you want to join TCS over other IT companies?': {
+    expertAnswer:
+      'I want to join TCS because of its scale as one of the world’s largest IT employers, structured fresher development through ILP, and platforms like Fresco Play for continuous upskilling. TCS’s global delivery footprint means early exposure to enterprise clients and diverse tech stacks — which fits my goal of building production discipline before specializing. I have researched their campus programs and am drawn to the stability, mentorship density, and certification paths (cloud, architecture) that support long-term growth — not just brand recognition.',
+    evaluates:
+      'Company research depth, genuine motivation, and fit for IT services career path — beyond generic answers.',
+    strategy:
+      'Three pillars: scale + training (ILP/Fresco Play), project exposure, alignment with your 2–3 year skill goals.',
+    mistakes:
+      'Generic “brand name” answers, incorrect facts about TCS programs, or only mentioning salary.',
+    followUps: ['Why not Infosys or Wipro?', 'Which TCS business unit interests you?'],
+  },
+  'Explain normalisation in databases. What are 1NF, 2NF, and 3NF?': {
+    expertAnswer:
+      'Normalisation reduces redundancy and update anomalies by decomposing tables based on functional dependencies. 1NF: atomic column values, no repeating groups, unique rows. 2NF: 1NF plus no partial dependency — non-key attributes must depend on the whole composite primary key. 3NF: 2NF plus no transitive dependency — non-key attributes depend only on the primary key, not on other non-key columns. Example: Student(CourseID, StudentID, Grade, InstructorName) violates 3NF if InstructorName depends only on CourseID — split into StudentGrade and CourseInstructor tables.',
+    evaluates:
+      'DBMS design literacy — can you define each normal form and demonstrate with a concrete decomposition.',
+    strategy:
+      'One sentence per normal form, then walk a Student/Course table through violations and fixes step by step.',
+    mistakes:
+      'Memorizing definitions without examples, confusing 2NF partial dependency with 3NF transitive dependency.',
+    followUps: ['What is BCNF?', 'When might you intentionally denormalize?'],
+  },
+  'What is your understanding of Agile methodology and how does it differ from Waterfall?': {
+    expertAnswer:
+      'Waterfall is sequential: requirements → design → implementation → testing → deployment, with scope locked early. Agile is iterative: work ships in short sprints with continuous stakeholder feedback and changing requirements welcomed late. Scrum adds roles (Product Owner, Scrum Master), ceremonies (sprint planning, daily standup, retrospective), and artifacts (backlog, increment). TCS uses Agile on most client delivery — I mention that I am comfortable with sprint demos, backlog grooming, and adapting when priorities shift mid-sprint.',
+    evaluates:
+      'Software delivery methodology awareness and readiness for client-project Agile environments.',
+    strategy:
+      'Contrast planning rigidity vs iteration, name Scrum ceremonies, connect to TCS delivery context.',
+    mistakes:
+      'Equating Agile with “no documentation,” or unable to name a single Scrum ceremony.',
+    followUps: ['What happens in a sprint retrospective?', 'How do you handle scope creep in Agile?'],
+  },
+  'Where do you see yourself in five years, and how does TCS fit into that plan?': {
+    expertAnswer:
+      'In five years I see myself as a confident IT Analyst or Assistant Consultant with strong delivery on at least one enterprise domain — having earned relevant certifications through TCS’s learning ecosystem (cloud, architecture, or a specialization aligned to my project). Short term, I want to master fundamentals on ILP, contribute reliably on client sprints, and build communication skills for stakeholder calls. TCS fits because it offers structured career tracks, global project exposure, and certification support that maps to my goal of becoming a solution-oriented engineer, not jumping roles every year.',
+    evaluates:
+      'Long-term planning realism, alignment with TCS career ladder, and commitment signal without overpromising.',
+    strategy:
+      'Anchor to TCS tracks (Associate → IT Analyst → Assistant Consultant), mention certifications, show 1-year and 5-year milestones.',
+    mistakes:
+      'Saying “CEO in five years,” vague ambitions, or a plan that implies leaving TCS immediately after skilling up.',
+    followUps: ['Which certification path interests you first?', 'How do you plan to grow in your first year on ILP?'],
+  },
 }
 
 export function mergeQuestionInsights(question: SeoQuestion): SeoQuestion {

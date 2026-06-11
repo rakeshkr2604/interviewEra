@@ -1854,7 +1854,7 @@ export const ROLE_QUESTION_REGISTRY: Partial<Record<RoleSlug, QuestionSet>> = {
 export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>> = {
   // ── Service tier ─────────────────────────────────────────────────────────────
   tcs: {
-    lastUpdated: '2026-05-22',
+    lastUpdated: '2026-06-12',
     questions: [
       {
         question: 'What is the TCS NQT and what sections does it cover?',
@@ -1867,7 +1867,7 @@ export const COMPANY_QUESTION_REGISTRY: Partial<Record<CompanySlug, QuestionSet>
         question: 'What is the difference between TCS Digital and TCS Prime? Which one should you target?',
         category: 'hr',
         difficulty: 'easy',
-        tip: 'Prime (₹7 LPA) demands strong DSA and coding; Digital (₹4.5 LPA) requires solid aptitude and basic OOP. Target Prime only if you can solve LeetCode Easy/Medium within 30 minutes under test conditions.',
+        tip: 'Prime (UG ₹9.09–9.30 LPA; PG up to ₹11.80 LPA) demands strong DSA and coding; Digital (UG ₹7.09–8.04 LPA) requires solid aptitude and basic OOP. Target Prime only if you can solve LeetCode Easy/Medium within 30 minutes under test conditions.',
         keywords: ['TCS Digital', 'TCS Prime', 'package', 'track selection'],
       },
       {

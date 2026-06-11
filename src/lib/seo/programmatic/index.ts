@@ -38,6 +38,29 @@ export type { RoleSlug, Role } from './roles'
 export { COMPANIES, COMPANY_COUNT } from './companies'
 export type { CompanySlug, Company } from './companies'
 
+// ── Company hub blueprint (TCS reference) ─────────────────────────────────────
+export {
+  COMPANY_HUB_REFERENCE_SLUG,
+  COMPANY_HUB_PILLAR_SLUGS,
+  COMPANY_HUB_PROSE_CLASS,
+  COMPANY_HUB_CONTENT_CLASS,
+  COMPANY_HUB_CARD_STYLE,
+  COMPANY_HUB_SECTION_H2_CLASS,
+  COMPANY_HUB_SECTION_H3_CLASS,
+  COMPANY_HUB_TOUCH_TARGET_CLASS,
+  COMPANY_HUB_SECTION_FLOW,
+  COMPANY_HUB_QUESTION_CARD_STANDARD,
+  COMPANY_HUB_COMPONENTS,
+  COMPANY_HUB_TABLE_ACCENTS_2COL,
+  COMPANY_HUB_TABLE_ACCENTS_3COL,
+  COMPANY_HUB_TABLE_ACCENTS_4COL,
+  COMPANY_HUB_PAGE_SCHEMA_SHELL,
+  COMPANY_HUB_PEER_LINKS,
+  companyHubCanonicalPath,
+  TCS_HUB_SECTION_ANCHORS,
+} from './company-hub-blueprint'
+export type { CompanyHubPillarSlug } from './company-hub-blueprint'
+
 // ── Skills ────────────────────────────────────────────────────────────────────
 export { SKILLS, SKILL_COUNT } from './skills'
 export type { SkillSlug, Skill } from './skills'

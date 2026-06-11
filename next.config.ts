@@ -75,6 +75,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: '/interview-questions/companies/tcs',
+        destination: '/interview-questions/tcs',
+        permanent: true,
+      },
+      {
         source: '/:path*',
         has: [{ type: 'host', value: 'www.interviewera.com' }],
         destination: 'https://interviewera.com/:path*',
