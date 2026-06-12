@@ -31,6 +31,7 @@ import {
 import type { Role, RoleSlug } from './roles'
 import type { Company, CompanySlug } from './companies'
 import type { Skill, SkillSlug } from './skills'
+import { HIGH_VALUE_INTERSECTIONS } from './slugs'
 
 /**
  * Minimum curated questions a page must carry to be worth indexing.
@@ -55,23 +56,18 @@ export function isSkillIndexable(skill: Skill): boolean {
 }
 
 /**
- * Company × role intersection pages currently reuse the role's question bank
- * verbatim, so every company's "<role> interview questions" page is a soft
- * duplicate of the canonical role page (and of every other company's same-role
- * page). Until each intersection has bespoke, company-specific question content,
- * hold them out of the index — they remain `follow` so they still funnel
- * authority to the role + company parents and serve users who land on them.
+ * Company × role intersection pages ship as static routes from
+ * `HIGH_VALUE_INTERSECTIONS`. They reuse the role question bank with
+ * company-specific framing — index when both parents clear the content bar
+ * so metadata, sitemap, and internal links stay aligned (no sitemap/noindex split).
  *
- * Promotion path: add a dedicated intersection question registry and flip this
- * to `getIntersectionQuestionsFlat(company, role).length >= MIN_INDEXABLE_QUESTIONS`.
+ * Editorial pillar hubs (Amazon/Microsoft/Infosys/Freshworks) still override
+ * metadata in their page files but also satisfy this gate.
  */
 export function isIntersectionIndexable(company: Company, role: Role): boolean {
-  if (company.slug === 'infosys' && (role.slug === 'java-developer' || role.slug === 'software-engineer')) {
-    return true
-  }
-  if (company.slug === 'freshworks' && role.slug === 'frontend-developer') {
-    return true
-  }
-  if (role.slug !== 'software-engineer') return false
-  return company.slug === 'amazon' || company.slug === 'microsoft'
+  const isPublishedIntersection = HIGH_VALUE_INTERSECTIONS.some(
+    (pair) => pair.company === company.slug && pair.role === role.slug,
+  )
+  if (!isPublishedIntersection) return false
+  return isCompanyIndexable(company) && isRoleIndexable(role)
 }

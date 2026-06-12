@@ -1389,4 +1389,66 @@ export const SKILL_QUESTIONS: Partial<Record<SkillSlug, QuestionSet>> = {
       },
     ],
   },
+
+  android: {
+    lastUpdated: '2026-06-11',
+    questions: [
+      {
+        question: 'What are the four main components of an Android application?',
+        category: 'technical',
+        difficulty: 'easy',
+        tip: 'Activity (UI screen), Service (background work), BroadcastReceiver (system/app events), and ContentProvider (shared data). Each is declared in AndroidManifest.xml — interviewers map scenarios to the right component.',
+        keywords: ['Activity', 'Service', 'BroadcastReceiver', 'ContentProvider', 'AndroidManifest'],
+      },
+      {
+        question: 'Explain the Android Activity lifecycle. When is onStop called vs onPause?',
+        category: 'technical',
+        difficulty: 'easy',
+        tip: 'onPause runs when the activity is partially obscured; onStop when it is fully hidden; onDestroy when it is torn down. Persist fragile UI state in onPause because onStop is not guaranteed on low-memory kills.',
+        keywords: ['onCreate', 'onResume', 'onPause', 'onStop', 'onDestroy', 'lifecycle'],
+      },
+      {
+        question: 'What is the difference between Fragment and Activity?',
+        category: 'technical',
+        difficulty: 'easy',
+        tip: 'Activity is a standalone screen entry point. Fragment is a reusable UI module hosted inside an Activity — ideal for adaptive layouts and Navigation Component graphs.',
+        keywords: ['Fragment', 'Activity', 'FragmentManager', 'Navigation Component', 'back stack'],
+      },
+      {
+        question: 'What are Jetpack components? Name and explain three commonly used ones.',
+        category: 'technical',
+        difficulty: 'medium',
+        tip: 'ViewModel survives configuration changes; Room is a type-safe SQLite layer; Navigation Component handles fragment transactions declaratively. LiveData/StateFlow expose lifecycle-aware streams to the UI.',
+        keywords: ['ViewModel', 'Room', 'Navigation Component', 'LiveData', 'Jetpack'],
+      },
+      {
+        question: 'What are Kotlin coroutines? How do they differ from threads?',
+        category: 'technical',
+        difficulty: 'medium',
+        tip: 'Coroutines suspend cooperatively without blocking a thread — many coroutines can share one thread. Use viewModelScope.launch with Dispatchers.IO for network/DB and Dispatchers.Main for UI updates.',
+        keywords: ['coroutines', 'suspend', 'Dispatchers', 'viewModelScope', 'concurrency'],
+      },
+      {
+        question: 'What is RecyclerView and how does the ViewHolder pattern help performance?',
+        category: 'technical',
+        difficulty: 'medium',
+        tip: 'RecyclerView recycles item views as rows scroll off-screen. ViewHolder caches findViewById lookups so binding work happens once per row type, not on every scroll frame.',
+        keywords: ['RecyclerView', 'ViewHolder', 'Adapter', 'view recycling', 'LayoutManager'],
+      },
+      {
+        question: 'What is MVVM on Android and why do teams adopt it?',
+        category: 'technical',
+        difficulty: 'medium',
+        tip: 'MVVM separates UI (Activity/Fragment/Compose) from ViewModel state and Repository data access. It improves testability, survives rotation via ViewModel scope, and keeps networking off the main thread.',
+        keywords: ['MVVM', 'ViewModel', 'Repository', 'separation of concerns', 'testability'],
+      },
+      {
+        question: 'How do you ensure backward compatibility across Android API levels?',
+        category: 'technical',
+        difficulty: 'medium',
+        tip: 'Use AndroidX for backported APIs, guard newer APIs with SDK_INT checks or @RequiresApi, set a realistic minSdk, and test emulators at min and target SDK. Runtime permissions matter from API 23 onward.',
+        keywords: ['AndroidX', 'minSdkVersion', 'API levels', 'runtime permissions', 'compatibility'],
+      },
+    ],
+  },
 }
