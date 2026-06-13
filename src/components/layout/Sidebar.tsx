@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { createClient } from '@/lib/supabase/client'
+import { performClientLogout } from '@/lib/supabase/client-logout'
 import type { PlanTier } from '@/types/app.types'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
@@ -61,7 +62,6 @@ export function Sidebar({
   onNavigate?: () => void
 } = {}) {
   const pathname = usePathname()
-  const router = useRouter()
   const [canAccessAdmin, setCanAccessAdmin] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
@@ -124,19 +124,11 @@ export function Sidebar({
     [canAccessAdmin],
   )
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return
     setLoggingOut(true)
-    try {
-      const supabase = createClient()
-      // scope:'local' clears the session from the browser immediately —
-      // no server round-trip needed. Fast logout every time.
-      await supabase.auth.signOut({ scope: 'local' })
-      router.push('/login')
-      router.refresh()
-    } catch {
-      setLoggingOut(false)
-    }
+    onNavigate?.()
+    void performClientLogout({ redirectTo: '/login' })
   }
 
   return (

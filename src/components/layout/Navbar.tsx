@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import { performClientLogout } from '@/lib/supabase/client-logout';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Award,
@@ -438,13 +439,9 @@ function AvatarMenu({
 }) {
   const router = useRouter();
 
-  const handleLogout = async () => {
-    const { createClient } = await import('@/lib/supabase/client');
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push('/login');
-    router.refresh();
-  };
+  const handleLogout = () => {
+    void performClientLogout({ redirectTo: '/login' })
+  }
 
   const showUpgrade = !isAdmin && (user.plan_tier === 'free' || user.plan_tier === 'starter');
 

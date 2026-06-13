@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   Home,
@@ -13,7 +13,7 @@ import {
   LayoutGrid,
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
-import { createClient } from '@/lib/supabase/client'
+import { performClientLogout } from '@/lib/supabase/client-logout'
 
 interface CampusSidebarProps {
   orgName: string
@@ -127,21 +127,14 @@ export function CampusSidebar({
   seatsUsed,
   onNavigate,
 }: CampusSidebarProps) {
-  const router = useRouter()
   const [logoutHovered, setLogoutHovered] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     if (loggingOut) return
     setLoggingOut(true)
-    try {
-      const supabase = createClient()
-      await supabase.auth.signOut({ scope: 'local' })
-      router.push('/login')
-      router.refresh()
-    } catch {
-      setLoggingOut(false)
-    }
+    onNavigate?.()
+    void performClientLogout({ redirectTo: '/login' })
   }
 
   const seatsRemaining = seatCount - seatsUsed
