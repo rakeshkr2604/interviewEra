@@ -3,6 +3,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCandidateCameraConstraints } from '@/lib/voice/camera-constraints'
 
+function classifyCameraError(err: unknown): 'denied' | 'unavailable' {
+  if (err instanceof DOMException) {
+    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+      return 'denied'
+    }
+    if (
+      err.name === 'NotFoundError' ||
+      err.name === 'NotReadableError' ||
+      err.name === 'OverconstrainedError' ||
+      err.name === 'ConstraintNotSatisfiedError'
+    ) {
+      return 'unavailable'
+    }
+  }
+  return 'unavailable'
+}
+
+/** Request video-only preview; relax constraints when the webcam rejects them. */
+async function requestCandidateVideoStream(): Promise<MediaStream> {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      video: getCandidateCameraConstraints(),
+      audio: false,
+    })
+  } catch (first) {
+    if (first instanceof DOMException) {
+      if (first.name === 'NotAllowedError' || first.name === 'PermissionDeniedError') {
+        throw first
+      }
+      if (
+        first.name === 'OverconstrainedError' ||
+        first.name === 'ConstraintNotSatisfiedError'
+      ) {
+        return navigator.mediaDevices.getUserMedia({ video: true, audio: false })
+      }
+    }
+    throw first
+  }
+}
+
 export type CandidateCameraStatus =
   | 'idle'
   | 'starting'
@@ -36,7 +76,9 @@ export function useCandidateCamera({
       Boolean(navigator.mediaDevices?.getUserMedia),
   )
   const [hasStream, setHasStream] = useState(false)
-  const [captureError, setCaptureError] = useState<'denied' | null>(null)
+  const [captureError, setCaptureError] = useState<'denied' | 'unavailable' | null>(
+    null,
+  )
 
   useEffect(() => {
     if (!active || !isSupported) {
@@ -45,11 +87,7 @@ export function useCandidateCamera({
 
     let cancelled = false
 
-    void navigator.mediaDevices
-      .getUserMedia({
-        video: getCandidateCameraConstraints(),
-        audio: false,
-      })
+    void requestCandidateVideoStream()
       .then((stream) => {
         if (cancelled) {
           stream.getTracks().forEach((t) => t.stop())
@@ -59,8 +97,8 @@ export function useCandidateCamera({
         setCaptureError(null)
         setHasStream(true)
       })
-      .catch(() => {
-        if (!cancelled) setCaptureError('denied')
+      .catch((err: unknown) => {
+        if (!cancelled) setCaptureError(classifyCameraError(err))
       })
 
     return () => {
@@ -88,7 +126,9 @@ export function useCandidateCamera({
       ? 'unavailable'
       : captureError === 'denied'
         ? 'denied'
-        : hasStream
+        : captureError === 'unavailable'
+          ? 'unavailable'
+          : hasStream
           ? 'active'
           : 'starting'
 

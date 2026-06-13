@@ -159,7 +159,7 @@ const nextConfig: NextConfig = {
       ...(IS_VERCEL_PREVIEW ? [] : ([{ key: "X-Frame-Options", value: "DENY" }] satisfies { key: string; value: string }[])),
       { key: "X-Content-Type-Options", value: "nosniff" },
       { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-      { key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" },
+      { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=()" },
       { key: "X-DNS-Prefetch-Control", value: "on" },
       // Matches prior vercel.json HSTS intent; single STS source-of-truth here (headers block removed there).
       { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },

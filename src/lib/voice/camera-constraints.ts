@@ -1,7 +1,7 @@
 /** Front-camera constraints tuned for mobile/PWA selfie preview vs desktop sidebar. */
 export function getCandidateCameraConstraints(): MediaTrackConstraints {
   if (typeof navigator === 'undefined') {
-    return { facingMode: 'user' }
+    return { width: { ideal: 640 }, height: { ideal: 480 } }
   }
 
   const mobileViewport =
@@ -13,17 +13,17 @@ export function getCandidateCameraConstraints(): MediaTrackConstraints {
 
   if (mobileViewport || ios) {
     return {
-      facingMode: 'user',
+      // `ideal` only — required facingMode fails on devices without a labeled front cam.
+      facingMode: { ideal: 'user' },
       width: { ideal: 720, max: 1280 },
       height: { ideal: 960, max: 1920 },
       aspectRatio: { ideal: 3 / 4 },
     }
   }
 
+  // Desktop/laptop webcams usually omit facingMode — never require it here.
   return {
-    facingMode: 'user',
-    width: { ideal: 640 },
-    height: { ideal: 480 },
-    aspectRatio: { ideal: 4 / 3 },
+    width: { ideal: 640, max: 1280 },
+    height: { ideal: 480, max: 720 },
   }
 }

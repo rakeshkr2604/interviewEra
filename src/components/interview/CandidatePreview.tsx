@@ -41,18 +41,18 @@ export function CandidatePreview({
         ) : null}
       </div>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-(--bg-secondary)">
+      <div className="relative min-h-0 flex-1 overflow-hidden bg-(--bg-secondary)">
         {showLive ? (
           <video
             ref={videoRef}
             autoPlay
             muted
             playsInline
-            className="h-full w-full -scale-x-100 object-cover object-[center_22%] lg:scale-x-100 lg:object-contain lg:object-center"
+            className="absolute inset-0 h-full w-full -scale-x-100 object-cover object-[center_28%] lg:scale-x-100"
             aria-label="Your camera preview"
           />
         ) : (
-          <div className="flex flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
             <div
               className="flex h-20 w-20 items-center justify-center rounded-full border border-(--card-border) bg-(--card-bg) shadow-sm"
               aria-hidden
