@@ -99,7 +99,9 @@ export type StopListeningReason =
   | 'question_timeout'
   | 'phase_change'
   | 'permission_revoked'
-  | 'fatal_audio_error';
+  | 'fatal_audio_error'
+  | 'bootstrap_stuck_starting'
+  | 'user_retry_stuck_starting';
 
 export interface WebSpeechStalledPayload {
   noSpeechStreak: number;

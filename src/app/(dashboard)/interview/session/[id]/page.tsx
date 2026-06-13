@@ -1607,7 +1607,6 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     if (phase !== 'candidate_answering') return
     if (inputMode !== 'voice' || useManualInput || userMicMuted) return
-    if (permissionState === 'denied') return
 
     const attemptBootstrap = (source: string) => {
       if (phaseRef.current !== 'candidate_answering') return
@@ -1641,7 +1640,6 @@ export default function InterviewSessionPage() {
     inputMode,
     useManualInput,
     userMicMuted,
-    permissionState,
     stopListening,
     clearStormBudgetForAnswer,
     clearRecognitionFailure,
