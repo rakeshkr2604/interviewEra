@@ -6,6 +6,7 @@ import {
   ListenV1VadEvents,
   type ListenV1Model,
 } from '@deepgram/sdk';
+import { resolveSttLocale, type SttLocale } from '@/lib/voice/speech-locale';
 import { lifecycleLog, lifecycleWarn, voiceDebug } from './lifecycle-log';
 
 export interface TranscriptChunk {
@@ -28,6 +29,12 @@ export interface STTCallbacks {
    * UI must NOT render "Listening…" before this fires.
    */
   onOpen?: () => void;
+  /** Fires when the WebSocket closes (normal or abnormal). */
+  onClose?: (info: { code?: number; reason?: string; wasClean?: boolean }) => void;
+}
+
+export interface STTStartOptions {
+  locale?: SttLocale;
 }
 
 // Deepgram Nova-3 streaming STT with VAD via utterance_end_ms.
@@ -61,7 +68,7 @@ export class StreamingSTT {
     this.client = new DeepgramClient({ apiKey });
   }
 
-  async start(callbacks: STTCallbacks): Promise<void> {
+  async start(callbacks: STTCallbacks, options?: STTStartOptions): Promise<void> {
     this.fullTranscript = '';
     this.lastFinal = '';
     this.aborted = false;
@@ -69,11 +76,12 @@ export class StreamingSTT {
 
     // ConnectArgs requires Authorization for WebSocket auth (SDK v4 doesn't
     // auto-inject the header for live streaming connections).
+    const language = options?.locale ?? resolveSttLocale();
     let socket: unknown;
     try {
       socket = await this.client.listen.v1.connect({
         model: 'nova-3' as ListenV1Model,
-        language: 'en-IN',
+        language,
         smart_format: ListenV1SmartFormat.True,
         interim_results: ListenV1InterimResults.True,
         punctuate: ListenV1Punctuate.True,   // cleaner sentence boundaries
@@ -181,13 +189,22 @@ export class StreamingSTT {
       try { callbacks.onError(err); } catch { /* */ }
     });
 
-    this.socket.on('close', () => {
+    this.socket.on('close', (event?: { code?: number; reason?: string; wasClean?: boolean }) => {
       voiceDebug('dg_ws_closed', {
         session: mySession,
         was_aborted: this.aborted,
         was_superseded: mySession !== this.gen,
+        code: event?.code,
       });
-      lifecycleLog('stt', 'ws_close', { session: mySession });
+      lifecycleLog('stt', 'ws_close', { session: mySession, code: event?.code });
+      if (mySession !== this.gen || this.aborted) return;
+      try {
+        callbacks.onClose?.({
+          code: event?.code,
+          reason: typeof event?.reason === 'string' ? event.reason : undefined,
+          wasClean: event?.wasClean,
+        });
+      } catch { /* */ }
     });
   }
 

@@ -1,5 +1,5 @@
 'use client'
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useCallback, useContext, useMemo, useState } from 'react'
 import type { OnboardingData, InterviewGoal } from '@/types/onboarding.types'
 
 const DEFAULT_STATE: OnboardingData = {
@@ -45,43 +45,96 @@ export function OnboardingProvider({
 }) {
   const [data, setData] = useState<OnboardingData>(initialData ?? DEFAULT_STATE)
 
-  const setGoal = (goal: InterviewGoal) => setData(p => ({ ...p, goal }))
-  const setRole = (role: string) => setData(p => ({ ...p, role }))
-  const setExperienceYears = (experienceYears: number) => setData(p => ({ ...p, experienceYears }))
-  const setMode = (mode: 'Technical' | 'HR' | 'Mixed') => setData(p => ({ ...p, mode }))
-  const setInterviewerId = (interviewerId: 'priya' | 'arjun') =>
-    setData(p => ({ ...p, interviewerId }))
-  const setResumeId = (resumeId: string) => setData(p => ({ ...p, resumeId }))
-  const setResumeData = (rd: {
-    resumeText: string
-    skills: string[]
-    projects: string[]
-    role?: string
-    experienceYears?: number
-  }) =>
-    setData(p => ({
-      ...p,
-      resumeText: rd.resumeText,
-      skills: rd.skills,
-      projects: rd.projects,
-      role: rd.role ?? p.role,
-      experienceYears: rd.experienceYears ?? p.experienceYears,
-    }))
-  const setPlacementDate = (placementDate: string) => setData(p => ({ ...p, placementDate }))
-  const reset = () => setData(DEFAULT_STATE)
+  const setGoal = useCallback(
+    (goal: InterviewGoal) => setData(p => (p.goal === goal ? p : { ...p, goal })),
+    [],
+  )
+  const setRole = useCallback(
+    (role: string) => setData(p => (p.role === role ? p : { ...p, role })),
+    [],
+  )
+  const setExperienceYears = useCallback(
+    (experienceYears: number) =>
+      setData(p => (p.experienceYears === experienceYears ? p : { ...p, experienceYears })),
+    [],
+  )
+  const setMode = useCallback(
+    (mode: 'Technical' | 'HR' | 'Mixed') => setData(p => (p.mode === mode ? p : { ...p, mode })),
+    [],
+  )
+  const setInterviewerId = useCallback(
+    (interviewerId: 'priya' | 'arjun') =>
+      setData(p => (p.interviewerId === interviewerId ? p : { ...p, interviewerId })),
+    [],
+  )
+  const setResumeId = useCallback(
+    (resumeId: string) => setData(p => (p.resumeId === resumeId ? p : { ...p, resumeId })),
+    [],
+  )
+  const setResumeData = useCallback(
+    (rd: {
+      resumeText: string
+      skills: string[]
+      projects: string[]
+      role?: string
+      experienceYears?: number
+    }) =>
+      setData(p => {
+        const nextRole = rd.role ?? p.role
+        const nextExperienceYears = rd.experienceYears ?? p.experienceYears
+        if (
+          p.resumeText === rd.resumeText &&
+          p.skills === rd.skills &&
+          p.projects === rd.projects &&
+          p.role === nextRole &&
+          p.experienceYears === nextExperienceYears
+        ) {
+          return p
+        }
+        return {
+          ...p,
+          resumeText: rd.resumeText,
+          skills: rd.skills,
+          projects: rd.projects,
+          role: nextRole,
+          experienceYears: nextExperienceYears,
+        }
+      }),
+    [],
+  )
+  const setPlacementDate = useCallback(
+    (placementDate: string) =>
+      setData(p => (p.placementDate === placementDate ? p : { ...p, placementDate })),
+    [],
+  )
+  const reset = useCallback(() => setData(DEFAULT_STATE), [])
 
-  const value: OnboardingContextType = {
-    data,
-    setGoal,
-    setRole,
-    setExperienceYears,
-    setMode,
-    setInterviewerId,
-    setResumeId,
-    setResumeData,
-    setPlacementDate,
-    reset,
-  }
+  const value: OnboardingContextType = useMemo(
+    () => ({
+      data,
+      setGoal,
+      setRole,
+      setExperienceYears,
+      setMode,
+      setInterviewerId,
+      setResumeId,
+      setResumeData,
+      setPlacementDate,
+      reset,
+    }),
+    [
+      data,
+      setGoal,
+      setRole,
+      setExperienceYears,
+      setMode,
+      setInterviewerId,
+      setResumeId,
+      setResumeData,
+      setPlacementDate,
+      reset,
+    ],
+  )
 
   return React.createElement(OnboardingContext.Provider, { value }, children)
 }

@@ -13,6 +13,10 @@ import {
   readPreferredInterviewerId,
 } from '@/lib/settings/client-preferences';
 import { unlockAudioForInterview } from '@/lib/voice/audio-gesture';
+import {
+  runStartInterviewWithTelemetry,
+  stashStartupClickMeta,
+} from '@/lib/telemetry/interview-startup-telemetry';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
@@ -84,49 +88,75 @@ export function StartInterviewForm({
     setLoading(true);
     setError(null);
 
-    try {
-      const body: Record<string, unknown> = {
-        resumeId,
-        difficulty,
-        interviewerId: readPreferredInterviewerId(),
-      };
+    const result = await runStartInterviewWithTelemetry({
+      unlockAudio: unlockAudioForInterview,
+      createSession: async () => {
+        try {
+          const body: Record<string, unknown> = {
+            resumeId,
+            difficulty,
+            interviewerId: readPreferredInterviewerId(),
+          };
 
-      if (interviewMode === 'ai') {
-        body.role = role.trim();
-        body.questionCount = difficultyQuestionCount(difficulty);
-      } else {
-        const pack = domainPacks.find((p) => p.id === selectedPackId);
-        body.role = pack?.name ?? 'Domain Interview';
-        body.domainPackId = selectedPackId;
-        body.questionCount = pack?.question_count ?? 10;
-      }
+          if (interviewMode === 'ai') {
+            body.role = role.trim();
+            body.questionCount = difficultyQuestionCount(difficulty);
+          } else {
+            const pack = domainPacks.find((p) => p.id === selectedPackId);
+            body.role = pack?.name ?? 'Domain Interview';
+            body.domainPackId = selectedPackId;
+            body.questionCount = pack?.question_count ?? 10;
+          }
 
-      const res = await fetch('/api/interview/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+          const res = await fetch('/api/interview/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
 
-      const data = (await res.json()) as { interviewId?: string; error?: string };
+          const data = (await res.json()) as {
+            interviewId?: string;
+            error?: string;
+            preparing?: boolean;
+          };
 
-      if (!res.ok) {
-        if (res.status === 402) {
-          setError('No credits remaining. Please upgrade your plan.');
-        } else if (res.status === 503) {
-          setError(data.error ?? 'AI is temporarily unavailable. Try again in 30 seconds.');
-        } else {
-          setError(data.error ?? 'Failed to start interview. Please try again.');
+          if (!res.ok) {
+            if (res.status === 402) {
+              return { ok: false, error: 'No credits remaining. Please upgrade your plan.' };
+            }
+            if (res.status === 503) {
+              return {
+                ok: false,
+                error: data.error ?? 'AI is temporarily unavailable. Try again in 30 seconds.',
+              };
+            }
+            return { ok: false, error: data.error ?? 'Failed to start interview. Please try again.' };
+          }
+
+          if (!data.interviewId) {
+            return { ok: false, error: 'Failed to start interview. Please try again.' };
+          }
+
+          return {
+            ok: true,
+            interviewId: data.interviewId,
+            preparing: data.preparing ?? false,
+          };
+        } catch {
+          return { ok: false, error: 'Network error. Please check your connection and try again.' };
         }
-        setLoading(false);
-        return;
-      }
+      },
+    });
 
-      const prep = (data as { preparing?: boolean }).preparing ? '?preparing=1' : '';
-      router.push(`/interview/session/${data.interviewId!}${prep}`);
-    } catch {
-      setError('Network error. Please check your connection and try again.');
+    if (!result.ok) {
+      setError(result.error ?? 'Failed to start interview. Please try again.');
       setLoading(false);
+      return;
     }
+
+    stashStartupClickMeta(result.interviewId!);
+    const prep = result.preparing ? '?preparing=1' : '';
+    router.push(`/interview/session/${result.interviewId!}${prep}`);
   }
 
   return (

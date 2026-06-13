@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabase, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { abuseGate, recordSTTTokenRequest } from '@/lib/abuse/risk-scorer';
-import { checkSTTQuota, checkAndAcquireSession } from '@/lib/quota/voice-quota';
+import { checkSTTQuota } from '@/lib/quota/voice-quota';
+import {
+  createSessionLease,
+  validateRefreshLease,
+} from '@/lib/quota/stt-session-lease';
+import { releaseSession } from '@/lib/quota/voice-quota';
 
 const EPHEMERAL_TTL_SECONDS = 120;
 
@@ -18,9 +23,14 @@ export async function POST(request: NextRequest) {
 
   // ── 1. Parse body ────────────────────────────────────────────────────────
   let interviewId: string | undefined;
+  let refreshLeaseId: string | undefined;
   try {
-    const body = (await request.json()) as { interview_id?: string };
+    const body = (await request.json()) as {
+      interview_id?: string;
+      refresh_lease_id?: string;
+    };
     interviewId = body.interview_id?.trim();
+    refreshLeaseId = body.refresh_lease_id?.trim();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -97,6 +107,14 @@ export async function POST(request: NextRequest) {
   // ── 7. Monthly STT quota check ───────────────────────────────────────────
   const quota = await checkSTTQuota(user.id, planTier);
   if (!quota.allowed) {
+    console.warn('[RATE-LIMIT]', JSON.stringify({
+      event: 'deepgram_token_failure',
+      reason: 'monthly_quota',
+      interview_id: interviewId,
+      user_id: user.id,
+      duration_ms: Date.now() - t0,
+      ts: new Date().toISOString(),
+    }));
     return NextResponse.json(
       {
         error: 'Monthly voice recording quota exceeded. Text mode is still available.',
@@ -107,17 +125,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 8. Concurrency check ─────────────────────────────────────────────────
-  const concurrency = await checkAndAcquireSession(user.id, planTier);
-  if (!concurrency.allowed) {
-    return NextResponse.json(
-      {
-        error: `You already have ${concurrency.active_sessions} active voice session(s). Please end the current session first.`,
-        active_sessions: concurrency.active_sessions,
-        max_sessions: concurrency.max_sessions,
-      },
-      { status: 429 },
-    );
+  // ── 8. Concurrency / session lease ───────────────────────────────────────
+  let sessionLeaseId: string;
+  if (refreshLeaseId) {
+    const valid = await validateRefreshLease(user.id, refreshLeaseId);
+    if (!valid) {
+      return NextResponse.json(
+        { error: 'Voice session expired. Please start voice again.' },
+        { status: 409 },
+      );
+    }
+    sessionLeaseId = refreshLeaseId;
+  } else {
+    const lease = await createSessionLease(user.id, planTier);
+    if (!lease.ok) {
+      return NextResponse.json(
+        {
+          error: `You already have ${lease.active_sessions} active voice session(s). Please end the current session first.`,
+          active_sessions: lease.active_sessions,
+          max_sessions: lease.max_sessions,
+        },
+        { status: 429 },
+      );
+    }
+    sessionLeaseId = lease.lease_id;
   }
 
   // ── 9. Require DEEPGRAM_PROJECT_ID — no master-key fallback ─────────────
@@ -157,7 +188,18 @@ export async function POST(request: NextRequest) {
 
     if (!res.ok) {
       const body = await res.text().catch(() => res.statusText);
-      console.error('[stt/token] Deepgram key creation failed:', res.status, body);
+      console.warn('[DEEPGRAM]', JSON.stringify({
+        event: 'deepgram_token_failure',
+        interview_id: interviewId,
+        user_id: user.id,
+        status: res.status,
+        duration_ms: Date.now() - t0,
+        error: body.slice(0, 500),
+        ts: new Date().toISOString(),
+      }));
+      if (!refreshLeaseId) {
+        await releaseSession(user.id);
+      }
       return NextResponse.json(
         { error: 'Could not create voice session. Please try again.' },
         { status: 502 },
@@ -167,6 +209,9 @@ export async function POST(request: NextRequest) {
     const data = (await res.json()) as { key?: string };
     if (!data.key) {
       console.error('[stt/token] Deepgram returned no key in response');
+      if (!refreshLeaseId) {
+        await releaseSession(user.id);
+      }
       return NextResponse.json(
         { error: 'Voice session initialization failed.' },
         { status: 502 },
@@ -176,6 +221,9 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const isTimeout = err instanceof Error && err.name === 'TimeoutError';
     console.error('[stt/token] Deepgram API call failed:', isTimeout ? 'timeout' : err);
+    if (!refreshLeaseId) {
+      await releaseSession(user.id);
+    }
     return NextResponse.json(
       { error: 'Voice service temporarily unavailable.' },
       { status: 502 },
@@ -183,15 +231,17 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 12. Structured telemetry log ──────────────────────────────────────────
-  console.log(JSON.stringify({
-    event:             'stt_token_issued',
+  console.info('[DEEPGRAM]', JSON.stringify({
+    event:             'deepgram_token_success',
     user_id:           user.id,
     interview_id:      interviewId,
+    session_lease_id:  sessionLeaseId,
+    refresh:           Boolean(refreshLeaseId),
     plan_tier:         planTier,
     expires_in_seconds: EPHEMERAL_TTL_SECONDS,
     quota_remaining_s: quota.remaining_seconds,
     quota_warning:     quota.warning,
-    latency_ms:        Date.now() - t0,
+    duration_ms:        Date.now() - t0,
     ip,
     user_agent:        request.headers.get('user-agent') ?? 'unknown',
     ts:                new Date().toISOString(),
@@ -204,6 +254,7 @@ export async function POST(request: NextRequest) {
     interview_id:       interviewId,
     issued_at:          new Date().toISOString(),
     quota_remaining_s:  quota.remaining_seconds,
+    session_lease_id:   sessionLeaseId,
   };
 
   if (quota.warning !== 'ok') {

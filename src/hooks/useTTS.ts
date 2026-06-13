@@ -4,6 +4,7 @@ import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import { resolveVoiceForInterviewer } from '@/lib/interviewer/voice'
 import { readAiVoiceEnabled, readTtsRate } from '@/lib/settings/client-preferences'
+import { resolveSttLocale } from '@/lib/voice/speech-locale'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import { normalizePlaybackArg, type PlaybackCallbacks } from '@/lib/voice/playback-callbacks'
 
@@ -86,7 +87,7 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
       utterance.rate = baseRate
       utterance.pitch = interviewer?.gender === 'female' ? 1.02 : 0.94
       utterance.volume = 0.92
-      utterance.lang = voice?.lang ?? 'en-IN'
+      utterance.lang = voice?.lang ?? resolveSttLocale()
       if (voice) utterance.voice = voice
 
       utterance.onstart = () => {

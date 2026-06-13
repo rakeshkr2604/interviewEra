@@ -22,6 +22,10 @@ import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
 import { unlockAudioForInterview } from '@/lib/voice/audio-gesture'
+import {
+  runStartInterviewWithTelemetry,
+  stashStartupClickMeta,
+} from '@/lib/telemetry/interview-startup-telemetry'
 
 const STEP_LABELS = ['You & goal', 'Resume & start']
 const TOTAL_STEPS = 2
@@ -110,6 +114,7 @@ export default function OnboardingPage() {
   const [jdShowRawEditor, setJdShowRawEditor] = useState(false)
   const jdParseSeq = useRef(0)
   const hydrationApplied = useRef(false)
+  const serverHydrationSynced = useRef(false)
 
   const persistEnabled =
     resumeState !== 'uploading' && resumeState !== 'processing'
@@ -177,7 +182,8 @@ export default function OnboardingPage() {
 
   /** Sync server hydration into store — draft may omit resumeId while DB resume is parsed. */
   useEffect(() => {
-    if (!serverHydration) return
+    if (!serverHydration || serverHydrationSynced.current) return
+    serverHydrationSynced.current = true
 
     const h = serverHydration
     if (h.data.goal) setGoal(h.data.goal)
@@ -639,7 +645,6 @@ export default function OnboardingPage() {
 
   const handleStartInterview = async () => {
     if (startLoading) return
-    unlockAudioForInterview()
     setStartLoading(true)
     setStartError('')
 
@@ -653,89 +658,111 @@ export default function OnboardingPage() {
       setResumeId(effectiveResumeId)
     }
 
-    try {
-      const jdTrim = jdText.trim()
-      let jobDescription: string | undefined
-      if (jdTrim.length > 0) {
-        const vr = await fetch('/api/job-description/validate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ text: jdTrim.slice(0, 12_000) }),
-        })
-        const vd = await parseResponseJsonSafe<{ error?: string; text?: string }>(vr)
-        if (!vr.ok) {
-          setStartError(vd.error ?? 'Job description does not look like a valid JD. Fix it or clear the field.')
-          setStartLoading(false)
-          return
+    const result = await runStartInterviewWithTelemetry({
+      unlockAudio: unlockAudioForInterview,
+      createSession: async () => {
+        try {
+          const jdTrim = jdText.trim()
+          let jobDescription: string | undefined
+          if (jdTrim.length > 0) {
+            const vr = await fetch('/api/job-description/validate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ text: jdTrim.slice(0, 12_000) }),
+            })
+            const vd = await parseResponseJsonSafe<{ error?: string; text?: string }>(vr)
+            if (!vr.ok) {
+              return {
+                ok: false,
+                error:
+                  vd.error ??
+                  'Job description does not look like a valid JD. Fix it or clear the field.',
+              }
+            }
+            const normalized =
+              typeof vd.text === 'string' && vd.text.length > 0
+                ? vd.text
+                : refineJobDescriptionForUi(jdTrim).slice(0, 12_000)
+            setJdText(normalized)
+            const structured =
+              parsedJd && jdParseStatus === 'ready'
+                ? formatParsedJobDescriptionForInterview(parsedJd).trim()
+                : ''
+            jobDescription = (structured.length >= 24 ? structured : normalized).slice(0, 12_000)
+          }
+
+          const interviewMode =
+            data.mode === 'HR'
+              ? 'hr_behavioral'
+              : data.mode === 'Mixed'
+                ? 'mixed'
+                : 'technical'
+          const response = await fetch('/api/interview/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              resumeId: effectiveResumeId,
+              role: data.role.trim(),
+              difficulty,
+              interviewerId: data.interviewerId,
+              goal: data.goal,
+              interviewMode,
+              experienceYears:
+                typeof data.experienceYears === 'number' &&
+                Number.isFinite(data.experienceYears)
+                  ? Math.trunc(data.experienceYears)
+                  : 0,
+              questionCount: difficultyQuestionCount(difficulty),
+              ...(jobDescription ? { jobDescription } : {}),
+            }),
+          })
+
+          const responseData = (await response.json().catch(() => null)) as {
+            interviewId?: string
+            error?: string
+            preparing?: boolean
+          } | null
+
+          if (response.status === 405) {
+            return { ok: false, error: 'Internal API mismatch. Please contact support.' }
+          }
+
+          if (!response.ok || !responseData?.interviewId) {
+            return {
+              ok: false,
+              error: responseData?.error ?? 'Failed to start interview. Please try again.',
+            }
+          }
+
+          return {
+            ok: true,
+            interviewId: responseData.interviewId,
+            preparing: responseData.preparing ?? false,
+          }
+        } catch (err: unknown) {
+          const msg =
+            err instanceof Error ? err.message : 'Failed to start interview. Please try again.'
+          return { ok: false, error: msg }
         }
-        const normalized =
-          typeof vd.text === 'string' && vd.text.length > 0
-            ? vd.text
-            : refineJobDescriptionForUi(jdTrim).slice(0, 12_000)
-        setJdText(normalized)
-        const structured =
-          parsedJd && jdParseStatus === 'ready'
-            ? formatParsedJobDescriptionForInterview(parsedJd).trim()
-            : ''
-        jobDescription = (structured.length >= 24 ? structured : normalized).slice(0, 12_000)
-      }
+      },
+    })
 
-      const interviewMode =
-        data.mode === 'HR'
-          ? 'hr_behavioral'
-          : data.mode === 'Mixed'
-            ? 'mixed'
-            : 'technical'
-      const response = await fetch('/api/interview/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          resumeId: effectiveResumeId,
-          role: data.role.trim(),
-          difficulty,
-          interviewerId: data.interviewerId,
-          goal: data.goal,
-          interviewMode,
-          experienceYears:
-            typeof data.experienceYears === 'number' &&
-            Number.isFinite(data.experienceYears)
-              ? Math.trunc(data.experienceYears)
-              : 0,
-          questionCount: difficultyQuestionCount(difficulty),
-          ...(jobDescription ? { jobDescription } : {}),
-        }),
-      })
-
-      const responseData = (await response.json().catch(() => null)) as {
-        interviewId?: string
-        error?: string
-        preparing?: boolean
-      } | null
-
-      if (response.status === 405) {
-        setStartError('Internal API mismatch. Please contact support.')
-        return
-      }
-
-      if (!response.ok || !responseData?.interviewId) {
-        setStartError(responseData?.error ?? 'Failed to start interview. Please try again.')
-        return
-      }
-
-      void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
-
-      const prepQ = responseData.preparing ? '&preparing=1' : ''
-      router.push(
-        `/interview/session/${responseData.interviewId}?interviewer=${data.interviewerId}${prepQ}`,
-      )
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to start interview. Please try again.'
-      setStartError(msg)
-    } finally {
+    if (!result.ok) {
+      setStartError(result.error ?? 'Failed to start interview. Please try again.')
       setStartLoading(false)
+      return
     }
+
+    void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
+
+    stashStartupClickMeta(result.interviewId!)
+    const prepQ = result.preparing ? '&preparing=1' : ''
+    router.push(
+      `/interview/session/${result.interviewId}?interviewer=${data.interviewerId}${prepQ}`,
+    )
+    setStartLoading(false)
   }
 
   const canBegin =

@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useCallback, useEffect } from 'react';
+import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
 import { lifecycleLog, lifecycleWarn, voiceDebug } from '@/lib/voice/lifecycle-log';
 
 type CleanupFn = () => void;
@@ -62,14 +63,7 @@ export function useMicrophone(): UseMicrophoneReturn {
       let audioContext: AudioContext | null = null;
       try {
         voiceDebug('mic_permission_requested', { source: 'useMicrophone' });
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: {
-            channelCount: 1,
-            sampleRate: 16000,
-            echoCancellation: true,
-            noiseSuppression: true,
-          },
-        });
+        stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints());
         {
           const tracks = stream.getTracks();
           voiceDebug('mic_stream_acquired', {
@@ -119,7 +113,12 @@ export function useMicrophone(): UseMicrophoneReturn {
         };
 
         source.connect(processor);
-        processor.connect(audioContext.destination);
+        // ScriptProcessor must be wired into the graph to fire, but must not
+        // play mic audio through speakers (causes echo / focus fights on mobile).
+        const silentSink = audioContext.createGain();
+        silentSink.gain.value = 0;
+        processor.connect(silentSink);
+        silentSink.connect(audioContext.destination);
         setIsRecording(true);
         voiceDebug('recorder_started', { sample_rate: audioContext.sampleRate });
 
@@ -133,6 +132,7 @@ export function useMicrophone(): UseMicrophoneReturn {
           cleanedUp = true;
           try { processor.disconnect(); } catch { /* */ }
           try { source.disconnect(); } catch { /* */ }
+          try { silentSink.disconnect(); } catch { /* */ }
           try { capturedStream.getTracks().forEach((t) => t.stop()); } catch { /* */ }
           try { capturedCtx.close().catch(() => {}); } catch { /* */ }
           if (mountedRef.current) setIsRecording(false);

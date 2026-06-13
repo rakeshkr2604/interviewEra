@@ -50,6 +50,7 @@ interface UseInterviewAvatarSpeakingParams {
   currentWordIndex: number
   lastVoiceMeta: VoiceMetadata | null
   onAvatarFinished: (reason: AvatarAnsweringReason) => void
+  onStartupTtsEvent?: (event: 'tts_started' | 'tts_completed' | 'tts_failed', extra?: Record<string, unknown>) => void
 }
 
 export interface UseInterviewAvatarSpeakingReturn {
@@ -92,6 +93,7 @@ export function useInterviewAvatarSpeaking(
     currentWordIndex,
     lastVoiceMeta,
     onAvatarFinished,
+    onStartupTtsEvent,
   } = params
 
   const [spokenText, setSpokenText] = useState('')
@@ -136,6 +138,9 @@ export function useInterviewAvatarSpeaking(
 
       if (reason === 'audio_completed') {
         trackAvatarTelemetry('avatar_audio_completed', telemetryCtx, { mode: inputMode })
+        if (currentIndex === 0) {
+          onStartupTtsEvent?.('tts_completed', { questionIndex: currentIndex })
+        }
         try { stopSpeaking() } catch { /* */ }
         try { elStop() } catch { /* */ }
       }
@@ -159,7 +164,7 @@ export function useInterviewAvatarSpeaking(
         onAvatarFinished(reason)
       }, AVATAR_FINISHED_BRIDGE_MS)
     },
-    [currentIndex, inputMode, mountedRef, onAvatarFinished, phaseRef, setPhase, stopSpeaking, elStop, telemetryCtx],
+    [currentIndex, inputMode, mountedRef, onAvatarFinished, onStartupTtsEvent, phaseRef, setPhase, stopSpeaking, elStop, telemetryCtx],
   )
 
   const markPlaybackFailed = useCallback(
@@ -171,8 +176,11 @@ export function useInterviewAvatarSpeaking(
         questionIndex: currentIndex,
         message,
       })
+      if (currentIndex === 0) {
+        onStartupTtsEvent?.('tts_failed', { questionIndex: currentIndex, message })
+      }
     },
-    [currentIndex, inputMode, telemetryCtx],
+    [currentIndex, inputMode, onStartupTtsEvent, telemetryCtx],
   )
 
   const continueWithoutAudio = useCallback(() => {
@@ -205,6 +213,9 @@ export function useInterviewAvatarSpeaking(
       mode: inputMode,
     })
     interviewFlowLog('tts', 'tts_started', { questionIndex: currentIndex, mode: inputMode })
+    if (currentIndex === 0) {
+      onStartupTtsEvent?.('tts_started', { questionIndex: currentIndex, mode: inputMode })
+    }
 
     const playbackCallbacks: PlaybackCallbacks = {
       onPlaybackStarted: () => {
@@ -247,6 +258,7 @@ export function useInterviewAvatarSpeaking(
     interviewRole,
     lastVoiceMeta,
     markPlaybackFailed,
+    onStartupTtsEvent,
     pendingFollowUp,
     phaseRef,
     speakQuestion,
@@ -265,6 +277,9 @@ export function useInterviewAvatarSpeaking(
     if (needsAudioGestureUnlock() && !audioUnlocked) return
 
     if (!readAiVoiceEnabled()) {
+      if (currentIndex === 0) {
+        onStartupTtsEvent?.('tts_completed', { questionIndex: currentIndex, skipped: true })
+      }
       const t = window.setTimeout(() => finishAuthorized('voice_disabled'), 0)
       return () => {
         window.clearTimeout(t)
@@ -300,6 +315,7 @@ export function useInterviewAvatarSpeaking(
     markPlaybackFailed,
     stopSpeaking,
     elStop,
+    onStartupTtsEvent,
     phaseRef,
   ])
 

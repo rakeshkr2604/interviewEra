@@ -16,8 +16,11 @@ import { useAutoGrowTextarea } from '@/hooks/useAutoGrowTextarea'
 import { analyzeFillerWords } from '@/hooks/useFillerDetection'
 import type { FillerAnalysis } from '@/hooks/useFillerDetection'
 import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
-import { StreamingSTT } from '@/lib/voice/stt-client'
-import { fetchSTTToken } from '@/lib/voice/stt-token'
+import { DeepgramSessionController } from '@/lib/voice/deepgram-session-controller'
+import type { VoiceConnectionState } from '@/lib/voice/deepgram-health'
+import { DeepgramVoiceStatusBanner } from '@/components/interview/DeepgramVoiceStatusBanner'
+import { getBrowserVoiceCapabilities, getSpeechSynthesisProbeError } from '@/lib/voice/browser-capabilities'
+import { useInterviewKeyboardViewport } from '@/hooks/useInterviewKeyboardViewport'
 import type { VoiceMetadata } from '@/lib/interview/interview-orchestrator'
 import type { InterviewerTone } from '@/lib/voice/tts-client'
 import { api } from '@/services/api'
@@ -44,7 +47,7 @@ import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
-import { releaseAudioForMicCapture } from '@/lib/voice/audio-gesture'
+import { releaseAudioForMicCapture, resumeSharedInterviewAudioContext } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
@@ -55,6 +58,15 @@ import { trackProductEventClient } from '@/lib/analytics/product-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
 import { useInterviewRecovery } from '@/hooks/useInterviewRecovery'
 import { useInterviewDraft } from '@/hooks/useInterviewDraft'
+import { useVoiceInterviewRecovery } from '@/hooks/useVoiceInterviewRecovery'
+import { VoiceRecoveryBanner } from '@/components/interview/VoiceRecoveryBanner'
+import { InterviewStartupRecoveryPanel } from '@/components/interview/InterviewStartupRecoveryPanel'
+import { useInterviewStartupReliability } from '@/hooks/useInterviewStartupReliability'
+import {
+  getStartupLoadingExplanation,
+  getStartupSubtext,
+} from '@/lib/telemetry/startup-reliability-policy'
+import type { StartupStage } from '@/lib/telemetry/interview-startup-telemetry'
 import type { InterviewDraft, DraftPhase } from '@/lib/session/interview-draft'
 
 const TIME_PER_QUESTION = 60
@@ -193,6 +205,7 @@ export default function InterviewSessionPage() {
   const interviewId = params.id
   const { ensureQuestionsReady } = useInterviewPrepare()
   const [questionGenActive, setQuestionGenActive] = useState(false)
+  const [reloadNonce, setReloadNonce] = useState(0)
 
   // ─── Interview Data ───────────────────────────────────────
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null)
@@ -218,7 +231,21 @@ export default function InterviewSessionPage() {
   const [answerStartTime, setAnswerStartTime] = useState<number>(0)
   const [fetchError, setFetchError] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
-  const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>('voice')
+  const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>(() => {
+    if (typeof window === 'undefined') return 'voice'
+    return getBrowserVoiceCapabilities().recommendedMode
+  })
+
+  const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
+  const telemetryCtx = useMemo(
+    () => ({
+      interviewId: interviewId ?? '',
+      questionIndex: currentIndex,
+      phase,
+    }),
+    [interviewId, currentIndex, phase],
+  )
+  const voiceRecovery = useVoiceInterviewRecovery(interviewId, track, telemetryCtx)
   /** Matches TimerCircle denominator for the active answering phase */
   const [answerTimeBudget, setAnswerTimeBudget] = useState(TIME_PER_QUESTION)
   const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null)
@@ -226,6 +253,9 @@ export default function InterviewSessionPage() {
   const [dgTranscript, setDgTranscript] = useState('')
   const [dgInterim, setDgInterim] = useState('')
   const [dgError, setDgError] = useState<string | null>(null)
+  const [dgVoiceUiState, setDgVoiceUiState] = useState<VoiceConnectionState>('idle')
+  const [dgVoiceUiMessage, setDgVoiceUiMessage] = useState<string | null>(null)
+  const [dgVoiceShowActions, setDgVoiceShowActions] = useState(false)
   const [dgRecordingSeconds, setDgRecordingSeconds] = useState(0)
   // dgWsOpen — Deepgram WebSocket has reached OPEN state. UI must NOT render
   // "Listening…" until this is true even if the mic stream (dgIsRecording)
@@ -243,7 +273,7 @@ export default function InterviewSessionPage() {
   } | null>(null)
   // Max 1 follow-up per static question — keeps interview length bounded.
   const followUpForIndexRef = useRef<number>(-1)
-  const dgSttRef = useRef<StreamingSTT | null>(null)
+  const dgControllerRef = useRef<DeepgramSessionController | null>(null)
   const dgMicCleanupRef = useRef<(() => void) | null>(null)
   // Ref so the VAD callback can read the current phase without a stale closure
   const phaseRef = useRef<RuntimePhase>('loading')
@@ -260,6 +290,8 @@ export default function InterviewSessionPage() {
   //   "post-TTS auto-start" and the explicit deepgram mic toggle button can
   //   both fire the same start within a tick — second caller bails.
   const dgStartInFlightRef = useRef<boolean>(false)
+  const dgTranscriptRef = useRef('')
+  const dgInterimRef = useRef('')
   // Transcript watchdog: auto-submit if text exists but no request leaves the client.
   const transcriptWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const mockInterviewStartedRef = useRef(false)
@@ -308,6 +340,86 @@ export default function InterviewSessionPage() {
   const { timeLeft, start: startTimer, stop: stopTimer, reset: resetTimer } =
     useTimer(TIME_PER_QUESTION)
 
+  const interviewDataRef = useRef(interviewData)
+  useEffect(() => {
+    interviewDataRef.current = interviewData
+  }, [interviewData])
+
+  const startupMarkRef = useRef<(stage: StartupStage, extra?: Record<string, unknown>) => void>(() => {})
+
+  const startupReliability = useInterviewStartupReliability({
+    interviewId: interviewId ?? '',
+    phase,
+    startupStep,
+    inputMode,
+    questionGenActive,
+    track,
+    telemetryCtx,
+    onRetryLoad: () => {
+      setFetchError('')
+      setAudioInitError(null)
+      setAudioReady(false)
+      setStartupStep('fetching_interview')
+      setPhase('loading')
+      setInterviewData(null)
+      setQuestionGenActive(false)
+      setReloadNonce((n) => n + 1)
+    },
+    onReconnectPrepare: async () => {
+      setFetchError('')
+      setAudioInitError(null)
+      setAudioReady(false)
+      setStartupStep('fetching_interview')
+      setPhase('loading')
+      setInterviewData(null)
+      setQuestionGenActive(true)
+      startupMarkRef.current('session_create_started', { source: 'reconnect' })
+      try {
+        const prep = await ensureQuestionsReady(interviewId)
+        if (!prep.ok) {
+          startupMarkRef.current('session_create_failed', { error: prep.error, source: 'reconnect' })
+          setFetchError(prep.error)
+          return
+        }
+        startupMarkRef.current('session_create_success', { source: 'reconnect' })
+      } catch (err) {
+        startupMarkRef.current('session_create_failed', {
+          error: err instanceof Error ? err.message : String(err),
+          source: 'reconnect',
+        })
+        setFetchError('Reconnect failed. Please try again.')
+      } finally {
+        setQuestionGenActive(false)
+        setReloadNonce((n) => n + 1)
+      }
+    },
+    onSwitchToTyping: () => {
+      setInputMode('text')
+      const data = interviewDataRef.current
+      if (data?.questions?.length) {
+        setStartupStep('interview_ready')
+        const budget = TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER
+        setAnswerTimeBudget(budget)
+        setPhase('candidate_answering')
+        setAnswerStartTime(Date.now())
+        resetTimer(budget)
+        startTimer()
+      }
+    },
+  })
+
+  useEffect(() => {
+    startupMarkRef.current = startupReliability.mark
+  }, [startupReliability.mark])
+
+  const {
+    mark: startupMark,
+    handleRetry: handleStartupRetry,
+    handleReconnect: handleStartupReconnect,
+    handleSwitchToTyping: handleStartupSwitchToTyping,
+    markFirstQuestionReceived,
+  } = startupReliability
+
   // ─── Speech Recognition ───────────────────────────────────
   const micKeepArmedRef = useRef(false)
   const sttTelemetryRef = useRef<SttTelemetryCallback | null>(null)
@@ -341,6 +453,7 @@ export default function InterviewSessionPage() {
     recognitionFailed,
     clearRecognitionFailure,
     resetTranscript,
+    restoreTranscript,
     getMergedTranscript,
     hasRecentSpeech,
   } = useSpeechRecognition({
@@ -356,11 +469,15 @@ export default function InterviewSessionPage() {
   // Requires: local mic stream is up AND the Deepgram WebSocket is OPEN.
   const dgListening = dgIsRecording && dgWsOpen
   const useManualInput =
-    inputMode === 'text' || !isMicSupported || permissionState === 'denied'
+    inputMode === 'text' ||
+    voiceRecovery.isBlockingMic ||
+    !isMicSupported ||
+    permissionState === 'denied'
 
   const micArmed =
     phase === 'candidate_answering' &&
     (inputMode === 'voice' || inputMode === 'deepgram') &&
+    !voiceRecovery.isBlockingMic &&
     !userMicMuted &&
     permissionState !== 'denied' &&
     (inputMode === 'deepgram' || isMicSupported)
@@ -374,12 +491,6 @@ export default function InterviewSessionPage() {
 
   // Keep phaseRef in sync so Deepgram VAD callback reads current phase
   useEffect(() => { phaseRef.current = phase }, [phase])
-
-  // ─── Unified telemetry + draft persistence ────────────────
-  // Single observability layer: every event carries interviewId / questionIndex
-  // / phase / platform / browser / pwa / timestamp, and critical events beacon
-  // to /api/product-events so mobile failures are visible server-side.
-  const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
 
   useEffect(() => {
     sttTelemetryRef.current = (event, data) => {
@@ -411,10 +522,31 @@ export default function InterviewSessionPage() {
   micErrorRef.current = micError
 
   useEffect(() => {
-    if (!isMicSupported || permissionState === 'denied') {
-      if (inputMode === 'voice') setInputMode('text')
+    dgTranscriptRef.current = dgTranscript
+  }, [dgTranscript])
+
+  useEffect(() => {
+    dgInterimRef.current = dgInterim
+  }, [dgInterim])
+
+  const keyboardBottomInset = useInterviewKeyboardViewport(
+    phase === 'candidate_answering' && useManualInput,
+  )
+
+  useEffect(() => {
+    if (voiceRecovery.isActive) return
+    if (permissionState === 'denied') {
+      if (inputMode !== 'text') setInputMode('text')
+      return
     }
-  }, [isMicSupported, permissionState, inputMode])
+    if (inputMode !== 'voice') return
+    const caps = getBrowserVoiceCapabilities()
+    if (!caps.webSpeech && caps.deepgramMic) {
+      setInputMode('deepgram')
+    } else if (!caps.webSpeech) {
+      setInputMode('text')
+    }
+  }, [isMicSupported, permissionState, inputMode, voiceRecovery.isActive])
 
   // Deepgram recording duration counter (debug + UI)
   useEffect(() => {
@@ -514,13 +646,16 @@ export default function InterviewSessionPage() {
         if (!result.data.questions?.length || result.data.preparing) {
           setQuestionGenActive(true)
           trackProductEventClient('interview_generation_started', { interviewId })
+          startupMarkRef.current('session_create_started', { source: 'question_prepare' })
           const prep = await ensureQuestionsReady(interviewId)
           if (timedOut || !mountedRef.current) return
           if (!prep.ok) {
+            startupMarkRef.current('session_create_failed', { error: prep.error, source: 'question_prepare' })
             setFetchError(prep.error)
             setQuestionGenActive(false)
             return
           }
+          startupMarkRef.current('session_create_success', { source: 'question_prepare' })
           result = await api.get<InterviewData>(`/api/interview/${interviewId}`)
           trackProductEventClient('interview_generation_completed', { interviewId })
           setQuestionGenActive(false)
@@ -570,6 +705,10 @@ export default function InterviewSessionPage() {
         // questions are present. The next step (audio init) is driven by its
         // own useEffect watching this state value.
         setStartupStep('questions_ready')
+        markFirstQuestionReceived({
+          questionCount: result.data.questions.length,
+          restoredIndex,
+        })
         // Persist session context so the feedback form can include it automatically.
         const firstQ = result.data.questions[0]
         storeSessionContext({
@@ -595,7 +734,7 @@ export default function InterviewSessionPage() {
     // `track` are all stable callbacks (no identity churn), so excluding them
     // keeps this a single-shot load without re-fetching on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interviewId])
+  }, [interviewId, reloadNonce])
 
   // ─── Startup state machine: questions_ready → initializing_audio ────────────
   // Single-shot transition. Guarded on:
@@ -634,13 +773,14 @@ export default function InterviewSessionPage() {
     if (startupStep !== 'initializing_audio') return
     let cancelled = false
     const probeAudio = async () => {
+      startupMarkRef.current('audio_unlock_started', { source: 'tts_probe' })
       try {
         if (typeof window === 'undefined') {
           throw new Error('Audio pipeline unavailable in this environment')
         }
         if (inputMode !== 'deepgram') {
           if (!('speechSynthesis' in window)) {
-            throw new Error('Speech synthesis is not supported in this browser. Try Chrome or Edge.')
+            throw new Error(getSpeechSynthesisProbeError())
           }
           let voices = window.speechSynthesis.getVoices()
           if (voices.length === 0) {
@@ -678,12 +818,14 @@ export default function InterviewSessionPage() {
         }
         if (cancelled || !mountedRef.current) return
         interviewStartupLog('tts_ready', { mode: inputMode })
+        startupMarkRef.current('audio_unlock_success', { source: 'tts_probe', mode: inputMode })
         setAudioReady(true)
       } catch (err) {
         if (cancelled || !mountedRef.current) return
         const message = err instanceof Error ? err.message : 'Audio init failed'
         console.error('[startup] Audio probe failed:', message)
         interviewStartupLog('tts_probe_failed', { error: message, mode: inputMode })
+        startupMarkRef.current('audio_unlock_failed', { error: message, mode: inputMode })
         setAudioInitError(message)
       }
     }
@@ -724,8 +866,20 @@ export default function InterviewSessionPage() {
       pendingRestoreRef.current = null
       const budget = restore.timerBudget > 0 ? restore.timerBudget : TIME_PER_QUESTION
       const remaining = restore.timerRemaining > 0 ? Math.min(restore.timerRemaining, budget) : budget
-      setInputMode('text')
-      setManualAnswer(restore.transcript)
+      const voiceRecoveryActive = voiceRecovery.beginFromDraft(restore, currentIndex)
+      if (voiceRecoveryActive) {
+        setInputMode(restore.inputMode)
+        if (restore.inputMode === 'deepgram') {
+          setDgTranscript(restore.transcript)
+          setDgInterim('')
+        } else {
+          restoreTranscript(restore.transcript)
+        }
+        setManualAnswer(restore.transcript)
+      } else {
+        setInputMode('text')
+        setManualAnswer(restore.transcript)
+      }
       setSkipCount(restore.skipCount)
       setPendingFollowUp(
         restore.pendingFollowUp
@@ -742,6 +896,8 @@ export default function InterviewSessionPage() {
         transcriptLen: restore.transcript.length,
         timerRemaining: remaining,
         budget,
+        inputMode: restore.inputMode,
+        voiceRecovery: voiceRecoveryActive,
       })
       return
     }
@@ -796,17 +952,10 @@ export default function InterviewSessionPage() {
     setPhase,
     stopTimer,
   })
-  const startDgListeningRef = useRef<() => Promise<unknown>>(async () => {})
+  const startDgListeningRef = useRef<
+    (opts?: { preserveTranscript?: boolean; isRefresh?: boolean }) => Promise<unknown>
+  >(async () => {})
   const startListeningRef = useRef<() => Promise<unknown>>(async () => {})
-
-  const telemetryCtx = useMemo(
-    () => ({
-      interviewId: interviewId ?? '',
-      questionIndex: currentIndex,
-      phase,
-    }),
-    [interviewId, currentIndex, phase],
-  )
 
   const enterAnsweringPhase = useCallback(
     (reason: AvatarAnsweringReason) => {
@@ -859,7 +1008,13 @@ export default function InterviewSessionPage() {
         voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'web_speech' })
         interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_avatar_finished' })
         trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech' })
-        void startListeningRef.current()
+        startupMarkRef.current('mic_permission_started', { mode: 'web_speech' })
+        void startListeningRef.current().then((granted) => {
+          startupMarkRef.current(
+            granted ? 'mic_permission_granted' : 'mic_permission_denied',
+            { mode: 'web_speech' },
+          )
+        })
       } else {
         interviewStartupLog('listening_skipped', {
           mode: inputMode,
@@ -930,16 +1085,21 @@ export default function InterviewSessionPage() {
     currentWordIndex,
     lastVoiceMeta,
     onAvatarFinished: enterAnsweringPhase,
+    onStartupTtsEvent: (event, extra) => {
+      startupMark(event, extra)
+    },
   })
 
   const handleUnlockAudioGesture = useCallback(() => {
+    startupMark('audio_unlock_started', { source: 'gesture_tap' })
     interviewAudio.unlock()
+    startupMark('audio_unlock_success', { source: 'gesture_tap' })
     trackAvatarTelemetry('avatar_unlock_success', telemetryCtx, { mode: inputMode })
     track('INTERVIEW_FLOW', 'tts_gesture_unlocked', { mode: inputMode })
     if (phase === 'awaiting_audio_unlock' || phase === 'avatar_speaking') {
       setPhase('avatar_speaking')
     }
-  }, [interviewAudio, phase, inputMode, track, telemetryCtx])
+  }, [interviewAudio, phase, inputMode, startupMark, track, telemetryCtx])
 
   const {
     spokenText,
@@ -1137,36 +1297,19 @@ export default function InterviewSessionPage() {
   // which is declared further down.
   const handleNextQuestionRef = useRef<() => void>(() => {})
 
-  // Idempotent: safe to call from the Submit button, the VAD onFinal callback,
-  // the error path of startDgListening, and the unmount cleanup, in any order.
+  // Idempotent Deepgram teardown — delegates to hardened session controller.
   const stopDgListening = useCallback(() => {
-    // Clear the in-flight guard FIRST so a queued start that observes the flag
-    // before this stop completes still observes it as "open" — but the actual
-    // teardown below also bumps StreamingSTT's generation, so a still-pending
-    // connect() will close its socket on resolution.
     dgStartInFlightRef.current = false
-    // Drop the listening-allowed flag IMMEDIATELY so the UI cannot show
-    // "Listening…" for the brief window between teardown start and the
-    // socket-close event landing.
-    if (mountedRef.current) setDgWsOpen(false)
-    const stt = dgSttRef.current
-    dgSttRef.current = null
-    if (stt) {
-      try { stt.stop() } catch (err) {
-        lifecycleWarn('session', 'dg_stt_stop_threw', { err: err instanceof Error ? err.message : String(err) })
-      }
+    if (mountedRef.current) {
+      setDgWsOpen(false)
+      setDgVoiceUiState('idle')
+      setDgVoiceUiMessage(null)
     }
-    const micCleanup = dgMicCleanupRef.current
+    dgControllerRef.current?.stop()
     dgMicCleanupRef.current = null
-    if (micCleanup) {
-      try { micCleanup() } catch (err) {
-        lifecycleWarn('session', 'dg_mic_cleanup_threw', { err: err instanceof Error ? err.message : String(err) })
-      }
-    }
-    dgStopRecording()
-  }, [dgStopRecording])
+  }, [])
 
-  const startDgListening = useCallback(async () => {
+  const startDgListening = useCallback(async (opts?: { preserveTranscript?: boolean; isRefresh?: boolean }) => {
     if (!mountedRef.current) {
       lifecycleWarn('session', 'dg_start_after_unmount_ignored')
       return
@@ -1175,116 +1318,99 @@ export default function InterviewSessionPage() {
       lifecycleWarn('session', 'dg_start_already_in_flight')
       return
     }
-    // If a previous session is somehow still live (rapid mode-switching, a
-    // missed cleanup), tear it down before opening a new one. Single-owner
-    // invariant for the Deepgram pipeline.
-    if (dgSttRef.current || dgMicCleanupRef.current) {
+    if (dgControllerRef.current?.isActive()) {
       lifecycleWarn('session', 'dg_start_with_lingering_session_teardown_first')
       stopDgListening()
     }
 
     dgStartInFlightRef.current = true
     setDgError(null)
-    setDgTranscript('')
-    setDgInterim('')
-
-    let token: string
-    try {
-      token = await fetchSTTToken(interviewId)
-    } catch (err) {
-      dgStartInFlightRef.current = false
-      const msg = err instanceof Error ? err.message : 'Failed to start voice recording.'
-      if (mountedRef.current) setDgError(msg)
-      lifecycleWarn('session', 'dg_token_failed', { err: msg })
-      return
+    setDgVoiceShowActions(false)
+    if (!opts?.preserveTranscript) {
+      setDgTranscript('')
+      setDgInterim('')
     }
 
-    // The user may have navigated / submitted / switched mode while the token
-    // fetch was outstanding. If so, do not open a socket.
-    if (!mountedRef.current) {
-      dgStartInFlightRef.current = false
-      lifecycleWarn('session', 'dg_start_aborted_post_token_unmount')
-      return
+    if (!dgControllerRef.current) {
+      dgControllerRef.current = new DeepgramSessionController(
+        interviewId,
+        telemetryCtx,
+        track,
+        {
+          onPartial: (chunk) => {
+            if (!mountedRef.current) return
+            if (chunk.isFinal) {
+              setDgTranscript((prev) => prev + chunk.text + ' ')
+              setDgInterim('')
+            } else {
+              setDgInterim(chunk.text)
+            }
+          },
+          onFinal: () => {
+            if (phaseRef.current === 'candidate_answering' && mountedRef.current) {
+              queueMicrotask(() => { void handleSubmitAnswerRef.current('vad') })
+            }
+            stopDgListening()
+          },
+          onWsOpen: () => {
+            if (mountedRef.current) setDgWsOpen(true)
+          },
+          onRefreshRestart: () => {
+            if (phaseRef.current !== 'candidate_answering') return
+            const saved = `${dgTranscriptRef.current} ${dgInterimRef.current}`.trim()
+            if (saved) {
+              setDgTranscript(saved.endsWith(' ') ? saved : `${saved} `)
+              setDgInterim('')
+            }
+            void startDgListeningRef.current({ preserveTranscript: true, isRefresh: true })
+          },
+          onUiState: (state, message) => {
+            if (!mountedRef.current) return
+            setDgVoiceUiState(state)
+            setDgVoiceUiMessage(message)
+          },
+          onFatalError: (message, fatalOpts) => {
+            if (!mountedRef.current) return
+            setDgError(message)
+            setDgVoiceShowActions(fatalOpts.canRetryVoice || fatalOpts.canSwitchToText)
+          },
+          onQuotaFallback: (message) => {
+            if (!mountedRef.current) return
+            setDgError(message)
+            setInputMode('text')
+            track('RECOVERY', 'deepgram_quota_fallback_text_mode', { interview_id: interviewId })
+          },
+          isMounted: () => mountedRef.current,
+          startMic: async (sendAudio) => {
+            startupMarkRef.current('mic_permission_started', { mode: 'deepgram' })
+            const cleanup = await dgStartRecording(sendAudio)
+            startupMarkRef.current('mic_permission_granted', { mode: 'deepgram' })
+            dgMicCleanupRef.current = cleanup
+            return cleanup
+          },
+          stopMic: () => {
+            dgStopRecording()
+          },
+          releaseAudio: () => releaseAudioForMicCapture(),
+        },
+      )
     }
 
-    const stt = new StreamingSTT(token)
-    dgSttRef.current = stt
-
     try {
-      await stt.start({
-        onOpen: () => {
-          // Authoritative signal that the Deepgram WebSocket is OPEN. Until
-          // this fires, the UI is forbidden from showing "Listening…" — the
-          // composite `dgListening` flag computed at the top of the component
-          // ANDs this with `dgIsRecording` (local mic stream).
-          if (mountedRef.current && dgSttRef.current === stt) setDgWsOpen(true)
-        },
-        onPartial: (chunk) => {
-          if (!mountedRef.current) return
-          if (chunk.isFinal) {
-            setDgTranscript(prev => prev + chunk.text + ' ')
-            setDgInterim('')
-          } else {
-            setDgInterim(chunk.text)
-          }
-        },
-        onFinal: () => {
-          // VAD detected end of utterance — auto-submit if still answering.
-          // Called through ref to avoid a forward-declaration error.
-          if (phaseRef.current === 'candidate_answering' && mountedRef.current) {
-            queueMicrotask(() => { void handleSubmitAnswerRef.current('vad') })
-          }
-          stopDgListening()
-        },
-        onError: (err) => {
-          lifecycleWarn('session', 'dg_stt_error', { err: err.message })
-          if (mountedRef.current) setDgError(err.message)
-          stopDgListening()
-        },
+      startupMarkRef.current('deepgram_token_requested')
+      await dgControllerRef.current.start({
+        preserveTranscript: opts?.preserveTranscript,
+        isRefresh: opts?.isRefresh,
       })
-    } catch (err) {
-      // stt.start can throw if Deepgram connect() rejects. Unwind cleanly so
-      // no half-opened session lingers, and surface the error to the user.
-      stopDgListening()
-      const msg = err instanceof Error ? err.message : 'Could not open voice connection.'
-      if (mountedRef.current) setDgError(msg)
-      lifecycleWarn('session', 'dg_stt_start_failed', { err: msg })
-      return
-    }
-
-    // Same-tick unmount check: if the component tore down during stt.start, the
-    // unmount cleanup already nulled dgSttRef. Don't open a mic stream that no
-    // one owns.
-    if (!mountedRef.current || dgSttRef.current !== stt) {
-      stopDgListening()
-      lifecycleWarn('session', 'dg_start_superseded_post_stt_open')
-      return
-    }
-
-    try {
-      const cleanup = await dgStartRecording((data) => stt.sendAudio(data))
-      // Yet another race window: the component may have unmounted (or another
-      // startDgListening superseded us) during the getUserMedia await. If so,
-      // run the freshly-returned cleanup and bail.
-      if (!mountedRef.current || dgSttRef.current !== stt) {
-        try { cleanup() } catch { /* */ }
-        stopDgListening()
-        lifecycleWarn('session', 'dg_start_superseded_post_mic_open')
-        return
-      }
-      dgMicCleanupRef.current = cleanup
       lifecycleLog('session', 'dg_started')
     } catch (err) {
-      // Permission denied, device busy, or hook double-start. Unwind the STT
-      // socket so we don't bill Deepgram for a session with no mic feeding it.
-      stopDgListening()
-      const msg = err instanceof Error ? err.message : 'Microphone unavailable.'
+      const msg = err instanceof Error ? err.message : 'Failed to start voice recording.'
       if (mountedRef.current) setDgError(msg)
-      lifecycleWarn('session', 'dg_mic_start_failed', { err: msg })
+      lifecycleWarn('session', 'dg_start_failed', { err: msg })
     } finally {
       dgStartInFlightRef.current = false
     }
-  }, [dgStartRecording, stopDgListening, interviewId])
+  }, [dgStartRecording, dgStopRecording, interviewId, stopDgListening, telemetryCtx, track])
 
   useEffect(() => {
     startDgListeningRef.current = startDgListening
@@ -1299,16 +1425,9 @@ export default function InterviewSessionPage() {
     return () => {
       mountedRef.current = false
       dgStartInFlightRef.current = false
-      const stt = dgSttRef.current
-      dgSttRef.current = null
-      if (stt) {
-        try { stt.stop() } catch { /* */ }
-      }
-      const micCleanup = dgMicCleanupRef.current
+      dgControllerRef.current?.stop()
+      dgControllerRef.current = null
       dgMicCleanupRef.current = null
-      if (micCleanup) {
-        try { micCleanup() } catch { /* */ }
-      }
       lifecycleLog('session', 'unmounted')
     }
   }, [])
@@ -1847,17 +1966,105 @@ export default function InterviewSessionPage() {
     }
   }
 
+  const handleResumeVoiceInterview = useCallback(async () => {
+    if (phase !== 'candidate_answering' || !voiceRecovery.isActive) return
+    voiceRecovery.trackResumeClicked()
+    voiceRecovery.markResuming()
+
+    const { savedMode, transcript: savedTranscript } = voiceRecovery.state
+
+    try {
+      if (interviewAudio.needsUnlock && !interviewAudio.isUnlocked) {
+        interviewAudio.unlock()
+      }
+      await resumeSharedInterviewAudioContext()
+
+      if (savedMode === 'deepgram') {
+        setInputMode('deepgram')
+        setDgTranscript(savedTranscript)
+        setDgInterim('')
+        setManualAnswer('')
+        await startDgListeningRef.current({ preserveTranscript: true })
+        if (!mountedRef.current) return
+        if (!dgControllerRef.current?.isActive()) {
+          voiceRecovery.markFailed(
+            'Could not connect AI Voice. Check your connection and try again, or continue typing.',
+          )
+          return
+        }
+        voiceRecovery.markSuccess()
+        return
+      }
+
+      setInputMode('voice')
+      restoreTranscript(savedTranscript)
+      setManualAnswer('')
+      clearStormBudgetForAnswer()
+      clearRecognitionFailure()
+      setUserMicMuted(false)
+      const ok = await startListening()
+      if (!ok) {
+        const reason =
+          permissionStateRef.current === 'denied'
+            ? 'Microphone permission was denied. Allow access in browser settings, or continue typing.'
+            : micErrorRef.current ??
+              'Could not start the microphone. Close other apps using the mic and try again.'
+        voiceRecovery.markFailed(reason)
+        return
+      }
+      voiceRecovery.markSuccess()
+    } catch (err) {
+      voiceRecovery.markFailed(
+        err instanceof Error ? err.message : 'Voice setup failed. Try again or continue typing.',
+      )
+    }
+  }, [
+    phase,
+    voiceRecovery,
+    interviewAudio,
+    restoreTranscript,
+    clearStormBudgetForAnswer,
+    clearRecognitionFailure,
+    startListening,
+  ])
+
+  const handleContinueTypingFromRecovery = useCallback(() => {
+    if (!voiceRecovery.isActive) return
+    voiceRecovery.trackContinueTyping()
+    const savedTranscript = voiceRecovery.state.transcript
+    setInputMode('text')
+    setManualAnswer(savedTranscript)
+    if (voiceRecovery.state.savedMode === 'voice') {
+      restoreTranscript(savedTranscript)
+    } else {
+      setDgTranscript(savedTranscript)
+      setDgInterim('')
+    }
+    voiceRecovery.dismissToTyping()
+  }, [voiceRecovery, restoreTranscript])
+
+  useEffect(() => {
+    if (phase === 'candidate_answering' && voiceRecovery.isActive) {
+      voiceRecovery.trackBannerShown()
+    }
+  }, [phase, voiceRecovery.isActive, voiceRecovery.trackBannerShown])
+
   // ─── Loading / Error States ───────────────────────────────
   if (fetchError) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4"
            style={{ background: 'var(--page-gradient)' }}>
-        <div className="dashboard-premium-card max-w-md p-8 text-center">
+        <div className="dashboard-premium-card max-w-md space-y-4 p-8 text-center">
           <p className="text-(--accent-danger) font-semibold">{fetchError}</p>
+          <InterviewStartupRecoveryPanel
+            onRetry={handleStartupRetry}
+            onReconnect={handleStartupReconnect}
+            onSwitchToTyping={handleStartupSwitchToTyping}
+          />
           <button
             onClick={() => router.back()}
-            className="mt-4 rounded-xl bg-(--accent-primary) px-6 py-2
-                       text-sm font-semibold text-white"
+            className="w-full rounded-xl border border-(--card-border) bg-(--bg-secondary) px-6 py-2
+                       text-sm font-semibold text-(--text-primary)"
           >
             Go Back
           </button>
@@ -1870,18 +2077,17 @@ export default function InterviewSessionPage() {
     // Startup-step-specific message. Each label corresponds to exactly one
     // state in the StartupStep machine — the user sees deterministic
     // progress instead of a generic "loading" spinner.
-    const startupLabel = (() => {
-      switch (startupStep) {
-        case 'fetching_interview':  return 'Loading your interview…'
-        case 'questions_ready':     return 'Preparing audio pipeline…'
-        case 'initializing_audio':  return audioInitError
-          ? 'Audio setup failed — please retry'
-          : 'Initializing voice playback…'
-        case 'speech_ready':        return 'Almost ready…'
-        case 'interview_ready':     return 'Starting interview…'
-        default:                    return loadingMessage
-      }
-    })()
+    const startupLabel = getStartupLoadingExplanation({
+      questionGenActive,
+      startupStep,
+      audioInitError,
+      loadingMessage,
+    })
+    const startupSubtext = getStartupSubtext({
+      questionGenActive,
+      showRecovery: false,
+      audioInitError,
+    })
     return (
       <div className="flex min-h-dvh items-center justify-center"
            style={{ background: 'var(--page-gradient)' }}>
@@ -1908,11 +2114,9 @@ export default function InterviewSessionPage() {
                 Retry audio setup
               </button>
             </div>
-          ) : (
-            <p className="text-(--text-muted) text-xs">
-              This usually takes a few seconds — stay on this page.
-            </p>
-          )}
+          ) : startupSubtext ? (
+            <p className="text-(--text-muted) text-xs">{startupSubtext}</p>
+          ) : null}
         </div>
       </div>
     )
@@ -2201,13 +2405,36 @@ export default function InterviewSessionPage() {
                       <p className="text-sm text-(--text-muted)">
                         {dgListening
                           ? 'Listening…'
-                          : dgIsRecording
-                            ? 'Connecting voice channel…'
-                            : 'Waiting for microphone…'}
+                          : dgVoiceUiState === 'retrying'
+                            ? (dgVoiceUiMessage ?? 'Voice service is temporarily busy. Retrying automatically…')
+                            : dgVoiceUiState === 'reconnecting'
+                              ? 'Reconnecting voice channel…'
+                              : dgVoiceUiState === 'connecting'
+                                ? 'Connecting voice channel…'
+                                : dgIsRecording
+                                  ? 'Connecting voice channel…'
+                                  : 'Waiting for microphone…'}
                       </p>
                     )}
                   </div>
-                  {dgError && (
+                  <DeepgramVoiceStatusBanner
+                    uiState={dgVoiceUiState}
+                    message={dgVoiceUiMessage}
+                    errorMessage={dgVoiceShowActions ? dgError : null}
+                    showActions={dgVoiceShowActions}
+                    onRetryVoice={() => {
+                      setDgError(null)
+                      setDgVoiceShowActions(false)
+                      void startDgListening({ preserveTranscript: true })
+                    }}
+                    onSwitchToText={() => {
+                      stopDgListening()
+                      setDgError(null)
+                      setDgVoiceShowActions(false)
+                      setInputMode('text')
+                    }}
+                  />
+                  {!dgVoiceShowActions && dgError && (
                     <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dgError}</p>
                   )}
                   {/* Tone badge from last answer */}
@@ -2425,6 +2652,19 @@ export default function InterviewSessionPage() {
               )}
             </div>
 
+            {/* ── Voice recovery after page refresh ── */}
+            {phase === 'candidate_answering' && voiceRecovery.isActive && (
+              <VoiceRecoveryBanner
+                phase={voiceRecovery.state.phase}
+                savedMode={voiceRecovery.state.savedMode}
+                error={voiceRecovery.state.error}
+                resuming={voiceRecovery.state.phase === 'resuming'}
+                onResumeVoice={() => { void handleResumeVoiceInterview() }}
+                onContinueTyping={handleContinueTypingFromRecovery}
+                onRetry={() => { void handleResumeVoiceInterview() }}
+              />
+            )}
+
             {/* ── Empty-payload warning ── */}
             {phase === 'candidate_answering' && showEmptyWarning && (
               <div className="dashboard-premium-card mb-3 w-full min-w-0 border border-amber-300 bg-amber-50/70 p-3">
@@ -2486,7 +2726,9 @@ export default function InterviewSessionPage() {
                 gesture bar in Safari + standalone PWA (audit mobile issue #7). */}
             <div
               className="dashboard-premium-card w-full min-w-0 p-4"
-              style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom))' }}
+              style={{
+                paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
+              }}
             >
               <div className="flex items-center justify-between mb-3">
                 <button

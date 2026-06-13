@@ -3,6 +3,11 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { resolveInterviewQuestions } from '@/lib/interview/resolve-interview-questions';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import {
+  logPrepareCompleted,
+  logPrepareFailed,
+  logPrepareStarted,
+} from '@/lib/telemetry/prepare-server-span';
 import type {
   InterviewSessionContext,
   ParsedResume,
@@ -16,8 +21,10 @@ export async function POST(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
+  const { id: interviewId } = await params;
+  let prepareStartedAt: number | null = null;
+
   try {
-    const { id: interviewId } = await params;
     const supabase = await createClient();
     const {
       data: { user },
@@ -58,6 +65,7 @@ export async function POST(
           .update({ status: 'in_progress' })
           .eq('id', interviewId);
       }
+      logPrepareCompleted(interviewId, logPrepareStarted(interviewId), existingCount ?? 0);
       return NextResponse.json({
         ready: true,
         status: 'in_progress',
@@ -99,6 +107,7 @@ export async function POST(
     }
 
     const parsedResume = resume.parsed_data as ParsedResume;
+    prepareStartedAt = logPrepareStarted(interviewId);
     const resolved = await resolveInterviewQuestions({
       userId: user.id,
       planTier,
@@ -136,6 +145,7 @@ export async function POST(
 
     if (qErr) {
       console.error('[interview/prepare] insert failed', qErr);
+      logPrepareFailed(interviewId, prepareStartedAt, 'Failed to save questions.', 500);
       return NextResponse.json({ error: 'Failed to save questions.' }, { status: 500 });
     }
 
@@ -154,6 +164,8 @@ export async function POST(
       })
       .eq('id', interviewId);
 
+    logPrepareCompleted(interviewId, prepareStartedAt, resolved.questions.length);
+
     return NextResponse.json({
       ready: true,
       status: 'in_progress',
@@ -162,6 +174,12 @@ export async function POST(
     });
   } catch (err) {
     console.error('[interview/prepare] unexpected', err);
+    logPrepareFailed(
+      interviewId,
+      prepareStartedAt,
+      err instanceof Error ? err.message : 'Internal server error',
+      500,
+    );
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

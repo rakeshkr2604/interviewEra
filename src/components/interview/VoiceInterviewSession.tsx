@@ -1,26 +1,21 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { StreamingSTT } from '@/lib/voice/stt-client';
-import { fetchSTTToken } from '@/lib/voice/stt-token';
 import { useMicrophone } from '@/hooks/useMicrophone';
 import { useVoicePlayer } from '@/hooks/useVoicePlayer';
 import type { VoiceMetadata } from '@/lib/interview/interview-orchestrator';
+import { DeepgramSessionController } from '@/lib/voice/deepgram-session-controller';
 import { Mic, MicOff, Volume2 } from 'lucide-react';
 
 interface VoiceInterviewSessionProps {
   interviewId: string;
   currentQuestion: string;
   onAnswerComplete: (answer: string) => void;
-  // When provided, speaks the question text through ElevenLabs with the
-  // tone appropriate for the current rapport level.
   voiceMetadata?: VoiceMetadata;
 }
 
-// Standalone voice-input panel: streams Deepgram Nova-3 transcripts in
-// real-time and calls onAnswerComplete when VAD detects end-of-utterance.
-// If voiceMetadata is passed, the question is also read aloud via ElevenLabs
-// with an emotionally-adapted tone (encouraging / neutral / challenging).
+const noopTrack = () => {};
+
 export function VoiceInterviewSession({
   interviewId,
   currentQuestion,
@@ -30,81 +25,84 @@ export function VoiceInterviewSession({
   const [partialTranscript, setPartialTranscript] = useState('');
   const [fullTranscript, setFullTranscript] = useState('');
   const [sttError, setSttError] = useState<string | null>(null);
-  const sttRef = useRef<StreamingSTT | null>(null);
-  const micCleanupRef = useRef<(() => void) | null>(null);
-  const { isRecording, startRecording, stopRecording } = useMicrophone();
+  const [isListening, setIsListening] = useState(false);
+  const controllerRef = useRef<DeepgramSessionController | null>(null);
+  const mountedRef = useRef(true);
+  const { startRecording, stopRecording } = useMicrophone();
   const { isPlaying: interviewerSpeaking, speak: speakQuestion } = useVoicePlayer('female');
 
-  // STT client is created per-session in handleStartListening so that each
-  // session uses a fresh server-issued ephemeral token (never the master key).
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      controllerRef.current?.stop();
+      controllerRef.current = null;
+    };
+  }, []);
 
-  // Speak the question whenever voiceMetadata says to
   useEffect(() => {
     if (!voiceMetadata?.shouldUseVoice || !currentQuestion) return;
     void speakQuestion(currentQuestion, voiceMetadata.tone);
-    // currentQuestion + voiceMetadata changes drive this — speakQuestion is stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentQuestion, voiceMetadata]);
+
+  const ensureController = useCallback(() => {
+    if (controllerRef.current) return controllerRef.current;
+
+    controllerRef.current = new DeepgramSessionController(
+      interviewId,
+      { interviewId, questionIndex: 0, phase: 'candidate_answering' },
+      noopTrack,
+      {
+        onPartial: (chunk) => {
+          if (!mountedRef.current) return;
+          if (chunk.isFinal) {
+            setFullTranscript((prev) => prev + chunk.text + ' ');
+            setPartialTranscript('');
+          } else {
+            setPartialTranscript(chunk.text);
+          }
+        },
+        onFinal: (answer) => {
+          if (!mountedRef.current) return;
+          setFullTranscript(answer);
+          setPartialTranscript('');
+          setIsListening(false);
+          controllerRef.current?.stop();
+          onAnswerComplete(answer);
+        },
+        onWsOpen: () => {
+          if (mountedRef.current) setIsListening(true);
+        },
+        onRefreshRestart: () => {
+          void controllerRef.current?.start({ preserveTranscript: true, isRefresh: true });
+        },
+        onUiState: () => {},
+        onFatalError: (message) => {
+          if (!mountedRef.current) return;
+          setSttError(message);
+          setIsListening(false);
+        },
+        isMounted: () => mountedRef.current,
+        startMic: startRecording,
+        stopMic: stopRecording,
+        releaseAudio: async () => {},
+      },
+    );
+    return controllerRef.current;
+  }, [interviewId, onAnswerComplete, startRecording, stopRecording]);
 
   const handleStartListening = useCallback(async () => {
     setSttError(null);
     setPartialTranscript('');
     setFullTranscript('');
-
-    let token: string;
-    try {
-      token = await fetchSTTToken(interviewId);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to start voice recording.';
-      setSttError(msg);
-      return;
-    }
-
-    // Stop any previous session before starting a new one
-    sttRef.current?.stop();
-    sttRef.current = new StreamingSTT(token);
-
-    await sttRef.current.start({
-      onPartial: (chunk) => {
-        if (chunk.isFinal) {
-          setFullTranscript((prev) => prev + chunk.text + ' ');
-          setPartialTranscript('');
-        } else {
-          setPartialTranscript(chunk.text);
-        }
-      },
-      onFinal: (answer) => {
-        setFullTranscript(answer);
-        setPartialTranscript('');
-        stopRecording();
-        onAnswerComplete(answer);
-      },
-      onError: (err) => {
-        console.error('[VoiceInterviewSession] STT error:', err);
-        setSttError(err.message);
-        stopRecording();
-      },
-    });
-
-    const cleanup = await startRecording((audioData) => {
-      sttRef.current?.sendAudio(audioData);
-    });
-    micCleanupRef.current = cleanup;
-  }, [startRecording, stopRecording, onAnswerComplete, interviewId]);
+    const controller = ensureController();
+    await controller.start();
+  }, [ensureController]);
 
   const handleStopListening = useCallback(() => {
-    sttRef.current?.stop();
-    micCleanupRef.current?.();
-    micCleanupRef.current = null;
-    stopRecording();
-  }, [stopRecording]);
-
-  // Clean up on unmount
-  useEffect(() => {
-    return () => {
-      sttRef.current?.stop();
-      micCleanupRef.current?.();
-    };
+    controllerRef.current?.stop();
+    setIsListening(false);
   }, []);
 
   const displayText = fullTranscript + partialTranscript;
@@ -117,7 +115,6 @@ export function VoiceInterviewSession({
 
   return (
     <div className="space-y-6">
-      {/* Question — with speaking indicator */}
       <div className="rounded-xl border border-(--card-border) bg-(--card-bg) p-6">
         <div className="mb-2 flex items-center gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-widest text-(--text-muted)">
@@ -138,10 +135,9 @@ export function VoiceInterviewSession({
         <p className="text-base leading-relaxed text-(--text-primary)">{currentQuestion}</p>
       </div>
 
-      {/* Live transcript */}
       <div className="min-h-32 rounded-xl border border-(--card-border) bg-(--card-bg) p-6">
         <h4 className="mb-2 text-xs font-semibold uppercase tracking-widest text-(--text-muted)">
-          {isRecording ? 'Live transcript' : 'Your Answer'}
+          {isListening ? 'Live transcript' : 'Your Answer'}
         </h4>
         {displayText ? (
           <p className="text-sm leading-relaxed text-(--text-primary)">
@@ -152,7 +148,7 @@ export function VoiceInterviewSession({
           </p>
         ) : (
           <p className="text-sm text-(--text-muted)">
-            {isRecording ? 'Listening…' : 'Tap the mic to start speaking.'}
+            {isListening ? 'Listening…' : 'Tap the mic to start speaking.'}
           </p>
         )}
       </div>
@@ -161,9 +157,8 @@ export function VoiceInterviewSession({
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{sttError}</p>
       )}
 
-      {/* Mic toggle */}
       <div className="flex justify-center">
-        {!isRecording ? (
+        {!isListening ? (
           <button
             type="button"
             onClick={() => void handleStartListening()}

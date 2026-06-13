@@ -2,6 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
 import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
+import { getWebSpeechUnsupportedMessage } from '@/lib/voice/browser-capabilities';
+import { resolveSttLocale } from '@/lib/voice/speech-locale';
 import {
   mergeFinalTranscript,
   shouldPromoteInterimOnEnd,
@@ -130,6 +132,8 @@ export interface UseSpeechRecognitionReturn {
   /** Reset failure after user taps Retry Mic. */
   clearRecognitionFailure: () => void;
   resetTranscript: () => void;
+  /** Restore finalized text after page refresh (does not start the mic). */
+  restoreTranscript: (text: string) => void;
   /**
    * Snapshot of finalized chunks + interim, joined and trimmed.
    * Read from refs — survives stale-closure timing of state updates so the
@@ -150,8 +154,12 @@ export interface UseSpeechRecognitionReturn {
 // must never terminate the mic. `onend` transparently restarts recognition
 // while the candidate is still answering.
 // Minimum gap between automatic session restarts (Android reconnect storm fix).
-const RESTART_COOLDOWN_MS = 5_000;
-const RESTART_DELAY_MS = RESTART_COOLDOWN_MS;
+// Silence restarts (browser onend after a pause) use a short delay so the mic
+// feels continuous; error restarts keep a longer cooldown to prevent storms.
+const RESTART_COOLDOWN_SILENCE_MS = 400;
+const RESTART_COOLDOWN_ERROR_MS = 3_000;
+const RESTART_DELAY_SILENCE_MS = RESTART_COOLDOWN_SILENCE_MS;
+const RESTART_DELAY_ERROR_MS = RESTART_COOLDOWN_ERROR_MS;
 const DEFAULT_SILENCE_WINDOW_MS = 8_000;
 
 /** Max failed start()/permission recovery attempts per question — silence restarts are unlimited. */
@@ -169,6 +177,8 @@ const STARTING_STALL_RECOVERY_MS = 12_000;
 // session; if it does not, the existing stuck-mic escape UI in the session
 // page still surfaces the manual Retry mic button.
 const STUCK_WATCHDOG_THRESHOLD_MS = 10_000;
+/** Longer threshold while armed — candidates routinely pause 15–45s to think. */
+const STUCK_WATCHDOG_ARMED_THRESHOLD_MS = 45_000;
 const STUCK_WATCHDOG_POLL_MS = 2_000;
 const MIN_RECOVERY_GAP_MS = 15_000;
 const MAX_RECOVERIES_PER_WINDOW = 3;
@@ -207,7 +217,7 @@ export function useSpeechRecognition(
     () => (typeof window !== 'undefined' &&
       ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window))
       ? null
-      : 'Speech recognition not supported in this browser. Use Chrome or Edge.'
+      : getWebSpeechUnsupportedMessage()
   );
   const [permissionState, setPermissionState] = useState<'unknown' | 'granted' | 'prompt' | 'denied' | 'requesting'>('unknown');
   const [recognitionFailed, setRecognitionFailed] = useState(false);
@@ -473,18 +483,21 @@ export function useSpeechRecognition(
   ): boolean => {
     if (!shouldListenRef.current || !mountedRef.current) return false;
 
+    const cooldownMs = kind === 'error' ? RESTART_COOLDOWN_ERROR_MS : RESTART_COOLDOWN_SILENCE_MS;
+    const delayMs = kind === 'error' ? RESTART_DELAY_ERROR_MS : RESTART_DELAY_SILENCE_MS;
+
     const now = Date.now();
     const sinceLast = lastRestartAtRef.current ? now - lastRestartAtRef.current : Infinity;
-    if (sinceLast < RESTART_COOLDOWN_MS) {
+    if (sinceLast < cooldownMs) {
       emitStt('stt_restart_blocked', {
         source,
         kind,
         reason: 'cooldown',
         elapsedMs: sinceLast,
-        cooldownMs: RESTART_COOLDOWN_MS,
+        cooldownMs,
         sessionId: gen,
       });
-      const waitMs = RESTART_COOLDOWN_MS - sinceLast;
+      const waitMs = cooldownMs - sinceLast;
       pendingRestartRef.current = true;
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       restartTimerRef.current = setTimeout(() => {
@@ -520,7 +533,7 @@ export function useSpeechRecognition(
       if (shouldListenRef.current && mountedRef.current && gen === generationRef.current) {
         beginRecognitionRef.current();
       }
-    }, RESTART_DELAY_MS);
+    }, delayMs);
     return true;
   }, [emitStt, markRestartBudgetExhausted]);
 
@@ -549,17 +562,21 @@ export function useSpeechRecognition(
     // Bump generation BEFORE binding handlers so myGen captures the new id.
     const myGen = ++generationRef.current;
 
-    // Reset state to 'idle' synchronously. If a previous instance flipped
-    // state to 'active' and we did not transition back to 'idle' (e.g. an
-    // orphaned onresult fired between stop() and now), the next instance's
-    // onstart would still set 'starting' — but during the gap the UI could
-    // show stale "Listening…". Force-resetting here closes that window.
-    setRecognitionState('idle');
+    // Force-reset to idle only on intentional stops. During auto-restart the
+    // browser cycles sessions on silence — showing 'idle' / "Mic Ready" for
+    // several seconds felt like the mic was dropping.
+    if (!shouldListenRef.current) {
+      setRecognitionState('idle');
+    } else if (recognitionStateRef.current === 'active' || recognitionStateRef.current === 'starting') {
+      setRecognitionState('starting');
+    } else {
+      setRecognitionState('idle');
+    }
 
     const recognition = new Cls();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-IN';
+    recognition.lang = resolveSttLocale();
 
     lastResultHashRef.current = '';
     voiceDebug('begin_recognition', { gen: myGen });
@@ -772,7 +789,7 @@ export function useSpeechRecognition(
       const messages: Record<string, string> = {
         'not-allowed': 'Microphone permission denied',
         'audio-capture': 'No microphone detected. Please connect a microphone and try again.',
-        'service-not-allowed': 'Speech service unavailable. Try Chrome or Edge.',
+        'service-not-allowed': getWebSpeechUnsupportedMessage(),
       };
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         setPermissionState('denied');
@@ -823,7 +840,12 @@ export function useSpeechRecognition(
       if (recognitionRef.current === recognition) {
         recognitionRef.current = null;
       }
-      setRecognitionState('idle');
+      if (shouldListenRef.current) {
+        // Optimistic reconnect UI — avoid flashing to idle before the next session.
+        setRecognitionState('starting');
+      } else {
+        setRecognitionState('idle');
+      }
       const pendingInterim = interimRef.current.trim();
       if (pendingInterim && shouldPromoteInterimOnEnd(finalTranscriptRef.current, pendingInterim)) {
         const promoted = mergeFinalTranscript(finalTranscriptRef.current, pendingInterim);
@@ -982,6 +1004,20 @@ export function useSpeechRecognition(
     log('reset');
   }, [syncRender]);
 
+  const restoreTranscript = useCallback(
+    (text: string) => {
+      const trimmed = text.trim();
+      finalTranscriptRef.current = trimmed;
+      interimRef.current = '';
+      lastSpeechAtRef.current = trimmed ? Date.now() : 0;
+      lastResultHashRef.current = '';
+      syncRender();
+      voiceDebug('transcript_restored', { chars: trimmed.length });
+      log('transcript_restored', { chars: trimmed.length });
+    },
+    [syncRender],
+  );
+
   // ── Mobile Safari / PWA defensive handling ──────────────────────────────
   // iOS pauses recognition when the tab/PWA loses visibility (incoming call,
   // app switcher). On return, restart recognition if we should still be
@@ -1041,8 +1077,12 @@ export function useSpeechRecognition(
       if (recognitionState !== 'active') return;
 
       const now = Date.now();
+      const stuckThresholdMs =
+        keepArmedDuringAnswerRef?.current === true
+          ? STUCK_WATCHDOG_ARMED_THRESHOLD_MS
+          : STUCK_WATCHDOG_THRESHOLD_MS;
       const sinceLastSpeech = now - lastSpeechAtRef.current;
-      if (lastSpeechAtRef.current === 0 || sinceLastSpeech < STUCK_WATCHDOG_THRESHOLD_MS) {
+      if (lastSpeechAtRef.current === 0 || sinceLastSpeech < stuckThresholdMs) {
         return;
       }
 
@@ -1079,7 +1119,7 @@ export function useSpeechRecognition(
     }, STUCK_WATCHDOG_POLL_MS);
 
     return () => clearInterval(iv);
-  }, [recognitionState, tryScheduleAutoRestart]);
+  }, [recognitionState, tryScheduleAutoRestart, keepArmedDuringAnswerRef]);
 
   // Android often reaches onstart but delays first onresult — rebuild without
   // consuming the error-restart budget so thinking pauses up to 60s stay valid.
@@ -1099,11 +1139,11 @@ export function useSpeechRecognition(
         sessionId: generationRef.current,
         elapsedMs: since,
       });
-      beginRecognitionRef.current();
+      tryScheduleAutoRestart('starting_stall_recovery', generationRef.current, 'silence');
     }, 3_000);
 
     return () => clearInterval(iv);
-  }, [recognitionState, emitStt]);
+  }, [recognitionState, emitStt, tryScheduleAutoRestart]);
 
   // ── StrictMode remount fix ───────────────────────────────────────────────
   // React StrictMode (dev) performs a mount → unmount → remount cycle. The
@@ -1165,6 +1205,7 @@ export function useSpeechRecognition(
     recognitionFailed,
     clearRecognitionFailure,
     resetTranscript,
+    restoreTranscript,
     getMergedTranscript,
     hasRecentSpeech,
   };
