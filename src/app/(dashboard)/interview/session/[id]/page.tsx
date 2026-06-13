@@ -525,7 +525,6 @@ export default function InterviewSessionPage() {
     resetTranscript,
     restoreTranscript,
     getMergedTranscript,
-    hasRecentSpeech,
   } = useSpeechRecognition({
     keepArmedDuringAnswerRef: micKeepArmedRef,
     onSttTelemetry,
@@ -1135,6 +1134,7 @@ export default function InterviewSessionPage() {
       permissionState,
       voiceRecovery.isBlockingMic,
       clearRecognitionFailure,
+      telemetryCtx,
     ],
   )
 
@@ -2329,7 +2329,7 @@ export default function InterviewSessionPage() {
     if (phase === 'candidate_answering' && voiceRecovery.isActive) {
       voiceRecovery.trackBannerShown()
     }
-  }, [phase, voiceRecovery.isActive, voiceRecovery.trackBannerShown])
+  }, [phase, voiceRecovery])
 
   // ─── Loading / Error States ───────────────────────────────
   if (fetchError) {

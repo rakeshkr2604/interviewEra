@@ -29,24 +29,20 @@ export function useCandidateCamera({
 }: UseCandidateCameraParams): UseCandidateCameraReturn {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const [status, setStatus] = useState<CandidateCameraStatus>('idle')
+  const [isSupported] = useState(
+    () =>
+      typeof navigator !== 'undefined' &&
+      Boolean(navigator.mediaDevices?.getUserMedia),
+  )
+  const [hasStream, setHasStream] = useState(false)
+  const [captureError, setCaptureError] = useState<'denied' | null>(null)
 
   useEffect(() => {
-    if (!active) {
-      streamRef.current?.getTracks().forEach((t) => t.stop())
-      streamRef.current = null
-      if (videoRef.current) videoRef.current.srcObject = null
-      setStatus('idle')
-      return
-    }
-
-    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-      setStatus('unavailable')
+    if (!active || !isSupported) {
       return
     }
 
     let cancelled = false
-    setStatus('starting')
 
     void navigator.mediaDevices
       .getUserMedia({
@@ -59,28 +55,41 @@ export function useCandidateCamera({
           return
         }
         streamRef.current = stream
-        setStatus('active')
+        setCaptureError(null)
+        setHasStream(true)
       })
       .catch(() => {
-        if (!cancelled) setStatus('denied')
+        if (!cancelled) setCaptureError('denied')
       })
 
     return () => {
       cancelled = true
       streamRef.current?.getTracks().forEach((t) => t.stop())
       streamRef.current = null
-      if (videoRef.current) videoRef.current.srcObject = null
+      setHasStream(false)
+      setCaptureError(null)
     }
-  }, [active])
+  }, [active, isSupported])
 
-  // Bind stream after the <video> mounts (status flips to active first).
+  // Bind stream after the <video> mounts (hasStream flips true first).
   useEffect(() => {
+    if (!hasStream) return
     const el = videoRef.current
     const stream = streamRef.current
-    if (status !== 'active' || !el || !stream) return
+    if (!el || !stream) return
     el.srcObject = stream
     void el.play().catch(() => {})
-  }, [status])
+  }, [hasStream])
+
+  const status: CandidateCameraStatus = !active
+    ? 'idle'
+    : !isSupported
+      ? 'unavailable'
+      : captureError === 'denied'
+        ? 'denied'
+        : hasStream
+          ? 'active'
+          : 'starting'
 
   return { videoRef, status }
 }
