@@ -7,8 +7,12 @@ import {
 } from '@/lib/telemetry/interview-startup-telemetry'
 import {
   PREPARE_CLIENT_TIMEOUT_MS,
+  QUESTION_GEN_STAGE_DURATION_MS,
   STARTUP_POST_READY_TIMEOUT_MS,
   classifyPrepareError,
+  getQuestionGenHeadline,
+  getQuestionGenStageIndex,
+  getQuestionGenSubtext,
   getStartupLoadingExplanation,
   getStartupSubtext,
   getStartupWatchdogDelayMs,
@@ -49,7 +53,7 @@ describe('startup watchdog policy', () => {
 })
 
 describe('startup loading copy', () => {
-  it('shows generating copy while questionGenActive', () => {
+  it('shows first-stage headline while questionGenActive', () => {
     expect(
       getStartupLoadingExplanation({
         questionGenActive: true,
@@ -57,17 +61,29 @@ describe('startup loading copy', () => {
         audioInitError: null,
         loadingMessage: 'x',
       }),
-    ).toBe('Generating interview questions…')
+    ).toBe(getQuestionGenHeadline(0))
   })
 
-  it('shows prepare subtext during generation', () => {
+  it('shows optimistic prepare subtext during generation', () => {
     expect(
       getStartupSubtext({
         questionGenActive: true,
         showRecovery: false,
         audioInitError: null,
       }),
-    ).toContain('up to a minute')
+    ).toBe(getQuestionGenSubtext())
+    expect(getStartupSubtext({
+      questionGenActive: true,
+      showRecovery: false,
+      audioInitError: null,
+    })).not.toContain('minute')
+  })
+
+  it('advances question-gen stages over time', () => {
+    expect(getQuestionGenStageIndex(0)).toBe(0)
+    expect(getQuestionGenStageIndex(QUESTION_GEN_STAGE_DURATION_MS - 1)).toBe(0)
+    expect(getQuestionGenStageIndex(QUESTION_GEN_STAGE_DURATION_MS)).toBe(1)
+    expect(getQuestionGenStageIndex(QUESTION_GEN_STAGE_DURATION_MS * 10)).toBe(3)
   })
 
   it('hides subtext when audio init failed', () => {

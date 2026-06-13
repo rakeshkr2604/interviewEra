@@ -61,6 +61,7 @@ import { useInterviewDraft } from '@/hooks/useInterviewDraft'
 import { useVoiceInterviewRecovery } from '@/hooks/useVoiceInterviewRecovery'
 import { VoiceRecoveryBanner } from '@/components/interview/VoiceRecoveryBanner'
 import { InterviewStartupRecoveryPanel } from '@/components/interview/InterviewStartupRecoveryPanel'
+import { InterviewQuestionGenLoading } from '@/components/interview/InterviewQuestionGenLoading'
 import { useInterviewStartupReliability } from '@/hooks/useInterviewStartupReliability'
 import {
   getStartupLoadingExplanation,
@@ -180,6 +181,8 @@ interface InterviewData {
   preparing?: boolean
 }
 
+type PrepareContext = Pick<InterviewData, 'role' | 'interviewerId' | 'difficulty'>
+
 /**
  * Deterministic interview-startup state machine.
  *
@@ -205,6 +208,7 @@ export default function InterviewSessionPage() {
   const interviewId = params.id
   const { ensureQuestionsReady } = useInterviewPrepare()
   const [questionGenActive, setQuestionGenActive] = useState(false)
+  const [prepareContext, setPrepareContext] = useState<PrepareContext | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
 
   // ─── Interview Data ───────────────────────────────────────
@@ -363,6 +367,7 @@ export default function InterviewSessionPage() {
       setPhase('loading')
       setInterviewData(null)
       setQuestionGenActive(false)
+      setPrepareContext(null)
       setReloadNonce((n) => n + 1)
     },
     onReconnectPrepare: async () => {
@@ -644,6 +649,11 @@ export default function InterviewSessionPage() {
         }
 
         if (!result.data.questions?.length || result.data.preparing) {
+          setPrepareContext({
+            role: result.data.role,
+            interviewerId: result.data.interviewerId,
+            difficulty: result.data.difficulty,
+          })
           setQuestionGenActive(true)
           trackProductEventClient('interview_generation_started', { interviewId })
           startupMarkRef.current('session_create_started', { source: 'question_prepare' })
@@ -2074,6 +2084,15 @@ export default function InterviewSessionPage() {
   }
 
   if (phase === 'loading' || !interviewData || !currentQuestion) {
+    if (questionGenActive) {
+      return (
+        <InterviewQuestionGenLoading
+          role={prepareContext?.role ?? interviewData?.role}
+          interviewerId={prepareContext?.interviewerId ?? interviewData?.interviewerId}
+        />
+      )
+    }
+
     // Startup-step-specific message. Each label corresponds to exactly one
     // state in the StartupStep machine — the user sees deterministic
     // progress instead of a generic "loading" spinner.
@@ -2089,12 +2108,17 @@ export default function InterviewSessionPage() {
       audioInitError,
     })
     return (
-      <div className="flex min-h-dvh items-center justify-center"
+      <div className="flex min-h-dvh items-center justify-center p-4"
            style={{ background: 'var(--page-gradient)' }}>
-        <div className="text-center space-y-3">
+        <div className="dashboard-premium-card w-full max-w-sm space-y-4 p-6 text-center sm:p-8">
           <div className="mx-auto h-10 w-10 animate-spin rounded-full
                           border-2 border-(--accent-primary) border-t-transparent" />
-          <p className="text-(--text-secondary) text-sm">{startupLabel}</p>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-(--text-primary)">{startupLabel}</p>
+            {startupSubtext ? (
+              <p className="text-xs text-(--text-muted)">{startupSubtext}</p>
+            ) : null}
+          </div>
           {audioInitError ? (
             <div className="space-y-2">
               <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
@@ -2114,8 +2138,6 @@ export default function InterviewSessionPage() {
                 Retry audio setup
               </button>
             </div>
-          ) : startupSubtext ? (
-            <p className="text-(--text-muted) text-xs">{startupSubtext}</p>
           ) : null}
         </div>
       </div>
