@@ -8,6 +8,7 @@ import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
 import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import { usePersistOnboardingDraft } from '@/lib/onboarding/use-persist-onboarding-draft'
 import { snapshotFromHydration } from '@/lib/onboarding/apply-hydration'
+import { shouldSkipJdReparse } from '@/lib/onboarding/jd-parse-guard'
 import { OnboardingStepGoalProfile } from '@/components/onboarding/OnboardingStepGoalProfile'
 import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResume'
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
@@ -63,6 +64,16 @@ type ApiErr = {
 
 type JdParseStatus = 'idle' | 'parsing' | 'ready' | 'failed'
 
+function jdTextNormalized(text: string): string {
+  return refineJobDescriptionForUi(text).trim().slice(0, 12_000)
+}
+
+function initialJdParsedSource(hydration: OnboardingHydration | null): string | null {
+  if (!hydration || hydration.jdParseStatus !== 'ready' || !hydration.parsedJd) return null
+  const normalized = jdTextNormalized(hydration.jdText)
+  return normalized.length >= JD_PARSE_MIN_LEN ? normalized : null
+}
+
 export default function OnboardingPage() {
   const router = useRouter()
   const serverHydration = useOnboardingHydration()
@@ -115,6 +126,8 @@ export default function OnboardingPage() {
   const [jdExtractError, setJdExtractError] = useState('')
   const [jdShowRawEditor, setJdShowRawEditor] = useState(false)
   const jdParseSeq = useRef(0)
+  /** Normalized JD text last successfully structured — prevents re-parse on refresh. */
+  const jdParsedSourceRef = useRef<string | null>(initialJdParsedSource(serverHydration))
   const hydrationApplied = useRef(false)
   const serverHydrationSynced = useRef(false)
   const prevStepRef = useRef<1 | 2>(serverHydration?.step ?? 1)
@@ -165,6 +178,9 @@ export default function OnboardingPage() {
         setMode(snap.data.mode)
         if (snap.data.interviewerId != null) setInterviewerId(snap.data.interviewerId)
         if (snap.data.resumeId) setResumeId(snap.data.resumeId)
+        if (snap.jdParseStatus === 'ready' && snap.parsedJd) {
+          jdParsedSourceRef.current = jdTextNormalized(snap.jdText)
+        }
       } catch {
         /* best-effort */
       } finally {
@@ -197,6 +213,9 @@ export default function OnboardingPage() {
     setMode(snap.data.mode)
     if (snap.data.interviewerId != null) setInterviewerId(snap.data.interviewerId)
     if (snap.data.resumeId) setResumeId(snap.data.resumeId)
+    if (serverHydration.jdParseStatus === 'ready' && serverHydration.parsedJd) {
+      jdParsedSourceRef.current = jdTextNormalized(serverHydration.jdText)
+    }
   }, [
     serverHydration,
     setGoal,
@@ -235,11 +254,23 @@ export default function OnboardingPage() {
 
   const runJdParse = useCallback(async (textOverride?: string) => {
     const source = textOverride ?? jdText
-    const base = refineJobDescriptionForUi(source).trim()
+    const base = jdTextNormalized(source)
     if (base.length < JD_PARSE_MIN_LEN) {
       setParsedJd(null)
       setJdParseStatus('idle')
       setJdParseError('')
+      jdParsedSourceRef.current = null
+      return
+    }
+    if (
+      shouldSkipJdReparse({
+        normalizedText: base,
+        minLen: JD_PARSE_MIN_LEN,
+        parseStatus: jdParseStatus,
+        hasParsedJd: parsedJd !== null,
+        lastParsedSource: jdParsedSourceRef.current,
+      })
+    ) {
       return
     }
     jdParseSeq.current += 1
@@ -264,6 +295,7 @@ export default function OnboardingPage() {
       if (data.parsed) {
         setParsedJd(data.parsed)
         setJdParseStatus('ready')
+        jdParsedSourceRef.current = base
       } else {
         setParsedJd(null)
         setJdParseStatus('failed')
@@ -275,22 +307,34 @@ export default function OnboardingPage() {
       setJdParseStatus('failed')
       setJdParseError('Network error while structuring job description.')
     }
-  }, [jdText])
+  }, [jdText, jdParseStatus, parsedJd])
 
   useEffect(() => {
     if (step !== 2 || jdShowRawEditor) return
-    const t = jdText.trim()
-    if (t.length < JD_PARSE_MIN_LEN) {
+    const normalized = jdTextNormalized(jdText)
+    if (normalized.length < JD_PARSE_MIN_LEN) {
       setParsedJd(null)
       setJdParseStatus('idle')
       setJdParseError('')
+      jdParsedSourceRef.current = null
+      return
+    }
+    if (
+      shouldSkipJdReparse({
+        normalizedText: normalized,
+        minLen: JD_PARSE_MIN_LEN,
+        parseStatus: jdParseStatus,
+        hasParsedJd: parsedJd !== null,
+        lastParsedSource: jdParsedSourceRef.current,
+      })
+    ) {
       return
     }
     const id = window.setTimeout(() => {
-      void runJdParse()
+      void runJdParse(normalized)
     }, 650)
     return () => window.clearTimeout(id)
-  }, [step, jdText, jdShowRawEditor, runJdParse])
+  }, [step, jdText, jdShowRawEditor, runJdParse, jdParseStatus, parsedJd])
 
   useEffect(() => {
     if (!data.resumeId || resumeState !== 'processing') return
@@ -861,14 +905,34 @@ export default function OnboardingPage() {
           onJdExtract={() => void handleJdExtract()}
           onJdShowRawEditor={setJdShowRawEditor}
           onJdBlur={() => {
-            const t = jdText.trim()
-            if (t.length < 24) return
             const refined = refineJobDescriptionForUi(jdText)
+            const normalized = jdTextNormalized(refined)
+            if (normalized.length < 24) return
             if (refined !== jdText) setJdText(refined)
             setJdShowRawEditor(false)
-            void runJdParse(refined)
+            if (
+              shouldSkipJdReparse({
+                normalizedText: normalized,
+                minLen: JD_PARSE_MIN_LEN,
+                parseStatus: jdParseStatus,
+                hasParsedJd: parsedJd !== null,
+                lastParsedSource: jdParsedSourceRef.current,
+              })
+            ) {
+              return
+            }
+            void runJdParse(normalized)
           }}
-          onJdClear={() => { setJdText(''); setParsedJd(null); setJdParseStatus('idle'); setJdParseError(''); setJdExtractError(''); setJdShowRawEditor(false); setStartError('') }}
+          onJdClear={() => {
+            setJdText('')
+            setParsedJd(null)
+            setJdParseStatus('idle')
+            setJdParseError('')
+            setJdExtractError('')
+            setJdShowRawEditor(false)
+            setStartError('')
+            jdParsedSourceRef.current = null
+          }}
           difficulty={difficulty}
           difficultyTouched={difficultyTouched}
           questionCount={difficultyQuestionCount(difficulty)}

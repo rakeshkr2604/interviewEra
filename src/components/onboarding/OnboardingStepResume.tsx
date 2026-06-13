@@ -632,8 +632,20 @@ export function OnboardingStepResume({
                             ? jobDescriptionSummaryLine(parsedJd)
                             : jdParseStatus === 'failed'
                               ? (jdParseError || 'You can edit the text or continue with the posting as-is.')
-                              : 'Structured preview preparing…'}
+                              : jdParseStatus === 'ready'
+                                ? 'Questions will use your resume and this job posting.'
+                                : 'Add or paste a job posting to tailor questions.'}
                         </p>
+                        {parsedJd && (jdParseStatus === 'ready' || jdParseStatus === 'failed') && (
+                          <p className="mt-1.5 text-[10px] leading-snug text-(--text-secondary)">
+                            Interview questions are generated from both your resume and this posting — not resume alone.
+                          </p>
+                        )}
+                        {!parsedJd && jdParseStatus === 'failed' && (
+                          <p className="mt-1.5 text-[10px] leading-snug text-(--text-secondary)">
+                            Interview questions will still use your resume and this posting text.
+                          </p>
+                        )}
 
                         {/* Dialog: view parsed JD */}
                         {parsedJd && (
@@ -682,6 +694,11 @@ export function OnboardingStepResume({
               </AnimatePresence>
 
               {/* JD file upload */}
+              {jdText.trim().length === 0 && (
+                <p className="text-[10px] leading-snug text-(--text-muted)">
+                  Optional — add a posting to get company-specific questions alongside your resume.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-(--card-border) px-2.5 py-1.5 text-[11px] font-semibold text-(--text-primary) hover:bg-(--bg-secondary) transition-colors">
                   <FileText className="size-3" aria-hidden />
@@ -756,6 +773,15 @@ export function OnboardingStepResume({
                   <SessionRow compact icon={Clock}           label="Duration"   value={durationLabel} />
                   <SessionRow compact icon={Mic}             label="Voice"      value={interviewerName} />
                   <SessionRow compact icon={Sparkles}        label="Follow-ups" value="Enabled" accent />
+                  {jdText.trim().length > 0 && (
+                    <SessionRow
+                      compact
+                      icon={FileText}
+                      label="Tailoring"
+                      value="Resume + posting"
+                      accent
+                    />
+                  )}
 
                   {/* Difficulty — full width */}
                   <div className="col-span-1 flex items-center gap-2 border-b border-(--card-border)/50 py-1.5 last:border-0 sm:col-span-2 lg:col-span-1">
