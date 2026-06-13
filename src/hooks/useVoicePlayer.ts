@@ -33,6 +33,7 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
   const progressRafRef = useRef<number | null>(null);
   const seqRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(true);
+  const fetchAbortRef = useRef<AbortController | null>(null);
 
   const clearProgressLoop = useCallback(() => {
     if (progressRafRef.current !== null) {
@@ -56,6 +57,8 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
 
   const stop = useCallback(() => {
     seqRef.current += 1;
+    fetchAbortRef.current?.abort();
+    fetchAbortRef.current = null;
     clearProgressLoop();
     if (sourceRef.current) {
       try { sourceRef.current.stop(); } catch { /* already stopped */ }
@@ -79,10 +82,12 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
 
       setError(null);
       lifecycleLog('voice-player', 'speak_start', { seq: mySeq, textLen: text.length, tone });
-      interviewFlowLog('tts', 'elevenlabs_fetch_started', { textLen: text.length, tone });
+
+      const abortController = new AbortController();
+      fetchAbortRef.current = abortController;
 
       try {
-        const audioData = await client.speak(text, { voice, tone });
+        const audioData = await client.speak(text, { voice, tone }, abortController.signal);
         if (mySeq !== seqRef.current || !mountedRef.current) {
           lifecycleLog('voice-player', 'speak_superseded_after_fetch', { mySeq, current: seqRef.current });
           return;
@@ -152,6 +157,10 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
           callbacks.onPlaybackStarted?.();
         }
       } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          lifecycleLog('voice-player', 'speak_aborted', { mySeq });
+          return;
+        }
         const message = err instanceof Error ? err.message : String(err);
         lifecycleWarn('voice-player', 'speak_failed', { mySeq, err: message });
         if (mountedRef.current && mySeq === seqRef.current) setIsPlaying(false);
@@ -172,6 +181,10 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
           }
         }
         callbacks.onPlaybackFailed?.(failMessage);
+      } finally {
+        if (fetchAbortRef.current === abortController) {
+          fetchAbortRef.current = null;
+        }
       }
     },
     [voice, stop, clearProgressLoop],

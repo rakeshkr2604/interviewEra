@@ -9,6 +9,7 @@ import { needsAudioGestureUnlock } from '@/lib/voice/audio-gesture'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { readAiVoiceEnabled } from '@/lib/settings/client-preferences'
+import { isElevenLabsTtsBlocked } from '@/lib/voice/elevenlabs-tts-gate'
 import type { PlaybackCallbacks } from '@/lib/voice/playback-callbacks'
 import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-telemetry'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
@@ -238,6 +239,14 @@ export function useInterviewAvatarSpeaking(
       interviewFlowLog('tts', 'browser_tts_fallback', { questionIndex: currentIndex })
       speakQuestion(intro, playbackCallbacks)
     }
+
+    if (isElevenLabsTtsBlocked()) {
+      interviewFlowLog('tts', 'elevenlabs_skipped_blocked', { questionIndex: currentIndex })
+      browserFallback()
+      return
+    }
+
+    interviewFlowLog('tts', 'elevenlabs_fetch_started', { textLen: intro.length, tone })
 
     void elSpeak(intro, tone, {
       ...playbackCallbacks,

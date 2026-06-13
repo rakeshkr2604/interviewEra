@@ -65,7 +65,10 @@ export async function POST(request: NextRequest) {
   const abuse = await abuseGate(user.id, ip);
   if (!abuse.allowed) {
     return NextResponse.json(
-      { error: 'Request blocked. Please try again later.' },
+      {
+        error: 'Request blocked. Please try again later.',
+        fallback: 'browser_tts',
+      },
       { status: 429, headers: abuse.block_ttl_s ? { 'Retry-After': String(abuse.block_ttl_s) } : {} },
     );
   }
@@ -122,7 +125,10 @@ export async function POST(request: NextRequest) {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     console.error('[TTS proxy] ELEVENLABS_API_KEY not configured');
-    return NextResponse.json({ error: 'TTS not configured' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'TTS not configured', fallback: 'browser_tts' },
+      { status: 503 },
+    );
   }
 
   const voiceId     = VOICE_IDS[voice ?? 'female'] ?? VOICE_IDS.female;

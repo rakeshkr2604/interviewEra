@@ -1,3 +1,8 @@
+import {
+  isElevenLabsTtsBlocked,
+  markElevenLabsBlockedForHttpStatus,
+} from '@/lib/voice/elevenlabs-tts-gate';
+
 export type InterviewerVoice = 'male' | 'female';
 export type InterviewerTone = 'encouraging' | 'neutral' | 'challenging';
 
@@ -34,17 +39,19 @@ export class ProsodicTTS {
   // server-side by the proxy route which reads ELEVENLABS_API_KEY.
   constructor(_apiKey?: string) {}
 
-  async speak(text: string, options: TTSOptions): Promise<ArrayBuffer> {
-    console.log('[TTS] Requesting via proxy:', {
-      voice: options.voice,
-      tone: options.tone,
-      textLen: text.length,
-    });
+  async speak(text: string, options: TTSOptions, signal?: AbortSignal): Promise<ArrayBuffer> {
+    if (isElevenLabsTtsBlocked()) {
+      throw new TTSFallbackToBrowserError(
+        503,
+        'ElevenLabs voice skipped — using browser speech for this session.',
+      );
+    }
 
     const response = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text, voice: options.voice, tone: options.tone }),
+      signal,
     });
 
     if (!response.ok) {
@@ -61,9 +68,23 @@ export class ProsodicTTS {
       }
       console.error('[TTS] Proxy error:', response.status, parsedBody ?? rawBody);
       if (parsedBody?.fallback === 'browser_tts') {
+        markElevenLabsBlockedForHttpStatus(
+          response.status,
+          parsedBody.error ?? `TTS unavailable (${response.status})`,
+        );
         throw new TTSFallbackToBrowserError(
           response.status,
           parsedBody.error ?? `TTS unavailable (${response.status})`,
+        );
+      }
+      if (response.status === 429 || response.status === 401) {
+        markElevenLabsBlockedForHttpStatus(
+          response.status,
+          parsedBody?.error ?? `TTS unavailable (${response.status})`,
+        );
+        throw new TTSFallbackToBrowserError(
+          response.status,
+          parsedBody?.error ?? `TTS unavailable (${response.status})`,
         );
       }
       throw new Error(`TTS failed (${response.status}): ${parsedBody?.error ?? rawBody}`);
