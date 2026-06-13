@@ -107,11 +107,11 @@ export function OnboardingStepGoalProfile({
   }, [role, mode])
 
   return (
-    <div className="grid grid-cols-1 gap-4 max-lg:flex-none lg:min-h-0 lg:flex-1 lg:grid-cols-[5fr_7fr] lg:items-stretch">
+    <div className="grid grid-cols-1 gap-3 max-lg:flex-none lg:min-h-0 lg:flex-1 lg:grid-cols-[5fr_7fr] lg:items-stretch lg:gap-3">
 
       {/* ── Left: Brand Panel (desktop only) ──────────────────────────────── */}
       <div
-        className="relative hidden overflow-hidden rounded-2xl border border-(--card-border)/60 lg:flex lg:flex-col lg:justify-center lg:px-6 lg:py-8"
+        className="relative hidden overflow-hidden rounded-2xl border border-(--card-border)/60 lg:flex lg:flex-col lg:justify-center lg:px-5 lg:py-6 xl:px-6 xl:py-7"
         style={{ background: 'color-mix(in srgb, var(--card-bg) 55%, transparent)' }}
       >
         {/* Decorative radial glow — top-right */}
@@ -128,7 +128,7 @@ export function OnboardingStepGoalProfile({
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          className="relative space-y-5"
+          className="relative space-y-4"
         >
           {/* AI label */}
           <div className="inline-flex items-center gap-1.5 rounded-full border border-(--accent-primary)/30 bg-(--accent-primary)/10 px-3 py-1 text-[11px] font-semibold text-(--accent-primary)">
@@ -196,28 +196,25 @@ export function OnboardingStepGoalProfile({
       >
         <div className="dashboard-premium-card flex flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden">
 
-          {/* Mobile-only inline header */}
-          <div className="shrink-0 border-b border-(--card-border) px-4 py-3 lg:hidden">
+          {/* Mobile-only inline header — compact */}
+          <div className="shrink-0 border-b border-(--card-border) px-3 py-2 lg:hidden">
             <div className="flex items-center gap-2">
-              <div className="flex size-6 items-center justify-center rounded-lg bg-(--accent-primary)/10">
-                <Sparkles className="size-3.5 text-(--accent-primary)" aria-hidden />
+              <div className="flex size-5 items-center justify-center rounded-md bg-(--accent-primary)/10">
+                <Sparkles className="size-3 text-(--accent-primary)" aria-hidden />
               </div>
-              <h2 className="text-sm font-semibold text-(--text-primary)">
+              <h2 className="text-[13px] font-semibold text-(--text-primary)">
                 Set your interview focus
               </h2>
             </div>
-            <p className="mt-1 text-[11px] leading-snug text-(--text-muted)">
-              Shapes every question, tone, and scoring for this session only.
-            </p>
           </div>
 
           {/* Scrollable form */}
-          <div className="p-4 sm:p-5 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain">
-            <div className="space-y-5">
+          <div className="p-3 sm:p-4 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain">
+            <div className="space-y-3.5 sm:space-y-4">
 
               {/* Goal */}
               <section aria-label="Interview goal">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                   Interview goal
                 </p>
                 <GoalSelector dense selected={goal} onSelect={onGoalSelect} />
@@ -225,12 +222,12 @@ export function OnboardingStepGoalProfile({
 
               {/* Target role */}
               <section aria-label="Target role">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                   Target role
                 </p>
                 <div className="relative">
                   <Briefcase
-                    className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-(--text-muted)"
+                    className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-(--text-muted) sm:left-3.5 sm:size-4"
                     aria-hidden
                   />
                   <input
@@ -240,7 +237,7 @@ export function OnboardingStepGoalProfile({
                     onChange={(e) => onRoleChange(e.target.value)}
                     className={cn(
                       'w-full rounded-xl border border-(--card-border) bg-(--bg-secondary)',
-                      'py-2.5 pl-10 pr-4 text-sm text-(--text-primary)',
+                      'py-2 pl-9 pr-3 text-sm text-(--text-primary) sm:py-2.5 sm:pl-10 sm:pr-4',
                       'placeholder:text-(--text-muted) transition-all duration-200',
                       'focus:border-(--accent-primary) focus:outline-none',
                       'focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]',
@@ -251,7 +248,7 @@ export function OnboardingStepGoalProfile({
 
                 {/* Quick-pick role chips — horizontal scroll, no wrap */}
                 <div
-                  className="ie-scroll-x mt-2 flex gap-1.5 overflow-x-auto pb-0.5"
+                  className="ie-scroll-x mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5 sm:mt-2"
                   role="group"
                   aria-label="Suggested roles"
                 >
@@ -277,11 +274,11 @@ export function OnboardingStepGoalProfile({
               </section>
 
               {/* Experience + Mode row */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
 
                 {/* Years of experience */}
                 <section aria-label="Years of experience">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                     Experience
                   </p>
                   <div className="relative">
@@ -296,14 +293,14 @@ export function OnboardingStepGoalProfile({
                       }
                       className={cn(
                         'input-no-spin w-full rounded-xl border border-(--card-border) bg-(--bg-secondary)',
-                        'px-4 py-2.5 pr-10 text-sm text-(--text-primary)',
+                        'px-3 py-2 pr-9 text-sm text-(--text-primary) sm:px-4 sm:py-2.5 sm:pr-10',
                         'placeholder:text-(--text-muted) transition-all duration-200',
                         'focus:border-(--accent-primary) focus:outline-none',
                         'focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]',
                       )}
                       aria-label="Years of experience"
                     />
-                    <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] text-(--text-muted)">
+                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-(--text-muted) sm:right-3.5 sm:text-[11px]">
                       yrs
                     </span>
                   </div>
@@ -311,7 +308,7 @@ export function OnboardingStepGoalProfile({
 
                 {/* Interview mode segmented control */}
                 <section aria-label="Interview mode">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                     Interview type
                   </p>
                   <div
@@ -349,7 +346,7 @@ export function OnboardingStepGoalProfile({
                       </button>
                     ))}
                   </div>
-                  <p className="mt-1.5 text-[10px] leading-snug text-(--text-muted)">
+                  <p className="mt-1 hidden text-[10px] leading-snug text-(--text-muted) sm:block lg:line-clamp-1">
                     {MODE_DESCRIPTIONS[mode]}
                   </p>
                 </section>
@@ -382,24 +379,25 @@ export function OnboardingStepGoalProfile({
                 )}
               </AnimatePresence>
 
-              {/* Interviewer voice */}
+              {/* Interviewer voice — compact row */}
               <section aria-label="Interviewer voice">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                   Interviewer voice
                 </p>
                 <div
-                  className="flex items-center justify-between rounded-xl border border-(--card-border) px-4 py-3"
+                  className="flex items-center justify-between gap-2 rounded-xl border border-(--card-border) px-3 py-2 sm:px-4 sm:py-2.5"
                   style={{ background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-(--text-primary)">{interviewerDisplayName}</p>
-                    <p className="mt-0.5 text-[11px] text-(--text-muted)">
-                      {voiceMatchesSettingsDefault
-                        ? 'From your Settings default'
-                        : 'This session only'}
+                    <p className="truncate text-[13px] font-medium text-(--text-primary) sm:text-sm">
+                      {interviewerDisplayName}
+                      <span className="font-normal text-(--text-muted)">
+                        {' · '}
+                        {voiceMatchesSettingsDefault ? 'Settings default' : 'This session'}
+                      </span>
                     </p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-1.5">
                     {!voiceMatchesSettingsDefault && (
                       <button
                         type="button"
@@ -407,7 +405,7 @@ export function OnboardingStepGoalProfile({
                           onResetVoiceToSettings()
                           setVoicePickerOpen(false)
                         }}
-                        className="rounded-lg border border-(--card-border) bg-(--card-bg) px-2.5 py-1.5 text-[11px] font-medium text-(--text-secondary) transition-colors hover:text-(--text-primary)"
+                        className="min-h-[36px] rounded-lg border border-(--card-border) bg-(--card-bg) px-2 py-1 text-[10px] font-medium text-(--text-secondary) transition-colors hover:text-(--text-primary) sm:min-h-0 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
                       >
                         Reset
                       </button>
@@ -415,7 +413,7 @@ export function OnboardingStepGoalProfile({
                     <button
                       type="button"
                       onClick={() => setVoicePickerOpen(true)}
-                      className="rounded-lg border border-(--accent-primary)/30 bg-(--accent-primary)/10 px-2.5 py-1.5 text-[11px] font-semibold text-(--accent-primary) transition-colors hover:bg-(--accent-primary)/20"
+                      className="min-h-[36px] rounded-lg border border-(--accent-primary)/30 bg-(--accent-primary)/10 px-2 py-1 text-[10px] font-semibold text-(--accent-primary) transition-colors hover:bg-(--accent-primary)/20 sm:min-h-0 sm:px-2.5 sm:py-1.5 sm:text-[11px]"
                     >
                       Change
                     </button>
@@ -426,9 +424,14 @@ export function OnboardingStepGoalProfile({
             </div>
           </div>
 
-          {/* Footer: status + CTA */}
-          <div className="flex shrink-0 items-center justify-between border-t border-(--card-border) px-4 py-3 sm:px-5">
-            <p className="text-[11px] text-(--text-muted)">
+          {/* Footer: status + CTA — always visible (outside scroll area) */}
+          <div
+            className={cn(
+              'flex shrink-0 items-center justify-between border-t border-(--card-border) px-3 py-2.5 sm:px-4 sm:py-3',
+              'pb-[max(0.625rem,env(safe-area-inset-bottom,0px))]',
+            )}
+          >
+            <p className="text-[10px] text-(--text-muted) sm:text-[11px]">
               {goal ? (
                 <span className="text-(--accent-success)">✓ Goal selected</span>
               ) : (
@@ -439,10 +442,10 @@ export function OnboardingStepGoalProfile({
               type="button"
               onClick={onContinue}
               disabled={!canContinue}
-              whileHover={canContinue ? { scale: 1.02 } : undefined}
-              whileTap={canContinue ? { scale: 0.97 } : undefined}
+              whileHover={canContinue ? { scale: 1.01 } : undefined}
+              whileTap={canContinue ? { scale: 0.98 } : undefined}
               className={cn(
-                'flex items-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200',
+                'flex min-h-[44px] items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-all duration-200 sm:px-5 sm:py-2.5',
                 canContinue
                   ? 'bg-(--accent-primary) hover:bg-(--accent-hover) shadow-[0_4px_18px_rgba(99,102,241,0.45)]'
                   : 'cursor-not-allowed bg-(--accent-primary)/40 shadow-none',

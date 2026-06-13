@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'motion/react'
 import Link from 'next/link'
-import { BriefingChecklist } from '@/components/onboarding/BriefingChecklist'
 import { ParsedJobDescriptionSections } from '@/components/onboarding/ParsedJobDescriptionSections'
 import {
   Dialog,
@@ -106,21 +105,36 @@ function SessionRow({
   label,
   value,
   accent,
+  compact = false,
 }: {
   icon: LucideIcon
   label: string
   value: string
   accent?: boolean
+  compact?: boolean
 }) {
   return (
-    <div className="flex items-center gap-3 border-b border-(--card-border)/50 py-2.5 last:border-0">
-      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-primary)/10">
-        <Icon className="size-3.5 text-(--accent-primary)" aria-hidden />
+    <div
+      className={cn(
+        'flex items-center gap-2 border-b border-(--card-border)/50 last:border-0',
+        compact ? 'py-1.5' : 'gap-3 py-2.5',
+      )}
+    >
+      <div
+        className={cn(
+          'flex shrink-0 items-center justify-center rounded-md bg-(--accent-primary)/10',
+          compact ? 'size-6' : 'size-7 rounded-lg',
+        )}
+      >
+        <Icon className={cn('text-(--accent-primary)', compact ? 'size-3' : 'size-3.5')} aria-hidden />
       </div>
-      <p className="w-20 shrink-0 text-[11px] text-(--text-muted)">{label}</p>
+      <p className={cn('shrink-0 text-(--text-muted)', compact ? 'w-14 text-[10px]' : 'w-20 text-[11px]')}>
+        {label}
+      </p>
       <p
         className={cn(
-          'flex-1 truncate text-[13px] font-semibold',
+          'min-w-0 flex-1 truncate font-semibold',
+          compact ? 'text-[12px]' : 'text-[13px]',
           accent ? 'text-(--accent-primary)' : 'text-(--text-primary)',
         )}
       >
@@ -268,39 +282,39 @@ function ParsedSuccessCard({
         className="h-[3px] w-full"
         style={{ background: 'var(--accent-success)' }}
       />
-      <div className="px-5 py-4">
-        <div className="flex items-start gap-3">
-          <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-(--accent-success)" aria-hidden />
+      <div className="px-4 py-3 sm:px-4 sm:py-2.5">
+        <div className="flex items-start gap-2.5">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-(--accent-success) sm:size-[1.125rem]" aria-hidden />
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-(--accent-success)">Resume analyzed</p>
+            <p className="text-[13px] font-semibold text-(--accent-success) sm:text-sm">Resume analyzed</p>
             {displayName && (
-              <p className="mt-0.5 truncate text-[11px] text-(--text-muted)">{displayName}</p>
+              <p className="mt-0.5 truncate text-[10px] text-(--text-muted) sm:text-[11px]">{displayName}</p>
             )}
           </div>
         </div>
 
         {parseWarning && (
-          <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug text-amber-200/90">
+          <p className="mt-2 rounded-lg border border-amber-500/35 bg-amber-500/10 px-2.5 py-1.5 text-[10px] leading-snug text-amber-200/90 sm:text-[11px]">
             {parseWarning}
           </p>
         )}
 
         {profile && (
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-2 flex flex-wrap gap-1.5 sm:gap-2">
             {profile.target_role && (
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-(--accent-success) sm:px-2.5 sm:py-1 sm:text-[11px]">
                 Role: {profile.target_role}
               </span>
             )}
             {topSkills.length > 0 && (
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
+              <span className="max-w-full truncate rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-(--accent-success) sm:px-2.5 sm:py-1 sm:text-[11px]">
                 Skills: {topSkills.join(', ')}
                 {profile.skills.length > topSkills.length ? '…' : ''}
               </span>
             )}
             {profile.experience_estimate && profile.experience_estimate !== 'Not specified' && (
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-(--accent-success)">
-                Experience: {profile.experience_estimate}
+              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-(--accent-success) sm:px-2.5 sm:py-1 sm:text-[11px]">
+                Exp: {profile.experience_estimate}
               </span>
             )}
           </div>
@@ -352,7 +366,6 @@ export function OnboardingStepResume({
   onEditGoalAndVoice,
 }: OnboardingStepResumeProps) {
   const [isDragOver,   setIsDragOver]   = useState(false)
-  const [allChecked,   setAllChecked]   = useState(false)
   const [fileError,    setFileError]    = useState('')
   const [diffOpen,     setDiffOpen]     = useState(false)
 
@@ -395,16 +408,16 @@ export function OnboardingStepResume({
       transition={{ duration: 0.38, ease: [0.16, 1, 0.3, 1] }}
       className="dashboard-premium-card flex flex-col max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden"
     >
-      {/* ── Card header ──────────────────────────────────────────────────────── */}
-      <header className="shrink-0 border-b border-(--card-border)/80 px-5 py-3 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-(--accent-primary)">
+      {/* ── Card header — compact on desktop to keep CTA above the fold ─────── */}
+      <header className="shrink-0 border-b border-(--card-border)/80 px-4 py-2.5 text-center sm:px-5 lg:py-2">
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--accent-primary)">
           Step 2 · Resume &amp; Start
         </p>
-        <h2 className="mt-0.5 text-lg font-bold tracking-tight text-(--text-primary)">
+        <h2 className="mt-0.5 text-base font-bold tracking-tight text-(--text-primary) sm:text-lg lg:text-[15px] lg:leading-snug">
           Prepare your session
         </h2>
-        <p className="mt-0.5 text-[11px] text-(--text-secondary)">
-          Upload your resume — your AI interviewer will calibrate every question to your background.
+        <p className="mt-0.5 hidden text-[11px] text-(--text-secondary) sm:block lg:hidden">
+          Upload your resume — questions calibrate to your background.
         </p>
       </header>
 
@@ -413,7 +426,7 @@ export function OnboardingStepResume({
         <div className="grid grid-cols-1 gap-0 max-lg:min-h-0 lg:min-h-full lg:h-full lg:grid-cols-[7fr_5fr] lg:divide-x lg:divide-(--card-border)/60">
 
           {/* ═══ LEFT: Upload + JD ══════════════════════════════════════════ */}
-          <div className="flex flex-col gap-4 p-4 sm:p-5 max-lg:overflow-visible lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:pb-6 lg:pr-5">
+          <div className="flex flex-col gap-3 p-3 sm:gap-4 sm:p-4 max-lg:overflow-visible lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:pb-4 lg:pr-4 lg:pl-4">
 
             {/* Upload section */}
             <section aria-label="Resume upload">
@@ -559,11 +572,11 @@ export function OnboardingStepResume({
                     <textarea
                       value={jdText}
                       maxLength={12000}
-                      rows={4}
+                      rows={3}
                       onChange={(e) => { onJdTextChange(e.target.value) }}
                       onBlur={onJdBlur}
                       placeholder="Paste the employer's job posting here for tailored questions…"
-                      className="min-h-[5.5rem] w-full resize-y rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3.5 py-2.5 text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:border-(--accent-primary) focus:outline-none focus:shadow-[0_0_0_3px_rgba(99,102,241,0.12)] transition-all duration-200"
+                      className="min-h-[4.5rem] w-full resize-y rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs text-(--text-primary) placeholder:text-(--text-muted) focus:border-(--accent-primary) focus:outline-none focus:shadow-[0_0_0_3px_rgba(99,102,241,0.12)] transition-all duration-200 sm:min-h-[5rem] sm:px-3.5 sm:py-2.5"
                     />
                     {jdShowRawEditor && (
                       <button
@@ -703,49 +716,57 @@ export function OnboardingStepResume({
             </section>
           </div>
 
-          {/* ═══ RIGHT: Session summary + Checklist + CTA ═══════════════════ */}
-          <div className="flex flex-col gap-4 p-4 sm:p-5 max-lg:overflow-visible lg:h-full lg:overflow-y-auto lg:overscroll-y-contain lg:pb-6 lg:pl-5">
+          {/* ═══ RIGHT: Session summary + CTA (sticky CTA on desktop split) ═══ */}
+          <div className="flex flex-col gap-2 p-3 sm:gap-2.5 sm:p-4 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-4 lg:pl-4">
 
-            {/* Session preview card */}
-            <section aria-label="Session preview">
-              <div className="flex items-center justify-between">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
+            {/* Session preview card — denser grid on sm+ */}
+            <section aria-label="Session preview" className="shrink-0">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-(--text-muted) sm:text-[11px]">
                   Your session
                 </p>
-                <button
-                  type="button"
-                  onClick={onEditGoalAndVoice}
-                  className="text-[11px] font-medium text-(--accent-primary) hover:underline"
-                >
-                  Edit →
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/settings"
+                    className="inline-flex items-center gap-0.5 text-[10px] font-medium text-(--text-muted) hover:text-(--text-primary) transition-colors sm:text-[11px]"
+                  >
+                    <Settings className="size-2.5 sm:size-3" aria-hidden />
+                    <span className="hidden sm:inline">Prefs</span>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={onEditGoalAndVoice}
+                    className="text-[10px] font-medium text-(--accent-primary) hover:underline sm:text-[11px]"
+                  >
+                    Edit →
+                  </button>
+                </div>
               </div>
 
               <div
-                className="mt-2.5 overflow-hidden rounded-2xl border border-(--card-border)"
+                className="mt-1.5 overflow-hidden rounded-xl border border-(--card-border) sm:mt-2 sm:rounded-2xl"
                 style={{ background: 'color-mix(in srgb, var(--bg-secondary) 40%, var(--card-bg))' }}
               >
-                {/* Accent top bar */}
-                <div className="h-[3px] w-full" style={{ background: 'var(--accent-primary)' }} />
+                <div className="h-[2px] w-full sm:h-[3px]" style={{ background: 'var(--accent-primary)' }} />
 
-                <div className="px-4 py-2">
-                  <SessionRow icon={User}           label="Role"       value={data.role || '—'} />
-                  <SessionRow icon={modeIcon}        label="Mode"       value={modeLabel} />
-                  <SessionRow icon={MessageSquare}   label="Questions"  value={`${questionCount} questions`} />
-                  <SessionRow icon={Clock}           label="Duration"   value={durationLabel} />
-                  <SessionRow icon={Mic}             label="Voice"      value={interviewerName} />
-                  <SessionRow icon={Sparkles}        label="AI follow-ups" value="Enabled" accent />
+                <div className="grid grid-cols-1 px-3 py-1 sm:grid-cols-2 sm:gap-x-2 sm:px-3 sm:py-1.5 lg:grid-cols-1 lg:gap-x-0">
+                  <SessionRow compact icon={User}           label="Role"       value={data.role || '—'} />
+                  <SessionRow compact icon={modeIcon}        label="Mode"       value={modeLabel} />
+                  <SessionRow compact icon={MessageSquare}   label="Questions"  value={`${questionCount} questions`} />
+                  <SessionRow compact icon={Clock}           label="Duration"   value={durationLabel} />
+                  <SessionRow compact icon={Mic}             label="Voice"      value={interviewerName} />
+                  <SessionRow compact icon={Sparkles}        label="Follow-ups" value="Enabled" accent />
 
-                  {/* Difficulty row with inline toggler */}
-                  <div className="flex items-center gap-3 border-b border-(--card-border)/50 py-2.5 last:border-0">
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-(--accent-primary)/10">
-                      <Gauge className="size-3.5 text-(--accent-primary)" aria-hidden />
+                  {/* Difficulty — full width */}
+                  <div className="col-span-1 flex items-center gap-2 border-b border-(--card-border)/50 py-1.5 last:border-0 sm:col-span-2 lg:col-span-1">
+                    <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-(--accent-primary)/10">
+                      <Gauge className="size-3 text-(--accent-primary)" aria-hidden />
                     </div>
-                    <p className="w-20 shrink-0 text-[11px] text-(--text-muted)">Difficulty</p>
-                    <div className="flex flex-1 items-center gap-1.5">
-                      <span className="text-[13px] font-semibold capitalize text-(--text-primary)">{difficulty}</span>
+                    <p className="w-14 shrink-0 text-[10px] text-(--text-muted) sm:text-[11px]">Difficulty</p>
+                    <div className="flex min-w-0 flex-1 items-center gap-1">
+                      <span className="truncate text-[12px] font-semibold capitalize text-(--text-primary)">{difficulty}</span>
                       {difficultyTouched && (
-                        <span className="rounded-full border border-(--card-border) px-1.5 py-0.5 text-[9px] font-medium text-(--text-muted)">
+                        <span className="shrink-0 rounded-full border border-(--card-border) px-1 py-px text-[8px] font-medium text-(--text-muted) sm:text-[9px]">
                           custom
                         </span>
                       )}
@@ -753,7 +774,7 @@ export function OnboardingStepResume({
                     <button
                       type="button"
                       onClick={() => setDiffOpen((v) => !v)}
-                      className="shrink-0 rounded-lg border border-(--card-border) bg-(--card-bg) px-2 py-1 text-[10px] font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors"
+                      className="shrink-0 rounded-md border border-(--card-border) bg-(--card-bg) px-1.5 py-0.5 text-[9px] font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors sm:rounded-lg sm:px-2 sm:py-1 sm:text-[10px]"
                     >
                       {diffOpen ? 'Done' : 'Change'}
                     </button>
@@ -768,16 +789,16 @@ export function OnboardingStepResume({
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.22 }}
-                        className="overflow-hidden"
+                        className="col-span-1 overflow-hidden sm:col-span-2 lg:col-span-1"
                       >
-                        <div className="flex flex-wrap items-center gap-2 pb-3 pt-1">
+                        <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-0.5 sm:gap-2 sm:pb-2.5">
                           {(['easy', 'medium', 'hard'] as const).map((level) => (
                             <button
                               key={level}
                               type="button"
                               onClick={() => { onDifficultyChange(level); setDiffOpen(false) }}
                               className={cn(
-                                'rounded-full border px-3 py-1 text-[11px] font-semibold capitalize transition-colors',
+                                'min-h-[36px] rounded-full border px-2.5 py-1 text-[11px] font-semibold capitalize transition-colors sm:min-h-0 sm:px-3',
                                 difficulty === level
                                   ? 'border-(--accent-primary) bg-(--accent-primary) text-white'
                                   : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary) hover:border-(--accent-primary)/40',
@@ -790,7 +811,7 @@ export function OnboardingStepResume({
                             <button
                               type="button"
                               onClick={() => { onMatchDifficultySettings(); setDiffOpen(false) }}
-                              className="text-[10px] font-medium text-(--text-muted) underline hover:text-(--text-primary)"
+                              className="min-h-[36px] text-[10px] font-medium text-(--text-muted) underline hover:text-(--text-primary) sm:min-h-0"
                             >
                               Match Settings
                             </button>
@@ -801,42 +822,31 @@ export function OnboardingStepResume({
                   </AnimatePresence>
                 </div>
               </div>
-
-              {/* Settings link */}
-              <Link
-                href="/settings"
-                className="mt-2 inline-flex items-center gap-1 text-[11px] font-medium text-(--text-muted) hover:text-(--text-primary) transition-colors"
-              >
-                <Settings className="size-3" aria-hidden />
-                All preferences
-              </Link>
             </section>
 
-            {/* Readiness checklist */}
-            <section aria-label="Interview readiness checklist">
-              <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-wider text-(--text-muted)">
-                Before you start
-              </p>
-              <BriefingChecklist compact variant="quick" onAllChecked={setAllChecked} />
-            </section>
-
-            {/* Error */}
+            {/* Error + CTA — sticky on desktop split so Start stays visible */}
+            <div
+              className={cn(
+                'shrink-0 space-y-2',
+                'lg:sticky lg:bottom-0 lg:z-10 lg:mt-auto',
+                'lg:border-t lg:border-(--card-border)/40 lg:bg-(--card-bg)/95 lg:pt-2 lg:backdrop-blur-[2px]',
+                'pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]',
+              )}
+            >
             {startError && (
               <p className="rounded-xl border border-(--accent-danger)/30 bg-(--accent-danger)/8 px-3 py-2 text-[12px] text-(--accent-danger)" role="alert">
                 {startError}
               </p>
             )}
 
-            {/* CTA */}
-            <div className="mt-auto space-y-3 pt-2">
               <motion.button
                 type="button"
                 onClick={onStartInterview}
                 disabled={!canBegin || startLoading}
-                whileHover={canBegin && !startLoading ? { scale: 1.015 } : undefined}
-                whileTap={canBegin && !startLoading ? { scale: 0.975 } : undefined}
+                whileHover={canBegin && !startLoading ? { scale: 1.01 } : undefined}
+                whileTap={canBegin && !startLoading ? { scale: 0.98 } : undefined}
                 className={cn(
-                  'relative w-full overflow-hidden rounded-2xl px-6 py-4 text-sm font-bold transition-all duration-300',
+                  'relative flex min-h-[48px] w-full items-center justify-center overflow-hidden rounded-xl px-5 py-3 text-sm font-bold transition-all duration-300 sm:rounded-2xl',
                   canBegin && !startLoading
                     ? 'text-white cursor-pointer'
                     : 'cursor-not-allowed text-(--text-muted)',
@@ -880,20 +890,20 @@ export function OnboardingStepResume({
               </motion.button>
 
               {/* Status hint below CTA */}
-              <p className="text-center text-[11px] text-(--text-muted)">
+              <p className="text-center text-[10px] text-(--text-muted) sm:text-[11px]">
                 {!isParsed
                   ? 'Upload your resume above to enable'
-                  : !allChecked
-                    ? 'Tip: check the items above to set yourself up for success'
-                    : 'You\'re ready — your AI interviewer is standing by'}
+                  : canBegin
+                    ? 'Your AI interviewer is standing by'
+                    : 'Complete goal, voice, and resume to begin'}
               </p>
 
-              {/* Back */}
-              <div className="flex justify-center">
+              {/* Back — compact row */}
+              <div className="flex justify-center pt-0.5">
                 <button
                   type="button"
                   onClick={onBack}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-(--text-secondary) transition-colors hover:text-(--text-primary)"
+                  className="inline-flex min-h-[44px] items-center gap-1 px-2 text-sm font-medium text-(--text-secondary) transition-colors hover:text-(--text-primary)"
                 >
                   <ChevronLeft className="size-4" aria-hidden />
                   Back

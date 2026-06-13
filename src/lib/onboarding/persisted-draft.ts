@@ -31,6 +31,8 @@ export const onboardingPersistedDraftSchema = z.object({
   jdParseStatus: z.enum(['idle', 'parsing', 'ready', 'failed']).optional(),
   difficulty: difficultySchema.optional(),
   difficultyTouched: z.boolean().optional(),
+  /** Session summary — AI follow-ups (always enabled in MVP). */
+  aiFollowupsEnabled: z.boolean().optional(),
   updatedAt: z.string().datetime(),
 })
 
@@ -45,6 +47,7 @@ export function buildPersistedDraft(input: {
   jdParseStatus: 'idle' | 'parsing' | 'ready' | 'failed'
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
+  aiFollowupsEnabled?: boolean
 }): OnboardingPersistedDraft {
   return {
     version: 1,
@@ -61,6 +64,7 @@ export function buildPersistedDraft(input: {
     jdParseStatus: input.jdParseStatus,
     difficulty: input.difficulty,
     difficultyTouched: input.difficultyTouched,
+    aiFollowupsEnabled: input.aiFollowupsEnabled ?? true,
     updatedAt: new Date().toISOString(),
   }
 }

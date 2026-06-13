@@ -13,8 +13,8 @@ interface GoalSelectorProps {
 
 export function GoalSelector({ selected, onSelect, dense = false }: GoalSelectorProps) {
   return (
-    <div className={cn('grid grid-cols-2', dense ? 'gap-2' : 'gap-3')}>
-      {GOAL_OPTIONS.map(goal => {
+    <div className={cn('grid grid-cols-2', dense ? 'gap-1.5 sm:gap-2' : 'gap-3')}>
+      {GOAL_OPTIONS.map((goal) => {
         const isSelected = selected === goal.id
         return (
           <button
@@ -23,23 +23,40 @@ export function GoalSelector({ selected, onSelect, dense = false }: GoalSelector
             onClick={() => onSelect(goal.id)}
             aria-pressed={isSelected}
             className={cn(
-              'relative rounded-2xl border text-left transition-all duration-200',
-              dense ? 'p-3' : 'p-4',
+              'relative rounded-xl border text-left transition-all duration-200',
+              dense ? 'p-2.5 sm:p-3' : 'rounded-2xl p-4',
               isSelected
                 ? 'border-(--accent-primary) bg-(--accent-primary)/12 shadow-[0_0_0_1px_var(--accent-primary)]'
                 : 'border-(--card-border) bg-(--card-bg) hover:border-(--accent-primary)/40 hover:bg-(--accent-primary)/5',
             )}
           >
             {isSelected && (
-              <span className="absolute right-2.5 top-2.5 flex size-4 items-center justify-center rounded-full bg-(--accent-primary)">
-                <Check className="size-2.5 text-white" strokeWidth={3} aria-hidden />
+              <span className="absolute right-2 top-2 flex size-3.5 items-center justify-center rounded-full bg-(--accent-primary) sm:right-2.5 sm:top-2.5 sm:size-4">
+                <Check className="size-2 text-white sm:size-2.5" strokeWidth={3} aria-hidden />
               </span>
             )}
-            <span className={dense ? 'text-xl' : 'text-2xl'}>{goal.emoji}</span>
-            <p className={cn('mt-1.5 font-semibold text-(--text-primary)', dense ? 'text-xs' : 'text-sm')}>
-              {goal.label}
-            </p>
-            <p className={cn('text-(--text-secondary)', dense ? 'mt-0.5 text-[11px] leading-snug' : 'text-xs')}>
+            <div className="flex items-center gap-1.5 pr-4 sm:pr-5">
+              <span
+                className={cn('shrink-0 leading-none', dense ? 'text-base sm:text-lg' : 'text-xl')}
+                aria-hidden
+              >
+                {goal.emoji}
+              </span>
+              <p
+                className={cn(
+                  'min-w-0 font-semibold leading-snug text-(--text-primary)',
+                  dense ? 'text-[11px] sm:text-xs' : 'text-sm',
+                )}
+              >
+                {goal.label}
+              </p>
+            </div>
+            <p
+              className={cn(
+                'text-(--text-secondary)',
+                dense ? 'mt-0.5 text-[10px] leading-snug sm:text-[11px]' : 'mt-1 text-xs',
+              )}
+            >
               {goal.description}
             </p>
           </button>

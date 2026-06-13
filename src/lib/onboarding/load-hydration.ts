@@ -31,6 +31,7 @@ export type OnboardingHydration = {
   jdParseStatus: 'idle' | 'parsing' | 'ready' | 'failed'
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
+  aiFollowupsEnabled: boolean
 }
 
 function resumeStateFromDbStatus(
@@ -168,5 +169,6 @@ export async function loadOnboardingHydration(): Promise<OnboardingHydration | n
     jdParseStatus: draft?.jdParseStatus ?? (draft?.parsedJd ? 'ready' : 'idle'),
     difficulty: draft?.difficulty ?? 'medium',
     difficultyTouched: draft?.difficultyTouched ?? false,
+    aiFollowupsEnabled: draft?.aiFollowupsEnabled ?? true,
   }
 }

@@ -1,67 +1,56 @@
 'use client'
 
 import { useCallback, useEffect, useRef } from 'react'
+import { createOnboardingPersistScheduler } from '@/lib/onboarding/onboarding-persist-scheduler'
+import type { PersistInput } from '@/lib/onboarding/persist-input'
 import { buildPersistedDraft } from '@/lib/onboarding/persisted-draft'
-import type { OnboardingData } from '@/types/onboarding.types'
-import type { InterviewDifficulty, ParsedJobDescription } from '@/types/app.types'
-
-type PersistInput = {
-  step: 1 | 2
-  data: OnboardingData
-  resumeFileName: string | null
-  jdText: string
-  parsedJd: ParsedJobDescription | null
-  jdParseStatus: 'idle' | 'parsing' | 'ready' | 'failed'
-  difficulty: InterviewDifficulty
-  difficultyTouched: boolean
-  /** Skip while upload/parse is in-flight to avoid overwriting with stale resumeId. */
-  enabled: boolean
-}
 
 const DEBOUNCE_MS = 450
 
-/** Debounced PATCH of users.onboarding_draft — database is source of truth after refresh. */
-async function patchOnboardingDraft(cur: PersistInput): Promise<void> {
-  if (!cur.enabled) return
+async function patchOnboardingDraft(input: PersistInput): Promise<void> {
+  if (!input.enabled) return
 
-  const draft = buildPersistedDraft(cur)
-  try {
-    await fetch('/api/onboarding/state', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(draft),
-    })
-  } catch (e) {
-    if (process.env.NODE_ENV === 'development') {
-      console.warn('[onboarding] draft persist failed', e)
-    }
+  const draft = buildPersistedDraft(input)
+  const res = await fetch('/api/onboarding/state', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(draft),
+  })
+  if (!res.ok && process.env.NODE_ENV === 'development') {
+    console.warn('[onboarding] draft persist failed', res.status)
   }
 }
 
+/**
+ * Debounced PATCH of users.onboarding_draft.
+ * Flushes pending writes on dependency change, tab hide, pagehide, and unmount.
+ */
 export function usePersistOnboardingDraft(input: PersistInput) {
   const inputRef = useRef(input)
-  const timerRef = useRef<number | null>(null)
+  const schedulerRef = useRef<ReturnType<typeof createOnboardingPersistScheduler> | null>(null)
+
+  if (schedulerRef.current === null) {
+    schedulerRef.current = createOnboardingPersistScheduler({
+      debounceMs: DEBOUNCE_MS,
+      persist: patchOnboardingDraft,
+    })
+  }
 
   useEffect(() => {
     inputRef.current = input
   })
 
-  const flush = useCallback(async () => {
-    await patchOnboardingDraft(inputRef.current)
+  const flushNow = useCallback(async () => {
+    await schedulerRef.current?.flushPending()
   }, [])
 
   useEffect(() => {
-    if (!input.enabled) return
-
-    if (timerRef.current !== null) window.clearTimeout(timerRef.current)
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null
-      void patchOnboardingDraft(inputRef.current)
-    }, DEBOUNCE_MS) as number
+    const scheduler = schedulerRef.current!
+    scheduler.schedule(input)
 
     return () => {
-      if (timerRef.current !== null) window.clearTimeout(timerRef.current)
+      void scheduler.flushPending()
     }
   }, [
     input.enabled,
@@ -78,7 +67,28 @@ export function usePersistOnboardingDraft(input: PersistInput) {
     input.jdParseStatus,
     input.difficulty,
     input.difficultyTouched,
+    input.aiFollowupsEnabled,
   ])
 
-  return { flushNow: flush }
+  useEffect(() => {
+    const scheduler = schedulerRef.current!
+    const flush = () => {
+      void scheduler.flushPending()
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      flush()
+    }
+  }, [])
+
+  return { flushNow }
 }

@@ -7,6 +7,7 @@ import { useOnboardingHydration } from '@/lib/onboarding/hydration-context'
 import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
 import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import { usePersistOnboardingDraft } from '@/lib/onboarding/use-persist-onboarding-draft'
+import { snapshotFromHydration } from '@/lib/onboarding/apply-hydration'
 import { OnboardingStepGoalProfile } from '@/components/onboarding/OnboardingStepGoalProfile'
 import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResume'
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
@@ -19,6 +20,7 @@ import { parseResponseJsonSafe } from '@/lib/http/parse-response-json'
 import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
 import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
+import { cn } from '@/lib/utils'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
 import { unlockAudioForInterview } from '@/lib/voice/audio-gesture'
@@ -115,11 +117,12 @@ export default function OnboardingPage() {
   const jdParseSeq = useRef(0)
   const hydrationApplied = useRef(false)
   const serverHydrationSynced = useRef(false)
+  const prevStepRef = useRef<1 | 2>(serverHydration?.step ?? 1)
 
   const persistEnabled =
     resumeState !== 'uploading' && resumeState !== 'processing'
 
-  usePersistOnboardingDraft({
+  const { flushNow } = usePersistOnboardingDraft({
     step,
     data,
     resumeFileName,
@@ -128,6 +131,7 @@ export default function OnboardingPage() {
     jdParseStatus,
     difficulty,
     difficultyTouched,
+    aiFollowupsEnabled: true,
     enabled: persistEnabled,
   })
 
@@ -145,22 +149,22 @@ export default function OnboardingPage() {
         const body = (await res.json()) as { hydration?: OnboardingHydration }
         const h = body.hydration
         if (!h || cancelled) return
-        if (h.step) setStep(h.step)
-        if (h.resumeFileName) setResumeFileName(h.resumeFileName)
-        if (h.parsedResume) setParsedResume(h.parsedResume)
-        if (h.resumeState) setResumeState(h.resumeState)
-        if (h.jdText) setJdText(h.jdText)
-        if (h.parsedJd) setParsedJd(h.parsedJd)
-        if (h.jdParseStatus) setJdParseStatus(h.jdParseStatus)
-        if (h.difficulty) setDifficulty(h.difficulty)
-        if (h.difficultyTouched) setDifficultyTouched(h.difficultyTouched)
-        const resumeId = resolveHydratedResumeId(h.draft, h.resume, h.data.resumeId)
-        if (resumeId) setResumeId(resumeId)
-        if (h.data.goal) setGoal(h.data.goal)
-        if (h.data.role) setRole(h.data.role)
-        if (h.data.experienceYears) setExperienceYears(h.data.experienceYears)
-        if (h.data.mode) setMode(h.data.mode)
-        if (h.data.interviewerId) setInterviewerId(h.data.interviewerId)
+        const snap = snapshotFromHydration(h)
+        setStep(snap.step)
+        setResumeFileName(snap.resumeFileName)
+        setParsedResume(snap.parsedResume)
+        setResumeState(snap.resumeState)
+        setJdText(snap.jdText)
+        setParsedJd(snap.parsedJd)
+        setJdParseStatus(snap.jdParseStatus)
+        setDifficulty(snap.difficulty)
+        setDifficultyTouched(snap.difficultyTouched)
+        if (snap.data.goal != null) setGoal(snap.data.goal)
+        setRole(snap.data.role)
+        setExperienceYears(snap.data.experienceYears)
+        setMode(snap.data.mode)
+        if (snap.data.interviewerId != null) setInterviewerId(snap.data.interviewerId)
+        if (snap.data.resumeId) setResumeId(snap.data.resumeId)
       } catch {
         /* best-effort */
       } finally {
@@ -186,16 +190,13 @@ export default function OnboardingPage() {
     serverHydrationSynced.current = true
 
     const h = serverHydration
-    if (h.data.goal) setGoal(h.data.goal)
-    if (h.data.role) setRole(h.data.role)
-    if (h.data.mode) setMode(h.data.mode)
-    if (h.data.interviewerId) setInterviewerId(h.data.interviewerId)
-    if (typeof h.data.experienceYears === 'number') {
-      setExperienceYears(h.data.experienceYears)
-    }
-
-    const resumeId = resolveHydratedResumeId(h.draft, h.resume, h.data.resumeId)
-    if (resumeId) setResumeId(resumeId)
+    const snap = snapshotFromHydration(h)
+    if (snap.data.goal != null) setGoal(snap.data.goal)
+    setRole(snap.data.role)
+    setExperienceYears(snap.data.experienceYears)
+    setMode(snap.data.mode)
+    if (snap.data.interviewerId != null) setInterviewerId(snap.data.interviewerId)
+    if (snap.data.resumeId) setResumeId(snap.data.resumeId)
   }, [
     serverHydration,
     setGoal,
@@ -223,9 +224,11 @@ export default function OnboardingPage() {
     if (step >= 2) refreshResolvedPreferences()
   }, [step, refreshResolvedPreferences])
 
-  /** Align session difficulty with Settings on the resume step unless user overrode. */
+  /** Align session difficulty with Settings only when entering step 2 — not on refresh. */
   useEffect(() => {
-    if (step !== 2 || difficultyTouched) return
+    const prev = prevStepRef.current
+    prevStepRef.current = step
+    if (prev !== 1 || step !== 2 || difficultyTouched) return
     refreshResolvedPreferences()
     setDifficulty(readDefaultDifficulty())
   }, [step, difficultyTouched, refreshResolvedPreferences])
@@ -578,11 +581,13 @@ export default function OnboardingPage() {
     setJdExtractError('')
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
+    await flushNow()
     if (step < TOTAL_STEPS) setStep(2)
   }
 
-  const handleBack = () => {
+  const handleBack = async () => {
+    await flushNow()
     if (step > 1) setStep(1)
   }
 
@@ -775,15 +780,29 @@ export default function OnboardingPage() {
   const voiceIsSettingsDefault = data.interviewerId === resolved.interviewerId
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-2 overflow-x-hidden pb-4 max-lg:pb-6 lg:max-h-full lg:min-h-0 lg:max-w-6xl lg:flex-1 lg:gap-2 lg:overflow-hidden lg:pb-0">
-      <div className="flex shrink-0 flex-col items-center gap-2 text-center sm:gap-2.5">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-1.5 overflow-x-hidden pb-4 max-lg:pb-6 lg:max-h-full lg:min-h-0 lg:max-w-6xl lg:flex-1 lg:gap-1.5 lg:overflow-hidden lg:pb-0">
+      <div
+        className={cn(
+          'flex shrink-0 flex-col items-center gap-1.5 text-center sm:gap-2',
+          step === 2 && 'lg:gap-1',
+        )}
+      >
         <div className="min-w-0 max-w-lg">
-          <h1 className="text-2xl font-bold tracking-tight text-(--text-primary) sm:text-3xl lg:text-xl lg:leading-snug">
+          <h1
+            className={cn(
+              'font-bold tracking-tight text-(--text-primary)',
+              step === 2
+                ? 'text-xl sm:text-2xl lg:text-lg lg:leading-snug'
+                : 'text-2xl sm:text-3xl lg:text-xl lg:leading-snug',
+            )}
+          >
             Set Up Your Interview
           </h1>
-          <p className="mt-0.5 text-sm font-medium leading-snug text-(--text-secondary) sm:text-base lg:mt-1 lg:text-xs lg:leading-snug">
-            Two quick steps — same path every time so practice stays frictionless.
-          </p>
+          {step === 1 ? (
+            <p className="mt-0.5 text-sm font-medium leading-snug text-(--text-secondary) sm:text-base lg:mt-1 lg:text-xs lg:leading-snug">
+              Two quick steps — same path every time so practice stays frictionless.
+            </p>
+          ) : null}
         </div>
         <StepIndicator dense currentStep={step} totalSteps={TOTAL_STEPS} labels={STEP_LABELS} />
       </div>
