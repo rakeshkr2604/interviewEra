@@ -31,9 +31,9 @@ interface CandidateTranscriptProps {
   onRetry: () => void
   /** Full answer window — mic stays armed; idle gaps are reconnects, not "off". */
   micArmed?: boolean
+  /** When true, user tapped mute — mic is intentionally off for this answer. */
+  userMicMuted?: boolean
 }
-
-// Heights for 8 bars — vary heights so it looks like a real waveform, not a comb
 const WAVEFORM_HEIGHTS = [0.45, 0.75, 0.55, 1, 0.65, 0.4, 0.85, 0.55]
 
 export function CandidateTranscript({
@@ -47,6 +47,7 @@ export function CandidateTranscript({
   onToggle,
   onRetry,
   micArmed = false,
+  userMicMuted = false,
 }: CandidateTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -57,12 +58,17 @@ export function CandidateTranscript({
   }, [transcript, interimTranscript])
 
   const hasContent = Boolean(transcript || interimTranscript)
-  // "Active" = transcript pipeline verified (first event received).
-  // When the caller does not pass `recognitionState` we fall back to the
-  // legacy boolean so this component keeps working in pre-tri-state callers.
-  const active     = recognitionState ? recognitionState === 'active' : isListening
-  const starting   = recognitionState === 'starting'
-  const showBars   = active && !hasContent
+  const micActive =
+    recognitionState === 'active' ||
+    (recognitionState === undefined && isListening)
+  const micLive = micActive && permissionState === 'granted' && !error
+  const active = micLive
+  const starting =
+    !micActive &&
+    (isListening ||
+      recognitionState === 'starting' ||
+      (micArmed && !userMicMuted && permissionState === 'granted'))
+  const showBars = active && !hasContent
 
   return (
     <div className="w-full min-w-0 space-y-2">
@@ -90,25 +96,29 @@ export function CandidateTranscript({
           className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs
                       font-semibold transition-colors duration-200
                       disabled:opacity-50
-                      ${isListening
+                      ${isListening && !userMicMuted
                         ? 'bg-(--accent-danger)/15 text-(--accent-danger)'
                         : 'bg-(--bg-tertiary) text-(--text-secondary)'
                       }`}
         >
-          {isListening ? <Mic size={12} className="animate-pulse" /> : <MicOff size={12} />}
+          {isListening && !userMicMuted ? <Mic size={12} className="animate-pulse" /> : <MicOff size={12} />}
           {permissionState === 'requesting'
             ? 'Requesting permission…'
-            : active
+            : userMicMuted
+              ? 'Mic muted — tap to resume'
+              : active
               ? 'Listening…'
               : starting
                 ? micArmed
-                  ? 'Reconnecting…'
+                  ? 'Getting ready…'
                   : 'Starting mic…'
                 : permissionState === 'denied'
                   ? 'Permission denied'
-                  : micArmed
-                    ? 'Mic Ready'
-                    : 'Click mic to enable'}
+                  : micArmed && !isListening
+                    ? 'Tap to start mic'
+                    : micArmed
+                      ? 'Mic ready'
+                      : 'Click mic to enable'}
         </button>
       </div>
 
@@ -152,8 +162,10 @@ export function CandidateTranscript({
               ? 'Start speaking — your words will appear here'
               : starting
                 ? 'Connecting microphone…'
-                : micArmed
-                  ? 'Take your time — start speaking when ready'
+                : recognitionState === 'active' && !isListening
+                  ? 'Mic is ready — speak now and your words will appear here'
+                  : micArmed
+                  ? 'Tap the button above to enable your microphone, then speak'
                   : isSupported
                     ? 'Click the mic button to start speaking'
                     : 'Speech recognition not supported in this browser'}

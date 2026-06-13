@@ -284,13 +284,15 @@ export function useInterviewMicSession(
     if (inputMode === 'deepgram') {
       void startDgListening()
     } else {
-      restartListening()
+      // Full pipeline rebuild (release TTS/audio focus, then capture) — required
+      // after avatar TTS on Chrome/Android where restartListening alone loops.
+      void startListening()
     }
   }, [
     bumpRecoveringWindow,
     inputMode,
-    restartListening,
     startDgListening,
+    startListening,
     telemetryCtx,
   ])
 

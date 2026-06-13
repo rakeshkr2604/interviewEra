@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      { error: 'Unauthorized', fallback: 'browser_tts' },
+      { status: 401 },
+    );
   }
 
   // ── 2. Abuse gate ────────────────────────────────────────────────────────────

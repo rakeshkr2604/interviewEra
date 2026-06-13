@@ -43,12 +43,18 @@ export function toDraftPhase(
 }
 
 /** User-visible label for the progress panel center ring */
-export function progressRingLabel(phase: RuntimePhase): string {
+export function progressRingLabel(
+  phase: RuntimePhase,
+  opts?: { speakingProgressPct?: number | null },
+): string {
   switch (phase) {
     case 'awaiting_audio_unlock':
       return 'Tap to listen'
     case 'avatar_speaking':
-      return 'Preparing…'
+      if (opts?.speakingProgressPct != null && opts.speakingProgressPct > 0) {
+        return `${opts.speakingProgressPct}%`
+      }
+      return 'Speaking…'
     case 'avatar_finished':
       return 'Your turn'
     case 'submitting':

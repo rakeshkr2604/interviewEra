@@ -19,7 +19,7 @@ import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
 import { DeepgramSessionController } from '@/lib/voice/deepgram-session-controller'
 import type { VoiceConnectionState } from '@/lib/voice/deepgram-health'
 import { DeepgramVoiceStatusBanner } from '@/components/interview/DeepgramVoiceStatusBanner'
-import { getBrowserVoiceCapabilities, getSpeechSynthesisProbeError } from '@/lib/voice/browser-capabilities'
+import { getSpeechSynthesisProbeError, resolvePreferredVoiceInputMode } from '@/lib/voice/browser-capabilities'
 import { useInterviewKeyboardViewport } from '@/hooks/useInterviewKeyboardViewport'
 import type { VoiceMetadata } from '@/lib/interview/interview-orchestrator'
 import type { InterviewerTone } from '@/lib/voice/tts-client'
@@ -49,6 +49,7 @@ import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
 import { releaseAudioForMicCapture, resumeSharedInterviewAudioContext } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
+import { SttInputDebugPanel } from '@/components/debug/SttInputDebugPanel'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackFunnelEvent } from '@/lib/analytics/funnel'
@@ -235,9 +236,10 @@ export default function InterviewSessionPage() {
   const [answerStartTime, setAnswerStartTime] = useState<number>(0)
   const [fetchError, setFetchError] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
+  const [showStuckEscape, setShowStuckEscape] = useState(false)
   const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>(() => {
     if (typeof window === 'undefined') return 'voice'
-    return getBrowserVoiceCapabilities().recommendedMode
+    return resolvePreferredVoiceInputMode()
   })
 
   const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
@@ -343,6 +345,57 @@ export default function InterviewSessionPage() {
   // ─── Timer ────────────────────────────────────────────────
   const { timeLeft, start: startTimer, stop: stopTimer, reset: resetTimer } =
     useTimer(TIME_PER_QUESTION)
+  /** One-shot guard: answer clock starts only after input readiness per mode. */
+  const answerTimerArmedRef = useRef(false)
+  const [answerTimerArmed, setAnswerTimerArmed] = useState(false)
+  const answerTimeBudgetRef = useRef(TIME_PER_QUESTION)
+
+  useEffect(() => {
+    answerTimeBudgetRef.current = answerTimeBudget
+  }, [answerTimeBudget])
+
+  const armAnswerTimer = useCallback(
+    (trigger: string, opts?: { remaining?: number; budget?: number }) => {
+      if (answerTimerArmedRef.current) return
+      if (phaseRef.current !== 'candidate_answering') return
+
+      answerTimerArmedRef.current = true
+      setAnswerTimerArmed(true)
+
+      const budget = opts?.budget ?? answerTimeBudgetRef.current
+      if (opts?.remaining != null) {
+        resetTimer(opts.remaining)
+        setAnswerStartTime(Date.now() - (budget - opts.remaining) * 1000)
+      } else {
+        setAnswerStartTime(Date.now())
+      }
+
+      startTimer()
+
+      interviewFlowLog('timer', 'timer_started', {
+        interviewId,
+        questionIndex: currentIndex,
+        budgetSeconds: budget,
+        mode: inputMode,
+        gated: true,
+        trigger,
+      })
+      interviewStartupLog('timer_started', {
+        questionIndex: currentIndex,
+        budgetSeconds: budget,
+        mode: inputMode,
+        gated: true,
+        trigger,
+      })
+      track('TIMER', 'timer_started', {
+        budgetSeconds: budget,
+        mode: inputMode,
+        gated: true,
+        trigger,
+      })
+    },
+    [currentIndex, inputMode, interviewId, resetTimer, startTimer, track],
+  )
 
   const interviewDataRef = useRef(interviewData)
   useEffect(() => {
@@ -406,9 +459,11 @@ export default function InterviewSessionPage() {
         const budget = TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER
         setAnswerTimeBudget(budget)
         setPhase('candidate_answering')
-        setAnswerStartTime(Date.now())
+        phaseRef.current = 'candidate_answering'
+        answerTimerArmedRef.current = false
+        setAnswerTimerArmed(false)
         resetTimer(budget)
-        startTimer()
+        armAnswerTimer('startup_switch_to_typing')
       }
     },
   })
@@ -427,6 +482,8 @@ export default function InterviewSessionPage() {
 
   // ─── Speech Recognition ───────────────────────────────────
   const micKeepArmedRef = useRef(false)
+  /** User chose AI Voice after Web Speech failed — do not auto-revert to browser STT. */
+  const webSpeechFallbackLockedRef = useRef(false)
   const sttTelemetryRef = useRef<SttTelemetryCallback | null>(null)
   const onSttTelemetry = useCallback<SttTelemetryCallback>((event, data) => {
     sttTelemetryRef.current?.(event, data)
@@ -436,6 +493,11 @@ export default function InterviewSessionPage() {
     try { elStop() } catch { /* */ }
     await releaseAudioForMicCapture()
   }, [stopSpeaking, elStop])
+  const handleSwitchToAiVoiceRef = useRef<(source: string) => Promise<void>>(async () => {})
+  const onWebSpeechStalled = useCallback((payload: { noSpeechStreak: number }) => {
+    track('VOICE', 'web_speech_stalled', { streak: payload.noSpeechStreak })
+    void handleSwitchToAiVoiceRef.current('web_speech_stalled')
+  }, [track])
   const [userMicMuted, setUserMicMuted] = useState(false)
   const userMicMutedRef = useRef(false)
   useEffect(() => {
@@ -451,6 +513,7 @@ export default function InterviewSessionPage() {
     error: micError,
     permissionState,
     startListening,
+    startListeningFromUserGesture,
     retryPermission,
     stopListening,
     restartListening,
@@ -465,11 +528,8 @@ export default function InterviewSessionPage() {
     keepArmedDuringAnswerRef: micKeepArmedRef,
     onSttTelemetry,
     prepareForMicCapture,
+    onWebSpeechStalled,
   })
-  // The ONLY state that may surface "Listening…" in the Web Speech path.
-  // 'starting' (between onstart and first transcript) intentionally does NOT
-  // qualify — that was the source of the false-positive label.
-  const webSpeechActive = recognitionState === 'active'
   // The ONLY state that may surface "Listening…" in the Deepgram path.
   // Requires: local mic stream is up AND the Deepgram WebSocket is OPEN.
   const dgListening = dgIsRecording && dgWsOpen
@@ -540,16 +600,16 @@ export default function InterviewSessionPage() {
 
   useEffect(() => {
     if (voiceRecovery.isActive) return
+    if (webSpeechFallbackLockedRef.current) return
     if (permissionState === 'denied') {
       if (inputMode !== 'text') setInputMode('text')
       return
     }
-    if (inputMode !== 'voice') return
-    const caps = getBrowserVoiceCapabilities()
-    if (!caps.webSpeech && caps.deepgramMic) {
-      setInputMode('deepgram')
-    } else if (!caps.webSpeech) {
-      setInputMode('text')
+    const preferred = resolvePreferredVoiceInputMode()
+    if (inputMode === 'deepgram' && preferred === 'voice') {
+      setInputMode('voice')
+    } else if (inputMode !== preferred && preferred !== 'deepgram') {
+      setInputMode(preferred)
     }
   }, [isMicSupported, permissionState, inputMode, voiceRecovery.isActive])
 
@@ -733,9 +793,14 @@ export default function InterviewSessionPage() {
           difficulty_level: result.data.difficulty,
           session_started_at: Date.now(),
         })
-      } catch {
+      } catch (err) {
         window.clearTimeout(loadTimeoutId)
         if (timedOut || !mountedRef.current) return
+        const msg = err instanceof Error ? err.message : String(err)
+        if (msg.includes('Unauthorized') || msg.includes('"401"') || msg.includes('status 401')) {
+          router.push(`/login?next=/interview/session/${interviewId}`)
+          return
+        }
         setFetchError('Failed to load interview. Please go back and try again.')
       }
     }
@@ -744,7 +809,7 @@ export default function InterviewSessionPage() {
     // `track` are all stable callbacks (no identity churn), so excluding them
     // keeps this a single-shot load without re-fetching on every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interviewId, reloadNonce])
+  }, [interviewId, reloadNonce, router])
 
   // ─── Startup state machine: questions_ready → initializing_audio ────────────
   // Single-shot transition. Guarded on:
@@ -875,11 +940,18 @@ export default function InterviewSessionPage() {
     if (restore && restore.questionIndex === currentIndex) {
       pendingRestoreRef.current = null
       const budget = restore.timerBudget > 0 ? restore.timerBudget : TIME_PER_QUESTION
-      const remaining = restore.timerRemaining > 0 ? Math.min(restore.timerRemaining, budget) : budget
+      const hasSavedAnswer = restore.transcript.trim().length > 0
+      const remaining =
+        !hasSavedAnswer && restore.timerRemaining <= 5
+          ? budget
+          : restore.timerRemaining > 0
+            ? Math.min(restore.timerRemaining, budget)
+            : budget
       const voiceRecoveryActive = voiceRecovery.beginFromDraft(restore, currentIndex)
+      const modeForSession = resolvePreferredVoiceInputMode()
       if (voiceRecoveryActive) {
-        setInputMode(restore.inputMode)
-        if (restore.inputMode === 'deepgram') {
+        setInputMode(modeForSession)
+        if (modeForSession === 'deepgram') {
           setDgTranscript(restore.transcript)
           setDgInterim('')
         } else {
@@ -898,9 +970,17 @@ export default function InterviewSessionPage() {
       )
       setAnswerTimeBudget(budget)
       resetTimer(remaining)
-      setAnswerStartTime(Date.now() - (budget - remaining) * 1000)
       setPhase('candidate_answering')
-      startTimer()
+      phaseRef.current = 'candidate_answering'
+      micKeepArmedRef.current =
+        (restore.inputMode === 'voice' || restore.inputMode === 'deepgram') &&
+        !voiceRecovery.isBlockingMic &&
+        permissionState !== 'denied' &&
+        (restore.inputMode === 'deepgram' || isMicSupported)
+      setUserMicMuted(false)
+      answerTimerArmedRef.current = false
+      setAnswerTimerArmed(false)
+      armAnswerTimer('draft_restore', { remaining, budget })
       track('INTERVIEW_FLOW', 'draft_restored', {
         questionIndex: currentIndex,
         transcriptLen: restore.transcript.length,
@@ -909,6 +989,9 @@ export default function InterviewSessionPage() {
         inputMode: restore.inputMode,
         voiceRecovery: voiceRecoveryActive,
       })
+      if (voiceRecoveryActive) {
+        clearStormBudgetForAnswer()
+      }
       return
     }
 
@@ -987,47 +1070,40 @@ export default function InterviewSessionPage() {
       const budget = manual ? TIME_PER_QUESTION * TEXT_ANSWER_TIME_MULTIPLIER : TIME_PER_QUESTION
       setAnswerTimeBudget(budget)
       setPhase('candidate_answering')
+      // Sync refs immediately — startListening runs in the same tick before
+      // React effects update phaseRef / micKeepArmedRef (root cause of stuck mic).
+      phaseRef.current = 'candidate_answering'
+      micKeepArmedRef.current =
+        (inputMode === 'voice' || inputMode === 'deepgram') &&
+        !voiceRecovery.isBlockingMic &&
+        permissionState !== 'denied' &&
+        (inputMode === 'deepgram' || isMicSupported)
       setUserMicMuted(false)
       clearStormBudgetForAnswer()
-      setAnswerStartTime(Date.now())
+      answerTimerArmedRef.current = false
+      setAnswerTimerArmed(false)
       resetTimer(budget)
-      startTimer()
-      interviewFlowLog('timer', 'timer_started', {
-        interviewId,
+      interviewStartupLog('answering_phase_entered', {
         questionIndex: currentIndex,
         budgetSeconds: budget,
         mode: inputMode,
+        timerArmed: false,
+        avatarReason: reason,
       })
-      interviewStartupLog('timer_started', {
-        questionIndex: currentIndex,
-        budgetSeconds: budget,
-        mode: inputMode,
-      })
-      track('TIMER', 'timer_started', { budgetSeconds: budget, mode: inputMode, avatarReason: reason })
       voiceDebug('question_transitioned', {
         mode: inputMode,
         question_index: currentIndex,
         has_follow_up: !!pendingFollowUp,
       })
-      if (inputMode === 'deepgram') {
+      if (inputMode === 'deepgram' && resolvePreferredVoiceInputMode() === 'deepgram') {
         voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'deepgram' })
         interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_avatar_finished' })
         trackMicTelemetry('mic_started', telemetryCtx, { mode: 'deepgram' })
         void startDgListeningRef.current()
-      } else if (!useManualInputRef.current && isMicSupported) {
-        voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'web_speech' })
-        interviewStartupLog('listening_started', { mode: 'web_speech', source: 'post_avatar_finished' })
-        trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech' })
-        startupMarkRef.current('mic_permission_started', { mode: 'web_speech' })
-        void startListeningRef.current().then((granted) => {
-          startupMarkRef.current(
-            granted ? 'mic_permission_granted' : 'mic_permission_denied',
-            { mode: 'web_speech' },
-          )
-        })
       } else {
         interviewStartupLog('listening_skipped', {
           mode: inputMode,
+          reason: 'await_user_mic_tap',
           useManualInput: useManualInputRef.current,
           micSupported: isMicSupported,
         })
@@ -1036,14 +1112,12 @@ export default function InterviewSessionPage() {
     [
       currentIndex,
       inputMode,
-      interviewId,
       isMicSupported,
       pendingFollowUp,
       resetTimer,
-      startTimer,
-      track,
       clearStormBudgetForAnswer,
-      telemetryCtx,
+      permissionState,
+      voiceRecovery.isBlockingMic,
     ],
   )
 
@@ -1071,6 +1145,43 @@ export default function InterviewSessionPage() {
 
   const micFailed = micSession.micFailed || recognitionFailed
 
+  // Web Speech: show "Listening…" only after transcript pipeline is confirmed.
+  const webSpeechActive = isListening && recognitionState === 'active'
+
+  // Gate answer timer on input readiness (audit: timer gating fix).
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'voice' || useManualInput) return
+    if (!webSpeechActive) return
+    armAnswerTimer('web_speech_active')
+  }, [phase, inputMode, useManualInput, webSpeechActive, armAnswerTimer])
+
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'deepgram') return
+    if (!dgListening) return
+    armAnswerTimer('dg_listening')
+  }, [phase, inputMode, dgListening, armAnswerTimer])
+
+  useEffect(() => {
+    if (phase === 'candidate_answering') return
+    answerTimerArmedRef.current = false
+    setAnswerTimerArmed(false)
+  }, [phase])
+
+  const handleManualAnswerEngage = useCallback(() => {
+    if (phaseRef.current !== 'candidate_answering') return
+    if (!useManualInputRef.current) return
+    armAnswerTimer('text_input')
+  }, [armAnswerTimer])
+
+  const onStartupTtsEvent = useCallback(
+    (event: 'tts_started' | 'tts_completed' | 'tts_failed', extra?: Record<string, unknown>) => {
+      startupMarkRef.current(event, extra)
+    },
+    [],
+  )
+
   const avatarSpeaking = useInterviewAvatarSpeaking({
     phase,
     setPhase,
@@ -1095,9 +1206,7 @@ export default function InterviewSessionPage() {
     currentWordIndex,
     lastVoiceMeta,
     onAvatarFinished: enterAnsweringPhase,
-    onStartupTtsEvent: (event, extra) => {
-      startupMark(event, extra)
-    },
+    onStartupTtsEvent,
   })
 
   const handleUnlockAudioGesture = useCallback(() => {
@@ -1119,8 +1228,14 @@ export default function InterviewSessionPage() {
     continueWithoutAudio,
     retryAudio,
     audioActuallyStarted,
+    speakingProgressPct,
     avatarHeaderLabel,
   } = avatarSpeaking
+
+  const audioActuallyStartedRef = useRef(false)
+  const retryAudioRef = useRef(retryAudio)
+  audioActuallyStartedRef.current = audioActuallyStarted
+  retryAudioRef.current = retryAudio
 
   const captionWordIndex = useMemo(() => {
     if (!elIsPlaying || !spokenText) return currentWordIndex
@@ -1130,14 +1245,18 @@ export default function InterviewSessionPage() {
   }, [elIsPlaying, elPlaybackProgress, currentWordIndex, spokenText])
 
   const [videoRecoverTick, setVideoRecoverTick] = useState(0)
+  const onVisibleResume = useCallback(() => {
+    setVideoRecoverTick((t) => t + 1)
+  }, [])
+  const onAvatarSpeakingResume = useCallback(() => {
+    if (!audioActuallyStartedRef.current && phaseRef.current === 'avatar_speaking') {
+      retryAudioRef.current()
+    }
+  }, [])
   useInterviewPwaLifecycle({
     phase,
-    onVisibleResume: () => setVideoRecoverTick((t) => t + 1),
-    onAvatarSpeakingResume: () => {
-      if (!audioActuallyStarted && phaseRef.current === 'avatar_speaking') {
-        retryAudio()
-      }
-    },
+    onVisibleResume,
+    onAvatarSpeakingResume,
   })
 
   useEffect(() => {
@@ -1381,6 +1500,16 @@ export default function InterviewSessionPage() {
           },
           onFatalError: (message, fatalOpts) => {
             if (!mountedRef.current) return
+            if (resolvePreferredVoiceInputMode() === 'voice') {
+              stopDgListening()
+              setDgError(null)
+              setDgVoiceShowActions(false)
+              setInputMode('voice')
+              clearStormBudgetForAnswer()
+              clearRecognitionFailure()
+              void startListening()
+              return
+            }
             setDgError(message)
             setDgVoiceShowActions(fatalOpts.canRetryVoice || fatalOpts.canSwitchToText)
           },
@@ -1420,12 +1549,56 @@ export default function InterviewSessionPage() {
     } finally {
       dgStartInFlightRef.current = false
     }
-  }, [dgStartRecording, dgStopRecording, interviewId, stopDgListening, telemetryCtx, track])
+  }, [
+    dgStartRecording,
+    dgStopRecording,
+    interviewId,
+    stopDgListening,
+    telemetryCtx,
+    track,
+    startListening,
+    clearStormBudgetForAnswer,
+    clearRecognitionFailure,
+  ])
 
   useEffect(() => {
     startDgListeningRef.current = startDgListening
     startListeningRef.current = startListening
   }, [startDgListening, startListening])
+
+  const handleSwitchToAiVoice = useCallback(async (source: string) => {
+    if (phaseRef.current !== 'candidate_answering') return
+    webSpeechFallbackLockedRef.current = true
+    voiceDebug('switch_to_ai_voice', { source })
+    track('VOICE', 'switch_to_deepgram', { source })
+    stopListening('phase_change')
+    stopDgListening()
+    clearStormBudgetForAnswer()
+    clearRecognitionFailure()
+    setInputMode('deepgram')
+    setUserMicMuted(false)
+    setShowStuckEscape(false)
+    await startDgListeningRef.current({ preserveTranscript: true })
+  }, [
+    stopListening,
+    stopDgListening,
+    clearStormBudgetForAnswer,
+    clearRecognitionFailure,
+    track,
+  ])
+
+  useEffect(() => {
+    handleSwitchToAiVoiceRef.current = handleSwitchToAiVoice
+  }, [handleSwitchToAiVoice])
+
+  // Tear down cloud STT when Chrome/Edge should use browser speech-to-text.
+  useEffect(() => {
+    if (webSpeechFallbackLockedRef.current) return
+    if (inputMode !== 'deepgram') return
+    if (resolvePreferredVoiceInputMode() !== 'voice') return
+    stopDgListening()
+    setInputMode('voice')
+  }, [inputMode, stopDgListening])
 
   // Cleanup Deepgram + lifecycle guards on unmount. Order matters:
   //   1. mark unmounted → every async callback already in flight bails on its
@@ -1770,21 +1943,21 @@ export default function InterviewSessionPage() {
 
   // ─── Timer runs out → auto submit ─────────────────────────
   useEffect(() => {
-    if (timeLeft === 0 && phase === 'candidate_answering') {
+    if (timeLeft === 0 && phase === 'candidate_answering' && answerTimerArmed) {
       track('TIMER', 'timer_expired', {})
       void handleSubmitAnswer('timer')
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, phase])
+  }, [timeLeft, phase, answerTimerArmed])
 
   // Emergency fallback: timer already expired but transcript arrived afterward
   // (common on iOS when the first timer tick fires before speech results land).
   useEffect(() => {
-    if (timeLeft !== 0 || phase !== 'candidate_answering') return
+    if (timeLeft !== 0 || phase !== 'candidate_answering' || !answerTimerArmed) return
     if (!answerText.trim()) return
     void handleSubmitAnswer('timer')
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft, phase, answerText])
+  }, [timeLeft, phase, answerText, answerTimerArmed])
 
   // Watchdog: transcript exists but no submit request leaves the client within 5s
   // of the last transcript change.
@@ -1842,23 +2015,43 @@ export default function InterviewSessionPage() {
   // Polls hasRecentSpeech (ref-based, no React state lag) every 2s rather
   // than relying on a single wall-clock timer that misses ongoing speech.
   const SILENCE_WINDOW_MS = 8000
-  const [showStuckEscape, setShowStuckEscape] = useState(false)
   useEffect(() => {
     setShowStuckEscape(false)
     if (phase !== 'candidate_answering') return
     if (inputMode === 'deepgram') {
-      // Deepgram has its own VAD — keep the legacy 15s heuristic for that mode
       const t = setTimeout(() => setShowStuckEscape(true), 15000)
       return () => clearTimeout(t)
     }
-    // Web Speech mode: check actual mic activity, not wall-clock
     const iv = setInterval(() => {
-      if (!hasRecentSpeech(SILENCE_WINDOW_MS) && !answerText) {
+      const noSpeech = !hasRecentSpeech(SILENCE_WINDOW_MS) && !answerText.trim()
+      if (inputMode === 'voice' && isListening && noSpeech) {
         setShowStuckEscape(true)
+        return
+      }
+      if (inputMode === 'voice' && micArmed && !isListening && noSpeech) {
+        const elapsedMs = Date.now() - answerStartTime
+        if (elapsedMs >= SILENCE_WINDOW_MS) setShowStuckEscape(true)
+        return
+      }
+      if (recognitionFailed || micFailed) {
+        if (noSpeech) setShowStuckEscape(true)
       }
     }, 2000)
     return () => clearInterval(iv)
-  }, [phase, currentIndex, pendingFollowUp, answerText, inputMode, hasRecentSpeech])
+  }, [
+    phase,
+    currentIndex,
+    pendingFollowUp,
+    answerText,
+    inputMode,
+    hasRecentSpeech,
+    micArmed,
+    recognitionFailed,
+    micFailed,
+    isListening,
+    recognitionState,
+    answerStartTime,
+  ])
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
@@ -1947,11 +2140,47 @@ export default function InterviewSessionPage() {
     goToInterviewerTurn()
   }, [phase, stopListening, elStop, stopDgListening, resetTranscript, stopTimer, resetTimer, goToInterviewerTurn])
 
+  const handleSwitchToTyping = useCallback(() => {
+    if (phase !== 'candidate_answering') return
+    stopListening('phase_change')
+    elStop()
+    stopDgListening()
+    const voice = getMergedTranscript().trim()
+    if (voice) {
+      setManualAnswer(voice)
+      restoreTranscript(voice)
+    }
+    setInputMode('text')
+    voiceRecovery.dismissToTyping()
+  }, [
+    phase,
+    stopListening,
+    elStop,
+    stopDgListening,
+    getMergedTranscript,
+    restoreTranscript,
+    voiceRecovery,
+  ])
+
   // ─── Toggle Mic ───────────────────────────────────────────
+  const handleStartMic = () => {
+    if (phase !== 'candidate_answering') return
+    if (!isMicSupported) return
+    voiceDebug('start_listening_triggered', { source: 'user_mic_tap' })
+    setUserMicMuted(false)
+    clearStormBudgetForAnswer()
+    clearRecognitionFailure()
+    trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech', source: 'user_tap' })
+    const ok = startListeningFromUserGesture()
+    if (ok && voiceRecovery.isActive) {
+      voiceRecovery.markSuccess()
+    }
+  }
+
   const handleToggleMic = async () => {
     if (phase !== 'candidate_answering') return
     if (!isMicSupported) return
-    if (isListening) {
+    if (!userMicMuted) {
       voiceDebug('stop_listening_triggered', { source: 'toggle_mic_off' })
       setUserMicMuted(true)
       stopListening('user_mute')
@@ -1961,7 +2190,7 @@ export default function InterviewSessionPage() {
     setUserMicMuted(false)
     clearStormBudgetForAnswer()
     trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'toggle_mic_on' })
-    await startListening()
+    startListeningFromUserGesture()
   }
 
   const handleTryVoiceAgain = async () => {
@@ -1982,6 +2211,7 @@ export default function InterviewSessionPage() {
     voiceRecovery.markResuming()
 
     const { savedMode, transcript: savedTranscript } = voiceRecovery.state
+    const resumeMode = resolvePreferredVoiceInputMode()
 
     try {
       if (interviewAudio.needsUnlock && !interviewAudio.isUnlocked) {
@@ -1989,7 +2219,7 @@ export default function InterviewSessionPage() {
       }
       await resumeSharedInterviewAudioContext()
 
-      if (savedMode === 'deepgram') {
+      if (resumeMode === 'deepgram' && savedMode === 'deepgram') {
         setInputMode('deepgram')
         setDgTranscript(savedTranscript)
         setDgInterim('')
@@ -1998,7 +2228,7 @@ export default function InterviewSessionPage() {
         if (!mountedRef.current) return
         if (!dgControllerRef.current?.isActive()) {
           voiceRecovery.markFailed(
-            'Could not connect AI Voice. Check your connection and try again, or continue typing.',
+            'Could not connect voice service. Check your connection and try again, or continue typing.',
           )
           return
         }
@@ -2355,17 +2585,24 @@ export default function InterviewSessionPage() {
 
               {/* Timer — only during candidate_answering (never during avatar turn) */}
               <div className="flex items-center justify-center py-2">
-                {phase === 'candidate_answering' ? (
+                {phase === 'candidate_answering' && answerTimerArmed ? (
                   <TimerCircle
                     timeLeft={timeLeft}
                     totalTime={answerTimeBudget}
                     size={96}
                   />
+                ) : phase === 'candidate_answering' ? (
+                  <div className="h-24 w-24 flex items-center justify-center
+                                  rounded-full border-2 border-(--bg-tertiary)">
+                    <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
+                      Your turn
+                    </span>
+                  </div>
                 ) : (
                   <div className="h-24 w-24 flex items-center justify-center
                                   rounded-full border-2 border-(--bg-tertiary)">
                     <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
-                      {progressRingLabel(phase)}
+                      {progressRingLabel(phase, { speakingProgressPct })}
                     </span>
                   </div>
                 )}
@@ -2490,14 +2727,17 @@ export default function InterviewSessionPage() {
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
-                      onClick={() => {
-                        clearRecognitionFailure()
-                        clearStormBudgetForAnswer()
-                        micSession.retryMicSession()
-                      }}
+                      onClick={() => { void handleStartMic() }}
                       className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
                     >
                       Retry microphone
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { void handleSwitchToAiVoice('mic_failed_banner') }}
+                      className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
+                    >
+                      Use AI Voice
                     </button>
                     <button
                       type="button"
@@ -2508,6 +2748,25 @@ export default function InterviewSessionPage() {
                     </button>
                   </div>
                 </div>
+              )}
+
+              {phase === 'candidate_answering' &&
+                !useManualInput &&
+                inputMode === 'voice' &&
+                !micFailed &&
+                !isListening &&
+                !userMicMuted &&
+                recognitionState === 'idle' && (
+                <button
+                  type="button"
+                  onClick={() => { void handleStartMic() }}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed
+                             border-(--accent-primary)/40 bg-(--accent-primary)/5 px-4 py-4 text-sm
+                             font-semibold text-(--accent-primary) hover:bg-(--accent-primary)/10"
+                >
+                  <Mic size={18} />
+                  Tap here to start microphone
+                </button>
               )}
 
               {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && !micFailed && (
@@ -2521,8 +2780,9 @@ export default function InterviewSessionPage() {
                     error={micError}
                     permissionState={permissionState}
                     micArmed={micArmed}
+                    userMicMuted={userMicMuted}
                     onToggle={() => { void handleToggleMic() }}
-                    onRetry={() => { void retryPermission() }}
+                    onRetry={() => { void handleStartMic() }}
                   />
                 </div>
               )}
@@ -2546,7 +2806,11 @@ export default function InterviewSessionPage() {
                   <textarea
                     ref={manualAnswerRef}
                     value={manualAnswer}
-                    onChange={(event) => setManualAnswer(event.target.value)}
+                    onFocus={handleManualAnswerEngage}
+                    onChange={(event) => {
+                      setManualAnswer(event.target.value)
+                      handleManualAnswerEngage()
+                    }}
                     placeholder="Type your answer here..."
                     className="box-border block min-h-[120px] min-w-0 w-full max-w-full resize-none overflow-y-auto rounded-xl border border-(--card-border) bg-(--card-bg) p-3 text-sm leading-relaxed text-(--text-primary) outline-none focus:border-(--accent-primary)"
                   />
@@ -2702,7 +2966,7 @@ export default function InterviewSessionPage() {
                 <p className="mb-2 text-xs text-(--text-secondary)">
                   Mic not picking you up? You can submit what you have, or continue.
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <button
                     type="button"
                     onClick={handleSubmitClick}
@@ -2710,6 +2974,15 @@ export default function InterviewSessionPage() {
                                font-semibold text-white hover:bg-(--accent-hover)"
                   >
                     Submit my answer now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { void handleSwitchToAiVoice('stuck_escape') }}
+                    className="rounded-lg border border-(--accent-primary) bg-white px-3 py-2
+                               text-xs font-semibold text-(--accent-primary)
+                               hover:bg-(--accent-primary)/5"
+                  >
+                    Use AI Voice
                   </button>
                   <button
                     type="button"
@@ -2726,10 +2999,7 @@ export default function InterviewSessionPage() {
                         stopDgListening()
                         void startDgListening()
                       } else {
-                        setUserMicMuted(false)
-                        clearRecognitionFailure()
-                        clearStormBudgetForAnswer()
-                        micSession.retryMicSession()
+                        void handleStartMic()
                       }
                       setShowStuckEscape(false)
                     }}
@@ -2766,17 +3036,11 @@ export default function InterviewSessionPage() {
                   Restart Interview
                 </button>
                 <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
-                  {inputMode === 'deepgram'
-                    ? dgListening
-                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> Recording · {dgRecordingSeconds}s</>
-                      : dgIsRecording
-                        ? <><Radio size={12} className="animate-pulse" /> Connecting voice channel…</>
-                        : <><Radio size={12} /> AI Voice</>
-                    : voiceUi.showListeningIndicator
-                      ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> {voiceUi.label}</>
-                      : voiceUi.phase === 'starting_microphone' || micArmed
-                        ? <><Mic size={12} className={voiceUi.phase === 'starting_microphone' ? 'animate-pulse' : ''} /> {voiceUi.label}</>
-                        : <><MicOff size={12} /> {voiceUi.label}</>
+                  {voiceUi.showListeningIndicator
+                    ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> {voiceUi.label}</>
+                    : voiceUi.phase === 'starting_microphone' || micArmed
+                      ? <><Mic size={12} className={voiceUi.phase === 'starting_microphone' ? 'animate-pulse' : ''} /> {voiceUi.label}</>
+                      : <><MicOff size={12} /> {voiceUi.label}</>
                   }
                 </div>
               </div>
@@ -2804,16 +3068,16 @@ export default function InterviewSessionPage() {
               )}
 
               <div className="flex items-center gap-3">
-                {/* Mode cycle: voice → deepgram → text */}
-                <button
-                  type="button"
-                  onClick={() => setInputMode((m) => m === 'voice' ? 'deepgram' : m === 'deepgram' ? 'text' : 'voice')}
-                  className="rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary)"
-                  title="Cycle input mode: Voice → AI Voice → Type"
-                >
-                  {inputMode === 'deepgram' ? 'AI Voice' : inputMode === 'text' ? 'Type' : 'Voice'}
-                </button>
-                {/* Mic toggle — hidden in deepgram mode (auto-managed) */}
+                {inputMode !== 'text' && (
+                  <button
+                    type="button"
+                    onClick={handleSwitchToTyping}
+                    className="rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary)"
+                    title="Switch to typing your answer"
+                  >
+                    Type answer
+                  </button>
+                )}
                 {inputMode !== 'deepgram' && (
                   <button
                     onClick={() => { void handleToggleMic() }}
@@ -2826,12 +3090,12 @@ export default function InterviewSessionPage() {
                     className={`flex h-12 w-12 items-center justify-center rounded-xl
                                  border transition-all duration-200
                                  disabled:opacity-40 disabled:cursor-not-allowed
-                                 ${isListening
+                                 ${isListening && !userMicMuted
                                    ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
                                    : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
                                  }`}
                   >
-                    {isListening ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
+                    {isListening && !userMicMuted ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
                   </button>
                 )}
                 {/* Deepgram: manual mic toggle for when VAD doesn't auto-start */}
@@ -2906,6 +3170,7 @@ export default function InterviewSessionPage() {
       </div>
     </div>
     {celebrationDialog}
+    <SttInputDebugPanel />
     </>
   )
 }

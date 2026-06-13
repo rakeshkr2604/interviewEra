@@ -107,6 +107,19 @@ export function useInterviewAvatarSpeaking(
   const finishBridgeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const introRef = useRef('')
   const playbackStartedRef = useRef(false)
+  const speakGenerationRef = useRef(0)
+  const runSpeakAttemptRef = useRef<() => void>(() => {})
+  const stopSpeakingRef = useRef(stopSpeaking)
+  const elStopRef = useRef(elStop)
+  const finishAuthorizedRef = useRef<(reason: AvatarAnsweringReason) => void>(() => {})
+  const markPlaybackFailedRef = useRef<(message: string) => void>(() => {})
+  const onStartupTtsEventRef = useRef(onStartupTtsEvent)
+
+  useEffect(() => {
+    stopSpeakingRef.current = stopSpeaking
+    elStopRef.current = elStop
+    onStartupTtsEventRef.current = onStartupTtsEvent
+  }, [stopSpeaking, elStop, onStartupTtsEvent])
 
   const audioActuallyStarted = isSpeaking || elIsPlaying
 
@@ -118,9 +131,6 @@ export function useInterviewAvatarSpeaking(
         questionIndex: currentIndex,
         engine: elIsPlaying ? 'elevenlabs' : 'browser',
       })
-    }
-    if (!audioActuallyStarted) {
-      playbackStartedRef.current = false
     }
   }, [audioActuallyStarted, currentIndex, elIsPlaying, inputMode, telemetryCtx])
 
@@ -184,6 +194,11 @@ export function useInterviewAvatarSpeaking(
     [currentIndex, inputMode, onStartupTtsEvent, telemetryCtx],
   )
 
+  useEffect(() => {
+    finishAuthorizedRef.current = finishAuthorized
+    markPlaybackFailedRef.current = markPlaybackFailed
+  }, [finishAuthorized, markPlaybackFailed])
+
   const continueWithoutAudio = useCallback(() => {
     try { stopSpeaking() } catch { /* */ }
     try { elStop() } catch { /* */ }
@@ -215,7 +230,7 @@ export function useInterviewAvatarSpeaking(
     })
     interviewFlowLog('tts', 'tts_started', { questionIndex: currentIndex, mode: inputMode })
     if (currentIndex === 0) {
-      onStartupTtsEvent?.('tts_started', { questionIndex: currentIndex, mode: inputMode })
+      onStartupTtsEventRef.current?.('tts_started', { questionIndex: currentIndex, mode: inputMode })
     }
 
     const playbackCallbacks: PlaybackCallbacks = {
@@ -224,11 +239,11 @@ export function useInterviewAvatarSpeaking(
       },
       onPlaybackComplete: () => {
         if (phaseRef.current !== 'avatar_speaking') return
-        finishAuthorized('audio_completed')
+        finishAuthorizedRef.current('audio_completed')
       },
       onPlaybackFailed: (msg) => {
         if (phaseRef.current !== 'avatar_speaking') return
-        markPlaybackFailed(msg ?? 'Avatar audio could not start.')
+        markPlaybackFailedRef.current(msg ?? 'Avatar audio could not start.')
       },
     }
 
@@ -261,18 +276,19 @@ export function useInterviewAvatarSpeaking(
     currentIndex,
     currentQuestion,
     elSpeak,
-    finishAuthorized,
     inputMode,
     interviewerDisplayName,
     interviewRole,
     lastVoiceMeta,
-    markPlaybackFailed,
-    onStartupTtsEvent,
     pendingFollowUp,
     phaseRef,
     speakQuestion,
     totalQuestions,
   ])
+
+  useEffect(() => {
+    runSpeakAttemptRef.current = runSpeakAttempt
+  }, [runSpeakAttempt])
 
   const retryAudio = useCallback(() => {
     interviewFlowLog('audio', 'avatar_audio_retry', { questionIndex: currentIndex })
@@ -281,51 +297,56 @@ export function useInterviewAvatarSpeaking(
     setSpeakAttempt((n) => n + 1)
   }, [currentIndex, elStop, stopSpeaking])
 
+  const pendingFollowUpKey = pendingFollowUp?.text ?? ''
+  const currentQuestionId = currentQuestion?.id ?? ''
+
   useEffect(() => {
-    if (phase !== 'avatar_speaking' || !currentQuestion) return
+    if (phase !== 'avatar_speaking' || !currentQuestionId) return
     if (needsAudioGestureUnlock() && !audioUnlocked) return
+
+    const generation = ++speakGenerationRef.current
 
     if (!readAiVoiceEnabled()) {
       if (currentIndex === 0) {
-        onStartupTtsEvent?.('tts_completed', { questionIndex: currentIndex, skipped: true })
+        onStartupTtsEventRef.current?.('tts_completed', { questionIndex: currentIndex, skipped: true })
       }
-      const t = window.setTimeout(() => finishAuthorized('voice_disabled'), 0)
+      const t = window.setTimeout(() => finishAuthorizedRef.current('voice_disabled'), 0)
       return () => {
         window.clearTimeout(t)
-        try { stopSpeaking() } catch { /* */ }
-        try { elStop() } catch { /* */ }
+        if (generation !== speakGenerationRef.current) return
+        try { stopSpeakingRef.current() } catch { /* */ }
+        try { elStopRef.current() } catch { /* */ }
       }
     }
 
     const stuckTimer = setTimeout(() => {
       if (phaseRef.current !== 'avatar_speaking') return
       if (playbackStartedRef.current) return
-      markPlaybackFailed('Avatar audio could not start. Tap Retry Audio or continue without voice.')
+      markPlaybackFailedRef.current(
+        'Avatar audio could not start. Tap Retry Audio or continue without voice.',
+      )
     }, AUDIO_STUCK_MS)
 
-    const speakTimer = window.setTimeout(() => runSpeakAttempt(), 0)
+    const speakTimer = window.setTimeout(() => {
+      if (generation !== speakGenerationRef.current) return
+      runSpeakAttemptRef.current()
+    }, 0)
 
     return () => {
       window.clearTimeout(speakTimer)
       clearTimeout(stuckTimer)
+      if (generation !== speakGenerationRef.current) return
       setPlaybackFailed(false)
-      try { stopSpeaking() } catch { /* */ }
-      try { elStop() } catch { /* */ }
+      try { stopSpeakingRef.current() } catch { /* */ }
+      try { elStopRef.current() } catch { /* */ }
     }
   }, [
     phase,
     currentIndex,
-    pendingFollowUp,
+    pendingFollowUpKey,
     audioUnlocked,
-    currentQuestion,
+    currentQuestionId,
     speakAttempt,
-    finishAuthorized,
-    runSpeakAttempt,
-    markPlaybackFailed,
-    stopSpeaking,
-    elStop,
-    onStartupTtsEvent,
-    phaseRef,
   ])
 
   useEffect(() => {

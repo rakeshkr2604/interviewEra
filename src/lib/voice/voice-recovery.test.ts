@@ -86,6 +86,15 @@ describe('voice-recovery', () => {
       }
       expect(shouldOfferVoiceRecovery(fullDraft, 2)).toBe(false)
     })
+
+    it('does not offer recovery when transcript is empty', () => {
+      const fullDraft = {
+        version: 1,
+        updatedAt: Date.now(),
+        ...makeDraftInput({ inputMode: 'voice', transcript: '   ' }),
+      }
+      expect(shouldOfferVoiceRecovery(fullDraft, 2)).toBe(false)
+    })
   })
 
   describe('buildVoiceRecoveryState', () => {
@@ -107,8 +116,8 @@ describe('voice-recovery', () => {
   })
 
   describe('isVoiceRecoveryBlockingMic', () => {
-    it('blocks mic while pending or resuming', () => {
-      expect(isVoiceRecoveryBlockingMic({ ...VOICE_RECOVERY_INITIAL, phase: 'pending', savedMode: 'voice', transcript: '' })).toBe(true)
+    it('blocks mic only while resuming (pending is informational)', () => {
+      expect(isVoiceRecoveryBlockingMic({ ...VOICE_RECOVERY_INITIAL, phase: 'pending', savedMode: 'voice', transcript: '' })).toBe(false)
       expect(isVoiceRecoveryBlockingMic({ ...VOICE_RECOVERY_INITIAL, phase: 'resuming', savedMode: 'voice', transcript: '' })).toBe(true)
       expect(isVoiceRecoveryBlockingMic(VOICE_RECOVERY_INITIAL)).toBe(false)
       expect(isVoiceRecoveryBlockingMic({ ...VOICE_RECOVERY_INITIAL, phase: 'failed', savedMode: 'voice', transcript: '', error: 'x' })).toBe(false)

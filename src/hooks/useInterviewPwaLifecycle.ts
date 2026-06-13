@@ -60,7 +60,16 @@ export function useInterviewPwaLifecycle({
       interviewFlowLog('session', 'pagehide', { phase: phaseRef.current })
     }
 
-    const onFocus = () => handleResume('focus')
+    const onFocus = () => {
+      interviewFlowLog('session', 'lifecycle_resume', {
+        phase: phaseRef.current,
+        source: 'focus',
+        persisted: false,
+      })
+      void resumeSharedInterviewAudioContext()
+      // Do not retry avatar TTS on focus — native confirm() and minor focus churn
+      // would cancel in-progress browser speech and cause restart loops.
+    }
 
     document.addEventListener('visibilitychange', onVisibility)
     window.addEventListener('pageshow', onPageShow)

@@ -123,6 +123,35 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
       }
     }
 
+    if (
+      sessionPhase === 'candidate_answering' &&
+      inputMode === 'voice' &&
+      webSpeechActive
+    ) {
+      return {
+        phase: 'listening' as const,
+        label: 'Listening…',
+        canRetry: true,
+        showListeningIndicator: true,
+      }
+    }
+
+    if (
+      sessionPhase === 'candidate_answering' &&
+      inputMode === 'voice' &&
+      (recognitionState === 'starting' || micSessionState === 'starting') &&
+      isMicSupported &&
+      permissionState === 'granted' &&
+      !userMicMuted
+    ) {
+      return {
+        phase: 'starting_microphone' as const,
+        label: micArmed ? 'Getting microphone ready…' : 'Connecting microphone…',
+        canRetry: true,
+        showListeningIndicator: false,
+      }
+    }
+
     if (micError && !micArmed) {
       return {
         phase: 'error' as const,
@@ -162,7 +191,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     if (recognitionState === 'starting' || micSessionState === 'starting') {
       return {
         phase: 'starting_microphone' as const,
-        label: 'Connecting microphone…',
+        label: micArmed ? 'Getting microphone ready…' : 'Connecting microphone…',
         canRetry: true,
         showListeningIndicator: false,
       }
@@ -180,9 +209,9 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     if (micArmed && permissionState === 'granted') {
       return {
         phase: 'permission_granted' as const,
-        label: 'Mic Ready',
+        label: webSpeechActive ? 'Listening…' : 'Tap microphone to start',
         canRetry: true,
-        showListeningIndicator: false,
+        showListeningIndicator: webSpeechActive,
       }
     }
 

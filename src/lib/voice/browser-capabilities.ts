@@ -30,6 +30,14 @@ function hasGetUserMedia(): boolean {
   return Boolean(navigator.mediaDevices?.getUserMedia)
 }
 
+/** Best voice input mode for this browser — prefer free Web Speech when available. */
+export function resolvePreferredVoiceInputMode(): InterviewInputMode {
+  if (typeof window === 'undefined') return 'voice'
+  if (hasWebSpeechRecognition()) return 'voice'
+  if (hasGetUserMedia()) return 'deepgram'
+  return 'text'
+}
+
 /**
  * Classify voice input options for the current browser + OS.
  * Used for smart fallbacks (e.g. Firefox → Deepgram) and accurate UI copy.

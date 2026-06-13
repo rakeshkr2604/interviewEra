@@ -64,7 +64,21 @@ export function closeSharedInterviewAudioContext(): void {
 }
 
 /**
- * Release speaker/audio focus before Web Speech mic capture.
+ * Synchronous audio release — call in the same turn as recognition.start()
+ * so Chrome keeps the user-gesture activation chain intact.
+ */
+export function releaseAudioForMicCaptureSync(): void {
+  if (typeof window === 'undefined') return
+  if ('speechSynthesis' in window) {
+    try {
+      window.speechSynthesis.cancel()
+    } catch {
+      /* best-effort */
+    }
+  }
+}
+
+/**
  * Android Chrome often fails recognition.start() when ElevenLabs TTS or
  * speechSynthesis still holds the audio path.
  */
@@ -78,16 +92,10 @@ export async function releaseAudioForMicCapture(): Promise<void> {
     pwa: platform.pwa,
   })
 
-  if ('speechSynthesis' in window) {
-    try {
-      window.speechSynthesis.cancel()
-    } catch {
-      /* best-effort */
-    }
-  }
+  releaseAudioForMicCaptureSync()
 
   const ctx = getSharedInterviewAudioContext()
-  if (ctx && ctx.state === 'running') {
+  if (ctx && ctx.state === 'running' && isAndroidInterviewPlatform()) {
     try {
       await ctx.suspend()
       interviewFlowLog('audio', 'audiocontext_suspended_for_mic', { state: ctx.state })

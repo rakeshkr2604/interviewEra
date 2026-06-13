@@ -114,6 +114,7 @@ export const api = {
     const res = await fetchWithTimeout(url, {
       method: 'GET',
       timeoutMs: config?.timeoutMs ?? GET_TIMEOUT_MS,
+      credentials: 'include',
       headers: config?.headers,
       signal: config?.signal,
     })
@@ -137,6 +138,7 @@ export const api = {
     const res = await fetchWithTimeout(url, {
       method: 'POST',
       timeoutMs: config?.timeoutMs ?? POST_TIMEOUT_MS,
+      credentials: 'include',
       // For FormData, let the browser set Content-Type + boundary automatically.
       // For JSON, set Content-Type and merge any caller headers.
       headers: isFormData

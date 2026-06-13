@@ -33,7 +33,10 @@ export function isSavedVoiceMode(mode: InterviewInputMode): mode is SavedVoiceMo
 export function shouldOfferVoiceRecovery(draft: InterviewDraft, questionIndex: number): boolean {
   if (draft.questionIndex !== questionIndex) return false
   if (!isSavedVoiceMode(draft.inputMode)) return false
-  return draft.phase === 'candidate_answering'
+  if (draft.phase !== 'candidate_answering') return false
+  // Empty transcript — normal mic-start flow; skip resume banner noise.
+  if (!draft.transcript.trim()) return false
+  return true
 }
 
 export function buildVoiceRecoveryState(draft: InterviewDraft): VoiceRecoveryState {
@@ -48,9 +51,9 @@ export function buildVoiceRecoveryState(draft: InterviewDraft): VoiceRecoverySta
   }
 }
 
-/** Whether mic/STT must stay disarmed until the user explicitly resumes or chooses typing. */
+/** Whether mic/STT must stay disarmed during an in-flight resume gesture. */
 export function isVoiceRecoveryBlockingMic(state: VoiceRecoveryState): boolean {
-  return state.phase === 'pending' || state.phase === 'resuming'
+  return state.phase === 'resuming'
 }
 
 /** Structured console logs for production grep. */

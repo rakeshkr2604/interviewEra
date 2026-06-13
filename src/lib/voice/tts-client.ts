@@ -66,27 +66,35 @@ export class ProsodicTTS {
       } catch {
         parsedBody = null;
       }
+
+      const isSessionAuthFailure = parsedBody?.error === 'Unauthorized';
+      const shouldFallbackToBrowser =
+        parsedBody?.fallback === 'browser_tts' ||
+        response.status === 429 ||
+        response.status === 401 ||
+        response.status === 502;
+
+      if (shouldFallbackToBrowser) {
+        if (!isSessionAuthFailure) {
+          markElevenLabsBlockedForHttpStatus(
+            response.status,
+            parsedBody?.error ?? `TTS unavailable (${response.status})`,
+          );
+        }
+        console.warn(
+          '[TTS] Browser speech fallback:',
+          response.status,
+          parsedBody?.error ?? (rawBody || '(empty body)'),
+        );
+        throw new TTSFallbackToBrowserError(
+          response.status,
+          isSessionAuthFailure
+            ? 'Voice service needs a fresh login — using browser speech for now.'
+            : (parsedBody?.error ?? `TTS unavailable (${response.status})`),
+        );
+      }
+
       console.error('[TTS] Proxy error:', response.status, parsedBody ?? rawBody);
-      if (parsedBody?.fallback === 'browser_tts') {
-        markElevenLabsBlockedForHttpStatus(
-          response.status,
-          parsedBody.error ?? `TTS unavailable (${response.status})`,
-        );
-        throw new TTSFallbackToBrowserError(
-          response.status,
-          parsedBody.error ?? `TTS unavailable (${response.status})`,
-        );
-      }
-      if (response.status === 429 || response.status === 401) {
-        markElevenLabsBlockedForHttpStatus(
-          response.status,
-          parsedBody?.error ?? `TTS unavailable (${response.status})`,
-        );
-        throw new TTSFallbackToBrowserError(
-          response.status,
-          parsedBody?.error ?? `TTS unavailable (${response.status})`,
-        );
-      }
       throw new Error(`TTS failed (${response.status}): ${parsedBody?.error ?? rawBody}`);
     }
 
