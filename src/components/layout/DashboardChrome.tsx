@@ -174,7 +174,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
               isOnboarding
                 ? 'flex-1 px-4 sm:px-5 py-2 md:py-3 lg:py-1.5 lg:pt-2'
                 : isInterviewSession
-                  ? 'flex-1 p-0 max-lg:px-3 max-lg:py-2'
+                  ? 'flex-1 p-0'
                   : 'flex-1 px-4 sm:px-5 py-8 sm:py-10 md:py-12',
               isInterviewSession ? 'w-full min-w-0 max-w-none' : LANDING_PAGE_CONTAINER,
             )}

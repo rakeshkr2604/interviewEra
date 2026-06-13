@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { getCandidateCameraConstraints } from '@/lib/voice/camera-constraints'
 
 export type CandidateCameraStatus =
   | 'idle'
@@ -46,7 +47,7 @@ export function useCandidateCamera({
 
     void navigator.mediaDevices
       .getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+        video: getCandidateCameraConstraints(),
         audio: false,
       })
       .then((stream) => {

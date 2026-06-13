@@ -233,6 +233,17 @@ code, pre, .font-mono {
 }
 
 /** Interview session — panels flush to sidebar / column split (no outer lavender gaps). */
+@media (max-width: 1023px) {
+  .session-flush-panel.dashboard-premium-card {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .session-video-strip {
+    min-height: min(36dvh, 280px);
+  }
+}
+
 @media (min-width: 1024px) {
   .session-flush-panel.dashboard-premium-card {
     border-radius: 0;

@@ -2448,6 +2448,78 @@ export default function InterviewSessionPage() {
     inputMode === 'deepgram' &&
     dgVoiceShowActions
 
+  const interviewModeLabel =
+    interviewData.questions[0]?.category === 'technical' ? 'Technical' : 'HR'
+
+  const renderProgressRing = (timerSize: number) => {
+    const idleSize = `${timerSize}px`
+    if (phase === 'candidate_answering' && answerTimerArmed) {
+      return (
+        <TimerCircle
+          timeLeft={timeLeft}
+          totalTime={answerTimeBudget}
+          size={timerSize}
+        />
+      )
+    }
+    if (phase === 'candidate_answering') {
+      return (
+        <div
+          className="flex items-center justify-center rounded-full border-2 border-(--bg-tertiary)"
+          style={{ width: idleSize, height: idleSize }}
+        >
+          <span className="px-1 text-center text-[10px] leading-tight text-(--text-muted)">
+            Your turn
+          </span>
+        </div>
+      )
+    }
+    return (
+      <div
+        className="flex items-center justify-center rounded-full border-2 border-(--bg-tertiary)"
+        style={{ width: idleSize, height: idleSize }}
+      >
+        <span className="px-1 text-center text-[10px] leading-tight text-(--text-muted)">
+          {progressRingLabel(phase, { speakingProgressPct })}
+        </span>
+      </div>
+    )
+  }
+
+  const sessionExitButton = (
+    <button
+      type="button"
+      onClick={() => {
+        if (window.confirm('Exit this interview? Your progress on this question will be lost.')) {
+          router.push('/dashboard')
+        }
+      }}
+      className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 sm:px-3"
+      style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
+      aria-label="Exit interview"
+    >
+      <X className="h-3.5 w-3.5" aria-hidden />
+      <span className="hidden sm:inline">Exit</span>
+    </button>
+  )
+
+  const questionProgressMeter = (barClassName = 'w-full') => (
+    <div className={barClassName}>
+      <div className="mb-0.5 flex justify-between gap-2 text-[10px] text-(--text-muted)">
+        <span className="min-w-0 truncate tabular-nums">
+          Question {currentIndex + 1} of {renderTotalQuestions}
+        </span>
+        <span className="shrink-0 tabular-nums">{sessionProgressPct}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-(--bg-tertiary)">
+        <div
+          className="h-full rounded-full bg-(--accent-primary) transition-all duration-500"
+          style={{ width: `${sessionProgressPct}%` }}
+        />
+      </div>
+    </div>
+  )
+
   return (
     <>
       <div
@@ -2456,104 +2528,87 @@ export default function InterviewSessionPage() {
       >
 
         {/* ── Top Bar ── */}
-        <div className="grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-(--card-border)/50 px-3 py-2 sm:gap-3 lg:px-3">
-          <div className="min-w-0 space-y-0.5">
-            <p className="text-[10px] font-semibold uppercase tracking-widest
-                          text-(--text-muted)">
-              INTERVIEW SESSION
-            </p>
-            <h1 className="text-lg font-bold text-(--text-primary) sm:text-xl">
-              Focus Mode
-            </h1>
-            <p className="text-[11px] text-(--text-secondary)">
-              Mode: {interviewData.questions[0]?.category === 'technical' ? 'Technical' : 'HR'}&nbsp;·&nbsp;
-              Skips used: {skipCount} / {MAX_SKIPS}
-            </p>
-          </div>
+        <div className="shrink-0 border-b border-(--card-border)/50 bg-(--card-bg)/90 backdrop-blur-sm">
 
-          {/* Timer — centered */}
-          <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
-            <span className="text-xs font-semibold text-(--text-secondary) sm:text-sm">
-              Progress :
-            </span>
-            <div className="shrink-0">
-              {phase === 'candidate_answering' && answerTimerArmed ? (
-                <TimerCircle
-                  timeLeft={timeLeft}
-                  totalTime={answerTimeBudget}
-                  size={72}
-                />
-              ) : phase === 'candidate_answering' ? (
-                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 border-(--bg-tertiary)">
-                  <span className="text-xs text-(--text-muted) text-center leading-tight px-1.5">
-                    Your turn
-                  </span>
-                </div>
-              ) : (
-                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 border-(--bg-tertiary)">
-                  <span className="text-xs text-(--text-muted) text-center leading-tight px-1.5">
-                    {progressRingLabel(phase, { speakingProgressPct })}
-                  </span>
-                </div>
-              )}
+          {/* Mobile / tablet — stacked rows (no column overlap on narrow PWA) */}
+          <div className="flex flex-col gap-2.5 px-3 py-2.5 lg:hidden">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                  INTERVIEW SESSION
+                </p>
+                <h1 className="text-base font-bold text-(--text-primary) sm:text-lg">
+                  Focus Mode
+                </h1>
+                <p className="truncate text-[10px] text-(--text-secondary) sm:text-[11px]">
+                  Mode: {interviewModeLabel}&nbsp;·&nbsp;Skips used: {skipCount} / {MAX_SKIPS}
+                </p>
+              </div>
+              {sessionExitButton}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-1.5">
+                <span className="text-[10px] font-semibold text-(--text-secondary) sm:text-xs">
+                  Progress
+                </span>
+                {renderProgressRing(52)}
+              </div>
+              <div className="min-w-0 flex-1">{questionProgressMeter()}</div>
             </div>
           </div>
 
-          {/* Progress bar + Exit — right */}
-          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
-            <div className="w-24 sm:w-28 xl:w-36">
-              <div className="flex justify-between text-[10px] text-(--text-muted) mb-0.5">
-                <span>Question {currentIndex + 1} of {renderTotalQuestions}</span>
-                <span>{sessionProgressPct}%</span>
-              </div>
-              <div className="h-1.5 w-full rounded-full bg-(--bg-tertiary)">
-                <div
-                  className="h-full rounded-full bg-(--accent-primary) transition-all duration-500"
-                  style={{ width: `${sessionProgressPct}%` }}
-                />
-              </div>
+          {/* Desktop — three-column header */}
+          <div className="hidden w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-3 py-2 lg:grid">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                INTERVIEW SESSION
+              </p>
+              <h1 className="text-lg font-bold text-(--text-primary) sm:text-xl">
+                Focus Mode
+              </h1>
+              <p className="text-[11px] text-(--text-secondary)">
+                Mode: {interviewModeLabel}&nbsp;·&nbsp;Skips used: {skipCount} / {MAX_SKIPS}
+              </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('Exit this interview? Your progress on this question will be lost.')) {
-                  router.push('/dashboard');
-                }
-              }}
-              className="flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-red-50 hover:border-red-300 hover:text-red-600"
-              style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
-              aria-label="Exit interview"
-            >
-              <X className="h-3.5 w-3.5" aria-hidden />
-              Exit
-            </button>
+            <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
+              <span className="text-xs font-semibold text-(--text-secondary) sm:text-sm">
+                Progress :
+              </span>
+              {renderProgressRing(72)}
+            </div>
+
+            <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
+              <div className="w-24 sm:w-28 xl:w-36">{questionProgressMeter()}</div>
+              {sessionExitButton}
+            </div>
           </div>
         </div>
 
-        {/* ── Main Layout: Left (Avatar) + Right (Answer) ── */}
-        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[min(340px,100%)_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)] lg:divide-x lg:divide-(--card-border)/60">
+        {/* ── Main Layout: Videos + Answer ── */}
+        <div className="grid min-h-0 min-w-0 flex-1 grid-rows-[auto_minmax(0,1fr)] gap-0 overflow-hidden max-lg:overflow-y-auto lg:grid-cols-[min(340px,100%)_minmax(0,1fr)] lg:grid-rows-1 xl:grid-cols-[380px_minmax(0,1fr)] lg:divide-x lg:divide-(--card-border)/60">
 
-          {/* ── LEFT: Interviewer + Candidate (50/50) ── */}
-          <div className="flex min-h-0 flex-col divide-y divide-(--card-border)/60 overflow-hidden">
+          {/* ── Video strip: side-by-side on phone, stacked on desktop ── */}
+          <div className="session-video-strip flex min-h-0 shrink-0 flex-row divide-x divide-(--card-border)/60 overflow-hidden max-lg:max-h-[min(36dvh,280px)] lg:max-h-none lg:flex-col lg:divide-x-0 lg:divide-y">
 
-            {/* Interviewer — top half */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* Interviewer */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="session-flush-panel dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden">
-                <div className="flex shrink-0 items-center justify-between border-b border-(--card-border) px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-(--accent-primary)">
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
-                      AI Interviewer
+                <div className="flex shrink-0 items-center justify-between border-b border-(--card-border) px-2 py-2 sm:px-3 sm:py-2.5">
+                  <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-(--accent-primary) sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]">
+                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-(--accent-primary)" />
+                      <span className="truncate">AI Interviewer</span>
                     </span>
                     {audioActuallyStarted && (
-                      <span className="flex items-center gap-1 rounded-full bg-(--accent-primary)/15 px-2 py-0.5 text-[10px] font-semibold text-(--accent-primary)">
+                      <span className="hidden items-center gap-1 rounded-full bg-(--accent-primary)/15 px-2 py-0.5 text-[10px] font-semibold text-(--accent-primary) sm:flex">
                         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
                         Speaking
                       </span>
                     )}
                   </div>
-                  <span className="text-xs font-semibold tabular-nums text-(--text-secondary)">
+                  <span className="shrink-0 text-[10px] font-semibold tabular-nums text-(--text-secondary) sm:text-xs">
                     {avatarHeaderLabel}
                   </span>
                 </div>
@@ -2608,14 +2663,14 @@ export default function InterviewSessionPage() {
                   )}
                 </div>
 
-                <p className="shrink-0 border-t border-(--card-border)/60 px-4 py-2 text-[11px] text-(--text-secondary)">
+                <p className="hidden shrink-0 border-t border-(--card-border)/60 px-4 py-2 text-[11px] text-(--text-secondary) lg:block">
                   Interviewer: {resolvedInterviewer?.name ?? 'Priya'}
                 </p>
               </div>
             </div>
 
-            {/* Candidate — bottom half */}
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            {/* Candidate */}
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <CandidatePreview
                 cameraActive={
                   phase === 'candidate_answering' ||
