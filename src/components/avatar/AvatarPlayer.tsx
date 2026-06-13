@@ -13,8 +13,8 @@ interface AvatarPlayerProps {
   isSpeaking: boolean
   className?: string
   telemetryCtx?: InterviewTelemetryContext
-  /** How video/image fill the frame — use `contain` to avoid cropping heads. */
-  objectFit?: 'cover' | 'contain'
+  /** How video/image fill the frame — `responsive` = cover on mobile, contain on desktop. */
+  objectFit?: 'cover' | 'contain' | 'responsive'
   /** When true, player stretches to parent height (session sidebar layout). */
   fillContainer?: boolean
 }
@@ -27,7 +27,12 @@ export function AvatarPlayer({
   objectFit = 'cover',
   fillContainer = false,
 }: AvatarPlayerProps) {
-  const fitClass = objectFit === 'contain' ? 'object-contain' : 'object-cover'
+  const fitClass =
+    objectFit === 'responsive'
+      ? 'object-cover object-[center_22%] lg:object-contain lg:object-center'
+      : objectFit === 'contain'
+        ? 'object-contain object-center'
+        : 'object-cover object-center'
   const interviewer = getInterviewerById(interviewerId)
   const videoSrc = interviewer?.video ?? ''
   const avatarImageSrc = interviewer?.avatarImage ?? '/default-avatar.png'

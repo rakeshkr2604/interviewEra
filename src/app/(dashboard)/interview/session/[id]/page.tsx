@@ -2619,7 +2619,7 @@ export default function InterviewSessionPage() {
                     interviewerId={resolvedInterviewerId as InterviewerId}
                     isSpeaking={audioActuallyStarted}
                     telemetryCtx={telemetryCtx}
-                    objectFit="contain"
+                    objectFit="responsive"
                     fillContainer
                     className="bg-(--bg-secondary)"
                   />
