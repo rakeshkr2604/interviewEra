@@ -232,6 +232,16 @@ code, pre, .font-mono {
   }
 }
 
+/** Interview session — panels flush to sidebar / column split (no outer lavender gaps). */
+@media (min-width: 1024px) {
+  .session-flush-panel.dashboard-premium-card {
+    border-radius: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    box-shadow: none;
+  }
+}
+
 /** Badges / popovers that extend outside the card shell (e.g. pricing “Most popular”) */
 .dashboard-premium-card.dashboard-premium-card--overflow-visible {
   overflow: visible;

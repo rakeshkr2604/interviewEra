@@ -8,9 +8,11 @@ interface TimerCircleProps {
 
 export function TimerCircle({ timeLeft, totalTime, size = 80 }: TimerCircleProps) {
   const percentage = (timeLeft / totalTime) * 100
-  const radius = (size - 8) / 2
+  const strokeWidth = size >= 68 ? 7 : 6
+  const radius = (size - strokeWidth * 2) / 2
   const circumference = 2 * Math.PI * radius
   const strokeDashoffset = circumference - (percentage / 100) * circumference
+  const innerFontPx = Math.max(15, Math.round(size * 0.24))
 
   const color =
     percentage > 50 ? 'var(--accent-success)'
@@ -23,19 +25,21 @@ export function TimerCircle({ timeLeft, totalTime, size = 80 }: TimerCircleProps
       <svg width={size} height={size} className="-rotate-90">
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke="var(--bg-tertiary)" strokeWidth={6}
+          fill="none" stroke="var(--bg-tertiary)" strokeWidth={strokeWidth}
         />
         <circle
           cx={size / 2} cy={size / 2} r={radius}
-          fill="none" stroke={color} strokeWidth={6}
+          fill="none" stroke={color} strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease' }}
         />
       </svg>
-      <span className="absolute text-sm font-bold"
-            style={{ color }}>
+      <span
+        className="absolute font-bold tabular-nums leading-none"
+        style={{ color, fontSize: innerFontPx }}
+      >
         {timeLeft}s
       </span>
     </div>

@@ -28,6 +28,8 @@ interface UseInterviewVoiceUiParams {
   isMicSupported: boolean
   permissionState: 'unknown' | 'granted' | 'denied' | 'requesting' | 'prompt'
   recognitionState: 'idle' | 'starting' | 'active' | 'stopped'
+  /** Web Speech capture session is open (includes armed restart gaps). */
+  isListening?: boolean
   micError: string | null
   webSpeechActive: boolean
   dgListening: boolean
@@ -49,6 +51,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     isMicSupported,
     permissionState,
     recognitionState,
+    isListening = false,
     micError,
     webSpeechActive,
     dgListening,
@@ -120,6 +123,23 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
         label: 'Voice connection lost. Tap Retry Mic.',
         canRetry: true,
         showListeningIndicator: false,
+      }
+    }
+
+    if (
+      sessionPhase === 'candidate_answering' &&
+      inputMode === 'voice' &&
+      micArmed &&
+      isListening &&
+      permissionState === 'granted' &&
+      !userMicMuted
+    ) {
+      const live = recognitionState === 'active'
+      return {
+        phase: live ? 'listening' : 'starting_microphone',
+        label: live ? 'Listening…' : 'Getting microphone ready…',
+        canRetry: true,
+        showListeningIndicator: live,
       }
     }
 
@@ -236,6 +256,7 @@ export function useInterviewVoiceUi(params: UseInterviewVoiceUiParams): VoiceUiS
     isMicSupported,
     permissionState,
     recognitionState,
+    isListening,
     micError,
     webSpeechActive,
     dgListening,

@@ -180,10 +180,11 @@ export interface UseSpeechRecognitionReturn {
 // Silence restarts (browser onend after a pause) use a short delay so the mic
 // feels continuous; error restarts keep a longer cooldown to prevent storms.
 const RESTART_COOLDOWN_SILENCE_MS = 400;
-const RESTART_COOLDOWN_ARMED_MS = 1_200;
+const RESTART_COOLDOWN_ARMED_MS = 250;
 const RESTART_COOLDOWN_ERROR_MS = 3_000;
 const RESTART_DELAY_SILENCE_MS = RESTART_COOLDOWN_SILENCE_MS;
-const RESTART_DELAY_ARMED_MS = 1_500;
+/** Armed answer window — restart quickly after browser onend (pause between phrases). */
+const RESTART_DELAY_ARMED_MS = 50;
 const RESTART_DELAY_ERROR_MS = RESTART_COOLDOWN_ERROR_MS;
 /** Consecutive no-speech errors with zero transcript before surfacing mic help. */
 const ARMED_NO_SPEECH_STREAK_HINT = 8;
@@ -194,6 +195,10 @@ const DEFAULT_SILENCE_WINDOW_MS = 8_000;
 /** Max failed start()/permission recovery attempts per question — silence restarts are unlimited. */
 const MAX_ERROR_RESTARTS_PER_QUESTION = 3;
 const STARTING_STALL_RECOVERY_MS = 12_000;
+/** Armed answer — recover faster when onstart never fires. */
+const STARTING_STALL_RECOVERY_ARMED_MS = 4_000;
+/** Armed + active but zero transcript — silent pipeline rebuild. */
+const ACTIVE_NO_TRANSCRIPT_ARMED_MS = 6_000;
 
 // ── Failsafe-recovery / restart-storm tuning ──────────────────────────────
 // Watchdog: if `recognitionState` stays at 'active' but no transcript event
@@ -268,6 +273,8 @@ export function useSpeechRecognition(
   const finalTranscriptRef = useRef<string>('');
   const interimRef = useRef<string>('');
   const lastSpeechAtRef = useRef<number>(0);
+  /** Updated only when transcript refs gain text — used for silent-pipeline recovery. */
+  const lastTranscriptAtRef = useRef<number>(0);
   const lastResultHashRef = useRef<string>('');
 
   // Render mirrors of the refs. Updated synchronously with each ref mutation
@@ -360,6 +367,13 @@ export function useSpeechRecognition(
     if (!finalized) return interim;
     if (!interim) return finalized;
     return `${finalized} ${interim}`;
+  }, []);
+
+  const hasTranscriptContent = useCallback((): boolean => {
+    return (
+      finalTranscriptRef.current.trim().length > 0 ||
+      interimRef.current.trim().length > 0
+    );
   }, []);
 
   const hasRecentSpeech = useCallback((windowMs: number = DEFAULT_SILENCE_WINDOW_MS): boolean => {
@@ -463,12 +477,15 @@ export function useSpeechRecognition(
   }, []);
 
   const maybeFireWebSpeechStalled = useCallback((streak: number) => {
+    // Never auto-fallback mid-answer — switching engines stops Web Speech and
+    // feels like the mic "gave up" while the candidate is still speaking.
+    if (isAnswerMicArmed()) return;
     if (streak < WEB_SPEECH_STALL_FALLBACK_STREAK) return;
     if (webSpeechStalledFiredRef.current) return;
     webSpeechStalledFiredRef.current = true;
     voiceDebug('web_speech_stalled', { no_speech_streak: streak });
     onWebSpeechStalledRef.current?.({ noSpeechStreak: streak });
-  }, []);
+  }, [isAnswerMicArmed]);
 
   const clearRecognitionFailure = useCallback(() => {
     errorRestartCountThisQuestionRef.current = 0;
@@ -668,8 +685,10 @@ export function useSpeechRecognition(
       setRecognitionState('active');
     } else if (isAnswerMicArmed()) {
       setRecognitionState('starting');
+      startingSinceRef.current = Date.now();
     } else if (recognitionStateRef.current !== 'active') {
       setRecognitionState('starting');
+      startingSinceRef.current = Date.now();
     }
 
     const recognition = new Cls();
@@ -753,7 +772,9 @@ export function useSpeechRecognition(
       armedNoSpeechStreakRef.current = 0;
       setCapturing(true);
       setRecognitionState('active');
-      lastSpeechAtRef.current = Date.now();
+      // Do not bump lastSpeechAt here — only real transcript events count for
+      // "recent speech" and stuck recovery. onspeechstart alone can fire while
+      // the audio pipeline delivers zero onresult events (Chrome/Edge silent STT).
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -775,8 +796,21 @@ export function useSpeechRecognition(
       let interimChunk = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const r = event.results[i];
-        if (r.isFinal) finalChunk += r[0].transcript;
-        else interimChunk += r[0].transcript;
+        const piece = r[0]?.transcript ?? '';
+        if (r.isFinal) finalChunk += piece;
+        else interimChunk += piece;
+      }
+
+      // Chromium sometimes reports a stale resultIndex with text only at index 0
+      // or the last slot — recover so speech is not dropped while "Listening…".
+      if (!finalChunk.trim() && !interimChunk.trim() && event.results.length > 0) {
+        for (let i = 0; i < event.results.length; i++) {
+          const r = event.results[i];
+          const piece = r[0]?.transcript ?? '';
+          if (!piece.trim()) continue;
+          if (r.isFinal) finalChunk += piece;
+          else interimChunk = piece;
+        }
       }
 
       const eventHash = sttResultEventHash(finalChunk, interimChunk);
@@ -852,6 +886,8 @@ export function useSpeechRecognition(
         setCapturing(true);
         setRecognitionState('active');
         startingSinceRef.current = 0;
+        lastTranscriptAtRef.current = now;
+        lastSpeechAtRef.current = now;
         emitStt('stt_onresult', {
           sessionId: myGen,
           has_final: Boolean(finalChunk),
@@ -899,10 +935,10 @@ export function useSpeechRecognition(
       // handle recovery, don't surface them as red errors to the user.
       if (event.error === 'no-speech') {
         log('benign_error', { error: 'no-speech' });
-        if (
-          finalTranscriptRef.current.length === 0 &&
-          interimRef.current.trim().length === 0
-        ) {
+        const hasLiveText =
+          finalTranscriptRef.current.length > 0 ||
+          interimRef.current.trim().length > 0;
+        if (!hasLiveText) {
           armedNoSpeechStreakRef.current += 1;
           maybeFireWebSpeechStalled(armedNoSpeechStreakRef.current);
           if (
@@ -913,6 +949,9 @@ export function useSpeechRecognition(
               'Microphone is open but not picking up speech. Check Windows sound settings (input device + level), or use AI Voice / Type answer.',
             );
           }
+        } else if (isAnswerMicArmed()) {
+          // Pause between phrases — keep streak cleared so we never fallback mid-answer.
+          armedNoSpeechStreakRef.current = 0;
         }
         if (!isAnswerMicArmed()) {
           recognition.stop();
@@ -1012,6 +1051,8 @@ export function useSpeechRecognition(
         const promoted = mergeFinalTranscript(finalTranscriptRef.current, pendingInterim);
         if (promoted.action !== 'ignore') {
           finalTranscriptRef.current = promoted.text;
+          lastTranscriptAtRef.current = Date.now();
+          lastSpeechAtRef.current = Date.now();
         }
         voiceDebug('interim_promoted_on_end', {
           gen: myGen,
@@ -1247,6 +1288,7 @@ export function useSpeechRecognition(
     finalTranscriptRef.current = '';
     interimRef.current = '';
     lastSpeechAtRef.current = 0;
+    lastTranscriptAtRef.current = 0;
     lastResultHashRef.current = '';
     syncRender();
     voiceDebug('transcript_reset', {});
@@ -1259,6 +1301,7 @@ export function useSpeechRecognition(
       finalTranscriptRef.current = trimmed;
       interimRef.current = '';
       lastSpeechAtRef.current = trimmed ? Date.now() : 0;
+      lastTranscriptAtRef.current = trimmed ? Date.now() : 0;
       lastResultHashRef.current = '';
       syncRender();
       voiceDebug('transcript_restored', { chars: trimmed.length });
@@ -1371,20 +1414,30 @@ export function useSpeechRecognition(
     return () => clearInterval(iv);
   }, [recognitionState, tryScheduleAutoRestart, keepArmedDuringAnswerRef, isAnswerMicArmed]);
 
-  // Android often reaches onstart but delays first onresult — rebuild without
-  // consuming the error-restart budget so thinking pauses up to 60s stay valid.
-  // Skipped during armed answer window — mic stays ON; silence is expected.
+  // Android often reaches onstart but delays (or never delivers) first onresult.
+  // Do NOT skip recovery just because isCapturing is true — onstart sets that
+  // flag before any transcript exists, which previously stranded "Listening…"
+  // with an empty answer box for the entire question.
   useEffect(() => {
     if (recognitionState !== 'starting') return;
 
     const iv = setInterval(() => {
       if (recognitionStateRef.current !== 'starting') return;
-      if (isCapturingRef.current) return;
       if (!shouldListenRef.current || !mountedRef.current) return;
       if (pendingRestartRef.current) return;
+      if (hasTranscriptContent()) return;
+
       const since = startingSinceRef.current ? Date.now() - startingSinceRef.current : 0;
-      if (since < STARTING_STALL_RECOVERY_MS) return;
-      voiceDebug('starting_stall_recovery', { elapsed_ms: since, armed: isAnswerMicArmed() });
+      const stallMs = isAnswerMicArmed()
+        ? STARTING_STALL_RECOVERY_ARMED_MS
+        : STARTING_STALL_RECOVERY_MS;
+      if (since < stallMs) return;
+
+      voiceDebug('starting_stall_recovery', {
+        elapsed_ms: since,
+        armed: isAnswerMicArmed(),
+        capturing: isCapturingRef.current,
+      });
       emitStt('stt_restart_attempt', {
         source: 'starting_stall_recovery',
         kind: 'silence',
@@ -1395,7 +1448,38 @@ export function useSpeechRecognition(
     }, 3_000);
 
     return () => clearInterval(iv);
-  }, [recognitionState, emitStt, tryScheduleAutoRestart, isAnswerMicArmed]);
+  }, [recognitionState, emitStt, tryScheduleAutoRestart, isAnswerMicArmed, hasTranscriptContent]);
+
+  // Armed answer window: mic shows "Listening…" (active) but browser STT never
+  // delivers onresult — rebuild the recognition instance silently.
+  useEffect(() => {
+    if (recognitionState !== 'active') return;
+    if (!isAnswerMicArmed()) return;
+
+    const iv = setInterval(() => {
+      if (recognitionStateRef.current !== 'active') return;
+      if (!shouldListenRef.current || !mountedRef.current) return;
+      if (!isAnswerMicArmed()) return;
+      if (pendingRestartRef.current) return;
+      if (hasTranscriptContent()) return;
+
+      const anchor = startingSinceRef.current || lastTranscriptAtRef.current;
+      if (!anchor) return;
+      const elapsed = Date.now() - anchor;
+      if (elapsed < ACTIVE_NO_TRANSCRIPT_ARMED_MS) return;
+
+      voiceDebug('active_no_transcript_recovery', { elapsed_ms: elapsed });
+      emitStt('stt_restart_attempt', {
+        source: 'active_no_transcript_recovery',
+        kind: 'silence',
+        sessionId: generationRef.current,
+        elapsedMs: elapsed,
+      });
+      tryScheduleAutoRestart('active_no_transcript_recovery', generationRef.current, 'silence');
+    }, 2_000);
+
+    return () => clearInterval(iv);
+  }, [recognitionState, emitStt, tryScheduleAutoRestart, isAnswerMicArmed, hasTranscriptContent]);
 
   // ── StrictMode remount fix ───────────────────────────────────────────────
   // React StrictMode (dev) performs a mount → unmount → remount cycle. The

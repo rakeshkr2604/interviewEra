@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { AvatarPlayer } from '@/components/avatar/AvatarPlayer'
 import { CaptionDisplay } from '@/components/avatar/CaptionDisplay'
 import { CandidateTranscript } from '@/components/interview/CandidateTranscript'
+import { CandidatePreview } from '@/components/interview/CandidatePreview'
 import { TimerCircle } from '@/components/interview/TimerCircle'
 import { FillerWordBadge } from '@/components/interview/FillerWordBadge'
 import { useAvatarSync } from '@/hooks/useAvatarSync'
@@ -49,7 +50,6 @@ import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
 import { releaseAudioForMicCapture, resumeSharedInterviewAudioContext } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
-import { SttInputDebugPanel } from '@/components/debug/SttInputDebugPanel'
 import { useInterviewMicSession } from '@/hooks/useInterviewMicSession'
 import { useInterviewPrepare } from '@/hooks/useInterviewPrepare'
 import { trackFunnelEvent } from '@/lib/analytics/funnel'
@@ -236,7 +236,7 @@ export default function InterviewSessionPage() {
   const [answerStartTime, setAnswerStartTime] = useState<number>(0)
   const [fetchError, setFetchError] = useState('')
   const [manualAnswer, setManualAnswer] = useState('')
-  const [showStuckEscape, setShowStuckEscape] = useState(false)
+  const [showEmptyWarning, setShowEmptyWarning] = useState(false)
   const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>(() => {
     if (typeof window === 'undefined') return 'voice'
     return resolvePreferredVoiceInputMode()
@@ -496,6 +496,8 @@ export default function InterviewSessionPage() {
   const handleSwitchToAiVoiceRef = useRef<(source: string) => Promise<void>>(async () => {})
   const onWebSpeechStalled = useCallback((payload: { noSpeechStreak: number }) => {
     track('VOICE', 'web_speech_stalled', { streak: payload.noSpeechStreak })
+    // Mid-answer: keep Web Speech running; user can switch via "Use AI Voice" manually.
+    if (phaseRef.current === 'candidate_answering') return
     void handleSwitchToAiVoiceRef.current('web_speech_stalled')
   }, [track])
   const [userMicMuted, setUserMicMuted] = useState(false)
@@ -582,9 +584,11 @@ export default function InterviewSessionPage() {
   const recognitionStateRef = useRef(recognitionState)
   const permissionStateRef = useRef(permissionState)
   const micErrorRef = useRef(micError)
+  const isListeningRef = useRef(isListening)
   recognitionStateRef.current = recognitionState
   permissionStateRef.current = permissionState
   micErrorRef.current = micError
+  isListeningRef.current = isListening
 
   useEffect(() => {
     dgTranscriptRef.current = dgTranscript
@@ -620,14 +624,14 @@ export default function InterviewSessionPage() {
     return () => clearInterval(iv)
   }, [dgIsRecording])
 
-  // Display-only merge of finalized + interim. The submit handler does NOT
-  // read this — it calls getMergedTranscript() directly so it sees the
-  // latest refs (no stale-closure race with the last interim).
+  // Display-only merge of finalized + interim. Submit eligibility uses the same
+  // authoritative union as resolveSubmittedText() so the button state always
+  // matches what the user sees in the answer panel.
   const answerText = inputMode === 'deepgram'
-    ? dgTranscript.trim()
+    ? (dgTranscript.trim() || dgInterim.trim())
     : useManualInput
       ? manualAnswer.trim()
-      : (transcript + ' ' + interimTranscript).trim()
+      : (getMergedTranscript().trim() || (transcript + ' ' + interimTranscript).trim())
 
   const manualAnswerGrowEnabled = phase === 'candidate_answering' && useManualInput
   const manualAnswerRef = useAutoGrowTextarea(manualAnswer, manualAnswerGrowEnabled)
@@ -1100,6 +1104,18 @@ export default function InterviewSessionPage() {
         interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_avatar_finished' })
         trackMicTelemetry('mic_started', telemetryCtx, { mode: 'deepgram' })
         void startDgListeningRef.current()
+      } else if (
+        inputMode === 'voice' &&
+        isMicSupported &&
+        !useManualInputRef.current &&
+        permissionState !== 'denied'
+      ) {
+        voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'voice' })
+        interviewStartupLog('listening_started', { mode: 'voice', source: 'post_avatar_finished' })
+        trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech' })
+        clearStormBudgetForAnswer()
+        clearRecognitionFailure()
+        void startListeningRef.current()
       } else {
         interviewStartupLog('listening_skipped', {
           mode: inputMode,
@@ -1118,8 +1134,20 @@ export default function InterviewSessionPage() {
       clearStormBudgetForAnswer,
       permissionState,
       voiceRecovery.isBlockingMic,
+      clearRecognitionFailure,
     ],
   )
+
+  // Fresh interviewer turn — never carry mute state from the previous answer.
+  useEffect(() => {
+    if (
+      phase === 'avatar_speaking' ||
+      phase === 'awaiting_audio_unlock' ||
+      phase === 'avatar_finished'
+    ) {
+      setUserMicMuted(false)
+    }
+  }, [phase, currentIndex])
 
   useEffect(() => {
     if (phase === 'candidate_answering' && permissionState === 'denied') {
@@ -1155,6 +1183,14 @@ export default function InterviewSessionPage() {
     if (!webSpeechActive) return
     armAnswerTimer('web_speech_active')
   }, [phase, inputMode, useManualInput, webSpeechActive, armAnswerTimer])
+
+  // Start countdown once the mic session opens (onstart), even before first word.
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'voice' || useManualInput) return
+    if (!isListening || userMicMuted) return
+    armAnswerTimer('web_speech_onstart')
+  }, [phase, inputMode, useManualInput, isListening, userMicMuted, armAnswerTimer])
 
   useEffect(() => {
     if (phase !== 'candidate_answering') return
@@ -1272,6 +1308,7 @@ export default function InterviewSessionPage() {
     permissionState,
     recognitionState,
     micError,
+    isListening,
     webSpeechActive,
     dgListening,
     sessionPhase: phase,
@@ -1566,6 +1603,51 @@ export default function InterviewSessionPage() {
     startListeningRef.current = startListening
   }, [startDgListening, startListening])
 
+  // If post-avatar auto-start did not reach active capture, retry quietly.
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'voice' || useManualInput || userMicMuted) return
+    if (permissionState === 'denied') return
+
+    const attemptBootstrap = (source: string) => {
+      if (phaseRef.current !== 'candidate_answering') return
+      if (userMicMutedRef.current || useManualInputRef.current) return
+      const state = recognitionStateRef.current
+      if (state === 'active') {
+        if (getMergedTranscript().trim().length > 0) return
+      } else if (state === 'starting' && isListeningRef.current) {
+        return
+      }
+
+      voiceDebug('mic_bootstrap_retry', { source, state })
+      if (state === 'starting' && !isListeningRef.current) {
+        stopListening('bootstrap_stuck_starting')
+      }
+      clearStormBudgetForAnswer()
+      clearRecognitionFailure()
+      void startListeningRef.current()
+    }
+
+    const t1 = window.setTimeout(() => attemptBootstrap('bootstrap_1_5s'), 1500)
+    const t2 = window.setTimeout(() => attemptBootstrap('bootstrap_4s'), 4000)
+
+    return () => {
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [
+    phase,
+    currentIndex,
+    inputMode,
+    useManualInput,
+    userMicMuted,
+    permissionState,
+    stopListening,
+    clearStormBudgetForAnswer,
+    clearRecognitionFailure,
+    getMergedTranscript,
+  ])
+
   const handleSwitchToAiVoice = useCallback(async (source: string) => {
     if (phaseRef.current !== 'candidate_answering') return
     webSpeechFallbackLockedRef.current = true
@@ -1577,7 +1659,6 @@ export default function InterviewSessionPage() {
     clearRecognitionFailure()
     setInputMode('deepgram')
     setUserMicMuted(false)
-    setShowStuckEscape(false)
     await startDgListeningRef.current({ preserveTranscript: true })
   }, [
     stopListening,
@@ -2004,54 +2085,10 @@ export default function InterviewSessionPage() {
   }, [phase, pendingFollowUp])
 
   // ─── Empty-submit warning ─────────────────────────────────
-  const [showEmptyWarning, setShowEmptyWarning] = useState(false)
   // Auto-dismiss once the user starts speaking again
   useEffect(() => {
     if (showEmptyWarning && answerText) setShowEmptyWarning(false)
   }, [showEmptyWarning, answerText])
-
-  // ─── Safety fallback: surface a manual escape if the candidate is in
-  // candidate_answering and no speech has been observed for SILENCE_WINDOW.
-  // Polls hasRecentSpeech (ref-based, no React state lag) every 2s rather
-  // than relying on a single wall-clock timer that misses ongoing speech.
-  const SILENCE_WINDOW_MS = 8000
-  useEffect(() => {
-    setShowStuckEscape(false)
-    if (phase !== 'candidate_answering') return
-    if (inputMode === 'deepgram') {
-      const t = setTimeout(() => setShowStuckEscape(true), 15000)
-      return () => clearTimeout(t)
-    }
-    const iv = setInterval(() => {
-      const noSpeech = !hasRecentSpeech(SILENCE_WINDOW_MS) && !answerText.trim()
-      if (inputMode === 'voice' && isListening && noSpeech) {
-        setShowStuckEscape(true)
-        return
-      }
-      if (inputMode === 'voice' && micArmed && !isListening && noSpeech) {
-        const elapsedMs = Date.now() - answerStartTime
-        if (elapsedMs >= SILENCE_WINDOW_MS) setShowStuckEscape(true)
-        return
-      }
-      if (recognitionFailed || micFailed) {
-        if (noSpeech) setShowStuckEscape(true)
-      }
-    }, 2000)
-    return () => clearInterval(iv)
-  }, [
-    phase,
-    currentIndex,
-    pendingFollowUp,
-    answerText,
-    inputMode,
-    hasRecentSpeech,
-    micArmed,
-    recognitionFailed,
-    micFailed,
-    isListening,
-    recognitionState,
-    answerStartTime,
-  ])
 
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
@@ -2171,6 +2208,9 @@ export default function InterviewSessionPage() {
     clearStormBudgetForAnswer()
     clearRecognitionFailure()
     trackMicTelemetry('mic_started', telemetryCtx, { mode: 'web_speech', source: 'user_tap' })
+    if (recognitionState === 'starting' && !isListening) {
+      stopListening('user_retry_stuck_starting')
+    }
     const ok = startListeningFromUserGesture()
     if (ok && voiceRecovery.isActive) {
       voiceRecovery.markSuccess()
@@ -2189,7 +2229,11 @@ export default function InterviewSessionPage() {
     voiceDebug('start_listening_triggered', { source: 'toggle_mic_on' })
     setUserMicMuted(false)
     clearStormBudgetForAnswer()
+    clearRecognitionFailure()
     trackMicTelemetry('mic_restarted', telemetryCtx, { source: 'toggle_mic_on' })
+    if (recognitionState === 'starting' && !isListening) {
+      stopListening('user_retry_stuck_starting')
+    }
     startListeningFromUserGesture()
   }
 
@@ -2398,35 +2442,69 @@ export default function InterviewSessionPage() {
   const sessionProgressPct = Math.round(
     ((currentIndex + 1) / renderTotalQuestions) * 100,
   )
+  const hasAnswerPayload = Boolean(answerText.trim())
+  const canSubmitAnswer = phase === 'candidate_answering' && hasAnswerPayload
+  /** Deepgram voice channel failed — Web Speech uses micFailed banner instead. */
+  const showMicFailureEscape =
+    phase === 'candidate_answering' &&
+    inputMode === 'deepgram' &&
+    dgVoiceShowActions
 
   return (
     <>
       <div
-        className="min-h-dvh px-4 py-6 sm:px-6 lg:px-10"
+        className="flex h-full min-h-0 w-full min-w-0 flex-col lg:px-0"
         style={{ background: 'var(--page-gradient)' }}
       >
-      <div className="mx-auto w-full max-w-[min(100%,1600px)]">
 
         {/* ── Top Bar ── */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="space-y-1">
-            <p className="text-xs font-semibold uppercase tracking-widest
+        <div className="grid w-full min-w-0 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-(--card-border)/50 px-3 py-2 sm:gap-3 lg:px-3">
+          <div className="min-w-0 space-y-0.5">
+            <p className="text-[10px] font-semibold uppercase tracking-widest
                           text-(--text-muted)">
               INTERVIEW SESSION
             </p>
-            <h1 className="text-xl font-bold text-(--text-primary)">
+            <h1 className="text-lg font-bold text-(--text-primary) sm:text-xl">
               Focus Mode
             </h1>
-            <p className="text-xs text-(--text-secondary)">
+            <p className="text-[11px] text-(--text-secondary)">
               Mode: {interviewData.questions[0]?.category === 'technical' ? 'Technical' : 'HR'}&nbsp;·&nbsp;
               Skips used: {skipCount} / {MAX_SKIPS}
             </p>
           </div>
 
-          {/* Top progress bar + Exit */}
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block w-48">
-              <div className="flex justify-between text-xs text-(--text-muted) mb-1">
+          {/* Timer — centered */}
+          <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
+            <span className="text-xs font-semibold text-(--text-secondary) sm:text-sm">
+              Progress :
+            </span>
+            <div className="shrink-0">
+              {phase === 'candidate_answering' && answerTimerArmed ? (
+                <TimerCircle
+                  timeLeft={timeLeft}
+                  totalTime={answerTimeBudget}
+                  size={72}
+                />
+              ) : phase === 'candidate_answering' ? (
+                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 border-(--bg-tertiary)">
+                  <span className="text-xs text-(--text-muted) text-center leading-tight px-1.5">
+                    Your turn
+                  </span>
+                </div>
+              ) : (
+                <div className="flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full border-2 border-(--bg-tertiary)">
+                  <span className="text-xs text-(--text-muted) text-center leading-tight px-1.5">
+                    {progressRingLabel(phase, { speakingProgressPct })}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Progress bar + Exit — right */}
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 sm:gap-3">
+            <div className="w-24 sm:w-28 xl:w-36">
+              <div className="flex justify-between text-[10px] text-(--text-muted) mb-0.5">
                 <span>Question {currentIndex + 1} of {renderTotalQuestions}</span>
                 <span>{sessionProgressPct}%</span>
               </div>
@@ -2437,6 +2515,7 @@ export default function InterviewSessionPage() {
                 />
               </div>
             </div>
+
             <button
               type="button"
               onClick={() => {
@@ -2455,185 +2534,122 @@ export default function InterviewSessionPage() {
         </div>
 
         {/* ── Main Layout: Left (Avatar) + Right (Answer) ── */}
-        <div className="grid min-w-0 gap-4 lg:grid-cols-[min(380px,100%)_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+        <div className="grid min-h-0 min-w-0 flex-1 gap-0 overflow-hidden lg:grid-cols-[min(340px,100%)_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)] lg:divide-x lg:divide-(--card-border)/60">
 
-          {/* ── LEFT: Avatar Panel ── */}
-          <div className="space-y-3">
+          {/* ── LEFT: Interviewer + Candidate (50/50) ── */}
+          <div className="flex min-h-0 flex-col divide-y divide-(--card-border)/60 overflow-hidden">
 
-            {/* Avatar Video */}
-            <div className="dashboard-premium-card overflow-hidden">
-              <div className="flex items-center justify-between border-b border-(--card-border) px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-(--accent-primary)">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
-                    AI INTERVIEWER
-                  </span>
-                  {audioActuallyStarted && (
-                    <span className="flex items-center gap-1 rounded-full
-                                     bg-(--accent-primary)/15 px-2 py-0.5
-                                     text-[10px] font-semibold text-(--accent-primary)">
-                      <span className="h-1.5 w-1.5 rounded-full bg-(--accent-primary)
-                                       animate-pulse" />
-                      Speaking
+            {/* Interviewer — top half */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="session-flush-panel dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden">
+                <div className="flex shrink-0 items-center justify-between border-b border-(--card-border) px-3 py-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-(--accent-primary)">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
+                      AI Interviewer
                     </span>
+                    {audioActuallyStarted && (
+                      <span className="flex items-center gap-1 rounded-full bg-(--accent-primary)/15 px-2 py-0.5 text-[10px] font-semibold text-(--accent-primary)">
+                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
+                        Speaking
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs font-semibold tabular-nums text-(--text-secondary)">
+                    {avatarHeaderLabel}
+                  </span>
+                </div>
+
+                <div className="relative min-h-0 flex-1">
+                  <AvatarPlayer
+                    key={`${resolvedInterviewerId}-${videoRecoverTick}`}
+                    interviewerId={resolvedInterviewerId as InterviewerId}
+                    isSpeaking={audioActuallyStarted}
+                    telemetryCtx={telemetryCtx}
+                    objectFit="contain"
+                    fillContainer
+                    className="bg-(--bg-secondary)"
+                  />
+                  {awaitingAudioTap && (
+                    <button
+                      type="button"
+                      onClick={handleUnlockAudioGesture}
+                      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/45 px-6 text-center backdrop-blur-[2px]"
+                      aria-label="Tap to hear the interviewer ask the question"
+                    >
+                      <span className="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-(--text-primary) shadow-lg">
+                        Tap to hear the question
+                      </span>
+                      <span className="max-w-[16rem] text-xs text-white/90">
+                        Required on iPhone so {resolvedInterviewer?.name ?? 'Priya'} can speak before you answer.
+                      </span>
+                    </button>
+                  )}
+                  {showPlaybackRecovery && phase === 'avatar_speaking' && (
+                    <div className="absolute inset-x-0 bottom-0 z-10 space-y-2 border-t border-amber-200/80 bg-amber-50/95 p-3 backdrop-blur-sm">
+                      <p className="text-xs font-medium text-amber-900">
+                        {playbackFailureMessage}
+                      </p>
+                      <div className="flex flex-col gap-2">
+                        <button
+                          type="button"
+                          onClick={retryAudio}
+                          className="rounded-lg border border-(--accent-primary) bg-white px-3 py-2 text-xs font-semibold text-(--accent-primary)"
+                        >
+                          Retry Audio
+                        </button>
+                        <button
+                          type="button"
+                          onClick={continueWithoutAudio}
+                          className="rounded-lg bg-(--accent-primary) px-3 py-2 text-xs font-semibold text-white"
+                        >
+                          Continue Without Audio
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-                <span className="text-xs font-semibold text-(--text-secondary)">
-                  {avatarHeaderLabel}
-                </span>
-              </div>
 
-              <div className="relative">
-              <AvatarPlayer
-                key={`${resolvedInterviewerId}-${videoRecoverTick}`}
-                interviewerId={resolvedInterviewerId as InterviewerId}
-                isSpeaking={audioActuallyStarted}
-                telemetryCtx={telemetryCtx}
-                className="aspect-[4/3] w-full bg-(--bg-secondary)"
+                <p className="shrink-0 border-t border-(--card-border)/60 px-4 py-2 text-[11px] text-(--text-secondary)">
+                  Interviewer: {resolvedInterviewer?.name ?? 'Priya'}
+                </p>
+              </div>
+            </div>
+
+            {/* Candidate — bottom half */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+              <CandidatePreview
+                cameraActive={
+                  phase === 'candidate_answering' ||
+                  phase === 'submitting' ||
+                  phase === 'feedback'
+                }
+                isListening={isListening || webSpeechActive || dgListening}
+                micArmed={micArmed}
+                userMicMuted={userMicMuted}
+                questionLabel={avatarHeaderLabel}
               />
-              {awaitingAudioTap && (
-                <button
-                  type="button"
-                  onClick={handleUnlockAudioGesture}
-                  className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3
-                             bg-black/45 px-6 text-center backdrop-blur-[2px]"
-                  aria-label="Tap to hear the interviewer ask the question"
-                >
-                  <span className="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-(--text-primary) shadow-lg">
-                    Tap to hear the question
-                  </span>
-                  <span className="max-w-[16rem] text-xs text-white/90">
-                    Required on iPhone so {resolvedInterviewer?.name ?? 'Priya'} can speak before you answer.
-                  </span>
-                </button>
-              )}
-              </div>
-            </div>
-            <div className="text-xs text-(--text-secondary)">
-              Interviewer: {resolvedInterviewer?.name ?? 'Priya'}
-            </div>
-
-            {/* Avatar Caption — shown while TTS is active */}
-            {audioActuallyStarted && currentQuestion && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-              >
-                <CaptionDisplay
-                  fullText={spokenText || currentQuestion.question_text}
-                  currentWordIndex={captionWordIndex}
-                />
-              </motion.div>
-            )}
-
-            {awaitingAudioTap && (
-              <div className="dashboard-premium-card p-4 text-sm text-(--text-secondary)">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted) mb-2">
-                  Current Question
-                </p>
-                <p>Tap the avatar above to hear the question read aloud. The timer starts after the interviewer finishes.</p>
-              </div>
-            )}
-
-            {showPlaybackRecovery && phase === 'avatar_speaking' && (
-              <div className="dashboard-premium-card space-y-3 p-4 border border-amber-200/80 bg-amber-50/80">
-                <p className="text-sm font-medium text-amber-900">
-                  {playbackFailureMessage}
-                </p>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={retryAudio}
-                    className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
-                  >
-                    Retry Audio
-                  </button>
-                  <button
-                    type="button"
-                    onClick={continueWithoutAudio}
-                    className="flex-1 rounded-lg bg-(--accent-primary) px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    Continue Without Audio
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* After TTS: show question text for reference (not during interviewer turn) */}
-            {!audioActuallyStarted &&
-              !awaitingAudioTap &&
-              phase !== 'avatar_speaking' &&
-              phase !== 'avatar_finished' &&
-              phase !== 'awaiting_audio_unlock' && (
-              <div className="dashboard-premium-card p-4 text-sm
-                              leading-relaxed text-(--text-primary)">
-                <p className="text-[10px] font-semibold uppercase tracking-widest
-                               text-(--text-muted) mb-2">
-                  Current Question
-                </p>
-                {currentQuestion.question_text}
-              </div>
-            )}
-
-            {/* Interview Progress Panel */}
-            <div className="dashboard-premium-card space-y-3 p-4">
-              <div className="flex items-center justify-between text-xs
-                              text-(--text-secondary) font-semibold uppercase tracking-widest">
-                <span>PROGRESS</span>
-                <span>{currentIndex + 1}/{renderTotalQuestions}</span>
-              </div>
-
-              {/* Timer — only during candidate_answering (never during avatar turn) */}
-              <div className="flex items-center justify-center py-2">
-                {phase === 'candidate_answering' && answerTimerArmed ? (
-                  <TimerCircle
-                    timeLeft={timeLeft}
-                    totalTime={answerTimeBudget}
-                    size={96}
-                  />
-                ) : phase === 'candidate_answering' ? (
-                  <div className="h-24 w-24 flex items-center justify-center
-                                  rounded-full border-2 border-(--bg-tertiary)">
-                    <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
-                      Your turn
-                    </span>
-                  </div>
-                ) : (
-                  <div className="h-24 w-24 flex items-center justify-center
-                                  rounded-full border-2 border-(--bg-tertiary)">
-                    <span className="text-xs text-(--text-muted) text-center leading-tight px-2">
-                      {progressRingLabel(phase, { speakingProgressPct })}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                <div>
-                  <p className="text-2xl font-bold text-(--text-primary)">
-                    {currentIndex + 1}
-                  </p>
-                  <p className="text-(--text-muted) uppercase tracking-wider text-[10px]">
-                    Current
-                  </p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-(--text-primary)">
-                    {renderTotalQuestions}
-                  </p>
-                  <p className="text-(--text-muted) uppercase tracking-wider text-[10px]">
-                    Total
-                  </p>
-                </div>
-              </div>
             </div>
           </div>
 
-          {/* ── RIGHT: Answer Panel (min-w-0 so 1fr column + textarea fill width) ── */}
-          <div className="flex min-w-0 flex-col space-y-3">
+          {/* ── RIGHT: Answer Panel ── */}
+          <div className="flex min-h-0 min-w-0 flex-col gap-0 divide-y divide-(--card-border)/60 overflow-hidden">
 
             {/* Candidate transcript / answer area */}
-            <div className="dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-3 p-5">
+            <div className="session-flush-panel dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-4">
+
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+
+              {phase === 'candidate_answering' && currentQuestion && (
+                <div className="shrink-0 rounded-xl border border-(--card-border)/60 bg-(--bg-secondary)/40 p-3 sm:p-4">
+                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                    Current Question
+                  </p>
+                  <p className="text-sm leading-relaxed text-(--text-primary)">
+                    {currentQuestion.question_text}
+                  </p>
+                </div>
+              )}
 
               {phase === 'candidate_answering' && inputMode === 'deepgram' && (
                 <div className="w-full min-w-0 space-y-3">
@@ -2720,7 +2736,7 @@ export default function InterviewSessionPage() {
               )}
 
               {phase === 'candidate_answering' && micFailed && (
-                <div className="dashboard-premium-card space-y-2 p-4 border border-amber-200/80 bg-amber-50/80">
+                <div className="session-flush-panel dashboard-premium-card space-y-2 p-4 border border-amber-200/80 bg-amber-50/80">
                   <p className="text-sm font-medium text-amber-900">
                     Voice connection lost. Tap Retry Mic or type your answer.
                   </p>
@@ -2750,27 +2766,8 @@ export default function InterviewSessionPage() {
                 </div>
               )}
 
-              {phase === 'candidate_answering' &&
-                !useManualInput &&
-                inputMode === 'voice' &&
-                !micFailed &&
-                !isListening &&
-                !userMicMuted &&
-                recognitionState === 'idle' && (
-                <button
-                  type="button"
-                  onClick={() => { void handleStartMic() }}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed
-                             border-(--accent-primary)/40 bg-(--accent-primary)/5 px-4 py-4 text-sm
-                             font-semibold text-(--accent-primary) hover:bg-(--accent-primary)/10"
-                >
-                  <Mic size={18} />
-                  Tap here to start microphone
-                </button>
-              )}
-
               {phase === 'candidate_answering' && !useManualInput && inputMode !== 'deepgram' && !micFailed && (
-                <div className="w-full min-w-0">
+                <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
                   <CandidateTranscript
                     transcript={transcript}
                     interimTranscript={interimTranscript}
@@ -2781,6 +2778,8 @@ export default function InterviewSessionPage() {
                     permissionState={permissionState}
                     micArmed={micArmed}
                     userMicMuted={userMicMuted}
+                    fillHeight
+                    hideMicToggle
                     onToggle={() => { void handleToggleMic() }}
                     onRetry={() => { void handleStartMic() }}
                   />
@@ -2788,7 +2787,7 @@ export default function InterviewSessionPage() {
               )}
 
               {phase === 'candidate_answering' && useManualInput && (
-                <div className="flex w-full min-w-0 flex-col space-y-2">
+                <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-2">
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
                     {isMicSupported
                       ? 'Microphone unavailable right now. Please type your answer.'
@@ -2812,7 +2811,7 @@ export default function InterviewSessionPage() {
                       handleManualAnswerEngage()
                     }}
                     placeholder="Type your answer here..."
-                    className="box-border block min-h-[120px] min-w-0 w-full max-w-full resize-none overflow-y-auto rounded-xl border border-(--card-border) bg-(--card-bg) p-3 text-sm leading-relaxed text-(--text-primary) outline-none focus:border-(--accent-primary)"
+                    className="box-border block min-h-0 flex-1 min-w-0 w-full max-w-full resize-none overflow-y-auto rounded-xl border border-(--card-border) bg-(--card-bg) p-3 text-sm leading-relaxed text-(--text-primary) outline-none focus:border-(--accent-primary)"
                   />
                 </div>
               )}
@@ -2821,10 +2820,9 @@ export default function InterviewSessionPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex-1 flex flex-col gap-4 p-1"
+                  className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
                 >
-                  {/* Live indicator */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex shrink-0 items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5 shrink-0">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent-primary)/40" />
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-(--accent-primary)" />
@@ -2834,14 +2832,12 @@ export default function InterviewSessionPage() {
                     </span>
                   </div>
 
-                  {/* Question text preview — read-along while audio plays */}
-                  <div className="rounded-xl border border-(--card-border)/60
-                                  bg-(--bg-secondary)/50 p-4 text-sm leading-relaxed
-                                  text-(--text-primary)/75">
-                    {spokenText || currentQuestion.question_text}
-                  </div>
+                  <CaptionDisplay
+                    fullText={spokenText || currentQuestion.question_text}
+                    currentWordIndex={captionWordIndex}
+                  />
 
-                  <p className="text-center text-xs text-(--text-muted)">
+                  <p className="shrink-0 text-center text-[11px] text-(--text-muted)">
                     Your timer starts once the question is read
                   </p>
                 </motion.div>
@@ -2937,6 +2933,7 @@ export default function InterviewSessionPage() {
                 </AnimatePresence>
               )}
             </div>
+            </div>
 
             {/* ── Voice recovery after page refresh ── */}
             {phase === 'candidate_answering' && voiceRecovery.isActive && (
@@ -2951,22 +2948,23 @@ export default function InterviewSessionPage() {
               />
             )}
 
-            {/* ── Empty-payload warning ── */}
-            {phase === 'candidate_answering' && showEmptyWarning && (
-              <div className="dashboard-premium-card mb-3 w-full min-w-0 border border-amber-300 bg-amber-50/70 p-3">
+            {/* ── Empty-payload warning (timer/auto-submit fallback only) ── */}
+            {phase === 'candidate_answering' && showEmptyWarning && !hasAnswerPayload && (
+              <div className="session-flush-panel dashboard-premium-card w-full min-w-0 border border-amber-300 bg-amber-50/70 p-3">
                 <p className="text-xs font-semibold text-amber-800">
                   We didn&apos;t catch your answer yet. Please speak (or type) before submitting.
                 </p>
               </div>
             )}
 
-            {/* ── Safety escape: auto-flow can never strand the user ── */}
-            {phase === 'candidate_answering' && showStuckEscape && (
-              <div className="dashboard-premium-card mb-3 w-full min-w-0 p-4">
+            {/* ── Safety escape: Deepgram voice failure only (Web Speech → micFailed banner) ── */}
+            {showMicFailureEscape && (
+              <div className="session-flush-panel dashboard-premium-card w-full min-w-0 p-4">
                 <p className="mb-2 text-xs text-(--text-secondary)">
-                  Mic not picking you up? You can submit what you have, or continue.
+                  Voice connection lost. Retry the mic, switch mode, or type your answer.
                 </p>
                 <div className="flex flex-col gap-2 sm:flex-row">
+                  {hasAnswerPayload && (
                   <button
                     type="button"
                     onClick={handleSubmitClick}
@@ -2975,6 +2973,7 @@ export default function InterviewSessionPage() {
                   >
                     Submit my answer now
                   </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => { void handleSwitchToAiVoice('stuck_escape') }}
@@ -3001,7 +3000,6 @@ export default function InterviewSessionPage() {
                       } else {
                         void handleStartMic()
                       }
-                      setShowStuckEscape(false)
                     }}
                     className="rounded-lg border border-(--card-border) bg-(--bg-secondary)
                                px-3 py-2 text-xs font-semibold text-(--text-secondary)
@@ -3013,11 +3011,24 @@ export default function InterviewSessionPage() {
               </div>
             )}
 
+            {phase === 'candidate_answering' &&
+              !useManualInput &&
+              inputMode === 'voice' &&
+              !micFailed &&
+              !isListening &&
+              !userMicMuted &&
+              recognitionState === 'idle' && (
+              <div className="session-flush-panel flex shrink-0 items-center justify-center gap-2 border-t border-(--card-border)/60 bg-(--accent-primary)/5 px-4 py-2.5 text-xs font-medium text-(--accent-primary)">
+                <Mic size={14} aria-hidden />
+                Tap the mic button below to start your answer
+              </div>
+            )}
+
             {/* ── Control Bar ── */}
             {/* Safe-area inset so the submit row clears the iOS home indicator /
                 gesture bar in Safari + standalone PWA (audit mobile issue #7). */}
             <div
-              className="dashboard-premium-card w-full min-w-0 p-4"
+              className="session-flush-panel dashboard-premium-card w-full min-w-0 shrink-0 p-3 sm:p-4"
               style={{
                 paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
               }}
@@ -3122,12 +3133,16 @@ export default function InterviewSessionPage() {
                 {/* Submit */}
                 <button
                   onClick={handleSubmitClick}
-                  disabled={phase !== 'candidate_answering' && !answerText.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 rounded-xl
-                             py-3 text-sm font-semibold text-white transition-all duration-200
-                             disabled:opacity-40 disabled:cursor-not-allowed"
+                  disabled={!canSubmitAnswer}
+                  title={!hasAnswerPayload ? 'Speak or type your answer first' : undefined}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl
+                             py-3 text-sm font-semibold transition-all duration-200
+                             disabled:cursor-not-allowed
+                             ${canSubmitAnswer
+                               ? 'text-white hover:opacity-95'
+                               : 'text-(--text-secondary)'}`}
                   style={{
-                    background: phase === 'candidate_answering'
+                    background: canSubmitAnswer
                       ? 'linear-gradient(135deg, #6366F1, #818CF8)'
                       : 'var(--bg-tertiary)',
                   }}
@@ -3168,9 +3183,7 @@ export default function InterviewSessionPage() {
           </div>
         </div>
       </div>
-    </div>
     {celebrationDialog}
-    <SttInputDebugPanel />
     </>
   )
 }

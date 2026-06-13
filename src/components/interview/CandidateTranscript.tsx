@@ -33,6 +33,10 @@ interface CandidateTranscriptProps {
   micArmed?: boolean
   /** When true, user tapped mute — mic is intentionally off for this answer. */
   userMicMuted?: boolean
+  /** Fill parent flex column (interview session viewport layout). */
+  fillHeight?: boolean
+  /** Hide inline mic toggle — caller provides control in a bottom bar. */
+  hideMicToggle?: boolean
 }
 const WAVEFORM_HEIGHTS = [0.45, 0.75, 0.55, 1, 0.65, 0.4, 0.85, 0.55]
 
@@ -48,6 +52,8 @@ export function CandidateTranscript({
   onRetry,
   micArmed = false,
   userMicMuted = false,
+  fillHeight = false,
+  hideMicToggle = false,
 }: CandidateTranscriptProps) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
@@ -65,13 +71,12 @@ export function CandidateTranscript({
   const active = micLive
   const starting =
     !micActive &&
-    (isListening ||
-      recognitionState === 'starting' ||
-      (micArmed && !userMicMuted && permissionState === 'granted'))
+    !userMicMuted &&
+    (recognitionState === 'starting' || isListening)
   const showBars = active && !hasContent
 
   return (
-    <div className="w-full min-w-0 space-y-2">
+    <div className={`w-full min-w-0 space-y-2 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -90,6 +95,7 @@ export function CandidateTranscript({
           )}
         </div>
 
+        {!hideMicToggle && (
         <button
           onClick={onToggle}
           disabled={!isSupported || permissionState === 'requesting'}
@@ -120,6 +126,7 @@ export function CandidateTranscript({
                       ? 'Mic ready'
                       : 'Click mic to enable'}
         </button>
+        )}
       </div>
 
       {error && (
@@ -138,9 +145,10 @@ export function CandidateTranscript({
 
       <div
         ref={scrollRef}
-        className="min-h-[120px] max-h-[min(50vh,520px)] w-full max-w-full overflow-y-auto rounded-xl
+        className={`w-full max-w-full overflow-y-auto rounded-xl
                    border border-(--card-border) bg-(--card-bg) p-4 text-sm leading-relaxed
-                   whitespace-pre-wrap break-words text-(--text-primary)"
+                   whitespace-pre-wrap break-words text-(--text-primary)
+                   ${fillHeight ? 'min-h-0 flex-1' : 'min-h-[120px] max-h-[min(50vh,520px)]'}`}
       >
         {hasContent ? (
           <>
@@ -165,9 +173,13 @@ export function CandidateTranscript({
                 : recognitionState === 'active' && !isListening
                   ? 'Mic is ready — speak now and your words will appear here'
                   : micArmed
-                  ? 'Tap the button above to enable your microphone, then speak'
+                  ? hideMicToggle
+                    ? 'Use the mic button below to start speaking'
+                    : 'Tap the button above to enable your microphone, then speak'
                   : isSupported
-                    ? 'Click the mic button to start speaking'
+                    ? hideMicToggle
+                      ? 'Use the mic button below to start speaking'
+                      : 'Click the mic button to start speaking'
                     : 'Speech recognition not supported in this browser'}
           </span>
         )}

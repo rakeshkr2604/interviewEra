@@ -13,6 +13,10 @@ interface AvatarPlayerProps {
   isSpeaking: boolean
   className?: string
   telemetryCtx?: InterviewTelemetryContext
+  /** How video/image fill the frame — use `contain` to avoid cropping heads. */
+  objectFit?: 'cover' | 'contain'
+  /** When true, player stretches to parent height (session sidebar layout). */
+  fillContainer?: boolean
 }
 
 export function AvatarPlayer({
@@ -20,7 +24,10 @@ export function AvatarPlayer({
   isSpeaking,
   className = '',
   telemetryCtx,
+  objectFit = 'cover',
+  fillContainer = false,
 }: AvatarPlayerProps) {
+  const fitClass = objectFit === 'contain' ? 'object-contain' : 'object-cover'
   const interviewer = getInterviewerById(interviewerId)
   const videoSrc = interviewer?.video ?? ''
   const avatarImageSrc = interviewer?.avatarImage ?? '/default-avatar.png'
@@ -50,7 +57,9 @@ export function AvatarPlayer({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl bg-(--bg-secondary) ${className}`}
+      className={`relative overflow-hidden bg-(--bg-secondary) ${
+        fillContainer ? 'h-full w-full' : 'rounded-2xl'
+      } ${className}`}
       style={{
         boxShadow: isSpeaking ? '0 0 40px var(--avatar-glow)' : 'none',
         transition: 'box-shadow 400ms ease',
@@ -65,7 +74,7 @@ export function AvatarPlayer({
         fill
         priority
         sizes="(max-width: 768px) 100vw, 420px"
-        className={`h-full w-full object-cover object-center transition-opacity duration-500 ${
+        className={`h-full w-full ${fitClass} object-center transition-opacity duration-500 ${
           isSpeaking && hasVideo ? 'opacity-0' : 'opacity-100'
         } ${!isSpeaking ? 'ie-avatar-breathe' : ''}`}
       />
@@ -88,7 +97,7 @@ export function AvatarPlayer({
           disablePictureInPicture
           disableRemotePlayback
           aria-hidden
-          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-500 ${
+          className={`absolute inset-0 h-full w-full ${fitClass} object-center transition-opacity duration-500 ${
             isSpeaking ? 'opacity-100' : 'pointer-events-none opacity-0'
           }`}
         />

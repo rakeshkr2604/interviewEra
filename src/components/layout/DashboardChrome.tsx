@@ -16,6 +16,9 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')
+  /** Live interview — viewport-fitted shell (no footer scroll, compact chrome). */
+  const isInterviewSession = pathname.startsWith('/interview/session/')
+  const isImmersiveViewport = isOnboarding || isInterviewSession
 
   /*
    * Onboarding mobile scroll (BUG #1 root cause):
@@ -54,7 +57,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
   }, [mobileOpen])
 
   return (
-    <div className={cn('flex', !isOnboarding && 'min-h-screen')} style={{ background: 'var(--bg-secondary)' }}>
+    <div className={cn('flex', !isImmersiveViewport && 'min-h-screen')} style={{ background: 'var(--bg-secondary)' }}>
       {mobileOpen ? (
         <button
           type="button"
@@ -81,7 +84,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
       <div
         className={cn(
           'flex min-w-0 flex-1 flex-col lg:pl-[15.25rem]',
-          isOnboarding
+          isImmersiveViewport
             ? 'min-h-dvh max-lg:overflow-visible lg:h-dvh lg:max-h-dvh lg:min-h-0 lg:overflow-hidden'
             : 'min-h-screen',
         )}
@@ -157,27 +160,29 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             'ie-landing-premium ie-landing-type relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
-            isOnboarding ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
+            isImmersiveViewport ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
           )}
           style={{
             background: 'var(--page-gradient)',
             color: 'var(--text-primary)',
-            scrollbarGutter: isOnboarding ? 'auto' : 'stable',
+            scrollbarGutter: isImmersiveViewport ? 'stable' : 'stable',
           }}
         >
           <div
             className={cn(
-              'relative flex min-h-0 min-w-0 flex-col px-4 sm:px-5',
+              'relative flex min-h-0 min-w-0 flex-col',
               isOnboarding
-                ? 'flex-1 py-2 md:py-3 lg:py-1.5 lg:pt-2'
-                : 'flex-1 py-8 sm:py-10 md:py-12',
-              LANDING_PAGE_CONTAINER,
+                ? 'flex-1 px-4 sm:px-5 py-2 md:py-3 lg:py-1.5 lg:pt-2'
+                : isInterviewSession
+                  ? 'flex-1 p-0 max-lg:px-3 max-lg:py-2'
+                  : 'flex-1 px-4 sm:px-5 py-8 sm:py-10 md:py-12',
+              isInterviewSession ? 'w-full min-w-0 max-w-none' : LANDING_PAGE_CONTAINER,
             )}
           >
             {children}
           </div>
 
-          {!isOnboarding ? (
+          {!isImmersiveViewport ? (
             <footer
               className="relative border-t px-4 py-4 sm:px-6"
               style={{
