@@ -477,8 +477,8 @@ export function OnboardingStepResume({
                     {(isFailed || fileError) && (
                       <div className="flex items-start gap-2 rounded-xl border border-(--accent-danger)/30 bg-(--accent-danger)/8 px-3 py-2.5">
                         <AlertCircle className="mt-0.5 size-4 shrink-0 text-(--accent-danger)" aria-hidden />
-                        <div className="flex-1">
-                          <p className="text-[12px] text-(--accent-danger)">{fileError || error}</p>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] leading-snug text-(--accent-danger)">{fileError || error}</p>
                           {isFailed && (
                             <button type="button" onClick={onRetry} className="mt-1 text-[11px] font-semibold text-(--accent-primary)">
                               Try again →

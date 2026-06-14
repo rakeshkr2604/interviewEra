@@ -54,8 +54,7 @@ Languages known: English, Hindi
 
 const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
-  SCANNED_NO_TEXT:
-    'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
+  SCANNED_NO_TEXT: RESUME_HARD_FAIL_MESSAGES.SCANNED_NO_TEXT.userMessage,
   CORRUPT:
     'This PDF could not be read as valid. If it opens on your laptop, export it again (“Save as PDF”) and re-upload.',
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',

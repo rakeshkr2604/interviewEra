@@ -16,14 +16,14 @@ import {
   PDFUnsupportedError,
 } from '@/lib/pdf/parser';
 import type { AtsResult, AtsState } from './ats-types';
+import { RESUME_HARD_FAIL_MESSAGES } from '@/lib/resume/parse-outcome';
 
 const PDF_USER_MESSAGES: Record<
   'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED' | 'PARSER_RUNTIME',
   string
 > = {
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
-  SCANNED_NO_TEXT:
-    'This PDF appears to be scanned. Upload a text-based PDF or a .txt export.',
+  SCANNED_NO_TEXT: RESUME_HARD_FAIL_MESSAGES.SCANNED_NO_TEXT.userMessage,
   CORRUPT: 'This PDF could not be read as valid. If you exported from Word or Canva, try “Save as PDF” again.',
   UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
   PARSER_RUNTIME:

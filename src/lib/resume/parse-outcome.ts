@@ -63,8 +63,9 @@ export const RESUME_HARD_FAIL_MESSAGES: Record<
     suggestion: 'Remove the password, then export and upload again.',
   },
   SCANNED_NO_TEXT: {
-    userMessage: 'Your PDF appears image-based and text could not be extracted.',
-    suggestion: 'Upload a text-based PDF or a .txt export instead of a scanned photo.',
+    userMessage:
+      "We couldn't read any text from your PDF. It appears to be a scanned document or image-based PDF. Please upload the original resume exported from Word or Google Docs, or a searchable PDF.",
+    suggestion: '',
   },
   WRONG_DOCUMENT_TYPE: {
     userMessage: 'This file reads like a job posting, not your resume.',
@@ -80,7 +81,18 @@ export const RESUME_HARD_FAIL_MESSAGES: Record<
   },
 };
 
-export const PARSE_DEGRADED_WARNING =
+export function formatResumeUserFacingError(body: {
+  userMessage?: string;
+  suggestion?: string;
+  error?: string;
+}): string {
+  const msg = (typeof body.userMessage === 'string' && body.userMessage.trim()) ||
+    (typeof body.error === 'string' && body.error.trim()) ||
+    '';
+  const hint = typeof body.suggestion === 'string' ? body.suggestion.trim() : '';
+  if (msg && hint) return `${msg} ${hint}`;
+  return msg || 'Upload failed. Please try again.';
+}
   'We extracted most of your resume, but some sections may be incomplete.';
 
 export const PARSE_MINIMAL_WARNING =

@@ -4,6 +4,7 @@ import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
+import { formatResumeUserFacingError } from '@/lib/resume/parse-outcome';
 import type { ParsedResume } from '@/types/app.types';
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
@@ -22,7 +23,9 @@ interface UploadZoneProps {
 
 interface UploadErrorResponse {
   error?: string;
-  code?: 'PARSER_UNAVAILABLE' | string;
+  userMessage?: string;
+  suggestion?: string;
+  code?: 'PARSER_UNAVAILABLE' | 'SCANNED_NO_TEXT' | string;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -81,11 +84,11 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
           setStatus('error');
           if (data.code === 'PARSER_UNAVAILABLE') {
             setErrorMessage(
-              data.error ??
-                'Resume parser is temporarily unavailable. Your file is fine - retry in a minute.'
+              formatResumeUserFacingError(data) ||
+                'Resume parser is temporarily unavailable. Your file is fine — retry in a minute.',
             );
           } else {
-            setErrorMessage(data.error ?? 'Upload failed. Please try again.');
+            setErrorMessage(formatResumeUserFacingError(data));
           }
           return;
         }

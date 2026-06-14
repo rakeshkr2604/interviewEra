@@ -20,6 +20,7 @@ import { getInterviewerById } from '@/lib/config/interviewers'
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json'
 import { fetchMultipartJson } from '@/lib/client/fetch-multipart-json'
 import { MULTIPART_UPLOAD_MAX_BYTES } from '@/lib/http/upload-limits'
+import { formatResumeUserFacingError } from '@/lib/resume/parse-outcome'
 import { refineJobDescriptionForUi } from '@/lib/documents/job-description-clean'
 import { cn } from '@/lib/utils'
 import { formatParsedJobDescriptionForInterview } from '@/lib/documents/job-description-interview-brief'
@@ -519,24 +520,17 @@ export default function OnboardingPage() {
           setError(withRequestRef(result.error ?? 'File too large.', rid))
           return
         }
-        const uploadMsg =
-          (typeof result.userMessage === 'string' && result.userMessage) ||
-          result.error
-        const uploadHint =
-          typeof result.suggestion === 'string' && result.suggestion
-            ? ` ${result.suggestion}`
-            : ''
+        const uploadMsg = formatResumeUserFacingError(result)
         setError(
           withRequestRef(
-            uploadMsg
-              ? `${uploadMsg}${uploadHint}`
-              : status === 401
+            uploadMsg ||
+              (status === 401
                 ? 'Your session expired. Refresh the page and sign in again.'
                 : status === 429
                   ? 'Too many uploads. Please wait a minute and try again.'
                   : status >= 500
                     ? 'Our servers could not finish the upload. Please try again in a moment.'
-                    : 'Resume upload failed. Please try again.',
+                    : 'Resume upload failed. Please try again.'),
             rid,
           ),
         )
