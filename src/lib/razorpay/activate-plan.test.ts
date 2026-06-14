@@ -188,6 +188,103 @@ const starterParams = (source: string, paymentId = PAY_STARTER): ActivatePlanPar
   source,
 });
 
+const PAY_OLD = 'pay_old';
+
+function createStaleReadStore() {
+  const state = {
+    user: baseUser({
+      last_payment_id: PAY_OLD,
+      plan_tier: 'starter',
+      credits_remaining: 2,
+      plan_status: 'active',
+    }),
+    payments: [starterPayment()],
+    ledger: [] as CreditTx[],
+    userUpdates: 0,
+    paymentUpdates: 0,
+    userSelectCount: 0,
+  };
+
+  // Webhook already activated pay_new before verify reaches CAS.
+  state.user.last_payment_id = PAY_STARTER;
+  state.user.credits_remaining = 10;
+
+  const supabase = {
+    from(table: string) {
+      if (table === 'payments') {
+        return {
+          select: (_cols: string) => ({
+            eq: (column: string, value: string) => ({
+              maybeSingle: async () => {
+                if (column === 'order_id') {
+                  const row = state.payments.find((p) => p.order_id === value);
+                  return { data: row ? { ...row } : null, error: null };
+                }
+                return { data: null, error: null };
+              },
+            }),
+          }),
+          update: () => ({
+            eq: async () => ({ error: null }),
+          }),
+        };
+      }
+
+      if (table === 'users') {
+        return {
+          select: () => ({
+            eq: (_col: string, id: string) => ({
+              maybeSingle: async () => {
+                if (state.user.id !== id) return { data: null, error: null };
+                state.userSelectCount++;
+                if (state.userSelectCount === 1) {
+                  return {
+                    data: {
+                      ...state.user,
+                      last_payment_id: PAY_OLD,
+                      credits_remaining: 2,
+                    },
+                    error: null,
+                  };
+                }
+                return { data: { ...state.user }, error: null };
+              },
+            }),
+          }),
+          update: () => ({
+            eq: (_col: string, _id: string) => ({
+              is: () => ({
+                select: async () => ({ data: [], error: null }),
+              }),
+              eq: (lockCol: string, lockVal: string) => ({
+                select: async () => {
+                  if (lockCol === 'last_payment_id' && lockVal === PAY_OLD) {
+                    return { data: [], error: null };
+                  }
+                  return { data: [], error: null };
+                },
+              }),
+            }),
+          }),
+        };
+      }
+
+      if (table === 'credit_transactions') {
+        return {
+          insert: async (row: CreditTx) => {
+            state.ledger.push(row);
+            return { error: null };
+          },
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+
+  return { supabase: supabase as unknown as SupabaseClient, state };
+}
+
 function assertSingleActivation(state: ReturnType<typeof createPaymentStore>['state']) {
   expect(state.userUpdates).toBeLessThanOrEqual(1);
   expect(state.paymentUpdates).toBeLessThanOrEqual(1);
@@ -301,6 +398,18 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
     expect(replayCount).toBe(1);
     expect(state.user.credits_remaining).toBe(11);
     assertSingleActivation(state);
+  });
+
+  it('verify CAS miss after webhook — alreadyActivated not conflict', async () => {
+    const { supabase, state } = createStaleReadStore();
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify', PAY_STARTER));
+
+    expect(result.alreadyActivated).toBe(true);
+    expect('activationFailed' in result && result.activationFailed).toBe(false);
+    expect(state.user.credits_remaining).toBe(10);
+    expect(state.userUpdates).toBe(0);
+    expect(state.ledger).toHaveLength(0);
   });
 
   it('duplicate webhook retries — idempotent', async () => {

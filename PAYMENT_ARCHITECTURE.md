@@ -190,9 +190,9 @@ WHERE id = $userId AND last_payment_id = $observed;
 
 **Critical:** Do not use `last_payment_id != $paymentId` — in SQL, `NULL != value` is unknown, so first-time buyers never match and every request returns "Activation conflict".
 
-If zero rows returned, re-read `last_payment_id`:
-- Matches → `alreadyActivated: true` (concurrent winner finished)
-- Does not match → `activationFailed: true` (unexpected conflict, safe to retry)
+If zero rows returned, re-read `last_payment_id` (with brief backoff for commit visibility):
+- Matches `paymentId` → `alreadyActivated: true` (concurrent winner finished — e.g. verify read `pay_old`, webhook set `pay_new`)
+- Still different → `activationFailed: true` (true conflict, safe to retry)
 
 ---
 

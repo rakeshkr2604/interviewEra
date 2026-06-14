@@ -91,6 +91,56 @@ function failedResult(error: string): ActivatePlanFailure {
   };
 }
 
+/** Brief backoff so a concurrent winner's commit is visible before we declare conflict. */
+const CAS_MISS_RETRY_DELAYS_MS = [0, 25, 50, 100, 200] as const;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * After a CAS miss, another caller may have activated this exact paymentId
+ * (e.g. verify read pay_old while webhook set pay_new). Re-read until settled.
+ */
+async function resolveAfterCasMiss(
+  supabase: SupabaseClient,
+  userId: string,
+  paymentId: string,
+  plan: PaidPlanId,
+  nowIso: string,
+  ids: ReturnType<typeof traceIds>,
+  source: string,
+): Promise<ActivatePlanReplay | null> {
+  for (let attempt = 0; attempt < CAS_MISS_RETRY_DELAYS_MS.length; attempt++) {
+    const delay = CAS_MISS_RETRY_DELAYS_MS[attempt];
+    if (delay > 0) {
+      await sleep(delay);
+    }
+
+    const { data: retryUser, error: retryErr } = await supabase
+      .from('users')
+      .select('last_payment_id, plan_expires_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (retryErr || !retryUser) {
+      continue;
+    }
+
+    if (retryUser.last_payment_id === paymentId) {
+      activationLog('already_activated', ids, {
+        source,
+        plan,
+        concurrent: true,
+        cas_attempt: attempt + 1,
+      });
+      return replayResult(plan, (retryUser.plan_expires_at as string | null) ?? nowIso);
+    }
+  }
+
+  return null;
+}
+
 /**
  * Single source of truth for granting plan access after a successful Razorpay payment.
  *
@@ -204,18 +254,23 @@ export async function activatePlanAfterPayment(
   }
 
   if (!updatedUsers?.length) {
-    const { data: retryUser } = await supabase
-      .from('users')
-      .select('last_payment_id, plan_expires_at')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (retryUser?.last_payment_id === paymentId) {
-      activationLog('already_activated', ids, { source, plan, concurrent: true });
-      return replayResult(plan, (retryUser.plan_expires_at as string | null) ?? nowIso);
+    const replay = await resolveAfterCasMiss(
+      supabase,
+      userId,
+      paymentId,
+      plan,
+      nowIso,
+      ids,
+      source,
+    );
+    if (replay) {
+      return replay;
     }
 
-    activationError('user_update_conflict', ids, { source });
+    activationError('user_update_conflict', ids, {
+      source,
+      observed_last_payment_id: observedLastPaymentId,
+    });
     return failedResult('Activation conflict — please retry.');
   }
 
