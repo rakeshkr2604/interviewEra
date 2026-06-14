@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import { verifyWebhookSignature } from '@/lib/razorpay/client';
+import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
+import { shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-response';
+import { isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
+import { trackFunnelEvent } from '@/lib/analytics/funnel';
 
 interface RazorpayPaymentEntity {
   id: string;
@@ -27,6 +31,8 @@ interface RazorpayWebhookPayload {
   };
 }
 
+const ACTIVATION_EVENTS = new Set(['payment.captured', 'order.paid']);
+
 export async function POST(request: Request): Promise<NextResponse> {
   const rawBody = await request.text();
   const signature = request.headers.get('x-razorpay-signature') ?? '';
@@ -45,89 +51,144 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
-  paymentLog('webhook', 'received', {
+  const paymentEntity = event.payload.payment?.entity;
+  const orderEntity = event.payload.order?.entity;
+  const orderId = paymentEntity?.order_id ?? orderEntity?.id;
+  const paymentId = paymentEntity?.id;
+
+  paymentLog('webhook', 'webhook_received', {
     event: event.event,
     eventId,
-    orderId: event.payload.payment?.entity?.order_id ?? event.payload.order?.entity?.id,
-    paymentId: event.payload.payment?.entity?.id,
+    order_id: orderId,
+    payment_id: paymentId,
   });
 
   const supabase = createServiceClient();
   const now = new Date().toISOString();
 
   try {
-    switch (event.event) {
-      case 'payment.captured':
-      case 'order.paid': {
-        const payment = event.payload.payment?.entity;
-        const order = event.payload.order?.entity;
-        const orderId = payment?.order_id ?? order?.id;
-        if (!orderId) {
-          paymentWarn('webhook', 'missing_order_id', { event: event.event });
-          break;
-        }
-
-        const { data: row } = await supabase
-          .from('payments')
-          .select('id, status, payment_id')
-          .eq('order_id', orderId)
-          .maybeSingle();
-
-        if (!row) {
-          paymentWarn('webhook', 'unknown_order', { orderIdPrefix: orderId.slice(0, 8) });
-          break;
-        }
-
-        if (row.status === 'paid') {
-          paymentLog('webhook', 'already_paid_skip', { orderIdPrefix: orderId.slice(0, 8) });
-          break;
-        }
-
-        const paymentId = payment?.id ?? row.payment_id;
-        const { error } = await supabase
-          .from('payments')
-          .update({
-            status: 'paid',
-            payment_id: paymentId,
-            updated_at: now,
-          })
-          .eq('order_id', orderId)
-          .eq('status', 'created');
-
-        if (error) throw new Error(error.message);
-
-        paymentLog('webhook', 'payment_history_updated', {
-          orderIdPrefix: orderId.slice(0, 8),
-          paymentIdPrefix: paymentId?.slice(0, 8),
-        });
-        break;
+    if (ACTIVATION_EVENTS.has(event.event)) {
+      if (!orderId) {
+        paymentWarn('webhook', 'missing_order_id', { event: event.event, eventId });
+        return NextResponse.json({ ok: true });
       }
-      case 'payment.failed': {
-        const payment = event.payload.payment?.entity;
-        if (!payment?.order_id) break;
 
-        const { error } = await supabase
-          .from('payments')
-          .update({ status: 'failed', updated_at: now })
-          .eq('order_id', payment.order_id)
-          .in('status', ['created']);
-
-        if (error) throw new Error(error.message);
-
-        paymentLog('webhook', 'payment_failed', {
-          orderIdPrefix: payment.order_id.slice(0, 8),
-          paymentIdPrefix: payment.id?.slice(0, 8),
+      if (!paymentId) {
+        paymentWarn('webhook', 'missing_payment_id', {
+          event: event.event,
+          order_id: orderId,
+          eventId,
         });
-        break;
+        return NextResponse.json({ ok: true });
       }
-      default:
-        paymentLog('webhook', 'ignored_event', { event: event.event, eventId });
-        break;
+
+      const { data: paymentRow, error: rowErr } = await supabase
+        .from('payments')
+        .select('user_id, plan, amount')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (rowErr) {
+        throw new Error(rowErr.message);
+      }
+
+      if (!paymentRow) {
+        paymentWarn('webhook', 'unknown_order', {
+          order_id: orderId,
+          payment_id: paymentId,
+          eventId,
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      if (!isPaidPlanId(paymentRow.plan)) {
+        paymentWarn('webhook', 'invalid_plan_on_row', {
+          order_id: orderId,
+          payment_id: paymentId,
+          plan: paymentRow.plan,
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      paymentLog('webhook', 'activation_dispatch', {
+        event: event.event,
+        order_id: orderId,
+        payment_id: paymentId,
+        user_id: paymentRow.user_id,
+      });
+
+      const result = await activatePlanAfterPayment(supabase, {
+        userId: paymentRow.user_id,
+        plan: paymentRow.plan,
+        orderId,
+        paymentId,
+        amountPaise: Number(paymentRow.amount),
+        source: 'webhook',
+      });
+
+      if ('activationFailed' in result && result.activationFailed) {
+        paymentError('webhook', 'activation_failed', {
+          order_id: orderId,
+          payment_id: paymentId,
+          user_id: paymentRow.user_id,
+          error: result.error,
+        });
+        return NextResponse.json({ error: 'Activation failed' }, { status: 500 });
+      }
+
+      if (shouldTrackPaymentCompleted(result)) {
+        trackFunnelEvent(
+          'payment_completed',
+          {
+            userId: paymentRow.user_id,
+            plan: paymentRow.plan,
+            amount: Number(paymentRow.amount),
+            paymentId,
+            source: 'webhook',
+          },
+          { ga4: false },
+        );
+      }
+
+      paymentLog('webhook', 'webhook_success', {
+        order_id: orderId,
+        payment_id: paymentId,
+        user_id: paymentRow.user_id,
+        activated: result.activated,
+        alreadyActivated: result.alreadyActivated,
+      });
+
+      return NextResponse.json({ ok: true });
     }
+
+    if (event.event === 'payment.failed') {
+      const payment = paymentEntity;
+      if (!payment?.order_id) {
+        return NextResponse.json({ ok: true });
+      }
+
+      const { error } = await supabase
+        .from('payments')
+        .update({ status: 'failed', updated_at: now })
+        .eq('order_id', payment.order_id)
+        .in('status', ['created']);
+
+      if (error) throw new Error(error.message);
+
+      paymentLog('webhook', 'payment_failed', {
+        order_id: payment.order_id,
+        payment_id: payment.id,
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    paymentLog('webhook', 'ignored_event', { event: event.event, eventId });
   } catch (err) {
     paymentError('webhook', 'processing_failed', {
       event: event.event,
       eventId,
+      order_id: orderId,
+      payment_id: paymentId,
       error: err instanceof Error ? err.message : 'unknown',
     });
     return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });

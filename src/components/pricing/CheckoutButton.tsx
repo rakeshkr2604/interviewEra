@@ -77,7 +77,14 @@ async function verifyPaymentOnServer(params: {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
-}): Promise<{ ok: boolean; error?: string; planExpiresAt?: string; skipped?: boolean }> {
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  plan?: 'starter' | 'pro';
+  planExpiresAt?: string;
+  activated?: boolean;
+  alreadyActivated?: boolean;
+}> {
   let res: Response;
   try {
     res = await fetch('/api/payments/verify', {
@@ -92,8 +99,11 @@ async function verifyPaymentOnServer(params: {
   const json = (await res.json()) as {
     ok?: boolean;
     error?: string;
+    plan?: 'starter' | 'pro';
     planExpiresAt?: string;
-    skipped?: boolean;
+    activated?: boolean;
+    alreadyActivated?: boolean;
+    activationFailed?: boolean;
   };
 
   if (!res.ok || !json.ok) {
@@ -103,7 +113,13 @@ async function verifyPaymentOnServer(params: {
     return { ok: false, error: json.error ?? PAYMENT_VERIFY_FAILED_USER_MESSAGE };
   }
 
-  return { ok: true, planExpiresAt: json.planExpiresAt, skipped: json.skipped };
+  return {
+    ok: true,
+    plan: json.plan,
+    planExpiresAt: json.planExpiresAt,
+    activated: json.activated,
+    alreadyActivated: json.alreadyActivated,
+  };
 }
 
 export function CheckoutButton({
@@ -224,7 +240,7 @@ export function CheckoutButton({
             return;
           }
 
-          if (verify.skipped) {
+          if (verify.alreadyActivated) {
             toast.success(PAYMENT_ALREADY_PROCESSED_MESSAGE);
           }
 
@@ -242,6 +258,7 @@ export function CheckoutButton({
             params.set('expires', verify.planExpiresAt);
           }
           router.push(`/dashboard?${params.toString()}`);
+          router.refresh();
         },
         modal: {
           ondismiss: () => {

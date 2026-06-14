@@ -123,8 +123,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  paymentLog('create-order', 'api_request', {
-    userId: user.id,
+  paymentLog('create-order', 'create_order_start', {
+    user_id: user.id,
     plan,
     mode: detectRazorpayMode(process.env.RAZORPAY_KEY_ID),
   });
@@ -146,8 +146,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     if (insertErr) {
       paymentError('create-order', 'payment_row_insert_failed', {
-        userId: user.id,
-        orderId: order.order_id,
+        user_id: user.id,
+        order_id: order.order_id,
         code: insertErr.code,
       });
       return NextResponse.json(
@@ -155,6 +155,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         { status: 500 },
       );
     }
+
+    paymentLog('create-order', 'create_order_done', {
+      user_id: user.id,
+      order_id: order.order_id,
+      plan,
+    });
 
     return NextResponse.json({
       order_id: order.order_id,
@@ -166,7 +172,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown';
     paymentError('create-order', 'api_failed', {
-      userId: user.id,
+      user_id: user.id,
       plan,
       error: message,
     });

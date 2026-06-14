@@ -4,7 +4,7 @@ import {
   getPaidPlan,
   type PaidPlanId,
 } from '@/lib/pricing/plans';
-import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
+import { activationError, activationLog } from '@/lib/razorpay/payment-log';
 import type { PlanTier } from '@/types/app.types';
 
 export interface ActivatePlanParams {
@@ -16,50 +16,100 @@ export interface ActivatePlanParams {
   source: string;
 }
 
-export type ActivatePlanResult =
-  | {
-      ok: true;
-      skipped: boolean;
-      planExpiresAt: string;
-    }
-  | {
-      ok: false;
-      error: string;
-    };
+/** Fresh activation completed in this request. */
+export type ActivatePlanFresh = {
+  activated: true;
+  alreadyActivated: false;
+  planExpiresAt: string;
+  plan: PaidPlanId;
+};
 
+/** Idempotent replay — this paymentId was already applied to the user. */
+export type ActivatePlanReplay = {
+  activated: false;
+  alreadyActivated: true;
+  planExpiresAt: string;
+  plan: PaidPlanId;
+};
+
+/** Validation or persistence failure — safe to retry (webhook) or surface error (verify). */
+export type ActivatePlanFailure = {
+  activated: false;
+  alreadyActivated: false;
+  activationFailed: true;
+  error: string;
+};
+
+export type ActivatePlanResult = ActivatePlanFresh | ActivatePlanReplay | ActivatePlanFailure;
+
+export function activationSucceeded(
+  result: ActivatePlanResult,
+): result is ActivatePlanFresh | ActivatePlanReplay {
+  return !('activationFailed' in result && result.activationFailed);
+}
+
+export function activationWasFresh(result: ActivatePlanResult): result is ActivatePlanFresh {
+  return 'activated' in result && result.activated === true && result.alreadyActivated === false;
+}
+
+function traceIds(params: ActivatePlanParams): {
+  order_id: string;
+  payment_id: string;
+  user_id: string;
+} {
+  return {
+    order_id: params.orderId,
+    payment_id: params.paymentId,
+    user_id: params.userId,
+  };
+}
+
+function replayResult(plan: PaidPlanId, planExpiresAt: string): ActivatePlanReplay {
+  return {
+    activated: false,
+    alreadyActivated: true,
+    planExpiresAt,
+    plan,
+  };
+}
+
+function freshResult(plan: PaidPlanId, planExpiresAt: string): ActivatePlanFresh {
+  return {
+    activated: true,
+    alreadyActivated: false,
+    planExpiresAt,
+    plan,
+  };
+}
+
+function failedResult(error: string): ActivatePlanFailure {
+  return {
+    activated: false,
+    alreadyActivated: false,
+    activationFailed: true,
+    error,
+  };
+}
+
+/**
+ * Single source of truth for granting plan access after a successful Razorpay payment.
+ *
+ * Safe to call from **both** POST /verify and POST /webhook — order of arrival does not matter.
+ *
+ * Idempotency marker: `users.last_payment_id === paymentId` (never `payments.status`).
+ * Concurrency: optimistic conditional update `.neq('last_payment_id', paymentId)`.
+ */
 export async function activatePlanAfterPayment(
   supabase: SupabaseClient,
   params: ActivatePlanParams,
 ): Promise<ActivatePlanResult> {
   const { userId, plan, orderId, paymentId, amountPaise, source } = params;
+  const ids = traceIds(params);
   const planConfig = getPaidPlan(plan);
   const now = new Date();
   const nowIso = now.toISOString();
 
-  const { data: existingPayment, error: existingPayErr } = await supabase
-    .from('payments')
-    .select('id, status, user_id, plan, amount')
-    .eq('payment_id', paymentId)
-    .maybeSingle();
-
-  if (existingPayErr) {
-    paymentError('verify', 'payment_lookup_failed', { code: existingPayErr.code, source });
-    return { ok: false, error: existingPayErr.message };
-  }
-
-  if (existingPayment?.status === 'paid') {
-    paymentLog('verify', 'already_paid_idempotent', { paymentIdPrefix: paymentId.slice(0, 8), source });
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('plan_expires_at')
-      .eq('id', userId)
-      .maybeSingle();
-    return {
-      ok: true,
-      skipped: true,
-      planExpiresAt: (userRow?.plan_expires_at as string | null) ?? nowIso,
-    };
-  }
+  activationLog('activate_start', ids, { plan, source });
 
   const { data: orderRow, error: orderErr } = await supabase
     .from('payments')
@@ -68,79 +118,66 @@ export async function activatePlanAfterPayment(
     .maybeSingle();
 
   if (orderErr || !orderRow) {
-    paymentError('verify', 'order_not_found', { orderIdPrefix: orderId.slice(0, 8), source });
-    return { ok: false, error: 'Order not found for this user.' };
+    activationError('order_not_found', ids, { source, code: orderErr?.code });
+    return failedResult('Order not found for this user.');
   }
 
   if (orderRow.user_id !== userId) {
-    paymentError('verify', 'order_user_mismatch', { orderIdPrefix: orderId.slice(0, 8), source });
-    return { ok: false, error: 'Order does not belong to this user.' };
+    activationError('order_user_mismatch', ids, { source });
+    return failedResult('Order does not belong to this user.');
   }
 
   if (orderRow.plan !== plan) {
-    return { ok: false, error: 'Plan mismatch for this order.' };
+    activationError('plan_mismatch', ids, { source, orderPlan: orderRow.plan });
+    return failedResult('Plan mismatch for this order.');
   }
 
   if (Number(orderRow.amount) !== amountPaise) {
-    return { ok: false, error: 'Amount mismatch for this order.' };
-  }
-
-  if (orderRow.status === 'paid') {
-    const { data: userRow } = await supabase
-      .from('users')
-      .select('plan_expires_at')
-      .eq('id', userId)
-      .maybeSingle();
-    return {
-      ok: true,
-      skipped: true,
-      planExpiresAt: (userRow?.plan_expires_at as string | null) ?? nowIso,
-    };
+    activationError('amount_mismatch', ids, {
+      source,
+      expected: amountPaise,
+      actual: orderRow.amount,
+    });
+    return failedResult('Amount mismatch for this order.');
   }
 
   const { data: user, error: userErr } = await supabase
     .from('users')
-    .select('plan_tier, plan_started_at, plan_expires_at, credits_remaining')
+    .select('plan_tier, plan_started_at, plan_expires_at, credits_remaining, last_payment_id')
     .eq('id', userId)
     .maybeSingle();
 
   if (userErr || !user) {
-    return { ok: false, error: 'User not found.' };
+    activationError('user_not_found', ids, { source, code: userErr?.code });
+    return failedResult('User not found.');
+  }
+
+  const creditsBefore = (user.credits_remaining as number | null) ?? 0;
+  const expiryBefore = (user.plan_expires_at as string | null) ?? null;
+
+  // ── Idempotent lock: already activated for this payment? ──────────────────
+  if (user.last_payment_id === paymentId) {
+    activationLog('already_activated', ids, { source, plan });
+    return replayResult(plan, expiryBefore ?? nowIso);
   }
 
   const currentTier = user.plan_tier as PlanTier;
   if (currentTier === 'campus' || currentTier === 'campus_admin') {
-    return { ok: false, error: 'Campus plans cannot be purchased via self-serve checkout.' };
+    activationError('campus_plan_blocked', ids, { source });
+    return failedResult('Campus plans cannot be purchased via self-serve checkout.');
   }
 
-  const currentExpires = user.plan_expires_at
-    ? new Date(user.plan_expires_at as string)
-    : null;
+  const currentExpires = expiryBefore ? new Date(expiryBefore) : null;
   const newExpiresAt = computePlanExpiry(currentExpires, planConfig.durationDays, now);
   const planStartedAt =
     user.plan_started_at && currentExpires && currentExpires > now
       ? (user.plan_started_at as string)
       : nowIso;
 
-  const { error: payUpdateErr } = await supabase
-    .from('payments')
-    .update({
-      payment_id: paymentId,
-      status: 'paid',
-      updated_at: nowIso,
-    })
-    .eq('order_id', orderId)
-    .eq('status', 'created');
+  const newCreditsRemaining = creditsBefore + planConfig.credits;
 
-  if (payUpdateErr) {
-    paymentError('verify', 'payment_row_update_failed', { code: payUpdateErr.code, source });
-    return { ok: false, error: payUpdateErr.message };
-  }
-
-  const existingCredits = (user.credits_remaining as number | null) ?? 0;
-  const newCreditsRemaining = existingCredits + planConfig.credits;
-
-  const { error: userUpdateErr } = await supabase
+  // ── Optimistic lock — only one concurrent caller wins ───────────────────
+  const { data: updatedUsers, error: userUpdateErr } = await supabase
     .from('users')
     .update({
       plan_tier: plan,
@@ -151,12 +188,61 @@ export async function activatePlanAfterPayment(
       last_payment_id: paymentId,
       last_order_id: orderId,
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .neq('last_payment_id', paymentId)
+    .select('id');
 
   if (userUpdateErr) {
-    paymentError('verify', 'user_update_failed', { code: userUpdateErr.code, source });
-    return { ok: false, error: userUpdateErr.message };
+    activationError('user_update_failed', ids, { source, code: userUpdateErr.code });
+    return failedResult(userUpdateErr.message);
   }
+
+  if (!updatedUsers?.length) {
+    const { data: retryUser } = await supabase
+      .from('users')
+      .select('last_payment_id, plan_expires_at')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (retryUser?.last_payment_id === paymentId) {
+      activationLog('already_activated', ids, { source, plan, concurrent: true });
+      return replayResult(plan, (retryUser.plan_expires_at as string | null) ?? nowIso);
+    }
+
+    activationError('user_update_conflict', ids, { source });
+    return failedResult('Activation conflict — please retry.');
+  }
+
+  activationLog('user_updated', ids, {
+    source,
+    plan,
+    credits_before: creditsBefore,
+    credits_after: newCreditsRemaining,
+    expiry_before: expiryBefore,
+    expiry_after: newExpiresAt.toISOString(),
+  });
+
+  activationLog('credits_granted', ids, {
+    source,
+    creditsAdded: planConfig.credits,
+    credits_after: newCreditsRemaining,
+  });
+
+  const { error: payUpdateErr } = await supabase
+    .from('payments')
+    .update({
+      payment_id: paymentId,
+      status: 'paid',
+      updated_at: nowIso,
+    })
+    .eq('order_id', orderId);
+
+  if (payUpdateErr) {
+    activationError('payment_row_update_failed', ids, { source, code: payUpdateErr.code });
+    return failedResult(payUpdateErr.message);
+  }
+
+  activationLog('payment_updated', ids, { source, paymentStatus: 'paid' });
 
   const { error: txErr } = await supabase.from('credit_transactions').insert({
     user_id: userId,
@@ -167,18 +253,17 @@ export async function activatePlanAfterPayment(
   });
 
   if (txErr) {
-    paymentError('verify', 'credit_tx_failed', { code: txErr.code, source });
-    return { ok: false, error: txErr.message };
+    activationError('ledger_insert_failed', ids, { source, code: txErr.code });
+    return failedResult(txErr.message);
   }
 
-  paymentLog('verify', 'plan_activated', {
-    userId,
-    plan,
-    orderIdPrefix: orderId.slice(0, 8),
-    paymentIdPrefix: paymentId.slice(0, 8),
-    planExpiresAt: newExpiresAt.toISOString(),
+  activationLog('ledger_written', ids, { source, creditsAdded: planConfig.credits });
+
+  activationLog('activate_success', ids, {
     source,
+    plan,
+    planExpiresAt: newExpiresAt.toISOString(),
   });
 
-  return { ok: true, skipped: false, planExpiresAt: newExpiresAt.toISOString() };
+  return freshResult(plan, newExpiresAt.toISOString());
 }

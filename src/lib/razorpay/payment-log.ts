@@ -3,9 +3,15 @@
  * Never log secrets, full key IDs, or webhook signatures.
  */
 
-type PaymentLogScope = 'create-order' | 'checkout' | 'verify' | 'webhook' | 'expiry';
+type PaymentLogScope = 'create-order' | 'checkout' | 'verify' | 'webhook' | 'activate' | 'expiry';
 
 type PaymentLogLevel = 'info' | 'warn' | 'error';
+
+export interface PaymentTraceIds {
+  order_id?: string;
+  payment_id?: string;
+  user_id?: string;
+}
 
 function emit(
   level: PaymentLogLevel,
@@ -49,4 +55,21 @@ export function paymentError(
   data?: Record<string, unknown>,
 ): void {
   emit('error', scope, event, data);
+}
+
+/** Activation pipeline logs — always include order_id, payment_id, user_id when known. */
+export function activationLog(
+  event: string,
+  ids: PaymentTraceIds,
+  data?: Record<string, unknown>,
+): void {
+  paymentLog('activate', event, { ...ids, ...data });
+}
+
+export function activationError(
+  event: string,
+  ids: PaymentTraceIds,
+  data?: Record<string, unknown>,
+): void {
+  paymentError('activate', event, { ...ids, ...data });
 }

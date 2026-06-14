@@ -6,11 +6,16 @@ import {
   verifyPaymentSignature,
 } from '@/lib/razorpay/client';
 import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
+import { toActivationApiBody, shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-response';
 import { getPaidPlan, isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentVerifySchema } from '@/lib/validations/schemas';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 
+/**
+ * Client payment verification — validates Razorpay payload, then delegates
+ * activation to activatePlanAfterPayment() (same path as webhook).
+ */
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createClient();
 
@@ -40,14 +45,14 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = validation.data;
 
-  paymentLog('verify', 'request', {
-    userId: user.id,
-    orderIdPrefix: razorpay_order_id.slice(0, 8),
-    paymentIdPrefix: razorpay_payment_id.slice(0, 8),
+  paymentLog('verify', 'verify_start', {
+    user_id: user.id,
+    order_id: razorpay_order_id,
+    payment_id: razorpay_payment_id,
   });
 
   if (!process.env.RAZORPAY_KEY_SECRET) {
-    paymentError('verify', 'missing_key_secret', {});
+    paymentError('verify', 'missing_key_secret', { user_id: user.id });
     return NextResponse.json(
       { ok: false, error: 'Payment configuration error.' },
       { status: 500 },
@@ -62,18 +67,36 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (!signatureValid) {
     paymentWarn('verify', 'signature_rejected', {
-      userId: user.id,
-      orderIdPrefix: razorpay_order_id.slice(0, 8),
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      signature_valid: false,
     });
     return NextResponse.json({ ok: false, error: 'Invalid signature' }, { status: 400 });
   }
 
+  paymentLog('verify', 'signature_ok', {
+    user_id: user.id,
+    order_id: razorpay_order_id,
+    payment_id: razorpay_payment_id,
+    signature_valid: true,
+  });
+
   let remoteOrder;
   try {
     remoteOrder = await fetchRazorpayOrder(razorpay_order_id);
+    paymentLog('verify', 'order_fetch_ok', {
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      status: remoteOrder.status,
+      amount: remoteOrder.amount,
+    });
   } catch (err) {
     paymentError('verify', 'order_fetch_failed', {
-      orderIdPrefix: razorpay_order_id.slice(0, 8),
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
       error: err instanceof Error ? err.message : 'unknown',
     });
     return NextResponse.json(
@@ -82,20 +105,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (remoteOrder.status !== 'paid') {
-    paymentWarn('verify', 'order_status_not_paid_yet', {
-      orderIdPrefix: razorpay_order_id.slice(0, 8),
-      status: remoteOrder.status,
-    });
-    // Checkout handler only runs after success; proceed when signature is valid.
-  }
-
   const notesUserId = remoteOrder.notes?.['user_id'];
   const notesPlan = remoteOrder.notes?.['plan'];
   if (notesUserId !== user.id) {
     paymentWarn('verify', 'order_user_mismatch', {
-      userId: user.id,
-      orderIdPrefix: razorpay_order_id.slice(0, 8),
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
     });
     return NextResponse.json(
       { ok: false, error: 'Order does not belong to this user.' },
@@ -110,7 +126,9 @@ export async function POST(request: Request): Promise<NextResponse> {
   const planConfig = getPaidPlan(notesPlan);
   if (remoteOrder.amount !== planConfig.amountPaise) {
     paymentError('verify', 'amount_mismatch', {
-      orderIdPrefix: razorpay_order_id.slice(0, 8),
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
       expected: planConfig.amountPaise,
       actual: remoteOrder.amount,
     });
@@ -127,15 +145,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     source: 'verify',
   });
 
-  if (!result.ok) {
+  const apiBody = toActivationApiBody(result, notesPlan);
+
+  if (apiBody.activationFailed) {
     paymentError('verify', 'activation_failed', {
-      userId: user.id,
-      error: result.error,
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      error: apiBody.error,
     });
-    return NextResponse.json({ ok: false, error: result.error }, { status: 500 });
+    return NextResponse.json(apiBody, { status: 500 });
   }
 
-  if (!result.skipped) {
+  if (shouldTrackPaymentCompleted(result)) {
     trackFunnelEvent(
       'payment_completed',
       {
@@ -149,17 +171,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  paymentLog('verify', 'success', {
-    userId: user.id,
+  paymentLog('verify', 'verify_success', {
+    user_id: user.id,
+    order_id: razorpay_order_id,
+    payment_id: razorpay_payment_id,
+    activated: apiBody.activated,
+    alreadyActivated: apiBody.alreadyActivated,
     plan: notesPlan,
-    skipped: result.skipped,
-    planExpiresAt: result.planExpiresAt,
   });
 
-  return NextResponse.json({
-    ok: true,
-    plan: notesPlan,
-    planExpiresAt: result.planExpiresAt,
-    skipped: result.skipped,
-  });
+  return NextResponse.json(apiBody);
 }
