@@ -16,7 +16,7 @@ import {
   EMPTY_PAYMENTS_MESSAGE,
   planExpiresCopy,
 } from '@/lib/pricing/copy'
-import { isPaidPlanActive, isRenewalCheckout } from '@/lib/pricing/plan-status'
+import { isRenewalCheckout } from '@/lib/pricing/plan-status'
 import { CheckoutButton } from '@/components/pricing/CheckoutButton'
 import { cn } from '@/lib/utils'
 import type { PlanTier } from '@/types/app.types'

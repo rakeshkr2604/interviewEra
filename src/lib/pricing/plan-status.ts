@@ -4,8 +4,6 @@
 
 import { formatPlanExpiryEnIn } from '@/lib/pricing/copy';
 
-import type { PlanTier } from '@/types/app.types';
-
 export function formatPlanTierName(tier: string): string {
   switch (tier) {
     case 'free':

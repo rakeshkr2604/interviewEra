@@ -6,53 +6,71 @@ import Link from 'next/link';
 import { Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatPlanExpiryEnIn } from '@/lib/pricing/copy';
-import { PAID_PLANS } from '@/lib/pricing/plans';
-import { isPaidPlanId } from '@/lib/pricing/plans';
+import { PAID_PLANS, isPaidPlanId } from '@/lib/pricing/plans';
+
+type PaymentSuccessData = {
+  plan: 'starter' | 'pro';
+  expiresAt: string | null;
+  credits: number;
+};
+
+function parsePaymentSuccess(searchParams: URLSearchParams): PaymentSuccessData | null {
+  const planParam = searchParams.get('upgraded');
+  if (!planParam || !isPaidPlanId(planParam)) return null;
+
+  const expires = searchParams.get('expires');
+  let expiresAt: string | null = null;
+  if (expires) {
+    try {
+      expiresAt = decodeURIComponent(expires);
+    } catch {
+      expiresAt = expires;
+    }
+  }
+
+  const creditsParam = searchParams.get('credits');
+  let credits = PAID_PLANS[planParam].credits;
+  if (creditsParam) {
+    const parsed = Number.parseInt(creditsParam, 10);
+    if (!Number.isNaN(parsed)) credits = parsed;
+  }
+
+  return { plan: planParam, expiresAt, credits };
+}
 
 export function PaymentSuccessBanner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [visible, setVisible] = useState(false);
-  const [plan, setPlan] = useState<'starter' | 'pro' | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [credits, setCredits] = useState<number | null>(null);
+  const [dismissed, setDismissed] = useState(false);
+  const parsed = parsePaymentSuccess(searchParams);
+  const [bannerData, setBannerData] = useState<PaymentSuccessData | null>(null);
+
+  if (parsed !== null && bannerData === null) {
+    setBannerData(parsed);
+  }
 
   useEffect(() => {
-    const planParam = searchParams.get('upgraded');
-    const expires = searchParams.get('expires');
-    const creditsParam = searchParams.get('credits');
-
-    if (!planParam || !isPaidPlanId(planParam)) return;
-
-    setPlan(planParam);
-    setVisible(true);
-
-    if (expires) {
-      try {
-        setExpiresAt(decodeURIComponent(expires));
-      } catch {
-        setExpiresAt(expires);
-      }
-    }
-
-    if (creditsParam) {
-      const parsed = Number.parseInt(creditsParam, 10);
-      if (!Number.isNaN(parsed)) setCredits(parsed);
-    } else {
-      setCredits(PAID_PLANS[planParam].credits);
-    }
+    if (!bannerData) return;
 
     const url = new URL(window.location.href);
+    if (
+      !url.searchParams.has('upgraded') &&
+      !url.searchParams.has('expires') &&
+      !url.searchParams.has('credits')
+    ) {
+      return;
+    }
+
     url.searchParams.delete('upgraded');
     url.searchParams.delete('expires');
     url.searchParams.delete('credits');
     router.replace(url.pathname + (url.search ? url.search : ''), { scroll: false });
-  }, [searchParams, router]);
+  }, [bannerData, router]);
 
-  if (!visible || !plan) return null;
+  if (dismissed || !bannerData) return null;
 
-  const planName = PAID_PLANS[plan].label;
-  const expiryLabel = expiresAt ? formatPlanExpiryEnIn(expiresAt) : null;
+  const planName = PAID_PLANS[bannerData.plan].label;
+  const expiryLabel = bannerData.expiresAt ? formatPlanExpiryEnIn(bannerData.expiresAt) : null;
 
   return (
     <div
@@ -92,22 +110,20 @@ export function PaymentSuccessBanner() {
                 </dd>
               </div>
             ) : null}
-            {credits !== null ? (
-              <div>
-                <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                  Credits
-                </dt>
-                <dd className="mt-0.5 font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                  {credits}
-                </dd>
-              </div>
-            ) : null}
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Credits
+              </dt>
+              <dd className="mt-0.5 font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                {bannerData.credits}
+              </dd>
+            </div>
           </dl>
           <div className="flex flex-wrap gap-2 pt-1">
             <Button size="sm" asChild>
               <Link href="/dashboard">Go to Dashboard</Link>
             </Button>
-            <Button size="sm" variant="outline" type="button" onClick={() => setVisible(false)}>
+            <Button size="sm" variant="outline" type="button" onClick={() => setDismissed(true)}>
               Dismiss
             </Button>
           </div>

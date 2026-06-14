@@ -1,7 +1,6 @@
 'use client';
 
-import { useState } from 'react';
-import Link from 'next/link';
+import { useState, type ReactNode } from 'react';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { Check, X } from 'lucide-react';
@@ -12,7 +11,6 @@ import { BillingCycleToggle, type BillingCycle } from '@/components/pricing/Bill
 import {
   BILLING_AMOUNTS,
   FREE_TIER_FEATURES,
-  MARKETING_PRICING_CARDS,
   PRO_FEATURES,
   STARTER_FEATURES,
 } from '@/lib/pricing/tiers';
@@ -43,6 +41,23 @@ const upgradeCtaStyle = {
   background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
   boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
 } as const;
+
+/** Full-width, button-shaped footer so tiers match CTAs (not plain right-aligned text). */
+function PlanTierFooter({ children }: { children: ReactNode }) {
+  return (
+    <div
+      role="status"
+      className="flex min-h-12 w-full shrink-0 items-center justify-center rounded-[14px] border-2 px-4 text-center text-sm font-semibold"
+      style={{
+        borderColor: 'var(--card-border)',
+        background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+        color: 'var(--text-secondary)',
+      }}
+    >
+      {children}
+    </div>
+  );
+}
 
 /** Landing pricing: same tokens as rest of marketing site (light + dark) */
 const marketingCardShell =
@@ -270,23 +285,6 @@ export function AppPricingGrid({
   const canBuyPro = !isCampus;
   const starterIsRenewal = isRenewalCheckout('starter', currentPlan, planExpiresAt, planStatus);
   const proIsRenewal = isRenewalCheckout('pro', currentPlan, planExpiresAt, planStatus);
-
-  /** Full-width, button-shaped footer so tiers match CTAs (not plain right-aligned text). */
-  function PlanTierFooter({ children }: { children: React.ReactNode }) {
-    return (
-      <div
-        role="status"
-        className="flex min-h-12 w-full shrink-0 items-center justify-center rounded-[14px] border-2 px-4 text-center text-sm font-semibold"
-        style={{
-          borderColor: 'var(--card-border)',
-          background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-          color: 'var(--text-secondary)',
-        }}
-      >
-        {children}
-      </div>
-    );
-  }
 
   function renderPlanStatus(plan: PlanTier) {
     if (isCampus) {
