@@ -7,6 +7,8 @@ import { webApplicationJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jso
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 import { StarBuilderForm } from './StarBuilderForm';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
+import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection';
+import { buildStarBuilderLandingLinks } from '@/lib/seo/internal-linking';
 
 export const metadata: Metadata = generateMetadata({
   title: 'STAR answer builder',
@@ -68,6 +70,8 @@ const STAR_LEGEND = [
 ] as const;
 
 export default function StarBuilderPage() {
+  const starTopicSections = buildStarBuilderLandingLinks();
+
   return (
     <>
       <JsonLdScript id="star-webapp-ld" data={STAR_WEBAPP_LD} />
@@ -125,6 +129,13 @@ export default function StarBuilderPage() {
     >
       <StarBuilderForm />
     </FreeToolPageLayout>
+      {starTopicSections.map((section) => (
+        <SeoCrossLinksSection
+          key={section.heading}
+          heading={section.heading}
+          links={section.links}
+        />
+      ))}
     </>
   );
 }

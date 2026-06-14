@@ -167,11 +167,14 @@ const nextConfig: NextConfig = {
     ];
 
     const nonIndexAssetHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] as const;
+    /** App shell — allow crawl so Google sees noindex (avoids GSC "indexed though blocked"). */
+    const privateAppHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] as const;
 
     return [
       { source: "/site.webmanifest", headers: [...nonIndexAssetHeaders] },
       { source: "/manifest.json", headers: [...nonIndexAssetHeaders] },
       { source: "/_next/static/media/:path*", headers: [...nonIndexAssetHeaders] },
+      { source: "/dashboard", headers: [...privateAppHeaders] },
       { source: "/(.*)", headers: securityHeaders },
     ];
   },

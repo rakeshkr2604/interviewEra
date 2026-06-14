@@ -18,6 +18,7 @@ const PRODUCT_LINKS = [
   { href: '/how-it-works', label: 'How It Works' },
   { href: '/signup', label: 'Start Mock Interview' },
   { href: '/campus', label: 'Campus Hiring' },
+  { href: '/college', label: 'College Dashboard' },
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 

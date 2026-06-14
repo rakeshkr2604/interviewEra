@@ -79,8 +79,10 @@ import {
   ROLES,
   COMPANIES,
   SKILLS,
+  STAR_TOPICS,
   roleQuestionsPath,
   companyQuestionsPath,
+  intersectionQuestionsPath,
   skillQuestionsPath,
   questionsHubPath,
   toolVariantRolePath,
@@ -289,6 +291,72 @@ function starClusterPeers(topicSlug: string): readonly StarTopic[] {
     .filter((t): t is StarTopic => t !== undefined)
 }
 
+/**
+ * Cross-links to company×role pages for approved `HIGH_VALUE_INTERSECTIONS` pairs only.
+ * `intersectionsForRole` / `intersectionsForCompany` already filter to that list.
+ */
+function intersectionLinksForRole(role: Role, max = MAX_COMPANY_LINKS): SeoTextLink[] {
+  return byPriority(
+    intersectionsForRole(role.slug as RoleSlug)
+      .map((p) => getCompanyBySlug(p.company))
+      .filter((c): c is Company => c !== undefined),
+  )
+    .slice(0, max)
+    .map((c) => ({
+      href: intersectionQuestionsPath(c.slug as CompanySlug, role.slug as RoleSlug),
+      label: `${c.label} ${role.shortLabel} questions`,
+    }))
+}
+
+function intersectionLinksForCompany(company: Company, max = MAX_INTERSECTION): SeoTextLink[] {
+  return byPriority(
+    intersectionsForCompany(company.slug as CompanySlug)
+      .map((p) => getRoleBySlug(p.role))
+      .filter((r): r is Role => r !== undefined),
+  )
+    .slice(0, max)
+    .map((r) => ({
+      href: intersectionQuestionsPath(company.slug as CompanySlug, r.slug as RoleSlug),
+      label: `${company.label} ${r.shortLabel} questions`,
+    }))
+}
+
+function intersectionSiblingLinksAtCompany(
+  company: Company,
+  excludeRoleSlug: string,
+  max = MAX_ROLE_LINKS,
+): SeoTextLink[] {
+  return byPriority(
+    intersectionsForCompany(company.slug as CompanySlug)
+      .filter((p) => p.role !== excludeRoleSlug)
+      .map((p) => getRoleBySlug(p.role))
+      .filter((r): r is Role => r !== undefined),
+  )
+    .slice(0, max)
+    .map((r) => ({
+      href: intersectionQuestionsPath(company.slug as CompanySlug, r.slug as RoleSlug),
+      label: `${company.label} ${r.shortLabel} questions`,
+    }))
+}
+
+function intersectionSiblingLinksForRole(
+  role: Role,
+  excludeCompanySlug: string,
+  max = MAX_COMPANY_LINKS,
+): SeoTextLink[] {
+  return byPriority(
+    intersectionsForRole(role.slug as RoleSlug)
+      .filter((p) => p.company !== excludeCompanySlug)
+      .map((p) => getCompanyBySlug(p.company))
+      .filter((c): c is Company => c !== undefined),
+  )
+    .slice(0, max)
+    .map((c) => ({
+      href: intersectionQuestionsPath(c.slug as CompanySlug, role.slug as RoleSlug),
+      label: `${c.label} ${role.shortLabel} questions`,
+    }))
+}
+
 // ─── Section builders ─────────────────────────────────────────────────────────
 
 // ── Role page (/interview-questions/[role]) ───────────────────────────────────
@@ -321,17 +389,8 @@ export function buildRolePageLinks(role: Role): LinkSection[] {
   const self = roleQuestionsPath(role.slug as RoleSlug)
   const sections: LinkSection[] = []
 
-  // 1. Companies hiring this role (sorted by sitemapPriority = search volume proxy)
-  const hiringCompanyLinks: SeoTextLink[] = byPriority(
-    intersectionsForRole(role.slug as RoleSlug)
-      .map((p) => getCompanyBySlug(p.company))
-      .filter((c): c is Company => c !== undefined),
-  )
-    .slice(0, MAX_COMPANY_LINKS)
-    .map((c) => ({
-      href: companyQuestionsPath(c.slug as CompanySlug),
-      label: `${c.label} ${role.shortLabel} questions`,
-    }))
+  // 1. Companies hiring this role → canonical intersection pages (HIGH_VALUE_INTERSECTIONS)
+  const hiringCompanyLinks = intersectionLinksForRole(role)
   if (hiringCompanyLinks.length > 0) {
     sections.push({
       heading: `Companies hiring ${role.pluralLabel}`,
@@ -384,17 +443,8 @@ export function buildCompanyPageLinks(company: Company): LinkSection[] {
   const self = companyQuestionsPath(company.slug as CompanySlug)
   const sections: LinkSection[] = []
 
-  // 1. Roles at this company
-  const roleLinks: SeoTextLink[] = byPriority(
-    intersectionsForCompany(company.slug as CompanySlug)
-      .map((p) => getRoleBySlug(p.role))
-      .filter((r): r is Role => r !== undefined),
-  )
-    .slice(0, MAX_INTERSECTION)
-    .map((r) => ({
-      href: roleQuestionsPath(r.slug as RoleSlug),
-      label: `${company.label} ${r.shortLabel} questions`,
-    }))
+  // 1. Roles at this company → canonical intersection pages (HIGH_VALUE_INTERSECTIONS)
+  const roleLinks = intersectionLinksForCompany(company)
   if (roleLinks.length > 0) {
     sections.push({
       heading: `Roles you can target at ${company.label}`,
@@ -511,34 +561,14 @@ export function buildSkillPageLinks(skill: Skill): LinkSection[] {
 export function buildIntersectionPageLinks(company: Company, role: Role): LinkSection[] {
   const sections: LinkSection[] = []
 
-  // 1. Other roles at the same company
-  const sameCompanyRoleLinks: SeoTextLink[] = byPriority(
-    intersectionsForCompany(company.slug as CompanySlug)
-      .filter((p) => p.role !== role.slug)
-      .map((p) => getRoleBySlug(p.role))
-      .filter((r): r is Role => r !== undefined),
-  )
-    .slice(0, MAX_ROLE_LINKS)
-    .map((r) => ({
-      href: roleQuestionsPath(r.slug as RoleSlug),
-      label: `${company.label} ${r.shortLabel} questions`,
-    }))
+  // 1. Other roles at the same company (sibling intersection pages)
+  const sameCompanyRoleLinks = intersectionSiblingLinksAtCompany(company, role.slug)
   if (sameCompanyRoleLinks.length > 0) {
     sections.push({ heading: `More ${company.label} roles`, links: sameCompanyRoleLinks })
   }
 
-  // 2. Same role at other companies
-  const sameRoleCompanyLinks: SeoTextLink[] = byPriority(
-    intersectionsForRole(role.slug as RoleSlug)
-      .filter((p) => p.company !== company.slug)
-      .map((p) => getCompanyBySlug(p.company))
-      .filter((c): c is Company => c !== undefined),
-  )
-    .slice(0, MAX_COMPANY_LINKS)
-    .map((c) => ({
-      href: companyQuestionsPath(c.slug as CompanySlug),
-      label: `${c.label} ${role.shortLabel} questions`,
-    }))
+  // 2. Same role at other companies (sibling intersection pages)
+  const sameRoleCompanyLinks = intersectionSiblingLinksForRole(role, company.slug)
   if (sameRoleCompanyLinks.length > 0) {
     sections.push({ heading: `${role.label} interviews at other companies`, links: sameRoleCompanyLinks })
   }
@@ -606,17 +636,8 @@ export function buildToolQGenRoleLinks(role: Role): LinkSection[] {
     ], self),
   })
 
-  // 4. Companies hiring this role
-  const companyLinks: SeoTextLink[] = byPriority(
-    intersectionsForRole(role.slug as RoleSlug)
-      .map((p) => getCompanyBySlug(p.company))
-      .filter((c): c is Company => c !== undefined),
-  )
-    .slice(0, MAX_COMPANY_LINKS)
-    .map((c) => ({
-      href: companyQuestionsPath(c.slug as CompanySlug),
-      label: `${c.label} ${role.shortLabel} questions`,
-    }))
+  // 4. Companies hiring this role → intersection question banks
+  const companyLinks = intersectionLinksForRole(role)
   if (companyLinks.length > 0) {
     sections.push({
       heading: `${role.label} hiring companies`,
@@ -654,17 +675,8 @@ export function buildToolQGenCompanyLinks(company: Company): LinkSection[] {
     })
   }
 
-  // 2. Roles available at this company
-  const roleLinks: SeoTextLink[] = byPriority(
-    intersectionsForCompany(company.slug as CompanySlug)
-      .map((p) => getRoleBySlug(p.role))
-      .filter((r): r is Role => r !== undefined),
-  )
-    .slice(0, MAX_INTERSECTION)
-    .map((r) => ({
-      href: roleQuestionsPath(r.slug as RoleSlug),
-      label: `${company.label} ${r.shortLabel} questions`,
-    }))
+  // 2. Roles available at this company → intersection question banks
+  const roleLinks = intersectionLinksForCompany(company)
   if (roleLinks.length > 0) {
     sections.push({
       heading: `Roles at ${company.label}`,
@@ -782,4 +794,15 @@ export function buildToolStarTopicLinks(topic: StarTopic): LinkSection[] {
   })
 
   return sections
+}
+
+/**
+ * Contextual links for the STAR Builder landing page — one anchor per topic page.
+ */
+export function buildStarBuilderLandingLinks(): LinkSection[] {
+  const links: SeoTextLink[] = STAR_TOPICS.map((t) => ({
+    href: toolStarTopicPath(t.slug as StarTopicSlug),
+    label: t.label,
+  }))
+  return [{ heading: 'Popular STAR Interview Questions', links }]
 }

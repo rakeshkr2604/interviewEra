@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { DashboardChrome } from '@/components/layout/DashboardChrome'
 
-/** App shell is disallowed in robots.txt; keep HTML meta aligned so GSC is not confused. */
+/** Private app shell — noindex via layout meta + X-Robots-Tag on /dashboard (not robots.txt disallow). */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
