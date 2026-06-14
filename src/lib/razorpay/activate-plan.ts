@@ -97,7 +97,8 @@ function failedResult(error: string): ActivatePlanFailure {
  * Safe to call from **both** POST /verify and POST /webhook — order of arrival does not matter.
  *
  * Idempotency marker: `users.last_payment_id === paymentId` (never `payments.status`).
- * Concurrency: optimistic conditional update `.neq('last_payment_id', paymentId)`.
+ * Concurrency: compare-and-swap on the observed `last_payment_id` (`.is(null)` or `.eq(observed)`).
+ * Do NOT use `.neq('last_payment_id', paymentId)` — SQL NULL != value is unknown, so first purchases never match.
  */
 export async function activatePlanAfterPayment(
   supabase: SupabaseClient,
@@ -175,22 +176,27 @@ export async function activatePlanAfterPayment(
       : nowIso;
 
   const newCreditsRemaining = creditsBefore + planConfig.credits;
+  const observedLastPaymentId = (user.last_payment_id as string | null) ?? null;
 
-  // ── Optimistic lock — only one concurrent caller wins ───────────────────
-  const { data: updatedUsers, error: userUpdateErr } = await supabase
-    .from('users')
-    .update({
-      plan_tier: plan,
-      credits_remaining: newCreditsRemaining,
-      plan_started_at: planStartedAt,
-      plan_expires_at: newExpiresAt.toISOString(),
-      plan_status: 'active',
-      last_payment_id: paymentId,
-      last_order_id: orderId,
-    })
-    .eq('id', userId)
-    .neq('last_payment_id', paymentId)
-    .select('id');
+  // ── Compare-and-swap lock — only one concurrent caller wins ─────────────
+  // Match the exact value we read so NULL first purchases work (.is null, not .neq).
+  const userUpdatePayload = {
+    plan_tier: plan,
+    credits_remaining: newCreditsRemaining,
+    plan_started_at: planStartedAt,
+    plan_expires_at: newExpiresAt.toISOString(),
+    plan_status: 'active',
+    last_payment_id: paymentId,
+    last_order_id: orderId,
+  };
+
+  const userUpdateBase = supabase.from('users').update(userUpdatePayload).eq('id', userId);
+
+  const { data: updatedUsers, error: userUpdateErr } = await (
+    observedLastPaymentId === null
+      ? userUpdateBase.is('last_payment_id', null)
+      : userUpdateBase.eq('last_payment_id', observedLastPaymentId)
+  ).select('id');
 
   if (userUpdateErr) {
     activationError('user_update_failed', ids, { source, code: userUpdateErr.code });

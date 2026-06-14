@@ -89,23 +89,47 @@ function createPaymentStore(initial: { user: UserRow; payments: PaymentRow[] }) 
               },
             }),
           }),
-          update: (payload: Partial<UserRow>) => ({
-            eq: (col: string, id: string) => ({
-              neq: (neqCol: string, neqVal: string) => ({
-                select: async () => {
-                  if (col !== 'id' || state.user.id !== id) {
-                    return { data: [], error: null };
-                  }
-                  if (state.user[neqCol as keyof UserRow] === neqVal) {
-                    return { data: [], error: null };
-                  }
-                  state.user = { ...state.user, ...payload };
-                  state.userUpdates++;
-                  return { data: [{ id }], error: null };
-                },
-              }),
-            }),
-          }),
+          update: (payload: Partial<UserRow>) => {
+            const finishUpdate = async (
+              lockCol: string,
+              lockMode: 'eq' | 'is',
+              lockVal: string | null,
+            ) => {
+              if (lockCol !== 'last_payment_id') {
+                return { data: [], error: null };
+              }
+              const current = state.user.last_payment_id;
+              const lockMatches =
+                lockMode === 'is'
+                  ? current === null
+                  : current === lockVal;
+              if (!lockMatches) {
+                return { data: [], error: null };
+              }
+              state.user = { ...state.user, ...payload };
+              state.userUpdates++;
+              return { data: [{ id: state.user.id }], error: null };
+            };
+
+            return {
+              eq: (col: string, id: string) => {
+                if (col === 'id') {
+                  return {
+                    is: (lockCol: string, lockVal: null) => ({
+                      select: () => finishUpdate(lockCol, 'is', lockVal),
+                    }),
+                    eq: (lockCol: string, lockVal: string) => ({
+                      select: () => finishUpdate(lockCol, 'eq', lockVal),
+                    }),
+                  };
+                }
+                return {
+                  is: () => ({ select: async () => ({ data: [], error: null }) }),
+                  eq: () => ({ select: async () => ({ data: [], error: null }) }),
+                };
+              },
+            };
+          },
         };
       }
 
@@ -185,7 +209,21 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
     if (!activationWasFresh(result)) return;
     expect(state.user.plan_tier).toBe('starter');
     expect(state.user.credits_remaining).toBe(11);
+    expect(state.user.last_payment_id).toBe(PAY_STARTER);
     assertSingleActivation(state);
+  });
+
+  it('null last_payment_id — first purchase must not hit activation conflict', async () => {
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({ last_payment_id: null, plan_tier: 'free' }),
+      payments: [starterPayment()],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect(activationWasFresh(result)).toBe(true);
+    expect('activationFailed' in result && result.activationFailed).toBe(false);
+    expect(state.user.last_payment_id).toBe(PAY_STARTER);
   });
 
   it('webhook first — payment row already paid, user not yet activated', async () => {

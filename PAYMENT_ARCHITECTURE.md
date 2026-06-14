@@ -176,15 +176,19 @@ No database migration required — uses existing `users.last_payment_id` and `us
 | Duplicate verify (refresh/retry) | Could double-credit | Same idempotency marker |
 | Webhook delayed 30+ seconds | Webhook-only: user stuck on Free | Verify activates immediately on checkout success |
 
-**Concurrency mechanism:**
+**Concurrency mechanism (compare-and-swap):**
 
 ```sql
-UPDATE users
-SET plan_tier = ..., credits_remaining = ..., last_payment_id = $paymentId, ...
-WHERE id = $userId
-  AND last_payment_id IS DISTINCT FROM $paymentId
-RETURNING id;
+-- First purchase (last_payment_id IS NULL):
+UPDATE users SET ... last_payment_id = $paymentId
+WHERE id = $userId AND last_payment_id IS NULL;
+
+-- Renewal / upgrade (last_payment_id = $observed):
+UPDATE users SET ... last_payment_id = $paymentId
+WHERE id = $userId AND last_payment_id = $observed;
 ```
+
+**Critical:** Do not use `last_payment_id != $paymentId` — in SQL, `NULL != value` is unknown, so first-time buyers never match and every request returns "Activation conflict".
 
 If zero rows returned, re-read `last_payment_id`:
 - Matches → `alreadyActivated: true` (concurrent winner finished)
