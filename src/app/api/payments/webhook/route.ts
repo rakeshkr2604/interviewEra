@@ -1,38 +1,39 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { verifyWebhookSignature, PLAN_ACTIVATION_CREDITS } from '@/lib/razorpay/client';
-import { trackFunnelEvent } from '@/lib/analytics/funnel';
-
-// Razorpay webhook payload shapes (minimal — only fields we use)
-interface RazorpaySubscriptionEntity {
-  id: string;
-  plan_id: string;
-  notes: Record<string, string>;
-  current_end?: number;
-  current_start?: number;
-}
+import { verifyWebhookSignature } from '@/lib/razorpay/client';
+import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 
 interface RazorpayPaymentEntity {
   id: string;
+  order_id: string;
   amount: number;
-  subscription_id?: string;
+  currency: string;
+  status: string;
+}
+
+interface RazorpayOrderEntity {
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  notes?: Record<string, string>;
 }
 
 interface RazorpayWebhookPayload {
   event: string;
   payload: {
-    subscription?: { entity: RazorpaySubscriptionEntity };
     payment?: { entity: RazorpayPaymentEntity };
+    order?: { entity: RazorpayOrderEntity };
   };
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
-  // Always return 200 to Razorpay quickly; processing is synchronous but fast
   const rawBody = await request.text();
   const signature = request.headers.get('x-razorpay-signature') ?? '';
+  const eventId = request.headers.get('x-razorpay-event-id') ?? undefined;
 
   if (!verifyWebhookSignature(rawBody, signature)) {
-    console.warn('[webhook] Invalid signature');
+    paymentWarn('webhook', 'invalid_signature', { eventId });
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
   }
 
@@ -40,196 +41,97 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     event = JSON.parse(rawBody) as RazorpayWebhookPayload;
   } catch {
+    paymentWarn('webhook', 'invalid_json', { eventId });
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
   }
 
+  paymentLog('webhook', 'received', {
+    event: event.event,
+    eventId,
+    orderId: event.payload.payment?.entity?.order_id ?? event.payload.order?.entity?.id,
+    paymentId: event.payload.payment?.entity?.id,
+  });
+
   const supabase = createServiceClient();
+  const now = new Date().toISOString();
 
   try {
     switch (event.event) {
-      case 'subscription.activated':
-        await handleActivated(supabase, event);
+      case 'payment.captured':
+      case 'order.paid': {
+        const payment = event.payload.payment?.entity;
+        const order = event.payload.order?.entity;
+        const orderId = payment?.order_id ?? order?.id;
+        if (!orderId) {
+          paymentWarn('webhook', 'missing_order_id', { event: event.event });
+          break;
+        }
+
+        const { data: row } = await supabase
+          .from('payments')
+          .select('id, status, payment_id')
+          .eq('order_id', orderId)
+          .maybeSingle();
+
+        if (!row) {
+          paymentWarn('webhook', 'unknown_order', { orderIdPrefix: orderId.slice(0, 8) });
+          break;
+        }
+
+        if (row.status === 'paid') {
+          paymentLog('webhook', 'already_paid_skip', { orderIdPrefix: orderId.slice(0, 8) });
+          break;
+        }
+
+        const paymentId = payment?.id ?? row.payment_id;
+        const { error } = await supabase
+          .from('payments')
+          .update({
+            status: 'paid',
+            payment_id: paymentId,
+            updated_at: now,
+          })
+          .eq('order_id', orderId)
+          .eq('status', 'created');
+
+        if (error) throw new Error(error.message);
+
+        paymentLog('webhook', 'payment_history_updated', {
+          orderIdPrefix: orderId.slice(0, 8),
+          paymentIdPrefix: paymentId?.slice(0, 8),
+        });
         break;
-      case 'subscription.charged':
-        await handleCharged(supabase, event);
+      }
+      case 'payment.failed': {
+        const payment = event.payload.payment?.entity;
+        if (!payment?.order_id) break;
+
+        const { error } = await supabase
+          .from('payments')
+          .update({ status: 'failed', updated_at: now })
+          .eq('order_id', payment.order_id)
+          .in('status', ['created']);
+
+        if (error) throw new Error(error.message);
+
+        paymentLog('webhook', 'payment_failed', {
+          orderIdPrefix: payment.order_id.slice(0, 8),
+          paymentIdPrefix: payment.id?.slice(0, 8),
+        });
         break;
-      case 'subscription.cancelled':
-        await handleCancelled(supabase, event);
-        break;
-      case 'payment.failed':
-        console.error('[webhook] Payment failed:', event.payload.payment?.entity?.id);
-        break;
+      }
       default:
-        // Ignore other events
+        paymentLog('webhook', 'ignored_event', { event: event.event, eventId });
         break;
     }
   } catch (err) {
-    console.error(`[webhook] Error processing ${event.event}:`, err);
-    // Still return 200 — Razorpay will retry on non-2xx
-    return NextResponse.json({ ok: true });
+    paymentError('webhook', 'processing_failed', {
+      event: event.event,
+      eventId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
-}
-
-function resolvePlanKey(plan: string, billingCycle: string): string {
-  return billingCycle === 'annual' ? `${plan}_annual` : plan;
-}
-
-function trackPaymentCompletedWebhook(params: {
-  userId: string;
-  plan: 'starter' | 'pro';
-  billingCycle: string;
-  paymentId: string;
-  amount: number;
-  source: string;
-}): void {
-  const planKey = resolvePlanKey(params.plan, params.billingCycle);
-  trackFunnelEvent(
-    'payment_completed',
-    {
-      userId: params.userId,
-      plan: planKey,
-      amount: params.amount,
-      paymentId: params.paymentId,
-      source: params.source,
-    },
-    { ga4: false },
-  );
-}
-
-async function handleActivated(
-  supabase: ReturnType<typeof createServiceClient>,
-  event: RazorpayWebhookPayload,
-): Promise<void> {
-  const sub = event.payload.subscription?.entity;
-  if (!sub) return;
-
-  const userId = sub.notes['user_id'];
-  const plan = sub.notes['plan'] as 'starter' | 'pro';
-  const billingCycle = (sub.notes['billing_cycle'] as string | undefined) ?? 'monthly';
-  if (!userId || !plan) return;
-
-  const planKey = resolvePlanKey(plan, billingCycle);
-  const credits = PLAN_ACTIVATION_CREDITS[planKey] ?? 0;
-  const now = new Date().toISOString();
-  const periodEnd = sub.current_end
-    ? new Date(sub.current_end * 1000).toISOString()
-    : null;
-  const periodStart = sub.current_start
-    ? new Date(sub.current_start * 1000).toISOString()
-    : null;
-
-  // Idempotency: skip if already activated for this subscription
-  const { data: existingSub } = await supabase
-    .from('subscriptions')
-    .select('id')
-    .eq('razorpay_sub_id', sub.id)
-    .maybeSingle();
-
-  if (existingSub) return;
-
-  // Upsert subscription record
-  await supabase.from('subscriptions').insert({
-    user_id: userId,
-    plan,
-    razorpay_sub_id: sub.id,
-    status: 'active',
-    current_period_start: periodStart,
-    current_period_end: periodEnd,
-  });
-
-  // Update user plan_tier and credits (plan_tier is always 'starter' or 'pro', not 'starter_annual')
-  await supabase
-    .from('users')
-    .update({ plan_tier: plan, credits_remaining: credits })
-    .eq('id', userId);
-
-  // Log credit transaction
-  await supabase.from('credit_transactions').insert({
-    user_id: userId,
-    type: 'credit',
-    amount: credits,
-    reason: `Subscription activated: ${sub.id}`,
-    created_at: now,
-  });
-}
-
-async function handleCharged(
-  supabase: ReturnType<typeof createServiceClient>,
-  event: RazorpayWebhookPayload,
-): Promise<void> {
-  const sub = event.payload.subscription?.entity;
-  const payment = event.payload.payment?.entity;
-  if (!sub || !payment) return;
-
-  const userId = sub.notes['user_id'];
-  const plan = sub.notes['plan'] as 'starter' | 'pro';
-  const billingCycle = (sub.notes['billing_cycle'] as string | undefined) ?? 'monthly';
-  if (!userId || !plan) return;
-
-  const planKey = resolvePlanKey(plan, billingCycle);
-  const credits = PLAN_ACTIVATION_CREDITS[planKey] ?? 0;
-
-  // Idempotency: skip if already processed this payment
-  const { data: existing } = await supabase
-    .from('credit_transactions')
-    .select('id')
-    .eq('reason', `Monthly charge: ${payment.id}`)
-    .maybeSingle();
-
-  if (existing) return;
-
-  // Top up credits (set to plan allocation — no indefinite stacking)
-  await supabase
-    .from('users')
-    .update({ credits_remaining: credits })
-    .eq('id', userId);
-
-  // Update subscription period dates
-  const periodEnd = sub.current_end
-    ? new Date(sub.current_end * 1000).toISOString()
-    : null;
-  const periodStart = sub.current_start
-    ? new Date(sub.current_start * 1000).toISOString()
-    : null;
-
-  await supabase
-    .from('subscriptions')
-    .update({ current_period_start: periodStart, current_period_end: periodEnd })
-    .eq('razorpay_sub_id', sub.id);
-
-  // Log credit transaction
-  await supabase.from('credit_transactions').insert({
-    user_id: userId,
-    type: 'credit',
-    amount: credits,
-    reason: `Monthly charge: ${payment.id}`,
-    created_at: new Date().toISOString(),
-  });
-
-  // Authoritative payment_completed — one product event per Razorpay payment.id
-  // (idempotent via credit_transactions reason above).
-  trackPaymentCompletedWebhook({
-    userId,
-    plan,
-    billingCycle,
-    paymentId: payment.id,
-    amount: payment.amount,
-    source: 'razorpay_subscription_charged',
-  });
-}
-
-async function handleCancelled(
-  supabase: ReturnType<typeof createServiceClient>,
-  event: RazorpayWebhookPayload,
-): Promise<void> {
-  const sub = event.payload.subscription?.entity;
-  if (!sub) return;
-
-  // Mark as cancelled — user keeps access until current_period_end
-  await supabase
-    .from('subscriptions')
-    .update({ status: 'cancelled' })
-    .eq('razorpay_sub_id', sub.id);
 }

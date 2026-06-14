@@ -182,7 +182,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
             <div className="rounded-lg bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
               <p className="text-sm text-blue-800 m-0">
                 <strong>Update (May 14, 2026):</strong> InterviewEra pricing updated.
-                New plans: Starter ₹149/month (8 credits), Pro ₹399/month (25 credits).
+                New plans: Starter ₹149 for 30-day access (8 credits), Pro ₹399 for 30-day access (25 credits).
                 Free tier now offers 3 lifetime credits.
               </p>
             </div>

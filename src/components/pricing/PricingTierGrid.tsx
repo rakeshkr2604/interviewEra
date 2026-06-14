@@ -15,9 +15,16 @@ import {
   MARKETING_PRICING_CARDS,
   PRO_FEATURES,
   STARTER_FEATURES,
-  proCheckoutLabel,
-  starterCheckoutLabel,
 } from '@/lib/pricing/tiers';
+import {
+  marketingPaidCtaLabel,
+  planPeriodLine,
+  planPriceLine,
+  upgradeCheckoutLabel,
+} from '@/lib/pricing/copy';
+import { PlanStatusHeader } from '@/components/pricing/PlanStatusHeader';
+import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
+import { isPaidPlanActive, isRenewalCheckout } from '@/lib/pricing/plan-status';
 import type { PlanTier } from '@/types/app.types';
 import { CheckoutButton } from '@/components/pricing/CheckoutButton';
 
@@ -98,21 +105,6 @@ function marketingSignupHref(plan: 'starter' | 'pro', cycle: BillingCycle): stri
 export function MarketingPricingSection() {
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
 
-  const starterMain =
-    cycle === 'annual'
-      ? BILLING_AMOUNTS.starter.annualEquivMonthlyInr
-      : BILLING_AMOUNTS.starter.monthlyInr;
-  const starterSub =
-    cycle === 'annual'
-      ? `Effective /mo · billed ₹${BILLING_AMOUNTS.starter.annualTotalInr}/yr`
-      : 'Billed monthly';
-
-  const proMain = cycle === 'annual' ? BILLING_AMOUNTS.pro.annualEquivMonthlyInr : BILLING_AMOUNTS.pro.monthlyInr;
-  const proSub =
-    cycle === 'annual'
-      ? `Effective /mo · billed ₹${BILLING_AMOUNTS.pro.annualTotalInr}/yr`
-      : 'Billed monthly';
-
   const proPerDay = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
 
   return (
@@ -125,19 +117,19 @@ export function MarketingPricingSection() {
         <span style={{ color: 'var(--accent-primary)' }}>₹5L–₹20L</span> in lost offers.
       </p>
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
-        Start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card — upgrade when you want PDF export, replay, and full analysis per answer.
+        Start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card — pay once for 30 days of access when you want PDF export, replay, and full analysis.
       </p>
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
         <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Pro</span> works out to about{' '}
         <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
           ₹{proPerDay}/day
         </span>{' '}
-        on monthly billing — less than one coffee vs the cost of walking in under-prepared.
+        for a 30-day period — less than one coffee vs walking in under-prepared.
       </p>
       <BillingCycleToggle value={cycle} onChange={setCycle} id="marketing-billing" variant="default" />
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
         <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-          ₹{BILLING_AMOUNTS.pro.monthlyInr}/mo on Pro
+          ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days on Pro
         </span>{' '}
         stacks against a <span style={{ color: 'var(--accent-primary)' }}>₹10L+</span> first job — one serious month of
         practice vs one silent rejection email.
@@ -189,13 +181,10 @@ export function MarketingPricingSection() {
               Starter
             </CardTitle>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              ₹{starterMain}
-              <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
-                /mo
-              </span>
+              {planPriceLine('starter')}
             </p>
             <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-              {starterSub}
+              {planPeriodLine()}
             </p>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col space-y-4">
@@ -207,11 +196,11 @@ export function MarketingPricingSection() {
             <TrackedCtaLink
               href={marketingSignupHref('starter', cycle)}
               ctaKey={CTA_KEYS.PRICING_CTA}
-              ctaText={cycle === 'annual' ? 'Start Starter — annual' : MARKETING_PRICING_CARDS[1].ctaLabel}
+              ctaText={marketingPaidCtaLabel('starter')}
               section="pricing_grid"
               className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
             >
-              {cycle === 'annual' ? 'Start Starter — annual' : MARKETING_PRICING_CARDS[1].ctaLabel}
+              {marketingPaidCtaLabel('starter')}
             </TrackedCtaLink>
           </CardContent>
         </Card>
@@ -231,13 +220,10 @@ export function MarketingPricingSection() {
               Pro
             </CardTitle>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent-primary)' }}>
-              ₹{proMain}
-              <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
-                /mo
-              </span>
+              {planPriceLine('pro')}
             </p>
             <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-              {proSub}
+              {planPeriodLine()}
             </p>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col space-y-4">
@@ -249,15 +235,16 @@ export function MarketingPricingSection() {
             <TrackedCtaLink
               href={marketingSignupHref('pro', cycle)}
               ctaKey={CTA_KEYS.PRICING_CTA}
-              ctaText={cycle === 'annual' ? 'Get Pro — annual' : MARKETING_PRICING_CARDS[2].ctaLabel}
+              ctaText={marketingPaidCtaLabel('pro')}
               section="pricing_grid"
               className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
             >
-              {cycle === 'annual' ? 'Get Pro — annual' : MARKETING_PRICING_CARDS[2].ctaLabel}
+              {marketingPaidCtaLabel('pro')}
             </TrackedCtaLink>
           </CardContent>
         </Card>
       </div>
+      <PaymentTrustSection />
     </div>
   );
 }
@@ -265,31 +252,24 @@ export function MarketingPricingSection() {
 interface AppPricingGridProps {
   currentPlan: PlanTier;
   userEmail: string;
+  planExpiresAt?: string | null;
+  planStatus?: string | null;
   billingCycle: 'monthly' | 'annual';
 }
 
-/** Logged-in /upgrade — Razorpay + current plan states */
-export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPricingGridProps) {
-  const canBuyStarter = TIER_ORDER[currentPlan] < TIER_ORDER.starter;
-  const canBuyPro = TIER_ORDER[currentPlan] < TIER_ORDER.pro;
-
-  const starterMonthlyLabel =
-    billingCycle === 'annual'
-      ? `₹${BILLING_AMOUNTS.starter.annualEquivMonthlyInr}`
-      : `₹${BILLING_AMOUNTS.starter.monthlyInr}`;
-  const starterPeriodLabel =
-    billingCycle === 'annual'
-      ? `/mo · billed ₹${BILLING_AMOUNTS.starter.annualTotalInr}/yr`
-      : '/mo';
-
-  const proMonthlyLabel =
-    billingCycle === 'annual'
-      ? `₹${BILLING_AMOUNTS.pro.annualEquivMonthlyInr}`
-      : `₹${BILLING_AMOUNTS.pro.monthlyInr}`;
-  const proPeriodLabel =
-    billingCycle === 'annual'
-      ? `/mo · billed ₹${BILLING_AMOUNTS.pro.annualTotalInr}/yr`
-      : '/mo';
+/** Logged-in /upgrade — Razorpay one-time 30-day orders */
+export function AppPricingGrid({
+  currentPlan,
+  userEmail,
+  planExpiresAt = null,
+  planStatus = null,
+}: Omit<AppPricingGridProps, 'billingCycle'>) {
+  const isCampus = currentPlan === 'campus' || currentPlan === 'campus_admin';
+  const isPaidActive = isPaidPlanActive(currentPlan, planStatus, planExpiresAt);
+  const canBuyStarter = !isCampus && currentPlan !== 'pro';
+  const canBuyPro = !isCampus;
+  const starterIsRenewal = isRenewalCheckout('starter', currentPlan, planExpiresAt, planStatus);
+  const proIsRenewal = isRenewalCheckout('pro', currentPlan, planExpiresAt, planStatus);
 
   /** Full-width, button-shaped footer so tiers match CTAs (not plain right-aligned text). */
   function PlanTierFooter({ children }: { children: React.ReactNode }) {
@@ -309,8 +289,15 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
   }
 
   function renderPlanStatus(plan: PlanTier) {
+    if (isCampus) {
+      return <PlanTierFooter>Managed by your institution</PlanTierFooter>;
+    }
     if (currentPlan === plan) {
-      return <PlanTierFooter>Current plan</PlanTierFooter>;
+      return null;
+    }
+    // Paid users: no faux CTA on the Free card (reads like a disabled button)
+    if (plan === 'free' && currentPlan !== 'free') {
+      return <div className="min-h-12 shrink-0" aria-hidden />;
     }
     if (TIER_ORDER[currentPlan] > TIER_ORDER[plan]) {
       return <PlanTierFooter>Included in your plan</PlanTierFooter>;
@@ -318,7 +305,16 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
     return null;
   }
 
+  function starterButtonLabel(): string {
+    return upgradeCheckoutLabel('starter', currentPlan);
+  }
+
+  function proButtonLabel(): string {
+    return upgradeCheckoutLabel('pro', currentPlan);
+  }
+
   return (
+    <div className="space-y-6">
     <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
       <div
         className={cn(
@@ -333,11 +329,7 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
               <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Free
               </CardTitle>
-              {currentPlan === 'free' && (
-                <Badge variant="secondary" className="text-xs">
-                  Current
-                </Badge>
-              )}
+              {currentPlan === 'free' && <PlanStatusHeader />}
             </div>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
               ₹0
@@ -368,16 +360,14 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                 Starter
               </CardTitle>
               {currentPlan === 'starter' && (
-                <Badge variant="secondary" className="text-xs">
-                  Current
-                </Badge>
+                <PlanStatusHeader planExpiresAt={planExpiresAt} isActive={isPaidActive} />
               )}
             </div>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {starterMonthlyLabel}
-              <span className="text-sm font-normal" style={{ color: 'var(--text-secondary)' }}>
-                {starterPeriodLabel}
-              </span>
+              {planPriceLine('starter')}
+            </p>
+            <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
+              {planPeriodLine()}
             </p>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5">
@@ -391,14 +381,15 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                 <CheckoutButton
                   userEmail={userEmail}
                   plan="starter"
-                  billingCycle={billingCycle}
                   source="upgrade"
-                  label={starterCheckoutLabel(billingCycle)}
+                  label={starterButtonLabel()}
+                  isRenewal={starterIsRenewal}
+                  planExpiresAt={starterIsRenewal ? planExpiresAt : null}
                   className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
                   style={upgradeCtaStyle}
                 />
               ) : (
-                renderPlanStatus('starter')
+                renderPlanStatus('starter') ?? <PlanTierFooter>Unavailable</PlanTierFooter>
               )}
             </div>
           </CardContent>
@@ -409,6 +400,8 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
         className={cn(
           'dashboard-premium-card dashboard-premium-card--overflow-visible relative flex min-h-0 flex-col pt-8 transition-transform duration-200 hover:-translate-y-0.5 md:pt-10',
           'ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]',
+          currentPlan === 'pro' &&
+            'ring-[color-mix(in_srgb,var(--accent-primary)_55%,transparent)]',
         )}
       >
         <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
@@ -430,16 +423,17 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                 Pro
               </CardTitle>
               {currentPlan === 'pro' && (
-                <Badge variant="secondary" className="text-xs">
-                  Current
-                </Badge>
+                <PlanStatusHeader
+                  planExpiresAt={planExpiresAt}
+                  isActive={isPaidActive}
+                />
               )}
             </div>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {proMonthlyLabel}
-              <span className="text-sm font-normal" style={{ color: 'var(--text-secondary)' }}>
-                {proPeriodLabel}
-              </span>
+              {planPriceLine('pro')}
+            </p>
+            <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
+              {planPeriodLine()}
             </p>
           </CardHeader>
           <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5">
@@ -453,19 +447,22 @@ export function AppPricingGrid({ currentPlan, userEmail, billingCycle }: AppPric
                 <CheckoutButton
                   userEmail={userEmail}
                   plan="pro"
-                  billingCycle={billingCycle}
                   source="upgrade"
-                  label={proCheckoutLabel(billingCycle)}
+                  label={proButtonLabel()}
+                  isRenewal={proIsRenewal}
+                  planExpiresAt={proIsRenewal ? planExpiresAt : null}
                   className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
                   style={upgradeCtaStyle}
                 />
               ) : (
-                renderPlanStatus('pro')
+                renderPlanStatus('pro') ?? <PlanTierFooter>Unavailable</PlanTierFooter>
               )}
             </div>
           </CardContent>
         </Card>
       </div>
+    </div>
+    <PaymentTrustSection />
     </div>
   );
 }

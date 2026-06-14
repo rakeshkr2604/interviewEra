@@ -13,7 +13,8 @@ import { VoiceAudioPanel } from '@/components/settings/VoiceAudioPanel'
 import { NotificationsPanel } from '@/components/settings/NotificationsPanel'
 import {
   BillingUsageCard,
-  type BillingSubscription,
+  type BillingPlanInfo,
+  type BillingPayment,
   type BillingTx,
 } from '@/components/settings/BillingUsageCard'
 import { PrivacySecurityPanel } from '@/components/settings/PrivacySecurityPanel'
@@ -34,7 +35,8 @@ export function SettingsPageClient({
   planTier,
   creditsRemaining,
   creditsUsedThisMonth,
-  subscription,
+  planInfo,
+  recentPayments,
   recentTransactions,
   notificationPrefs,
   weeklyImprovementSummaryOn,
@@ -46,7 +48,8 @@ export function SettingsPageClient({
   planTier: PlanTier
   creditsRemaining: number
   creditsUsedThisMonth: number
-  subscription: BillingSubscription
+  planInfo: BillingPlanInfo
+  recentPayments: BillingPayment[]
   recentTransactions: BillingTx[]
   notificationPrefs: NotificationPreferences
   weeklyImprovementSummaryOn: boolean
@@ -114,15 +117,17 @@ export function SettingsPageClient({
             id="settings-billing"
             eyebrow="Plan"
             title="Billing and usage"
-            description="Credits, subscription status, and your recent account activity."
+            description="Credits, plan access, and your recent account activity."
             density="compact"
           >
             <div className={SETTINGS_CARD_SHELL}>
               <BillingUsageCard
                 planTier={planTier}
+                userEmail={profileEmail}
                 creditsRemaining={creditsRemaining}
                 creditsUsedThisMonth={creditsUsedThisMonth}
-                subscription={subscription}
+                planInfo={planInfo}
+                recentPayments={recentPayments}
                 recentTransactions={recentTransactions}
               />
             </div>

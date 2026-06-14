@@ -1,111 +1,113 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
-import { PLAN_ACTIVATION_CREDITS } from '@/lib/razorpay/plan-credits';
+import {
+  assertRazorpayProductionReady,
+  auditRazorpayConfig,
+  detectRazorpayMode,
+  maskRazorpayKeyId,
+} from '@/lib/razorpay/config';
+import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
+import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
+import { verifyOrderPaymentSignature } from '@/lib/razorpay/payment-signature';
 
-export { PLAN_ACTIVATION_CREDITS };
+export { auditRazorpayConfig, detectRazorpayMode, maskRazorpayKeyId };
 
 export const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID!,
   key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
-// Amount in paise (100 paise = ₹1)
-export const PLAN_AMOUNTS_PAISE: Record<string, number> = {
-  starter: 14900,         // ₹149/mo
-  pro: 39900,             // ₹399/mo
-  starter_annual: 79900,  // ₹799/yr
-  pro_annual: 199900,     // ₹1,999/yr
-};
+export const MIN_ORDER_PAISE = 100;
 
-// Configure in Razorpay dashboard, then set in env
-const RAZORPAY_PLAN_IDS: Record<string, string> = {
-  starter: process.env.RAZORPAY_STARTER_PLAN_ID!,
-  pro: process.env.RAZORPAY_PRO_PLAN_ID!,
-  starter_annual: process.env.RAZORPAY_STARTER_ANNUAL_PLAN_ID!,
-  pro_annual: process.env.RAZORPAY_PRO_ANNUAL_PLAN_ID!,
-};
+export async function createPlanOrder(params: {
+  userId: string;
+  plan: PaidPlanId;
+}): Promise<{
+  order_id: string;
+  amount: number;
+  currency: string;
+  key: string;
+  plan: PaidPlanId;
+}> {
+  assertRazorpayProductionReady();
 
-export async function createSubscriptionOrder(
-  userId: string,
-  plan: 'starter' | 'pro',
-  billingCycle: 'monthly' | 'annual' = 'monthly',
-): Promise<{ subscriptionId: string; amount: number; currency: string; key: string }> {
-  const planKey = billingCycle === 'annual' ? `${plan}_annual` : plan;
-  const planId = RAZORPAY_PLAN_IDS[planKey];
-  if (!planId) {
-    throw new Error(`Razorpay plan ID not configured for: ${planKey}`);
-  }
-
-  const subscription = await razorpay.subscriptions.create({
-    plan_id: planId,
-    customer_notify: 1,
-    // Monthly: 12 billing cycles; Annual: 3 billing cycles (3 years)
-    total_count: billingCycle === 'annual' ? 3 : 12,
-    notes: { user_id: userId, plan, billing_cycle: billingCycle },
-  });
-
+  const planConfig = getPaidPlan(params.plan);
   const keyId = process.env.RAZORPAY_KEY_ID;
   if (!keyId) {
     throw new Error('RAZORPAY_KEY_ID is not configured');
   }
 
-  return {
-    subscriptionId: subscription.id,
-    amount: PLAN_AMOUNTS_PAISE[planKey],
-    currency: 'INR',
-    // Must match the key used server-side; avoid NEXT_PUBLIC_* drift on Vercel (causes checkout 401).
-    key: keyId,
-  };
-}
+  const receiptId = `ie_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`.slice(
+    0,
+    40,
+  );
 
-/** Minimum order amount for Razorpay standard checkout (1 INR). */
-export const MIN_STANDARD_ORDER_PAISE = 100;
+  paymentLog('create-order', 'request', {
+    userId: params.userId,
+    plan: params.plan,
+    amountPaise: planConfig.amountPaise,
+    mode: detectRazorpayMode(keyId),
+    keyIdMasked: maskRazorpayKeyId(keyId),
+  });
 
-export async function createStandardOrder(params: {
-  amount: number;
-  currency?: string;
-  receipt?: string;
-  userId: string;
-}): Promise<{ order_id: string; amount: number; currency: string }> {
-  const { amount, currency = 'INR', receipt, userId } = params;
-  if (amount < MIN_STANDARD_ORDER_PAISE) {
-    throw new Error(`Amount must be at least ${MIN_STANDARD_ORDER_PAISE} paise`);
+  let order: { id: string; amount: number | string; currency: string };
+  try {
+    order = await razorpay.orders.create({
+      amount: planConfig.amountPaise,
+      currency: 'INR',
+      receipt: receiptId,
+      notes: { user_id: params.userId, plan: params.plan },
+    });
+  } catch (err) {
+    paymentError('create-order', 'razorpay_api_failed', {
+      userId: params.userId,
+      plan: params.plan,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+    throw err;
   }
-  const receiptId = (
-    receipt ?? `ie_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`
-  ).slice(0, 40);
 
-  const order = await razorpay.orders.create({
-    amount,
-    currency,
-    receipt: receiptId,
-    notes: { user_id: userId },
+  paymentLog('create-order', 'success', {
+    userId: params.userId,
+    plan: params.plan,
+    orderId: order.id,
+    amountPaise: planConfig.amountPaise,
   });
 
   return {
     order_id: order.id,
     amount: typeof order.amount === 'number' ? order.amount : Number(order.amount),
     currency: order.currency,
+    key: keyId,
+    plan: params.plan,
   };
 }
 
-export function verifyStandardPaymentSignature(
-  orderId: string,
-  paymentId: string,
-  clientSignature: string,
-): boolean {
-  const secret = process.env.RAZORPAY_KEY_SECRET;
-  if (!secret) {
-    console.error('[razorpay] RAZORPAY_KEY_SECRET is not set');
-    return false;
-  }
+export async function fetchRazorpayOrder(orderId: string): Promise<{
+  id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  notes: Record<string, string>;
+}> {
+  const order = await razorpay.orders.fetch(orderId);
+  return {
+    id: order.id as string,
+    amount: typeof order.amount === 'number' ? order.amount : Number(order.amount),
+    currency: order.currency as string,
+    status: order.status as string,
+    notes: (order.notes ?? {}) as Record<string, string>,
+  };
+}
+
+function hmacSha256Hex(secret: string, payload: string): string {
+  return crypto.createHmac('sha256', secret).update(payload).digest('hex');
+}
+
+function timingSafeHexEqual(expected: string, actual: string): boolean {
   try {
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(`${orderId}|${paymentId}`)
-      .digest('hex');
     const a = Buffer.from(expected, 'hex');
-    const b = Buffer.from(clientSignature, 'hex');
+    const b = Buffer.from(actual, 'hex');
     if (a.length !== b.length) return false;
     return crypto.timingSafeEqual(a, b);
   } catch {
@@ -113,21 +115,28 @@ export function verifyStandardPaymentSignature(
   }
 }
 
+export function verifyPaymentSignature(
+  orderId: string,
+  paymentId: string,
+  clientSignature: string,
+): boolean {
+  const secret = process.env.RAZORPAY_KEY_SECRET;
+  if (!secret) {
+    paymentError('verify', 'missing_key_secret', {});
+    return false;
+  }
+  return verifyOrderPaymentSignature(orderId, paymentId, clientSignature, secret);
+}
+
 export function verifyWebhookSignature(body: string, signature: string): boolean {
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   if (!secret) {
-    console.error('[razorpay] RAZORPAY_WEBHOOK_SECRET is not set');
+    paymentError('webhook', 'missing_webhook_secret', {});
     return false;
   }
   try {
-    const expected = crypto
-      .createHmac('sha256', secret)
-      .update(body)
-      .digest('hex');
-    return crypto.timingSafeEqual(
-      Buffer.from(expected, 'hex'),
-      Buffer.from(signature, 'hex'),
-    );
+    const expected = hmacSha256Hex(secret, body);
+    return timingSafeHexEqual(expected, signature);
   } catch {
     return false;
   }

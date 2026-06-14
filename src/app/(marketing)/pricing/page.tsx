@@ -9,9 +9,9 @@ import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 export const metadata: Metadata = generateMetadata({
   title: 'Pricing',
   description:
-    'Simple, transparent pricing for InterviewEra. Start free with 3 credits. AI mock interviews from ₹149/month.',
+    'Simple, transparent pricing for InterviewEra. Start free with 3 credits. One-time 30-day plans from ₹149.',
   path: '/pricing',
-  keywords: 'InterviewEra pricing, AI mock interview price, placement prep cost, interview practice subscription India',
+  keywords: 'InterviewEra pricing, AI mock interview price, placement prep cost, interview practice India',
 });
 
 export const revalidate = 3600;

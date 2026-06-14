@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
+import { Suspense } from 'react'
+import { PaymentSuccessBanner } from '@/components/dashboard/PaymentSuccessBanner'
 import { createClient } from '@/lib/supabase/server'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
-import { CreditBadge } from '@/components/layout/CreditBadge'
+import { DashboardHeaderActions } from '@/components/dashboard/DashboardHeaderActions'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
 import { DashboardWelcomeCard } from './DashboardWelcomeCard'
@@ -45,7 +47,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from('users')
-      .select('name, plan_tier, credits_remaining, placement_date, created_at')
+      .select('name, plan_tier, credits_remaining, plan_expires_at, plan_status, placement_date, created_at')
       .eq('id', user.id)
       .single(),
     supabase
@@ -90,6 +92,9 @@ export default async function DashboardPage() {
   return (
     <>
       <RetentionProgressRefreshListener />
+      <Suspense fallback={null}>
+        <PaymentSuccessBanner />
+      </Suspense>
       <DashboardPageHeader
         eyebrow={
           <>
@@ -98,7 +103,14 @@ export default async function DashboardPage() {
         }
         title="Dashboard"
         subtitle="Track your interview performance and keep your prep on track."
-        action={<CreditBadge creditsRemaining={creditsRemaining} />}
+        action={
+          <DashboardHeaderActions
+            creditsRemaining={creditsRemaining}
+            planTier={userData?.plan_tier}
+            planExpiresAt={userData?.plan_expires_at}
+            planStatus={userData?.plan_status}
+          />
+        }
       />
 
       <DashboardWelcomeCard

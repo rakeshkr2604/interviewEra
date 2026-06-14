@@ -52,23 +52,23 @@ const SECTIONS = [
         q: 'What are the paid plans?',
         a: (
           <span>
-            <strong>Starter — ₹149/month:</strong> 8 credits per month, full per-answer feedback, detailed scores.
+            <strong>Starter — ₹149 (30-day access):</strong> 8 interview credits, full per-answer feedback, detailed scores.
             <br />
-            <strong>Pro — ₹399/month:</strong> 25 credits per month, plus detailed analysis, model answer comparison, PDF export, and interview replay.
+            <strong>Pro — ₹399 (30-day access):</strong> 25 interview credits, plus detailed analysis, model answer comparison, PDF export, and interview replay.
             <br />
             <strong>Campus — contact us:</strong> Unlimited interviews for entire college batches with cohort-level analytics.
             <br />
-            Annual plans are available at a discount — see <Link href="/pricing" className="underline underline-offset-2">Pricing</Link> for details.
+            One-time payment — no auto-renewal. See <Link href="/pricing" className="underline underline-offset-2">Pricing</Link> for details.
           </span>
         ),
       },
       {
-        q: 'Do monthly credits roll over?',
-        a: 'No. Unused monthly credits expire at the end of each billing cycle. Free credits (3 on sign-up) are lifetime and never expire.',
+        q: 'Do plan credits roll over after 30 days?',
+        a: 'No. Each Starter or Pro payment includes credits for that 30-day access period only. Unused credits do not carry over when access expires. Free credits (3 on sign-up) are lifetime and never expire.',
       },
       {
         q: 'Can I buy extra credits without upgrading my plan?',
-        a: 'Not in the current version. The easiest path to more credits is upgrading your plan or waiting for the next billing cycle.',
+        a: 'Not in the current version. Renew your plan for another 30-day period or upgrade from Starter to Pro when you need more credits.',
       },
     ],
   },
@@ -140,8 +140,8 @@ const SECTIONS = [
     heading: 'Account & Billing',
     faqs: [
       {
-        q: 'How do I cancel my subscription?',
-        a: 'Go to Settings → Billing and click "Cancel plan". You keep access until the end of the current billing period.',
+        q: 'How do I renew my plan?',
+        a: 'Go to Settings → Billing and click "Renew plan", or visit the Upgrade page. Each payment is one-time — there is no auto-renewal. UPI, cards, net banking, and wallets are supported via Razorpay.',
       },
       {
         q: 'What payment methods are accepted?',

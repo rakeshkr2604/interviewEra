@@ -177,7 +177,7 @@ export function DangerZoneCard() {
           }
         }}
         title="Delete all interview history?"
-        description="All interviews, answers, evaluations, and reports linked to your account will be permanently removed. Your login, plan, and subscription are not changed."
+        description="All interviews, answers, evaluations, and reports linked to your account will be permanently removed. Your login and current plan are not changed."
         phraseExact="DELETE MY HISTORY"
         phraseLabel="Required phrase"
         confirmLabel="Delete history"

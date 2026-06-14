@@ -7,7 +7,7 @@ import {
 } from '@/lib/settings/notification-preferences'
 import { privatePageMetadata } from '@/lib/seo/metadata'
 import type { PlanTier } from '@/types/app.types'
-import type { BillingSubscription, BillingTx } from '@/components/settings/BillingUsageCard'
+import type { BillingPlanInfo, BillingPayment, BillingTx } from '@/components/settings/BillingUsageCard'
 
 export const metadata = privatePageMetadata({
   title: 'Settings',
@@ -23,9 +23,9 @@ export default async function SettingsPage() {
   if (!user) redirect('/login')
 
   const profileSelectFull =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at' as const
   const profileSelectBase =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, plan_status, plan_expires_at, plan_started_at' as const
 
   let profile: {
     name: string | null
@@ -35,6 +35,9 @@ export default async function SettingsPage() {
     created_at: string | null
     email_digest_unsubscribed: boolean | null
     notification_preferences?: unknown
+    plan_status?: string | null
+    plan_expires_at?: string | null
+    plan_started_at?: string | null
   } | null = null
 
   const full = await supabase
@@ -74,6 +77,12 @@ export default async function SettingsPage() {
   const planTier = (profile.plan_tier ?? 'free') as PlanTier
   const creditsRemaining = profile.credits_remaining ?? 0
 
+  const planInfo: BillingPlanInfo = {
+    planStatus: (profile.plan_status as string | null) ?? 'none',
+    planExpiresAt: (profile.plan_expires_at as string | null) ?? null,
+    planStartedAt: (profile.plan_started_at as string | null) ?? null,
+  }
+
   const monthStart = creditsMonthStartIsoIst()
   const { data: debitRows } = await supabase
     .from('credit_transactions')
@@ -85,24 +94,24 @@ export default async function SettingsPage() {
   const creditsUsedThisMonth =
     debitRows?.reduce((sum, row) => sum + (Number(row.amount) || 0), 0) ?? 0
 
-  const { data: subRow } = await supabase
-    .from('subscriptions')
-    .select('plan, status, razorpay_sub_id, current_period_start, current_period_end')
+  const { data: paymentRows } = await supabase
+    .from('payments')
+    .select('id, order_id, payment_id, amount, currency, status, plan, created_at')
     .eq('user_id', user.id)
-    .eq('status', 'active')
-    .order('current_period_end', { ascending: false, nullsFirst: false })
-    .limit(1)
-    .maybeSingle()
+    .order('created_at', { ascending: false })
+    .limit(20)
 
-  const subscription: BillingSubscription = subRow
-    ? {
-        plan: subRow.plan,
-        status: subRow.status,
-        razorpay_sub_id: subRow.razorpay_sub_id,
-        current_period_start: subRow.current_period_start,
-        current_period_end: subRow.current_period_end,
-      }
-    : null
+  const recentPayments: BillingPayment[] =
+    paymentRows?.map((p) => ({
+      id: p.id as string,
+      order_id: p.order_id as string,
+      payment_id: p.payment_id as string | null,
+      amount: Number(p.amount) || 0,
+      currency: p.currency as string,
+      status: p.status as string,
+      plan: p.plan as string,
+      created_at: p.created_at as string,
+    })) ?? []
 
   const { data: txRows } = await supabase
     .from('credit_transactions')
@@ -135,7 +144,8 @@ export default async function SettingsPage() {
       planTier={planTier}
       creditsRemaining={creditsRemaining}
       creditsUsedThisMonth={creditsUsedThisMonth}
-      subscription={subscription}
+      planInfo={planInfo}
+      recentPayments={recentPayments}
       recentTransactions={recentTransactions}
       notificationPrefs={notificationPrefs}
       weeklyImprovementSummaryOn={!digestUnsub}

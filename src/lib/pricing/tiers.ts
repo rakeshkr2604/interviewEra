@@ -1,17 +1,20 @@
 /**
  * Canonical B2C pricing — single source for marketing + /upgrade + exhausted state.
- * Campus B2B stays separate in /campus.
+ * Paid plan amounts/credits/duration: src/lib/pricing/plans.ts
+ * User-facing labels: src/lib/pricing/copy.ts
  */
+
+import { PAID_PLANS } from '@/lib/pricing/plans';
+import { marketingPaidCtaLabel, planCreditsFeatureLine } from '@/lib/pricing/copy';
 
 export const BILLING_AMOUNTS = {
   starter: {
-    monthlyInr: 149,
+    monthlyInr: PAID_PLANS.starter.amountInr,
     annualTotalInr: 799,
-    /** Effective monthly when billed annually (display only) */
     annualEquivMonthlyInr: 67,
   },
   pro: {
-    monthlyInr: 399,
+    monthlyInr: PAID_PLANS.pro.amountInr,
     annualTotalInr: 1999,
     annualEquivMonthlyInr: 167,
   },
@@ -25,9 +28,9 @@ export const FREE_TIER_FEATURES = [
   { text: 'Model answer comparisons (blurred preview)', included: false as const },
 ] as const;
 
-/** Paid tiers — same strings everywhere (credits = CLAUDE.md) */
+/** Paid tiers — same strings everywhere */
 export const STARTER_FEATURES = [
-  '8 credits per month',
+  planCreditsFeatureLine('starter'),
   'Full AI feedback on every answer',
   '5 dimension scores per answer',
   'Progress tracking across sessions',
@@ -35,7 +38,7 @@ export const STARTER_FEATURES = [
 ] as const;
 
 export const PRO_FEATURES = [
-  '25 credits per month',
+  planCreditsFeatureLine('pro'),
   'Full feedback + detailed analysis',
   'Model answer comparisons',
   'Keyword gap analysis',
@@ -59,8 +62,8 @@ export const MARKETING_PRICING_CARDS = [
     id: 'starter' as const,
     name: 'Starter',
     priceDisplay: `₹${BILLING_AMOUNTS.starter.monthlyInr}`,
-    periodNote: '/month',
-    ctaLabel: 'Start Starter',
+    periodNote: '30-day access',
+    ctaLabel: marketingPaidCtaLabel('starter'),
     href: '/signup',
     highlighted: false,
     popular: false,
@@ -69,22 +72,20 @@ export const MARKETING_PRICING_CARDS = [
     id: 'pro' as const,
     name: 'Pro',
     priceDisplay: `₹${BILLING_AMOUNTS.pro.monthlyInr}`,
-    periodNote: '/month',
-    ctaLabel: 'Get Pro',
+    periodNote: '30-day access',
+    ctaLabel: marketingPaidCtaLabel('pro'),
     href: '/signup',
     highlighted: true,
     popular: true,
   },
 ] as const;
 
-export function starterCheckoutLabel(cycle: 'monthly' | 'annual'): string {
-  return cycle === 'annual'
-    ? `Subscribe · ₹${BILLING_AMOUNTS.starter.annualTotalInr}/yr`
-    : `Subscribe · ₹${BILLING_AMOUNTS.starter.monthlyInr}/mo`;
+/** @deprecated Use upgradeCheckoutLabel from copy.ts — kept for imports during migration */
+export function starterCheckoutLabel(_cycle: 'monthly' | 'annual'): string {
+  return marketingPaidCtaLabel('starter');
 }
 
-export function proCheckoutLabel(cycle: 'monthly' | 'annual'): string {
-  return cycle === 'annual'
-    ? `Subscribe · ₹${BILLING_AMOUNTS.pro.annualTotalInr}/yr`
-    : `Subscribe · ₹${BILLING_AMOUNTS.pro.monthlyInr}/mo`;
+/** @deprecated Use upgradeCheckoutLabel from copy.ts */
+export function proCheckoutLabel(_cycle: 'monthly' | 'annual'): string {
+  return marketingPaidCtaLabel('pro');
 }

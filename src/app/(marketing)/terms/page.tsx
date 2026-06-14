@@ -21,7 +21,7 @@ const SECTIONS = [
   {
     id: 'description',
     title: '2. Description of Service',
-    text: 'InterviewEra provides an AI-powered mock interview platform that includes resume parsing, personalised question generation, scored answer evaluation, and performance tracking. The Service is offered under a credit-based model with free and paid subscription tiers.',
+    text: 'InterviewEra provides an AI-powered mock interview platform that includes resume parsing, personalised question generation, scored answer evaluation, and performance tracking. The Service is offered under a credit-based model with free and paid plan tiers.',
   },
   {
     id: 'accounts',
@@ -36,7 +36,7 @@ const SECTIONS = [
   },
   {
     id: 'credits-billing',
-    title: '4. Credits, Billing & Subscriptions',
+    title: '4. Credits, Billing & Plans',
     content: [
       {
         sub: 'Free Tier',
@@ -47,16 +47,16 @@ const SECTIONS = [
         text: 'One credit is deducted when you start a mock interview session. Credits are not deducted on completion. Partially completed sessions still consume a credit.',
       },
       {
-        sub: 'Paid Subscriptions',
-        text: 'Starter (₹149/month) and Pro (₹399/month) subscriptions are billed in advance. Annual plans are billed annually at a discounted rate. Pricing is in Indian Rupees (INR) and includes applicable GST.',
+        sub: 'Paid Plans (One-Time)',
+        text: 'Starter (₹149) and Pro (₹399) are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. Pricing is in Indian Rupees (INR) and includes applicable GST. Plans do not auto-renew — renew manually whenever you need continued access.',
       },
       {
         sub: 'Payment Processing',
-        text: 'Payments are processed by Razorpay. By providing payment details, you authorise Razorpay to charge the applicable fees. InterviewEra does not store your card or bank account details.',
+        text: 'Payments are processed by Razorpay (UPI, cards, net banking, wallets, and more). By completing checkout, you authorise Razorpay to charge the applicable one-time fee. InterviewEra does not store your card or bank account details.',
       },
       {
-        sub: 'Auto-Renewal',
-        text: 'Subscriptions renew automatically at the end of each billing period. You can cancel at any time from your account settings to prevent the next renewal.',
+        sub: 'No Auto-Renewal',
+        text: 'Paid plans do not renew automatically. When your 30-day access period ends, your account returns to the free tier unless you make another one-time payment. You may renew early from Settings to extend access from your current expiry date.',
       },
     ],
   },

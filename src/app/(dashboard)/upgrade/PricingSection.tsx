@@ -9,9 +9,16 @@ import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTr
 interface PricingSectionProps {
   currentPlan: PlanTier;
   userEmail: string;
+  planExpiresAt?: string | null;
+  planStatus?: string | null;
 }
 
-export function PricingSection({ currentPlan, userEmail }: PricingSectionProps) {
+export function PricingSection({
+  currentPlan,
+  userEmail,
+  planExpiresAt,
+  planStatus,
+}: PricingSectionProps) {
   // TEMPORARILY HIDDEN: annual billing toggle (2026-05-14) — cycle fixed to 'monthly'
   // Annual plans still fully supported in backend; toggle hidden to defer annual repricing.
   // Uncomment setCycle and unwrap {false &&} to restore toggle.
@@ -39,7 +46,12 @@ export function PricingSection({ currentPlan, userEmail }: PricingSectionProps) 
         </div>
       )}
       <div className="p-6 sm:p-8">
-        <AppPricingGrid currentPlan={currentPlan} userEmail={userEmail} billingCycle={cycle} />
+        <AppPricingGrid
+          currentPlan={currentPlan}
+          userEmail={userEmail}
+          planExpiresAt={planExpiresAt}
+          planStatus={planStatus}
+        />
       </div>
     </div>
   );

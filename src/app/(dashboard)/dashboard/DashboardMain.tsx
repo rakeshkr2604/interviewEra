@@ -9,6 +9,12 @@ import {
   Clock,
 } from 'lucide-react'
 import type { InterviewWithReportsRow, UserRow } from './dashboard-types'
+import {
+  formatPlanTierName,
+  isPaidPlanActive,
+  planExpiryStatusLine,
+} from '@/lib/pricing/plan-status'
+import type { PlanTier } from '@/types/app.types'
 
 const ScoreTrendChart = dynamic(
   () =>
@@ -66,6 +72,14 @@ export function DashboardMain({
   const scoreMap = new Map(reports?.map((r) => [r.interview_id, r.overall_score]) || [])
 
   const creditsRemaining = userData?.credits_remaining ?? 0
+  const planTier = (userData?.plan_tier ?? 'free') as PlanTier
+  const planExpiresAt = userData?.plan_expires_at ?? null
+  const planStatus = userData?.plan_status ?? null
+  const paidActive = isPaidPlanActive(planTier, planStatus, planExpiresAt)
+  const planStatSub =
+    paidActive && planExpiresAt
+      ? `${formatPlanTierName(planTier)} · ${planExpiryStatusLine(planExpiresAt, true) ?? ''}`
+      : null
 
   return (
     <>
@@ -122,19 +136,24 @@ export function DashboardMain({
           { label: 'TOTAL INTERVIEWS', value: totalCount, icon: ClipboardList },
           { label: 'COMPLETED INTERVIEWS', value: completedCount, icon: CheckCircle2 },
           { label: 'AVERAGE SCORE', value: avgScore ? `${avgScore}/10` : '—', icon: TrendingUp },
-          { label: 'CREDITS LEFT', value: creditsRemaining, icon: Clock },
+          { label: 'CREDITS LEFT', value: creditsRemaining, icon: Clock, sub: planStatSub },
         ].map((stat) => {
           const Icon = stat.icon
           return (
             <div key={stat.label} className="dashboard-premium-card px-5 py-5 sm:px-6">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-secondary)' }}>
                     {stat.label}
                   </p>
                   <p className="text-4xl font-bold mt-2 leading-none" style={{ color: 'var(--text-primary)' }}>
                     {stat.value}
                   </p>
+                  {'sub' in stat && stat.sub ? (
+                    <p className="mt-1.5 truncate text-[11px] font-medium" style={{ color: 'var(--accent-primary)' }}>
+                      {stat.sub}
+                    </p>
+                  ) : null}
                 </div>
                 <div
                   className="rounded-xl p-2.5"

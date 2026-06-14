@@ -10,6 +10,7 @@ export const metadata = privatePageMetadata({
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { PricingSection } from './PricingSection';
 import { CreditExhaustedSection } from './CreditExhaustedSection';
+import { UpgradePageFooter } from '@/components/pricing/UpgradePageFooter';
 import type { PlanTier, RadarDataPoint } from '@/types/app.types';
 
 export default async function UpgradePage() {
@@ -26,13 +27,15 @@ export default async function UpgradePage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('plan_tier, email, credits_remaining')
+    .select('plan_tier, email, credits_remaining, plan_expires_at, plan_status')
     .eq('id', user.id)
     .single();
 
   const currentPlan = (profile?.plan_tier ?? 'free') as PlanTier;
   const creditsRemaining = profile?.credits_remaining ?? 0;
   const email = profile?.email ?? user.email ?? '';
+  const planExpiresAt = (profile?.plan_expires_at as string | null) ?? null;
+  const planStatus = (profile?.plan_status as string | null) ?? null;
 
   let trendData: RadarDataPoint[] = [];
   let totalInterviewsCompleted = 0;
@@ -74,7 +77,7 @@ export default async function UpgradePage() {
         title={isExhausted ? 'Keep your momentum going' : 'Upgrade your plan'}
         subtitle={
           isExhausted
-            ? "You've used your credits. Same plans as our homepage — pick monthly or annual and unlock more practice."
+            ? "You've used your credits. Same one-time plans as our homepage — pay once for 30 days and unlock more practice."
             : 'More credits, deeper feedback, better results. Credits deduct when an interview starts.'
         }
       />
@@ -86,16 +89,14 @@ export default async function UpgradePage() {
         />
       )}
 
-      <PricingSection currentPlan={currentPlan} userEmail={email} />
+      <PricingSection
+        currentPlan={currentPlan}
+        userEmail={email}
+        planExpiresAt={planExpiresAt}
+        planStatus={planStatus}
+      />
 
-      <div
-        className="mx-auto max-w-xl rounded-[14px] border-2 px-4 py-3 text-center"
-        style={{ borderColor: 'var(--card-border)', background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)' }}
-      >
-        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          Payments processed securely by Razorpay. Cancel anytime.
-        </p>
-      </div>
+      <UpgradePageFooter />
     </div>
   );
 }

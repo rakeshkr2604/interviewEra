@@ -65,8 +65,27 @@ export interface User {
   name: string | null;
   plan_tier: PlanTier;
   credits_remaining: number;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+  plan_status?: 'none' | 'active' | 'expired' | 'cancelled';
+  last_payment_id?: string | null;
+  last_order_id?: string | null;
   placement_date: string | null;
   created_at: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  user_id: string;
+  order_id: string;
+  payment_id: string | null;
+  amount: number;
+  currency: string;
+  status: 'created' | 'paid' | 'failed' | 'refunded';
+  plan: PlanTier;
+  gateway: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export type ResumeParseQuality = 'full' | 'degraded' | 'minimal';
@@ -257,16 +276,6 @@ export interface Report {
   trend_data: RadarDataPoint[] | null;
   summary: ReportSummary | null;
   generated_at: string;
-}
-
-export interface Subscription {
-  id: string;
-  user_id: string;
-  plan: PlanTier;
-  razorpay_sub_id: string | null;
-  status: 'active' | 'cancelled' | 'past_due';
-  current_period_start: string | null;
-  current_period_end: string | null;
 }
 
 export interface Referral {

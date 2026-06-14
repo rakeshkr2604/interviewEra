@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { createSubscriptionOrder } from '@/lib/razorpay/client';
+import { createServiceClient } from '@/lib/supabase/server';
+import {
+  auditRazorpayConfig,
+  createPlanOrder,
+  detectRazorpayMode,
+  maskRazorpayKeyId,
+} from '@/lib/razorpay/client';
+import { getPaidPlan, isPaidPlanId } from '@/lib/pricing/plans';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { paymentCreateOrderSchema } from '@/lib/validations/schemas';
 import type { PlanTier } from '@/types/app.types';
+import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -14,8 +22,23 @@ const TIER_ORDER: Record<PlanTier, number> = {
 };
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const supabase = await createClient();
+  const configIssues = auditRazorpayConfig().filter((i) => i.severity === 'critical');
+  if (configIssues.length > 0) {
+    paymentError('create-order', 'misconfigured', {
+      codes: configIssues.map((i) => i.code),
+      mode: detectRazorpayMode(process.env.RAZORPAY_KEY_ID),
+      keyIdMasked: maskRazorpayKeyId(process.env.RAZORPAY_KEY_ID),
+    });
+    return NextResponse.json(
+      {
+        error:
+          'Payment system is misconfigured. Please contact support@interviewera.com (code: RAZORPAY_CONFIG).',
+      },
+      { status: 503 },
+    );
+  }
 
+  const supabase = await createClient();
   const {
     data: { user },
     error: authError,
@@ -25,7 +48,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Rate limiting (5 orders / 60s per user)
   const rateLimit = await checkRateLimit(`payment:${user.id}`, 60, 5);
   if (!rateLimit.allowed) {
     return NextResponse.json(
@@ -55,9 +77,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const { plan, billingCycle } = validation.data;
+  const { plan } = validation.data;
 
-  // Campus requires direct enrollment — not available via self-serve checkout
   if (plan === 'campus') {
     return NextResponse.json(
       { error: 'Campus plan requires direct enrollment. Contact us at campus@interviewera.com' },
@@ -65,34 +86,99 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  // Check for existing active subscription
-  const { data: existing } = await supabase
-    .from('subscriptions')
-    .select('id, status, plan')
-    .eq('user_id', user.id)
-    .eq('status', 'active')
-    .maybeSingle();
-
-  if (existing) {
-    const existingTier = TIER_ORDER[(existing.plan as PlanTier) ?? 'free'];
-    const newTier = TIER_ORDER[plan as PlanTier] ?? 0;
-    // Block same-plan or downgrade; allow upgrade to higher tier
-    if (existingTier >= newTier) {
-      return NextResponse.json(
-        { error: 'You already have an active subscription for this plan or a higher plan.' },
-        { status: 409 },
-      );
-    }
+  if (!isPaidPlanId(plan)) {
+    return NextResponse.json({ error: 'Invalid plan.' }, { status: 400 });
   }
 
-  try {
-    const order = await createSubscriptionOrder(user.id, plan, billingCycle as 'monthly' | 'annual');
-    return NextResponse.json(order);
-  } catch (err) {
-    console.error('[create-order] Razorpay error:', err);
+  const { data: profile } = await supabase
+    .from('users')
+    .select('plan_tier, plan_status, plan_expires_at')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  const currentTier = (profile?.plan_tier ?? 'free') as PlanTier;
+  if (currentTier === 'campus' || currentTier === 'campus_admin') {
     return NextResponse.json(
-      { error: 'Failed to create subscription order. Please try again.' },
-      { status: 500 },
+      { error: 'Campus plans are managed by your institution.' },
+      { status: 400 },
+    );
+  }
+
+  const newTier = TIER_ORDER[plan];
+  const existingTier = TIER_ORDER[currentTier] ?? 0;
+  const expiresAt = profile?.plan_expires_at ? new Date(profile.plan_expires_at as string) : null;
+  const isActivePaid =
+    profile?.plan_status === 'active' &&
+    expiresAt &&
+    expiresAt > new Date() &&
+    (currentTier === 'starter' || currentTier === 'pro');
+
+  if (isActivePaid && existingTier > newTier) {
+    return NextResponse.json(
+      {
+        error:
+          'You already have a higher active plan. Wait until it expires before switching to a lower tier, or renew your current plan from Settings.',
+      },
+      { status: 409 },
+    );
+  }
+
+  paymentLog('create-order', 'api_request', {
+    userId: user.id,
+    plan,
+    mode: detectRazorpayMode(process.env.RAZORPAY_KEY_ID),
+  });
+
+  try {
+    const order = await createPlanOrder({ userId: user.id, plan });
+    const planConfig = getPaidPlan(plan);
+
+    const service = createServiceClient();
+    const { error: insertErr } = await service.from('payments').insert({
+      user_id: user.id,
+      order_id: order.order_id,
+      amount: planConfig.amountPaise,
+      currency: 'INR',
+      status: 'created',
+      plan,
+      gateway: 'razorpay',
+    });
+
+    if (insertErr) {
+      paymentError('create-order', 'payment_row_insert_failed', {
+        userId: user.id,
+        orderId: order.order_id,
+        code: insertErr.code,
+      });
+      return NextResponse.json(
+        { error: 'Failed to initialize payment. Please try again.' },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({
+      order_id: order.order_id,
+      amount: order.amount,
+      currency: order.currency,
+      key: order.key,
+      plan: order.plan,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown';
+    paymentError('create-order', 'api_failed', {
+      userId: user.id,
+      plan,
+      error: message,
+    });
+
+    const isConfig = message.includes('Razorpay configuration invalid');
+    return NextResponse.json(
+      {
+        error: isConfig
+          ? 'Payment system is misconfigured. Please contact support@interviewera.com.'
+          : 'Failed to create payment order. Please try again.',
+      },
+      { status: isConfig ? 503 : 500 },
     );
   }
 }

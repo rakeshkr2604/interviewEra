@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { Lock } from 'lucide-react';
-import { BILLING_AMOUNTS } from '@/lib/pricing/tiers';
+import { planPeriodLine, planPriceLine } from '@/lib/pricing/copy';
 import type { PlanTier } from '@/types/app.types';
 
 interface BlurredSectionProps {
@@ -36,10 +36,8 @@ export function BlurredSection({
   // The actual {children} are intentionally NOT rendered in the DOM —
   // this prevents any user from reading gated content via DevTools.
   const planLabel = requiredTier === 'pro' ? 'Pro' : 'Starter';
-  const planPrice =
-    requiredTier === 'pro'
-      ? `₹${BILLING_AMOUNTS.pro.monthlyInr}/mo`
-      : `₹${BILLING_AMOUNTS.starter.monthlyInr}/mo`;
+  const planPrice = planPriceLine(requiredTier === 'pro' ? 'pro' : 'starter');
+  const planPeriod = planPeriodLine();
 
   return (
     <div
@@ -71,7 +69,7 @@ export function BlurredSection({
           {upgradeLabel}
         </p>
         <p className="mt-0.5 text-xs" style={{ color: 'var(--text-secondary)' }}>
-          {planLabel} plan — {planPrice}
+          {planLabel} — {planPrice} · {planPeriod}
         </p>
         <Link
           href="/upgrade"

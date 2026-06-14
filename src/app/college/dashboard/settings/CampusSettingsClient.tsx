@@ -254,7 +254,7 @@ export function CampusSettingsClient({ org }: { org: OrgData }) {
         <SectionHeader
           icon={CreditCard}
           title="Plan &amp; Seats"
-          description="Your current subscription and seat utilization."
+          description="Your current campus plan and seat utilization."
         />
 
         <div className="space-y-5">

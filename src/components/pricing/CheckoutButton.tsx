@@ -1,10 +1,22 @@
 'use client';
 
-import { useState, useEffect, type CSSProperties } from 'react';
+import { useCallback, useEffect, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { BILLING_AMOUNTS } from '@/lib/pricing/tiers';
+import { PAID_PLANS } from '@/lib/pricing/plans';
+import {
+  checkoutOrderDescription,
+  PAYMENT_ALREADY_PROCESSED_MESSAGE,
+  PAYMENT_CANCELLED_MESSAGE,
+  PAYMENT_FAILED_USER_MESSAGE,
+  PAYMENT_NETWORK_ERROR_MESSAGE,
+  PAYMENT_ORDER_FAILED_MESSAGE,
+  PAYMENT_VERIFY_FAILED_USER_MESSAGE,
+} from '@/lib/pricing/copy';
+import { loadRazorpayScript } from '@/lib/pricing/razorpay-script';
+import { RenewPlanConfirmDialog } from '@/components/pricing/RenewPlanConfirmDialog';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import {
@@ -12,18 +24,6 @@ import {
   trackPaymentStartedOnce,
 } from '@/lib/analytics/funnel-ga4-bridge';
 
-interface RazorpayOptions {
-  key: string;
-  subscription_id: string;
-  name: string;
-  description: string;
-  prefill: { email: string };
-  theme: { color: string };
-  handler: (response: { razorpay_payment_id: string; razorpay_subscription_id: string }) => void;
-  modal: { ondismiss: () => void };
-}
-
-/** Standard (order_id) checkout — shared Window typing for CheckoutButton + StandardRazorpayCheckoutButton */
 interface RazorpayOrderCheckoutOptions {
   key: string;
   amount: number;
@@ -43,7 +43,7 @@ interface RazorpayOrderCheckoutOptions {
 
 declare global {
   interface Window {
-    Razorpay: new (options: RazorpayOptions | RazorpayOrderCheckoutOptions) => {
+    Razorpay: new (options: RazorpayOrderCheckoutOptions) => {
       open: () => void;
       on: (event: string, handler: (response: { error?: { description?: string } }) => void) => void;
     };
@@ -55,60 +55,89 @@ type ButtonVariant = 'default' | 'outline' | 'ghost' | 'secondary';
 interface CheckoutButtonProps {
   userEmail: string;
   plan: 'starter' | 'pro';
-  billingCycle: 'monthly' | 'annual';
   label: string;
   /** Analytics source for payment_started / payment_completed (e.g. upgrade, pricing). */
   source?: string;
+  /** True when extending an active paid plan (shows confirm modal). */
+  isRenewal?: boolean;
+  planExpiresAt?: string | null;
   className?: string;
   style?: CSSProperties;
   variant?: ButtonVariant;
 }
 
-function resolvePlanKey(plan: 'starter' | 'pro', billingCycle: 'monthly' | 'annual'): string {
-  return billingCycle === 'annual' ? `${plan}_annual` : plan;
+function mapCreateOrderError(status: number, error?: string): string {
+  if (status === 429) return error ?? 'Too many attempts. Please wait a moment and try again.';
+  if (status === 409) return error ?? 'You already have an active plan at this tier or higher.';
+  if (status === 503) return error ?? PAYMENT_ORDER_FAILED_MESSAGE;
+  return error ?? PAYMENT_ORDER_FAILED_MESSAGE;
 }
 
-function buildDescription(plan: 'starter' | 'pro', billingCycle: 'monthly' | 'annual'): string {
-  const planName = plan === 'starter' ? 'Starter' : 'Pro';
-  if (billingCycle === 'annual') {
-    const y =
-      plan === 'starter'
-        ? BILLING_AMOUNTS.starter.annualTotalInr
-        : BILLING_AMOUNTS.pro.annualTotalInr;
-    return `${planName} Plan — ₹${y}/year`;
+async function verifyPaymentOnServer(params: {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+}): Promise<{ ok: boolean; error?: string; planExpiresAt?: string; skipped?: boolean }> {
+  let res: Response;
+  try {
+    res = await fetch('/api/payments/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    return { ok: false, error: PAYMENT_NETWORK_ERROR_MESSAGE };
   }
-  const m =
-    plan === 'starter' ? BILLING_AMOUNTS.starter.monthlyInr : BILLING_AMOUNTS.pro.monthlyInr;
-  return `${planName} Plan — ₹${m}/month`;
+
+  const json = (await res.json()) as {
+    ok?: boolean;
+    error?: string;
+    planExpiresAt?: string;
+    skipped?: boolean;
+  };
+
+  if (!res.ok || !json.ok) {
+    if (res.status >= 500) {
+      return { ok: false, error: PAYMENT_VERIFY_FAILED_USER_MESSAGE };
+    }
+    return { ok: false, error: json.error ?? PAYMENT_VERIFY_FAILED_USER_MESSAGE };
+  }
+
+  return { ok: true, planExpiresAt: json.planExpiresAt, skipped: json.skipped };
 }
 
 export function CheckoutButton({
   userEmail,
   plan,
-  billingCycle,
   label,
   source = 'upgrade',
+  isRenewal = false,
+  planExpiresAt,
   className,
   style,
   variant = 'default',
 }: CheckoutButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+  const [scriptReady, setScriptReady] = useState(false);
+  const [renewDialogOpen, setRenewDialogOpen] = useState(false);
 
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => setScriptLoaded(true);
-    document.body.appendChild(script);
+    let cancelled = false;
+    loadRazorpayScript()
+      .then(() => {
+        if (!cancelled) setScriptReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setScriptReady(false);
+      });
     return () => {
-      document.body.removeChild(script);
+      cancelled = true;
     };
   }, []);
 
-  async function handleCheckout() {
-    if (!scriptLoaded) return;
+  const openCheckout = useCallback(async () => {
+    if (!scriptReady || loading) return;
 
     trackLandingCtaClicked({
       ctaKey: CTA_KEYS.UPGRADE_CTA,
@@ -120,23 +149,32 @@ export function CheckoutButton({
     setLoading(true);
 
     try {
-      const res = await fetch('/api/payments/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan, billingCycle }),
-      });
+      let res: Response;
+      try {
+        res = await fetch('/api/payments/create-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ plan }),
+        });
+      } catch {
+        toast.error(PAYMENT_NETWORK_ERROR_MESSAGE);
+        setLoading(false);
+        return;
+      }
 
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
-        alert(data.error ?? 'Failed to create order. Please try again.');
+        toast.error(mapCreateOrderError(res.status, data.error));
+        setLoading(false);
         return;
       }
 
       const data = (await res.json()) as {
-        subscriptionId: string;
+        order_id: string;
         amount: number;
         currency: string;
         key: string;
+        plan: 'starter' | 'pro';
       };
 
       let userId: string | undefined;
@@ -151,56 +189,124 @@ export function CheckoutButton({
         /* best-effort */
       }
 
-      const planKey = resolvePlanKey(plan, billingCycle);
+      console.info('[payment:checkout] opening', { plan: data.plan, orderId: data.order_id });
 
       trackPaymentStartedOnce({
-        subscriptionId: data.subscriptionId,
+        subscriptionId: data.order_id,
         userId,
-        plan: planKey,
+        plan: data.plan,
         amount: data.amount,
         source,
       });
 
+      let dismissed = false;
+
       const rzp = new window.Razorpay({
         key: data.key,
-        subscription_id: data.subscriptionId,
+        amount: data.amount,
+        currency: data.currency,
+        order_id: data.order_id,
         name: 'InterviewEra',
-        description: buildDescription(plan, billingCycle),
+        description: checkoutOrderDescription(data.plan),
         prefill: { email: userEmail },
         theme: { color: '#4F46E5' },
-        handler: (response: { razorpay_payment_id: string; razorpay_subscription_id: string }) => {
+        handler: async (response) => {
+          setLoading(true);
+          const verify = await verifyPaymentOnServer({
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+
+          if (!verify.ok) {
+            toast.error(verify.error ?? PAYMENT_VERIFY_FAILED_USER_MESSAGE);
+            setLoading(false);
+            return;
+          }
+
+          if (verify.skipped) {
+            toast.success(PAYMENT_ALREADY_PROCESSED_MESSAGE);
+          }
+
           trackPaymentCompletedGa4Backup({
             paymentId: response.razorpay_payment_id,
             userId,
-            plan: planKey,
+            plan: data.plan,
             amount: data.amount,
             source: 'checkout_success_handler',
           });
-          router.push(`/dashboard?upgraded=${plan}`);
+
+          const credits = PAID_PLANS[data.plan].credits;
+          const params = new URLSearchParams({ upgraded: data.plan, credits: String(credits) });
+          if (verify.planExpiresAt) {
+            params.set('expires', verify.planExpiresAt);
+          }
+          router.push(`/dashboard?${params.toString()}`);
         },
         modal: {
-          ondismiss: () => setLoading(false),
+          ondismiss: () => {
+            dismissed = true;
+            setLoading(false);
+            toast.message(PAYMENT_CANCELLED_MESSAGE);
+          },
         },
       });
 
+      rzp.on('payment.failed', (failResponse) => {
+        const msg = failResponse.error?.description ?? PAYMENT_FAILED_USER_MESSAGE;
+        console.error('[payment:checkout] payment.failed', msg);
+        toast.error(msg);
+        setLoading(false);
+      });
+
       rzp.open();
+      if (!dismissed) {
+        setLoading(false);
+      }
     } catch (err) {
-      console.error('[checkout]', err);
-      alert('Something went wrong. Please try again.');
-    } finally {
+      console.error('[payment:checkout]', err);
+      toast.error(PAYMENT_ORDER_FAILED_MESSAGE);
       setLoading(false);
     }
+  }, [scriptReady, loading, label, plan, userEmail, source, router]);
+
+  function handleClick() {
+    if (isRenewal && planExpiresAt) {
+      setRenewDialogOpen(true);
+      return;
+    }
+    void openCheckout();
   }
 
+  const checkoutAriaLabel = loading
+    ? 'Opening payment checkout'
+    : `${label} — pay via Razorpay`;
+
   return (
-    <Button
-      className={cn('w-full', className)}
-      style={style}
-      variant={variant}
-      onClick={handleCheckout}
-      disabled={loading || !scriptLoaded}
-    >
-      {loading ? 'Opening checkout…' : label}
-    </Button>
+    <>
+      <Button
+        className={cn('w-full min-h-12', className)}
+        style={style}
+        variant={variant}
+        onClick={handleClick}
+        disabled={loading || !scriptReady}
+        aria-label={checkoutAriaLabel}
+      >
+        {loading ? 'Opening checkout…' : !scriptReady ? 'Loading checkout…' : label}
+      </Button>
+
+      {isRenewal && planExpiresAt ? (
+        <RenewPlanConfirmDialog
+          open={renewDialogOpen}
+          onOpenChange={setRenewDialogOpen}
+          planExpiresAt={planExpiresAt}
+          loading={loading}
+          onConfirm={() => {
+            setRenewDialogOpen(false);
+            void openCheckout();
+          }}
+        />
+      ) : null}
+    </>
   );
 }

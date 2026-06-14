@@ -13,6 +13,8 @@ export type UserRow = {
   name: string | null
   plan_tier: string | null
   credits_remaining: number | null
+  plan_expires_at: string | null
+  plan_status: string | null
   placement_date: string | null
   created_at: string | null
 }

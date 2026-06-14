@@ -8,14 +8,14 @@ import { cn } from '@/lib/utils';
 export const metadata: Metadata = generateMetadata({
   title: 'Refund Policy',
   description:
-    "Understand InterviewEra's refund and cancellation policy for subscriptions and credits.",
+    "Understand InterviewEra's refund policy for one-time plan payments and credits.",
   path: '/refund',
 });
 
 const POLICY_HIGHLIGHTS = [
   { label: 'Credit refunds', value: 'Technical issues only' },
-  { label: 'Monthly plan cancellation', value: 'Anytime — no penalty' },
-  { label: 'Annual plan refund window', value: '7 days from purchase' },
+  { label: 'Plan access period', value: '30 days per payment' },
+  { label: 'Auto-renewal', value: 'None — renew manually' },
   { label: 'Pro-rated refunds', value: 'Not applicable' },
   { label: 'Response time', value: 'Within 5 business days' },
 ] as const;
@@ -40,27 +40,27 @@ const SECTIONS = [
     ],
   },
   {
-    id: 'subscriptions',
-    title: '2. Subscription Cancellation',
+    id: 'plans',
+    title: '2. Paid Plan Payments',
     content: [
       {
-        sub: 'Monthly Plans (Starter & Pro)',
-        text: 'You may cancel your monthly subscription at any time from Account Settings → Subscription. Cancellation takes effect at the end of the current billing period. You retain full access to your plan benefits until that date. Monthly plans are not eligible for pro-rated refunds.',
+        sub: 'One-Time Access (Starter & Pro)',
+        text: 'Starter and Pro are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. There is no auto-renewal. When access expires, your account returns to the free tier unless you pay again.',
       },
       {
-        sub: 'Annual Plans',
-        text: 'Annual plans may be cancelled within 7 days of purchase for a full refund, provided you have used fewer than 5 interview credits on the plan. After 7 days, annual subscriptions are non-refundable for the remaining term. Cancelling an annual plan stops auto-renewal; you retain access until the subscription end date.',
+        sub: 'Early Renewal',
+        text: 'You may renew before your current period ends from Settings → Billing. A new payment extends your access from your existing expiry date and refreshes your plan credits.',
       },
       {
-        sub: 'How to Cancel',
-        text: 'Log in → go to Settings → Subscription → Cancel Plan. Alternatively, email support@interviewera.com. Cancellations are processed within 24 hours and you will receive a confirmation email.',
+        sub: 'Refund Eligibility',
+        text: 'One-time plan payments are generally non-refundable once access has been granted, except where required by law or where a billing error occurred. Unused credits within an active 30-day period are not refundable on their own.',
       },
     ],
   },
   {
     id: 'prorated',
     title: '3. Pro-Rated Refunds',
-    text: 'We do not offer pro-rated refunds for partial months or unused credits on paid plans. For example, if you upgrade to Pro and use 10 credits, you will not receive a partial refund for the remaining 20 credits if you cancel. The exception is the 7-day full refund window for annual plans described above.',
+    text: 'We do not offer pro-rated refunds for partial access periods or unused credits on paid plans. For example, if you purchase Pro and use 10 credits, you will not receive a partial refund for the remaining credits if your 30-day period ends. Billing errors and technical issues are handled as described below.',
   },
   {
     id: 'technical',

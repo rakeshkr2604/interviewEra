@@ -35,7 +35,7 @@ const SECTIONS = [
       },
       {
         sub: 'Payment Information',
-        text: 'Subscription transactions are processed by Razorpay. We store your subscription status and plan tier, but we never receive or store raw card details.',
+        text: 'Plan payments are processed by Razorpay. We store your plan tier, access period, and payment status, but we never receive or store raw card details.',
       },
     ],
   },
@@ -46,7 +46,7 @@ const SECTIONS = [
       'Deliver and personalise your mock interview sessions',
       'Generate AI-powered questions tailored to your resume and target role',
       'Store and display your performance history and score trends',
-      'Process subscription payments and manage your plan',
+      'Process one-time plan payments and manage your plan access',
       'Send transactional emails (welcome, password reset, billing receipts) via Resend',
       'Detect and prevent abuse, fraud, and violations of our Terms',
       'Improve our AI models and platform features using aggregated, de-identified data',

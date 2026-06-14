@@ -12,6 +12,13 @@ import {
   STARTER_FEATURES,
   PRO_FEATURES,
 } from '@/lib/pricing/tiers';
+import {
+  marketingPaidCtaLabel,
+  planPeriodLine,
+  planPriceLine,
+} from '@/lib/pricing/copy';
+import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
+import { UpgradePageFooter } from '@/components/pricing/UpgradePageFooter';
 import { PRICING_FAQ } from '@/lib/landing/home-content';
 import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 
@@ -82,10 +89,6 @@ export function PricingPageClient() {
   // Uncomment setCycle and unwrap {false &&} to restore toggle.
   const [cycle, setCycle] = useState<BillingCycle>('monthly');
 
-  const starterPrice = cycle === 'annual' ? BILLING_AMOUNTS.starter.annualEquivMonthlyInr : BILLING_AMOUNTS.starter.monthlyInr;
-  const starterSub   = cycle === 'annual' ? `Effective /mo · billed ₹${BILLING_AMOUNTS.starter.annualTotalInr}/yr` : 'Billed monthly';
-  const proPrice     = cycle === 'annual' ? BILLING_AMOUNTS.pro.annualEquivMonthlyInr : BILLING_AMOUNTS.pro.monthlyInr;
-  const proSub       = cycle === 'annual' ? `Effective /mo · billed ₹${BILLING_AMOUNTS.pro.annualTotalInr}/yr` : 'Billed monthly';
   const proPerDay    = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
 
   return (
@@ -255,7 +258,7 @@ export function PricingPageClient() {
             </p>
             <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, maxWidth: 520, margin: '0 auto' }}>
               On <strong style={{ color: T.text }}>Pro</strong> you unlock full feedback, PDF export, and replay — about{' '}
-              <strong style={{ color: T.acc2 }}>₹{proPerDay}/day</strong> at monthly billing, less than one coffee.
+              <strong style={{ color: T.acc2 }}>₹{proPerDay}/day</strong> for a 30-day period, less than one coffee.
             </p>
           </div>
 
@@ -291,9 +294,9 @@ export function PricingPageClient() {
               <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Starter</h3>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.text, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
-                  ₹{starterPrice}<span style={{ fontSize: 13, fontWeight: 400, color: T.text3, marginLeft: 4 }}>/mo</span>
+                  {planPriceLine('starter')}
                 </p>
-                <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{starterSub}</p>
+                <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{planPeriodLine()}</p>
               </div>
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, marginBottom: 20, listStyle: 'none', padding: 0, margin: '0 0 20px 0' }}>
                 {STARTER_FEATURES.map((f) => <PaidFeatureRow key={f} text={f} />)}
@@ -301,11 +304,11 @@ export function PricingPageClient() {
               <TrackedCtaLink
                 href={`/signup?plan=starter&cycle=${cycle}`}
                 ctaKey={CTA_KEYS.PRICING_CTA}
-                ctaText={cycle === 'annual' ? 'Start Starter — annual' : 'Start Starter'}
+                ctaText={marketingPaidCtaLabel('starter')}
                 section="pricing_grid"
                 className="pr-btn pr-btn--accent"
               >
-                {cycle === 'annual' ? 'Start Starter — annual' : 'Start Starter'}
+                {marketingPaidCtaLabel('starter')}
               </TrackedCtaLink>
             </div>
 
@@ -315,9 +318,9 @@ export function PricingPageClient() {
               <div style={{ marginBottom: 16 }}>
                 <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Pro</h3>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.acc2, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
-                  ₹{proPrice}<span style={{ fontSize: 13, fontWeight: 400, color: T.text3, marginLeft: 4 }}>/mo</span>
+                  {planPriceLine('pro')}
                 </p>
-                <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{proSub}</p>
+                <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{planPeriodLine()}</p>
               </div>
               <ul style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1, marginBottom: 20, listStyle: 'none', padding: 0, margin: '0 0 20px 0' }}>
                 {PRO_FEATURES.map((f) => <PaidFeatureRow key={f} text={f} />)}
@@ -325,20 +328,22 @@ export function PricingPageClient() {
               <TrackedCtaLink
                 href={`/signup?plan=pro&cycle=${cycle}`}
                 ctaKey={CTA_KEYS.PRICING_CTA}
-                ctaText={cycle === 'annual' ? 'Get Pro — annual' : 'Get Pro'}
+                ctaText={marketingPaidCtaLabel('pro')}
                 section="pricing_grid"
                 className="pr-btn pr-btn--accent"
               >
-                {cycle === 'annual' ? 'Get Pro — annual' : 'Get Pro'}
+                {marketingPaidCtaLabel('pro')}
               </TrackedCtaLink>
             </div>
           </div>
 
           {/* Anchor copy */}
           <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, textAlign: 'center', marginTop: 24, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
-            <strong style={{ color: T.text }}>₹{BILLING_AMOUNTS.pro.monthlyInr}/mo on Pro</strong>{' '}
+            <strong style={{ color: T.text }}>₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days on Pro</strong>{' '}
             stacks against a <span style={{ color: T.acc2 }}>₹10L+</span> first job — one serious month of practice vs one rejection email.
           </p>
+          <PaymentTrustSection variant="marketing" />
+          <UpgradePageFooter variant="marketing" />
         </div>
       </section>
 
