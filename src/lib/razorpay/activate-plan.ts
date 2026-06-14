@@ -100,7 +100,7 @@ export async function activatePlanAfterPayment(
 
   const { data: user, error: userErr } = await supabase
     .from('users')
-    .select('plan_tier, plan_started_at, plan_expires_at')
+    .select('plan_tier, plan_started_at, plan_expires_at, credits_remaining')
     .eq('id', userId)
     .maybeSingle();
 
@@ -137,11 +137,14 @@ export async function activatePlanAfterPayment(
     return { ok: false, error: payUpdateErr.message };
   }
 
+  const existingCredits = (user.credits_remaining as number | null) ?? 0;
+  const newCreditsRemaining = existingCredits + planConfig.credits;
+
   const { error: userUpdateErr } = await supabase
     .from('users')
     .update({
       plan_tier: plan,
-      credits_remaining: planConfig.credits,
+      credits_remaining: newCreditsRemaining,
       plan_started_at: planStartedAt,
       plan_expires_at: newExpiresAt.toISOString(),
       plan_status: 'active',
