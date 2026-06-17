@@ -148,12 +148,17 @@ export async function loadOnboardingHydration(): Promise<OnboardingHydration | n
 
   const resumeState = resume ? resumeStateFromDbStatus(resume.status) : 'idle'
 
-  let step: 1 | 2 = draft?.step ?? 1
-  if (step === 1 && resumeState === 'parsed' && (draft?.goal || data.goal)) {
-    step = 2
-  }
-  if (step === 1 && resumeState === 'parsed' && resume && !draft) {
-    step = 2
+  let step: 1 | 2 = 1
+  const isStep1Complete =
+    data.goal !== null &&
+    data.role.trim().length > 0 &&
+    data.experienceYears >= 0 &&
+    data.interviewerId !== null
+
+  if (isStep1Complete) {
+    step = draft?.step ?? 2
+  } else {
+    step = 1
   }
 
   return {

@@ -369,6 +369,41 @@ export function OnboardingStepResume({
   const [fileError,    setFileError]    = useState('')
   const [diffOpen,     setDiffOpen]     = useState(false)
 
+  const getStatusHintMessage = () => {
+    if (canBegin) {
+      return 'Your AI interviewer is standing by'
+    }
+
+    const missingGoal = !data.goal
+    const missingRole = !data.role.trim()
+    const missingVoice = !data.interviewerId
+    const missingResume = !isParsed || !data.resumeId
+
+    const missingFields = []
+    if (missingGoal) missingFields.push('goal')
+    if (missingVoice) missingFields.push('voice')
+    if (missingRole) missingFields.push('role')
+    if (missingResume) missingFields.push('resume')
+
+    if (missingFields.length === 0) {
+      return 'Complete setup to begin'
+    }
+
+    const joined = missingFields.join(', ')
+    const lastCommaIdx = joined.lastIndexOf(', ')
+    const listStr = lastCommaIdx !== -1 
+      ? joined.substring(0, lastCommaIdx) + ' and ' + joined.substring(lastCommaIdx + 2)
+      : joined
+
+    const isOnlyResume = missingFields.length === 1 && missingResume
+    const actionWord = isOnlyResume ? 'Upload' : 'Complete'
+    const suffix = (missingGoal || missingVoice || missingRole) && !missingResume
+      ? ' in Step 1 to begin'
+      : ' to begin'
+
+    return `${actionWord} ${listStr}${suffix}`
+  }
+
   const isProcessing = resumeState === 'uploading' || resumeState === 'processing'
   const isParsed     = resumeState === 'parsed'
   const isFailed     = resumeState === 'failed'
@@ -916,12 +951,11 @@ export function OnboardingStepResume({
               </motion.button>
 
               {/* Status hint below CTA */}
-              <p className="text-center text-[10px] text-(--text-muted) sm:text-[11px]">
-                {!isParsed
-                  ? 'Upload your resume above to enable'
-                  : canBegin
-                    ? 'Your AI interviewer is standing by'
-                    : 'Complete goal, voice, and resume to begin'}
+              <p className={cn(
+                "text-center text-[10px] sm:text-[11px]",
+                canBegin ? "text-(--text-muted)" : "text-amber-600 dark:text-amber-400 font-medium"
+              )}>
+                {getStatusHintMessage()}
               </p>
 
               {/* Back — compact row */}
