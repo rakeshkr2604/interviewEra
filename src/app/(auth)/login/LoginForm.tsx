@@ -54,6 +54,23 @@ export function LoginForm({ next }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
+  function mapAuthError(message: string): string {
+    const msg = message.toLowerCase();
+    if (msg.includes('invalid login credentials') || msg.includes('invalid credentials')) {
+      return 'The email or password you entered is incorrect.';
+    }
+    if (msg.includes('email not confirmed')) {
+      return 'Please verify your email address before signing in. Check your inbox for a confirmation link.';
+    }
+    if (msg.includes('too many requests') || msg.includes('rate limit')) {
+      return 'Too many sign-in attempts. Please wait a few minutes and try again.';
+    }
+    if (msg.includes('network') || msg.includes('fetch')) {
+      return 'Network connection issue. Please check your internet connection and try again.';
+    }
+    return message;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -67,7 +84,7 @@ export function LoginForm({ next }: LoginFormProps) {
       });
 
       if (signInError) {
-        setError(signInError.message);
+        setError(mapAuthError(signInError.message));
         return;
       }
 

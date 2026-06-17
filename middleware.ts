@@ -33,6 +33,9 @@ const RATE_LIMITS: [string, number, number][] = [
   ['/api/resume/upload',     5, 60],
   ['/api/payments',         10, 60],
   ['/api/tools',             5, 60],
+  ['/login',                15, 60],
+  ['/signup',               10, 60],
+  ['/forgot-password',       5, 60],
 ];
 
 /** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
