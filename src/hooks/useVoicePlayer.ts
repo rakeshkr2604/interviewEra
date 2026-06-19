@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProsodicTTS, TTSFallbackToBrowserError } from '@/lib/voice/tts-client';
-import type { InterviewerVoice, InterviewerTone } from '@/lib/voice/tts-client';
+import type { InterviewerId } from '@/lib/config/interviewers';
+import type { InterviewerTone, TTSVoiceKey } from '@/lib/voice/tts-client';
 import { lifecycleLog, lifecycleWarn } from '@/lib/voice/lifecycle-log';
 import {
   getSharedInterviewAudioContext,
@@ -24,7 +25,7 @@ export interface UseVoicePlayerReturn {
   stop: () => void;
 }
 
-export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
+export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlayerReturn {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -190,10 +191,15 @@ export function useVoicePlayer(voice: InterviewerVoice): UseVoicePlayerReturn {
     [voice, stop, clearProgressLoop],
   );
 
+  // StrictMode remount: cleanup sets mountedRef false; useRef persists across
+  // remount — reset true on every mount so speak() is not permanently blocked.
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       seqRef.current += 1;
+      fetchAbortRef.current?.abort();
+      fetchAbortRef.current = null;
       if (sourceRef.current) {
         try { sourceRef.current.stop(); } catch { /* already stopped */ }
         sourceRef.current = null;

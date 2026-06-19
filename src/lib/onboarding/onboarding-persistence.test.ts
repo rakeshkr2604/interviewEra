@@ -201,6 +201,10 @@ describe('onboarding persist scheduler', () => {
 })
 
 describe('onboarding hydration restore', () => {
+  it('defaults new sessions to easy difficulty', () => {
+    expect(emptyOnboardingPageSnapshot().difficulty).toBe('easy')
+  })
+
   it('restores experienceYears 0 after refresh (not treated as missing)', () => {
     const hydration = makeHydration({
       data: { ...draftToOnboardingData(buildPersistedDraft(makePersistInput())), experienceYears: 0 },

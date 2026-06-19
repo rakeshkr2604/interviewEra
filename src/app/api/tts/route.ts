@@ -3,14 +3,10 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkTTSQuota, recordTTSUsage, enforcePerInterviewTTSLimit } from '@/lib/quota/voice-quota';
 import { logTTSCall } from '@/lib/telemetry/voice-logger';
 import { abuseGate } from '@/lib/abuse/risk-scorer';
-
-/** Indian English–friendly voices (override via env for your ElevenLabs library). */
-const VOICE_IDS: Record<string, string> = {
-  female: process.env.ELEVENLABS_VOICE_FEMALE_ID ?? 'pFZP5JQG7iQjIQuC4Bku',
-  male: process.env.ELEVENLABS_VOICE_MALE_ID ?? '1qEiC6qsybMkmnNbush0',
-};
-
-const TTS_MODEL_ID = process.env.ELEVENLABS_MODEL_ID ?? 'eleven_multilingual_v2';
+import {
+  resolveElevenLabsModelId,
+  resolveElevenLabsVoiceId,
+} from '@/lib/voice/elevenlabs-voices';
 
 // Hard ceiling: no single TTS request may exceed this regardless of plan.
 // Prevents runaway prompts from generating 10-minute audio at full cost.
@@ -134,9 +130,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const voiceId     = VOICE_IDS[voice ?? 'female'] ?? VOICE_IDS.female;
-  const spokenText  = enhanceTextForSpeech(finalText);
+  const voiceId       = resolveElevenLabsVoiceId(voice ?? 'priya');
+  const ttsModelId    = resolveElevenLabsModelId();
+  const spokenText    = enhanceTextForSpeech(finalText);
   const voiceSettings = toneToVoiceSettings(tone ?? 'neutral', spokenText);
+
+  console.log(JSON.stringify({
+    ts: new Date().toISOString(),
+    event: 'tts_voice_resolved',
+    voice_key: voice ?? 'priya',
+    voice_id: voiceId,
+    model_id: ttsModelId,
+  }));
 
   // ── 8. ElevenLabs call ───────────────────────────────────────────────────────
   let success = false;
@@ -154,7 +159,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           text:           spokenText,
-          model_id:       TTS_MODEL_ID,
+          model_id:       ttsModelId,
           voice_settings: voiceSettings,
         }),
         signal: AbortSignal.timeout(12_000), // 12s hard timeout

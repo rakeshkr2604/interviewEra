@@ -1,3 +1,4 @@
+import { DEFAULT_INTERVIEW_DIFFICULTY } from '@/lib/settings/client-preferences'
 import type { OnboardingHydration } from '@/lib/onboarding/load-hydration'
 import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import type { InterviewGoal } from '@/types/onboarding.types'
@@ -74,7 +75,7 @@ export function emptyOnboardingPageSnapshot(): OnboardingPageSnapshot {
     jdText: '',
     parsedJd: null,
     jdParseStatus: 'idle',
-    difficulty: 'medium',
+    difficulty: DEFAULT_INTERVIEW_DIFFICULTY,
     difficultyTouched: false,
     aiFollowupsEnabled: true,
   }

@@ -29,7 +29,7 @@ export function VoiceInterviewSession({
   const controllerRef = useRef<DeepgramSessionController | null>(null);
   const mountedRef = useRef(true);
   const { startRecording, stopRecording } = useMicrophone();
-  const { isPlaying: interviewerSpeaking, speak: speakQuestion } = useVoicePlayer('female');
+  const { isPlaying: interviewerSpeaking, speak: speakQuestion } = useVoicePlayer('priya');
 
   useEffect(() => {
     mountedRef.current = true;

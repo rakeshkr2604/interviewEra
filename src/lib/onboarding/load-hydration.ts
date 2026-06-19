@@ -9,6 +9,7 @@ import {
 import { resolveHydratedResumeId } from '@/lib/onboarding/hydration-shared'
 import type { ParsedResume, InterviewDifficulty } from '@/types/app.types'
 import type { InterviewGoal } from '@/types/onboarding.types'
+import { DEFAULT_INTERVIEW_DIFFICULTY } from '@/lib/settings/client-preferences'
 
 export type OnboardingResumeHydration = {
   id: string
@@ -172,7 +173,7 @@ export async function loadOnboardingHydration(): Promise<OnboardingHydration | n
     jdText: draft?.jdText ?? '',
     parsedJd: draft?.parsedJd ? coerceParsedJdFromDraft(draft.parsedJd) : null,
     jdParseStatus: draft?.jdParseStatus ?? (draft?.parsedJd ? 'ready' : 'idle'),
-    difficulty: draft?.difficulty ?? 'medium',
+    difficulty: draft?.difficulty ?? DEFAULT_INTERVIEW_DIFFICULTY,
     difficultyTouched: draft?.difficultyTouched ?? false,
     aiFollowupsEnabled: draft?.aiFollowupsEnabled ?? true,
   }

@@ -38,6 +38,9 @@ export type AnswerStyle = 'concise' | 'balanced' | 'detailed'
 
 export type VoiceGenderPreference = 'female' | 'male'
 
+/** First-time session default — users can raise via Change / Settings. */
+export const DEFAULT_INTERVIEW_DIFFICULTY: InterviewDifficulty = 'easy'
+
 export function readVoiceGender(): VoiceGenderPreference {
   if (typeof window === 'undefined') return 'female'
   const v = localStorage.getItem(STORAGE_KEYS.voiceGender)
@@ -84,10 +87,10 @@ export function getMicAudioConstraints(): MediaStreamConstraints {
 }
 
 export function readDefaultDifficulty(): InterviewDifficulty {
-  if (typeof window === 'undefined') return 'medium'
+  if (typeof window === 'undefined') return DEFAULT_INTERVIEW_DIFFICULTY
   const v = localStorage.getItem(STORAGE_KEYS.defaultDifficulty)
   if (v === 'easy' || v === 'medium' || v === 'hard') return v
-  return 'medium'
+  return DEFAULT_INTERVIEW_DIFFICULTY
 }
 
 export function readAnswerStyle(): AnswerStyle {

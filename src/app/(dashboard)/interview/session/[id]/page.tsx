@@ -47,6 +47,7 @@ import { useInterviewVoiceUi } from '@/hooks/useInterviewVoiceUi'
 import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
+import { clearElevenLabsTtsBlock } from '@/lib/voice/elevenlabs-tts-gate'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
 import { releaseAudioForMicCapture, resumeSharedInterviewAudioContext } from '@/lib/voice/audio-gesture'
 import { installInterviewDebug } from '@/lib/voice/interview-debug'
@@ -313,14 +314,13 @@ export default function InterviewSessionPage() {
     useAvatarSync(resolvedInterviewerId)
 
   // ─── ElevenLabs TTS (Deepgram mode) ───────────────────────
-  const resolvedGender = resolvedInterviewer?.gender === 'male' ? 'male' : 'female'
   const {
     isPlaying: elIsPlaying,
     playbackProgress: elPlaybackProgress,
     error: elTtsError,
     speak: elSpeak,
     stop: elStop,
-  } = useVoicePlayer(resolvedGender)
+  } = useVoicePlayer(resolvedInterviewerId ?? 'priya')
 
   const avatarReadyLoggedRef = useRef(false)
   useEffect(() => {
@@ -687,6 +687,7 @@ export default function InterviewSessionPage() {
     // prematurely. Without this line the machine is stuck at
     // `fetching_interview` forever in development (and on any fast-refresh).
     mountedRef.current = true
+    clearElevenLabsTtsBlock()
     interviewStartupLog('session_loaded', { interviewId })
     const loadInterview = async () => {
       // Hard deadline: if the interview data fetch stalls (slow DB, cold

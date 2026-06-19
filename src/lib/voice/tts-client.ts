@@ -3,11 +3,14 @@ import {
   markElevenLabsBlockedForHttpStatus,
 } from '@/lib/voice/elevenlabs-tts-gate';
 
+import type { InterviewerId } from '@/lib/config/interviewers';
+
 export type InterviewerVoice = 'male' | 'female';
+export type TTSVoiceKey = InterviewerVoice | InterviewerId;
 export type InterviewerTone = 'encouraging' | 'neutral' | 'challenging';
 
 export interface TTSOptions {
-  voice: InterviewerVoice;
+  voice: TTSVoiceKey;
   tone: InterviewerTone;
 }
 
