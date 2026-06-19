@@ -53,7 +53,7 @@ export interface SttStartOptions {
 
 export class SttPipeline {
   private readonly transportFactory: SttTransportFactory
-  private readonly callbacks: SttPipelineCallbacks
+  private callbacks: SttPipelineCallbacks
   private readonly logger: VoiceLogger
   private readonly bus?: VoiceEventBus
   private readonly primaryEngine: SttEngineKind
@@ -73,6 +73,14 @@ export class SttPipeline {
     this.bus = opts.bus
     this.primaryEngine = opts.primaryEngine ?? 'deepgram'
     this.engine = this.primaryEngine
+  }
+
+  /**
+   * Replace/merge consumer callbacks after construction. The orchestrator
+   * registers its handlers here (it cannot exist at pipeline-construction time).
+   */
+  setCallbacks(callbacks: Partial<SttPipelineCallbacks>): void {
+    this.callbacks = { ...this.callbacks, ...callbacks }
   }
 
   getEngine(): SttEngineKind {
