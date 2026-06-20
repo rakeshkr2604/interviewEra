@@ -20,6 +20,7 @@ const PUBLIC_ROUTES = new Set([
   '/terms',
   '/refund',
   '/auth/callback',
+  '/auth/confirm',
 ]);
 const AUTH_ROUTES = new Set(['/login', '/signup']);
 

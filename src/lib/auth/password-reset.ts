@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getBaseUrl } from '@/lib/server/get-base-url';
+import { buildPasswordResetConfirmUrl } from '@/lib/auth/reset-link';
 import { sendEmail } from '@/lib/email/send';
 import { renderResetPasswordEmail } from '@/lib/email/render-reset-password.server';
 
@@ -42,11 +43,6 @@ function maskEmail(email: string): string {
 
 function logStep(ctx: PasswordResetLogContext): void {
   console.info(LOG_PREFIX, JSON.stringify(ctx));
-}
-
-function buildRedirectTo(): string {
-  const base = getBaseUrl();
-  return `${base}/auth/callback?next=${encodeURIComponent('/reset-password')}`;
 }
 
 function resolveDisplayName(
@@ -113,7 +109,8 @@ export async function sendPasswordResetEmail(email: string): Promise<SendPasswor
     return { acknowledged: true, delivered: false };
   }
 
-  const redirectTo = buildRedirectTo();
+  const baseUrl = getBaseUrl();
+  const redirectTo = `${baseUrl}/auth/callback?next=${encodeURIComponent('/reset-password')}`;
 
   const { data: linkData, error: linkError } = await service.auth.admin.generateLink({
     type: 'recovery',
@@ -141,23 +138,26 @@ export async function sendPasswordResetEmail(email: string): Promise<SendPasswor
     return { acknowledged: true, delivered: false };
   }
 
-  const resetUrl = linkData.properties?.action_link;
-  if (!resetUrl) {
+  const hashedToken = linkData.properties?.hashed_token?.trim();
+  if (!hashedToken) {
     logStep({
       step: 'generate_link',
       emailDomain,
       userFound: true,
       tokenGenerated: false,
-      rootCause: 'Supabase generateLink returned no action_link',
+      rootCause: 'Supabase generateLink returned no hashed_token',
     });
     return { acknowledged: true, delivered: false };
   }
+
+  const resetUrl = buildPasswordResetConfirmUrl(hashedToken, baseUrl);
 
   logStep({
     step: 'generate_link',
     emailDomain,
     userFound: true,
     tokenGenerated: true,
+    supabaseMessage: `resetUrlHost=${new URL(resetUrl).host}`,
   });
 
   const userId = linkData.user?.id;
