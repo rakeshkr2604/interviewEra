@@ -69,12 +69,13 @@ export function StreakCounter({ className }: { className?: string }) {
   }, [])
 
   const n = streak ?? 0
+  const streakLabel = streak === null ? '—' : n === 1 ? '1 day streak' : `${n} days streak`
 
   return (
     <Link
       href="/profile/badges"
       className={className}
-      aria-label={`${n}-day quality streak`}
+      aria-label={`${n} day quality streak`}
       prefetch={false}
       style={{
         display: 'inline-flex',
@@ -108,7 +109,7 @@ export function StreakCounter({ className }: { className?: string }) {
       >
         🔥
       </motion.span>
-      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{streak === null ? '—' : n}-day streak</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{streakLabel}</span>
     </Link>
   )
 }

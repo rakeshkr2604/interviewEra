@@ -25,19 +25,19 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
 
   return (
     <div className="dashboard-premium-card mb-4 px-4 py-4 sm:mb-6 sm:px-6 sm:py-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+        <div className="min-w-0">
           <p
             className="text-[10px] font-bold uppercase tracking-[0.14em]"
             style={{ color: 'var(--accent-primary)' }}
           >
             Placement track
           </p>
-          <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <p className="mt-1 text-lg font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
             {tierLabel}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           {[
             { icon: Layers, label: `Tier ${snap.current_tier}/${MAX_TIER}` },
             { icon: Flame, label: `${snap.current_streak === 1 ? '1 day' : `${snap.current_streak} days`} streak` },

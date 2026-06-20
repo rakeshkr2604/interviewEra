@@ -34,7 +34,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
 
   return (
     <>
-      <div className="mb-6 flex gap-2">
+      <div className="mb-6 flex flex-wrap gap-2">
         {TABS.map((tab) => (
           <button
             key={tab}
@@ -82,10 +82,13 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
             return (
               <div
                 key={interview.id}
-                className="dashboard-premium-card flex flex-wrap items-center justify-between gap-4 px-6 py-5 sm:px-7"
+                className="dashboard-premium-card flex flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-5 lg:px-7"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  <p
+                    className="text-base font-semibold leading-snug sm:truncate"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
                     {interview.role}
                   </p>
                   <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
@@ -93,29 +96,34 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-                  <div className="text-right">
-                    <p className="text-2xl font-bold" style={{ color: 'var(--text-secondary)' }}>
-                      {interview.score != null ? `${interview.score}/10` : '—'}
-                    </p>
-                    <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
-                      Overall Score
-                    </p>
+                <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-3">
+                  <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+                    <div className="text-left sm:text-right">
+                      <p
+                        className="text-lg font-bold tabular-nums sm:text-2xl"
+                        style={{ color: 'var(--text-secondary)' }}
+                      >
+                        {interview.score != null ? `${interview.score}/10` : '—'}
+                      </p>
+                      <p className="text-[10px] sm:text-right" style={{ color: 'var(--text-muted)' }}>
+                        Overall Score
+                      </p>
+                    </div>
+                    <span
+                      className="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold sm:px-3 sm:text-xs"
+                      style={{
+                        background: isCompleted ? 'var(--accent-success)20' : 'var(--accent-warning)20',
+                        color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
+                      }}
+                    >
+                      {isCompleted ? 'Completed' : 'Incomplete'}
+                    </span>
                   </div>
-                  <span
-                    className="rounded-full px-3 py-1 text-xs font-semibold"
-                    style={{
-                      background: isCompleted ? 'var(--accent-success)20' : 'var(--accent-warning)20',
-                      color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
-                    }}
-                  >
-                    {isCompleted ? 'Completed' : 'Incomplete'}
-                  </span>
 
                   {!isCompleted ? (
                     <Link
                       href={`/interview/session/${interview.id}`}
-                      className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 active:opacity-90 sm:text-sm"
                       style={{ background: 'var(--accent-primary)' }}
                     >
                       Continue
@@ -123,7 +131,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                   ) : reportHref ? (
                     <Link
                       href={reportHref}
-                      className="shrink-0 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 active:opacity-90 sm:text-sm"
                       style={{ background: 'var(--accent-primary)' }}
                     >
                       View report
