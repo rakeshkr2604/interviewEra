@@ -2,8 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { getAuthRedirectOrigin } from '@/lib/auth/redirect-origin';
-import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
@@ -25,20 +23,39 @@ export function ForgotPasswordForm() {
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const origin = getAuthRedirectOrigin();
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${origin}/auth/callback?next=${encodeURIComponent('/reset-password')}`,
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() }),
       });
 
-      if (resetError) {
-        setError(resetError.message);
+      const payload = (await res.json().catch(() => null)) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      } | null;
+
+      if (res.status === 429) {
+        setError(
+          payload?.error ??
+            'Too many reset attempts. Please wait a minute and try again.',
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        setError(
+          payload?.error ??
+            'Unable to send a reset email right now. Please try again in a few minutes.',
+        );
         return;
       }
 
       setDone(true);
     } catch {
-      setError('Something went wrong. Please try again.');
+      setError(
+        'Unable to send a reset email right now. Please try again in a few minutes.',
+      );
     } finally {
       setLoading(false);
     }
@@ -63,7 +80,7 @@ export function ForgotPasswordForm() {
                 color: 'var(--text-primary)',
               }}
             >
-              Check your inbox for a reset link. If you don&apos;t see it in a few minutes, look in spam or try again.
+              If an account exists for this email, we&apos;ll send a reset link shortly. Check your inbox and spam folder.
             </p>
             <Link
               href="/login"
