@@ -21,7 +21,7 @@ export interface SendEmailResult {
  */
 export async function sendEmail({
   to,
-  from = process.env.SENDER_EMAIL_NO_REPLY || 'InterviewEra <noreply@mail.interviewera.com>',
+  from = process.env.SENDER_EMAIL_NO_REPLY || 'InterviewEra <noreply@interviewera.com>',
   replyTo,
   subject,
   html,

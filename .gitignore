@@ -71,6 +71,7 @@ manual-test*
 test-output*
 logs/
 *.log
+failed-emails.csv
 
 # Claude / AI session scratch outputs
 .claude/

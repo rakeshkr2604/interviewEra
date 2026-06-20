@@ -2,14 +2,32 @@ import * as React from 'react';
 
 interface FooterProps {
   unsubscribeUrl?: string;
+  tagline?: string;
 }
 
-export function Footer({ unsubscribeUrl }: FooterProps) {
+export function Footer({ unsubscribeUrl, tagline }: FooterProps) {
   const brandPurple = '#7c3aed';
   const textMuted = '#71717a';
 
   return (
     <table border={0} cellPadding={0} cellSpacing={0} width="100%" style={{ marginTop: '32px' }}>
+      {tagline ? (
+        <tr>
+          <td
+            align="center"
+            style={{
+              fontSize: '13px',
+              lineHeight: '20px',
+              color: '#6b7280',
+              textAlign: 'center',
+              paddingBottom: '16px',
+            }}
+            className="footer-tagline text-secondary"
+          >
+            {tagline}
+          </td>
+        </tr>
+      ) : null}
       <tr>
         <td align="center" style={{
           fontSize: '12px',

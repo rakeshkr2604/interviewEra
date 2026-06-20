@@ -5,9 +5,10 @@ interface EmailLayoutProps {
   children: React.ReactNode;
   previewText?: string;
   unsubscribeUrl?: string;
+  footerTagline?: string;
 }
 
-export function EmailLayout({ children, previewText, unsubscribeUrl }: EmailLayoutProps) {
+export function EmailLayout({ children, previewText, unsubscribeUrl, footerTagline }: EmailLayoutProps) {
   const brandPurple = '#7c3aed';
   const textDark = '#18181b';
 
@@ -25,6 +26,12 @@ export function EmailLayout({ children, previewText, unsubscribeUrl }: EmailLayo
             }
             .content-box {
               padding: 24px 16px !important;
+            }
+            .feature-grid-cell {
+              display: block !important;
+              width: 100% !important;
+              padding-left: 0 !important;
+              padding-right: 0 !important;
             }
           }
           @media (prefers-color-scheme: dark) {
@@ -117,6 +124,29 @@ export function EmailLayout({ children, previewText, unsubscribeUrl }: EmailLayo
               border-color: #dc2626 !important;
               color: #f87171 !important;
             }
+            /* Product update email */
+            .feature-card, .credits-badge {
+              background-color: #18181b !important;
+              border-color: #27272a !important;
+            }
+            .feature-icon-bg {
+              background-color: #1a1528 !important;
+            }
+            .new-badge {
+              background-color: #2e1065 !important;
+              color: #c4b5fd !important;
+            }
+            .product-preview-image {
+              border-color: #3f3f46 !important;
+            }
+            .product-preview-frame {
+              background-color: #1a1528 !important;
+              border-color: #27272a !important;
+            }
+            .credits-reassurance {
+              background-color: #18181b !important;
+              border-color: #27272a !important;
+            }
           }
         `}} />
       </head>
@@ -170,7 +200,7 @@ export function EmailLayout({ children, previewText, unsubscribeUrl }: EmailLayo
                 {/* Footer */}
                 <tr>
                   <td align="center" style={{ paddingTop: '32px', paddingBottom: '16px' }}>
-                    <Footer unsubscribeUrl={unsubscribeUrl} />
+                    <Footer unsubscribeUrl={unsubscribeUrl} tagline={footerTagline} />
                   </td>
                 </tr>
               </table>

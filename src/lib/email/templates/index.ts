@@ -7,6 +7,7 @@ import VerificationEmail from '../../../emails/VerificationEmail';
 import ResetPasswordEmail from '../../../emails/ResetPasswordEmail';
 import InterviewCompletedEmail from '../../../emails/InterviewCompletedEmail';
 import WeeklyProgressEmail from '../../../emails/WeeklyProgressEmail';
+import ProductUpdateEmail from '../../../emails/ProductUpdateEmail';
 
 export interface TemplateDefinition {
   name: string;
@@ -42,6 +43,11 @@ export class TemplateRegistry {
       name: 'weekly_progress',
       subject: 'Your InterviewEra Weekly Progress Report',
       component: WeeklyProgressEmail as React.ComponentType,
+    });
+    this.register('product_update', {
+      name: 'product_update',
+      subject: 'InterviewEra product update — your interview credits have been updated',
+      component: ProductUpdateEmail as React.ComponentType,
     });
   }
 
