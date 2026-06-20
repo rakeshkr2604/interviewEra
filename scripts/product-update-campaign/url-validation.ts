@@ -16,7 +16,7 @@ export function buildCampaignUrls(): CampaignUrls {
   const appUrl = getCampaignAppBaseUrl();
 
   return {
-    primaryCta: `${appUrl}/interview`,
+    primaryCta: `${appUrl}/interview/new`,
     secondaryCta: `${appUrl}/dashboard`,
     feedback: `${appUrl}/feedback`,
     settings: `${appUrl}/settings`,
