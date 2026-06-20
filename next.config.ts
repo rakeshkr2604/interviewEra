@@ -74,6 +74,12 @@ const nextConfig: NextConfig = {
         destination: '/onboarding',
         permanent: true,
       },
+      /** Legacy product-update email CTA — /interview is not a page; preserve ?query on redirect. */
+      {
+        source: '/interview',
+        destination: '/onboarding',
+        permanent: true,
+      },
       {
         source: '/interview-questions/companies/tcs',
         destination: '/interview-questions/tcs',
