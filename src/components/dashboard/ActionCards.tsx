@@ -14,7 +14,7 @@ interface ActionCardsProps {
 
 export function ActionCards({ cards }: ActionCardsProps) {
   return (
-    <div className="grid grid-cols-1 gap-4 mb-6 md:grid-cols-3">
+    <div className="mb-6 grid grid-cols-1 gap-3 min-[360px]:grid-cols-2 md:grid-cols-3">
       {cards.map((action) => (
         <Link
           key={action.label}

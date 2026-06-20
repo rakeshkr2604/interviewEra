@@ -2,19 +2,8 @@ import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { ActionCards } from '@/components/dashboard/ActionCards'
 import { RecentInterviews } from '@/components/dashboard/RecentInterviews'
-import {
-  ClipboardList,
-  TrendingUp,
-  CheckCircle2,
-  Clock,
-} from 'lucide-react'
+import { TrendingUp } from 'lucide-react'
 import type { InterviewWithReportsRow, UserRow } from './dashboard-types'
-import {
-  formatPlanTierName,
-  isPaidPlanActive,
-  planExpiryStatusLine,
-} from '@/lib/pricing/plan-status'
-import type { PlanTier } from '@/types/app.types'
 
 const ScoreTrendChart = dynamic(
   () =>
@@ -34,7 +23,7 @@ const ScoreTrendChart = dynamic(
 
 export function DashboardMain({
   rows,
-  userData,
+  userData: _userData,
 }: {
   rows: InterviewWithReportsRow[]
   userData: UserRow | null
@@ -52,7 +41,6 @@ export function DashboardMain({
   )
 
   const completedCount = (interviews || []).filter((i) => i.status === 'completed').length
-  const totalCount = interviews?.length || 0
   const avgScore =
     reports && reports.length > 0
       ? (reports.reduce((s, r) => s + (r.overall_score || 0), 0) / reports.length).toFixed(1)
@@ -70,16 +58,6 @@ export function DashboardMain({
     }))
 
   const scoreMap = new Map(reports?.map((r) => [r.interview_id, r.overall_score]) || [])
-
-  const creditsRemaining = userData?.credits_remaining ?? 0
-  const planTier = (userData?.plan_tier ?? 'free') as PlanTier
-  const planExpiresAt = userData?.plan_expires_at ?? null
-  const planStatus = userData?.plan_status ?? null
-  const paidActive = isPaidPlanActive(planTier, planStatus, planExpiresAt)
-  const planStatSub =
-    paidActive && planExpiresAt
-      ? `${formatPlanTierName(planTier)} · ${planExpiryStatusLine(planExpiresAt, true) ?? ''}`
-      : null
 
   return (
     <>
@@ -129,45 +107,6 @@ export function DashboardMain({
             <ScoreTrendChart data={trendData} />
           </div>
         )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-4 mb-6 lg:grid-cols-4">
-        {[
-          { label: 'TOTAL INTERVIEWS', value: totalCount, icon: ClipboardList },
-          { label: 'COMPLETED INTERVIEWS', value: completedCount, icon: CheckCircle2 },
-          { label: 'AVERAGE SCORE', value: avgScore ? `${avgScore}/10` : '—', icon: TrendingUp },
-          { label: 'CREDITS LEFT', value: creditsRemaining, icon: Clock, sub: planStatSub },
-        ].map((stat) => {
-          const Icon = stat.icon
-          return (
-            <div key={stat.label} className="dashboard-premium-card px-5 py-5 sm:px-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-secondary)' }}>
-                    {stat.label}
-                  </p>
-                  <p className="text-4xl font-bold mt-2 leading-none" style={{ color: 'var(--text-primary)' }}>
-                    {stat.value}
-                  </p>
-                  {'sub' in stat && stat.sub ? (
-                    <p className="mt-1.5 truncate text-[11px] font-medium" style={{ color: 'var(--accent-primary)' }}>
-                      {stat.sub}
-                    </p>
-                  ) : null}
-                </div>
-                <div
-                  className="rounded-xl p-2.5"
-                  style={{
-                    background: 'var(--accent-primary)18',
-                    color: 'var(--accent-primary)',
-                  }}
-                >
-                  <Icon size={18} />
-                </div>
-              </div>
-            </div>
-          )
-        })}
       </div>
 
       <ActionCards

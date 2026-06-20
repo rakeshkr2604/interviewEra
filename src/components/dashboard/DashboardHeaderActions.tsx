@@ -29,8 +29,8 @@ export function DashboardHeaderActions({
     paidActive && planExpiresAt ? planExpiryStatusLine(planExpiresAt, true) : null;
 
   return (
-    <div className="flex flex-col items-end gap-1.5">
-      <div className="flex flex-wrap items-center justify-end gap-2">
+    <div className="flex w-full flex-col items-stretch gap-1.5 sm:items-end">
+      <div className="flex flex-wrap items-center justify-start gap-2 sm:justify-end">
         {paidActive && planExpiresAt ? (
           <Link
             href="/upgrade"

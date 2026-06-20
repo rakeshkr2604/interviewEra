@@ -6,7 +6,10 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { DashboardHeaderActions } from '@/components/dashboard/DashboardHeaderActions'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { DashboardMain } from './DashboardMain'
-import { DashboardWelcomeCard } from './DashboardWelcomeCard'
+import { UserSummaryCard } from '@/components/dashboard/UserSummaryCard'
+import { CreditsOverviewCard } from '@/components/dashboard/CreditsOverviewCard'
+import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
+import { ProgressStatsGrid } from '@/components/dashboard/ProgressStatsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
 import type { InterviewWithReportsRow } from './dashboard-types'
@@ -14,6 +17,7 @@ import { PAGE_SEO } from '@/lib/seo/metadata'
 import { formatDateEnIn } from '@/lib/datetime/ist'
 import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
 import type { UserProgressRow } from '@/lib/retention/types'
+import type { PlanTier } from '@/types/app.types'
 
 export const metadata = PAGE_SEO.dashboard
 
@@ -83,11 +87,24 @@ export default async function DashboardPage() {
 
   const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
   const completedCount = rows.filter((i) => i.status === 'completed').length
+  const reports = rows.flatMap((i) =>
+    i.status === 'completed'
+      ? (i.reports ?? []).map((r) => ({
+          overall_score: r.overall_score,
+        }))
+      : [],
+  )
+  const avgScore =
+    reports.length > 0
+      ? (reports.reduce((s, r) => s + (r.overall_score || 0), 0) / reports.length).toFixed(1)
+      : null
 
   const memberSince = userData?.created_at ? formatDateEnIn(userData.created_at) : ''
 
   const creditsRemaining = userData?.credits_remaining ?? 0
   const displayName = userData?.name || user.email?.split('@')[0] || 'Student'
+  const planTier = (userData?.plan_tier ?? 'free') as PlanTier
+  const currentStreak = retentionDashboardSnap?.current_streak ?? 0
 
   return (
     <>
@@ -113,12 +130,31 @@ export default async function DashboardPage() {
         }
       />
 
-      <DashboardWelcomeCard
+      <UserSummaryCard
         userData={userData}
         displayName={displayName}
         memberSince={memberSince}
+        completedCount={completedCount}
+      />
+
+      <CreditsOverviewCard
         creditsRemaining={creditsRemaining}
         completedCount={completedCount}
+        planTier={planTier}
+        planExpiresAt={userData?.plan_expires_at ?? null}
+        planStatus={userData?.plan_status ?? null}
+      />
+
+      <QuickActionsGrid />
+
+      <ProgressStatsGrid
+        completedCount={completedCount}
+        avgScore={avgScore}
+        currentStreak={currentStreak}
+        creditsRemaining={creditsRemaining}
+        planTier={planTier}
+        planExpiresAt={userData?.plan_expires_at ?? null}
+        planStatus={userData?.plan_status ?? null}
       />
 
       <RetentionProgressCard snap={retentionDashboardSnap} />

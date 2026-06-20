@@ -19,8 +19,8 @@ export function DashboardPageHeader({
   backLabel?: string;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-5 sm:mb-10 sm:flex-row sm:items-start sm:justify-between">
-      <div className="min-w-0">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:gap-5 lg:mb-10 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0 flex-1">
         {backHref ? (
           <Link
             href={backHref}
@@ -52,7 +52,9 @@ export function DashboardPageHeader({
           </p>
         ) : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      {action ? (
+        <div className="flex w-full shrink-0 justify-start sm:justify-end lg:w-auto">{action}</div>
+      ) : null}
     </div>
   );
 }
