@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
-import { formatDateEnIn } from '@/lib/datetime/ist'
+import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
@@ -11,7 +11,8 @@ interface HistoryItem {
   role: string
   difficulty: string
   status: string
-  startedAt: string
+  startedAt: string | null
+  completedAt: string | null
   reportId: string | null
   score: number | null
 }
@@ -74,11 +75,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
         ) : (
           filteredItems.map((interview) => {
             const isCompleted = interview.status === 'completed'
-            const date = formatDateEnIn(interview.startedAt, {
-              day: 'numeric',
-              month: 'numeric',
-              year: 'numeric',
-            })
+            const date = formatInterviewDateEnIn(interview.startedAt, interview.completedAt)
             const reportHref =
               isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
 

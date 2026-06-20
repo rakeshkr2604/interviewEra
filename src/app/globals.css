@@ -225,6 +225,58 @@ code, pre, .font-mono {
     var(--card-shadow),
     0 0 64px color-mix(in srgb, var(--accent-primary) 12%, transparent),
     0 0 0 1px color-mix(in srgb, white 45%, transparent) inset;
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+.dashboard-hover-lift {
+  transition:
+    transform 220ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dashboard-hover-lift:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+    box-shadow:
+      var(--card-shadow),
+      0 12px 40px color-mix(in srgb, var(--accent-primary) 16%, transparent),
+      0 0 0 1px color-mix(in srgb, white 45%, transparent) inset;
+  }
+
+  .dashboard-hover-row:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--accent-primary) 22%, var(--card-border));
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  }
+}
+
+.dashboard-hover-lift:active,
+.dashboard-hover-row:active {
+  transform: scale(0.985);
+}
+
+.dashboard-hover-row {
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease,
+    border-color 200ms ease;
+}
+
+/* Dashboard pages — PWA safe horizontal inset + bottom scroll clearance above home indicator */
+.dashboard-page-shell {
+  padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+}
+
+@supports (padding: max(0px)) {
+  .dashboard-page-shell {
+    padding-left: max(0px, env(safe-area-inset-left, 0px));
+    padding-right: max(0px, env(safe-area-inset-right, 0px));
+  }
 }
 @media (min-width: 1024px) {
   .dashboard-premium-card {

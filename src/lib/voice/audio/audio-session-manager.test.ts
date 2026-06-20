@@ -52,6 +52,9 @@ class FakeAudioDriver implements AudioDriver {
   async resumePlayback(): Promise<boolean> {
     return this.resumeResult
   }
+  async resumeCapture(): Promise<boolean> {
+    return this.resumeResult
+  }
   async prepareForCapture(): Promise<void> {
     this.prepareForCaptureCalls++
   }
@@ -191,6 +194,15 @@ describe('AudioSessionManager', () => {
     await manager.playAudio(new ArrayBuffer(8), { onPlaybackFailed: onFail })
     expect(onFail).toHaveBeenCalledTimes(1)
     expect(driver.playCalls).toBe(0)
+  })
+
+  it('resumes capture and playback after background via resumeAfterBackground', async () => {
+    const resumePlayback = vi.spyOn(driver, 'resumePlayback')
+    const resumeCapture = vi.spyOn(driver, 'resumeCapture')
+    await manager.initialize()
+    await manager.resumeAfterBackground()
+    expect(resumePlayback).toHaveBeenCalledTimes(1)
+    expect(resumeCapture).toHaveBeenCalledTimes(1)
   })
 
   it('disposes deterministically and is idempotent', async () => {

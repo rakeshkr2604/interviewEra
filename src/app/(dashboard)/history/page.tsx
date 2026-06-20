@@ -35,14 +35,21 @@ export default async function HistoryPage() {
     (reports || []).map((r) => [r.interview_id as string, r]),
   )
 
-  const items = (interviews || []).map((interview) => {
+  const sortedInterviews = [...(interviews || [])].sort((a, b) => {
+    const aIso = (a.started_at as string | null) ?? (a.completed_at as string | null) ?? ''
+    const bIso = (b.started_at as string | null) ?? (b.completed_at as string | null) ?? ''
+    return bIso.localeCompare(aIso)
+  })
+
+  const items = sortedInterviews.map((interview) => {
     const report = reportByInterviewId.get(interview.id as string)
     return {
       id: interview.id as string,
       role: interview.role as string,
       difficulty: interview.difficulty as string,
       status: interview.status as string,
-      startedAt: interview.started_at as string,
+      startedAt: (interview.started_at as string | null) ?? null,
+      completedAt: (interview.completed_at as string | null) ?? null,
       reportId: report?.id ?? null,
       score: report?.overall_score ?? null,
     }

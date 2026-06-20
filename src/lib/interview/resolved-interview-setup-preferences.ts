@@ -8,10 +8,13 @@ import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import type { InterviewDifficulty } from '@/types/app.types'
 import {
+  readAdaptiveFollowUpEnabled,
   readAiVoiceEnabled,
   readAnswerStyle,
+  readCameraInterviewModeEnabled,
   readDefaultDifficulty,
   readInterviewLanguage,
+  INTERVIEW_LANGUAGE_LABELS,
   readNoiseCancellationPreferred,
   readPreferredInterviewerId,
   readTtsRate,
@@ -31,6 +34,8 @@ export type ResolvedInterviewSetupPreferences = {
   ttsRate: number
   aiVoiceEnabled: boolean
   noiseCancellationEnabled: boolean
+  adaptiveFollowUpEnabled: boolean
+  cameraInterviewModeEnabled: boolean
 }
 
 const DIFFICULTY_LABEL: Record<InterviewDifficulty, string> = {
@@ -60,9 +65,11 @@ export function readResolvedInterviewSetupPreferences(): ResolvedInterviewSetupP
     answerStyle,
     answerStyleLabel: ANSWER_STYLE_LABEL[answerStyle],
     interviewLanguage: lang,
-    interviewLanguageLabel: lang === 'en' ? 'English' : 'English',
+    interviewLanguageLabel: INTERVIEW_LANGUAGE_LABELS[lang],
     ttsRate: readTtsRate(),
     aiVoiceEnabled: readAiVoiceEnabled(),
     noiseCancellationEnabled: readNoiseCancellationPreferred(),
+    adaptiveFollowUpEnabled: readAdaptiveFollowUpEnabled(),
+    cameraInterviewModeEnabled: readCameraInterviewModeEnabled(),
   }
 }

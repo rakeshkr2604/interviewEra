@@ -68,6 +68,9 @@ export function usePersistOnboardingDraft(input: PersistInput) {
     input.difficulty,
     input.difficultyTouched,
     input.aiFollowupsEnabled,
+    input.aiFollowupsTouched,
+    input.cameraInterviewModeEnabled,
+    input.cameraModeTouched,
   ])
 
   useEffect(() => {

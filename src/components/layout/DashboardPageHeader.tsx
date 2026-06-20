@@ -19,7 +19,7 @@ export function DashboardPageHeader({
   backLabel?: string;
 }) {
   return (
-    <div className="mb-5 flex flex-col gap-3 sm:mb-8 sm:gap-5 lg:mb-10 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mb-4 flex flex-col gap-3 sm:mb-6 sm:gap-4 lg:mb-8 lg:flex-row lg:items-start lg:justify-between">
       <div className="min-w-0 flex-1">
         {backHref ? (
           <Link
@@ -38,7 +38,7 @@ export function DashboardPageHeader({
           {eyebrow}
         </p>
         <h1
-          className="mt-2 text-3xl font-bold tracking-tight text-balance md:text-4xl"
+          className="mt-1.5 text-2xl font-bold tracking-tight text-balance sm:mt-2 sm:text-3xl md:text-4xl"
           style={{ color: 'var(--text-primary)' }}
         >
           {title}

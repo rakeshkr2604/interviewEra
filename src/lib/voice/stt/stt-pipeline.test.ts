@@ -116,6 +116,55 @@ describe('SttPipeline', () => {
     expect(h.onAnswerReady).toHaveBeenCalledWith('I worked on a payments service')
   })
 
+  it('does not duplicate when utterance-end repeats finalized segments', async () => {
+    await h.pipeline.start()
+    const t = h.created[0]
+    t.finalSeg('Hello.')
+    t.finalSeg('World.')
+    t.utteranceEnd('Hello. World.')
+    expect(h.pipeline.getMergedTranscript()).toBe('Hello. World.')
+    expect(h.onAnswerReady).toHaveBeenCalledWith('Hello. World.')
+    expect(h.onAnswerReady).toHaveBeenCalledTimes(1)
+  })
+
+  it('handles three segments with pauses without duplication', async () => {
+    await h.pipeline.start()
+    const t = h.created[0]
+    t.finalSeg('First sentence.')
+    t.finalSeg('Second sentence.')
+    t.finalSeg('Third sentence.')
+    t.utteranceEnd('First sentence. Second sentence. Third sentence.')
+    expect(h.pipeline.getMergedTranscript()).toBe(
+      'First sentence. Second sentence. Third sentence.',
+    )
+  })
+
+  it('handles long multi-segment answers submitted exactly once', async () => {
+    await h.pipeline.start()
+    const t = h.created[0]
+    const segments = [
+      'I led a team of five engineers',
+      'building a payments microservice',
+      'that processed two million transactions daily',
+      'with sub-200ms latency at peak load',
+    ]
+    for (const seg of segments) t.finalSeg(seg)
+    t.utteranceEnd(segments.join(' '))
+    const expected =
+      'I led a team of five engineers building a payments microservice that processed two million transactions daily with sub-200ms latency at peak load'
+    expect(h.pipeline.getMergedTranscript()).toBe(expected)
+    expect(h.onAnswerReady).toHaveBeenCalledTimes(1)
+    expect(h.onAnswerReady).toHaveBeenCalledWith(expected)
+  })
+
+  it('accepts utterance-end as sole source when no prior finals', async () => {
+    await h.pipeline.start()
+    const t = h.created[0]
+    t.utteranceEnd('Single utterance only.')
+    expect(h.pipeline.getMergedTranscript()).toBe('Single utterance only.')
+    expect(h.onAnswerReady).toHaveBeenCalledWith('Single utterance only.')
+  })
+
   it('fires onListening when the engine opens', async () => {
     await h.pipeline.start()
     h.created[0].open()

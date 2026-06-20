@@ -26,7 +26,10 @@ import type {
   ScoreAnswerInput,
   ResolveNextTurnInput,
   ScoredAnswer,
+  InterviewCompletionPayload,
 } from '@/lib/voice/conversation/conversation-engine'
+import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge'
+import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
 
 export interface StaticQuestion {
   id: string
@@ -69,16 +72,19 @@ export interface ProcessAnswerApiResponse {
 
 export interface CompleteApiResponse {
   reportId: string
+  retention?: InterviewCompleteRetentionPayload | null
+  badgesUnlocked?: string[]
+  funnelComplete?: FunnelCompleteGa4Payload
 }
 
 export interface ConversationApiClient {
-  postAnswer(body: AnswerApiBody): Promise<AnswerApiResponse>
+  postAnswer(body: AnswerApiBody, signal?: AbortSignal): Promise<AnswerApiResponse>
   /** Non-fatal: resolve `null` on any failure so scoring still proceeds. */
   postProcessAnswer(
     body: ProcessAnswerApiBody,
     signal?: AbortSignal,
   ): Promise<ProcessAnswerApiResponse | null>
-  postComplete(body: { interviewId: string }): Promise<CompleteApiResponse>
+  postComplete(body: { interviewId: string }, signal?: AbortSignal): Promise<CompleteApiResponse>
 }
 
 export interface HttpConversationEngineConfig {
@@ -103,6 +109,8 @@ export class HttpConversationEngine implements ConversationEngine {
   private followUpUsedForIndex = -1
   /** In-flight process-answer promise started during scoreAnswer. */
   private processPromise: Promise<ProcessAnswerApiResponse | null> | null = null
+  private abortController: AbortController | null = null
+  private requestGeneration = 0
 
   constructor(config: HttpConversationEngineConfig) {
     if (config.questions.length === 0) {
@@ -117,38 +125,82 @@ export class HttpConversationEngine implements ConversationEngine {
     return this.staticIndex
   }
 
+  abort(): void {
+    this.requestGeneration++
+    if (this.abortController) {
+      try {
+        this.abortController.abort()
+      } catch {
+        /* idempotent */
+      }
+      this.abortController = null
+    }
+    this.processPromise = null
+  }
+
+  private beginRequest(): { signal: AbortSignal; generation: number } {
+    const generation = ++this.requestGeneration
+    if (this.abortController) {
+      try {
+        this.abortController.abort()
+      } catch {
+        /* idempotent */
+      }
+    }
+    this.processPromise = null
+    const controller = new AbortController()
+    this.abortController = controller
+    return { signal: controller.signal, generation }
+  }
+
+  private isStale(generation: number): boolean {
+    return generation !== this.requestGeneration
+  }
+
   async scoreAnswer(input: ScoreAnswerInput): Promise<ScoredAnswer> {
     const q = this.cfg.questions[this.staticIndex]
     if (!q) throw new Error(`No question at index ${this.staticIndex}`)
 
+    const { signal, generation } = this.beginRequest()
+
     // Fire process-answer in parallel; failure is non-fatal (→ null).
     this.processPromise = this.cfg.api
-      .postProcessAnswer({
-        interview_id: this.cfg.interviewId,
-        interviewer_id: this.cfg.interviewerId,
-        question: q.questionText,
-        answer: input.answerText,
-        context: {
-          role: this.cfg.role,
-          difficulty: this.cfg.difficulty,
-          focus_areas: [q.category ?? 'general'],
-          interview_style: q.category === 'technical' ? 'technical' : 'behavioral',
+      .postProcessAnswer(
+        {
+          interview_id: this.cfg.interviewId,
+          interviewer_id: this.cfg.interviewerId,
+          question: q.questionText,
+          answer: input.answerText,
+          context: {
+            role: this.cfg.role,
+            difficulty: this.cfg.difficulty,
+            focus_areas: [q.category ?? 'general'],
+            interview_style: q.category === 'technical' ? 'technical' : 'behavioral',
+          },
         },
-      })
+        signal,
+      )
       .catch((err) => {
+        if (signal.aborted || this.isStale(generation)) return null
         this.logger.warn('process_answer_failed', input.ctx, {
           message: err instanceof Error ? err.message : String(err),
         })
         return null
       })
 
-    const res = await this.cfg.api.postAnswer({
-      interviewId: this.cfg.interviewId,
-      questionId: q.id,
-      answerText: input.answerText,
-      answerMode: 'voice',
-      answerStyle: this.cfg.getAnswerStyle?.(),
-    })
+    const res = await this.cfg.api.postAnswer(
+      {
+        interviewId: this.cfg.interviewId,
+        questionId: q.id,
+        answerText: input.answerText,
+        answerMode: 'voice',
+        answerStyle: this.cfg.getAnswerStyle?.(),
+      },
+      signal,
+    )
+    if (signal.aborted || this.isStale(generation)) {
+      throw new DOMException('Aborted', 'AbortError')
+    }
 
     return {
       overallScore: res.score ?? null,
@@ -186,9 +238,18 @@ export class HttpConversationEngine implements ConversationEngine {
     // Advance to the next static question (or complete).
     this.staticIndex += 1
     if (this.staticIndex >= this.cfg.questions.length) {
-      const completed = await this.cfg.api.postComplete({ interviewId: this.cfg.interviewId })
+      const { signal, generation } = this.beginRequest()
+      const completed = await this.cfg.api.postComplete({ interviewId: this.cfg.interviewId }, signal)
+      if (signal.aborted || this.isStale(generation)) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
       this.logger.info('interview_completed', input.ctx, { reportId: completed.reportId })
-      return { done: true, reportId: completed.reportId }
+      const completion: InterviewCompletionPayload = {
+        retention: completed.retention ?? null,
+        funnelComplete: completed.funnelComplete,
+        badgesUnlocked: completed.badgesUnlocked ?? completed.retention?.newBadges ?? [],
+      }
+      return { done: true, reportId: completed.reportId, completion }
     }
 
     const nq = this.cfg.questions[this.staticIndex]
@@ -226,7 +287,7 @@ export function createHttpConversationApi(): ConversationApiClient {
   }
 
   return {
-    postAnswer: (body) => postJson<AnswerApiResponse>('/api/interview/answer', body),
+    postAnswer: (body, signal) => postJson<AnswerApiResponse>('/api/interview/answer', body, signal),
     postProcessAnswer: async (body, signal) => {
       try {
         return await postJson<ProcessAnswerApiResponse>(
@@ -238,6 +299,7 @@ export function createHttpConversationApi(): ConversationApiClient {
         return null // non-fatal — orchestrator falls back to the next static question
       }
     },
-    postComplete: (body) => postJson<CompleteApiResponse>('/api/interview/complete', body),
+    postComplete: (body, signal) =>
+      postJson<CompleteApiResponse>('/api/interview/complete', body, signal),
   }
 }

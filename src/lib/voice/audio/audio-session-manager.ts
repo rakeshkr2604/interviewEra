@@ -117,6 +117,19 @@ export class AudioSessionManager {
       this.captureHandle = handle
       this.disposal.register('mic-capture', () => handle.stop())
       this.status = 'ready'
+      const onVisible = () => {
+        if (typeof document === 'undefined') return
+        if (document.visibilityState !== 'visible') return
+        void this.resumeAfterBackground()
+      }
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisible)
+        window.addEventListener('pageshow', onVisible)
+        this.disposal.register('visibility-resume', () => {
+          document.removeEventListener('visibilitychange', onVisible)
+          window.removeEventListener('pageshow', onVisible)
+        })
+      }
       this.bus?.emit('ResourceLifecycle', { resource: 'mic-capture', phase: 'created' }, { ctx: this.ctx })
       this.logger.info('audio_session_ready', this.ctx, {})
     })()
@@ -232,6 +245,13 @@ export class AudioSessionManager {
         /* idempotent */
       }
     }
+  }
+
+  /** Resume playback + capture contexts (e.g. after tab visibility change). */
+  async resumeAfterBackground(): Promise<void> {
+    if (this.status !== 'ready') return
+    await this.driver.resumePlayback()
+    await this.driver.resumeCapture()
   }
 
   /** Resume the playback context (e.g. after tab visibility change). */

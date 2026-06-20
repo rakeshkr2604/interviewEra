@@ -29,7 +29,7 @@ function ProgressStatCard({
   sub?: string | null;
 }) {
   return (
-    <div className="dashboard-premium-card min-w-0 px-3.5 py-4 sm:px-5 sm:py-5">
+    <div className="dashboard-premium-card min-w-0 px-3.5 py-4 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
           <p
@@ -39,7 +39,7 @@ function ProgressStatCard({
             {label}
           </p>
           <p
-            className="mt-1.5 text-2xl font-bold tabular-nums leading-none sm:text-3xl"
+            className="mt-1.5 text-2xl font-bold tabular-nums leading-none sm:text-3xl lg:text-4xl"
             style={{ color: 'var(--text-primary)' }}
           >
             {value}
@@ -83,11 +83,11 @@ export function ProgressStatsGrid({
       : null;
 
   return (
-    <section className="mb-4 sm:mb-6">
-      <h2 className="mb-3 px-0.5 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+    <section className="mb-4 sm:mb-6 lg:mb-8">
+      <h2 className="mb-3 px-0.5 text-base font-semibold lg:mb-4 lg:text-lg" style={{ color: 'var(--text-primary)' }}>
         Progress summary
       </h2>
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4 lg:grid-cols-4 lg:gap-5 xl:gap-6">
         <ProgressStatCard
           label="Interviews completed"
           value={completedCount}

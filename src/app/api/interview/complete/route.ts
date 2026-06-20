@@ -141,7 +141,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { data: interview } = await serviceClient
       .from('interviews')
-      .select('id, user_id, status')
+      .select('id, user_id, status, started_at')
       .eq('id', interviewId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -189,9 +189,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
+    const completedAt = new Date().toISOString();
     await serviceClient
       .from('interviews')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .update({
+        status: 'completed',
+        completed_at: completedAt,
+        ...(interview.started_at ? {} : { started_at: completedAt }),
+      })
       .eq('id', interviewId);
 
     // ── Evaluation integrity check: ensure all answers have valid evaluations ──

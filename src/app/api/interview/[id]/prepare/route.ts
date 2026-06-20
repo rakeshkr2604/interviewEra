@@ -44,7 +44,7 @@ export async function POST(
 
     const { data: interview, error: intErr } = await serviceClient
       .from('interviews')
-      .select('id, user_id, status, session_context, resume_id, role, difficulty')
+      .select('id, user_id, status, started_at, session_context, resume_id, role, difficulty')
       .eq('id', interviewId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -59,11 +59,12 @@ export async function POST(
       .eq('interview_id', interviewId);
 
     if ((existingCount ?? 0) > 0) {
-      if (interview.status === 'pending') {
-        await serviceClient
-          .from('interviews')
-          .update({ status: 'in_progress' })
-          .eq('id', interviewId);
+      const now = new Date().toISOString();
+      const patch: { status?: string; started_at?: string } = {};
+      if (interview.status === 'pending') patch.status = 'in_progress';
+      if (!interview.started_at) patch.started_at = now;
+      if (Object.keys(patch).length > 0) {
+        await serviceClient.from('interviews').update(patch).eq('id', interviewId);
       }
       logPrepareCompleted(interviewId, logPrepareStarted(interviewId), existingCount ?? 0);
       return NextResponse.json({
@@ -156,10 +157,12 @@ export async function POST(
       fromCache: resolved.fromCache,
     };
 
+    const now = new Date().toISOString();
     await serviceClient
       .from('interviews')
       .update({
         status: 'in_progress',
+        started_at: interview.started_at ?? now,
         session_context: { ...ctx, generation: nextGen },
       })
       .eq('id', interviewId);

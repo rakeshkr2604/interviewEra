@@ -23,7 +23,7 @@ export default async function SettingsPage() {
   if (!user) redirect('/login')
 
   const profileSelectFull =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path' as const
   const profileSelectBase =
     'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, plan_status, plan_expires_at, plan_started_at' as const
 
@@ -38,6 +38,7 @@ export default async function SettingsPage() {
     plan_status?: string | null
     plan_expires_at?: string | null
     plan_started_at?: string | null
+    avatar_path?: string | null
   } | null = null
 
   const full = await supabase
@@ -134,6 +135,8 @@ export default async function SettingsPage() {
 
   const profileEmail = profile.email ?? user.email ?? ''
   const profileName = profile.name ?? (user.user_metadata?.name as string | undefined) ?? null
+  const profileAvatarPath =
+    typeof profile.avatar_path === 'string' ? profile.avatar_path : null
 
   return (
     <SettingsPageClient
@@ -141,6 +144,7 @@ export default async function SettingsPage() {
       profileName={profileName}
       profileEmail={profileEmail}
       profileJoinedAt={profile.created_at as string}
+      profileAvatarPath={profileAvatarPath}
       planTier={planTier}
       creditsRemaining={creditsRemaining}
       creditsUsedThisMonth={creditsUsedThisMonth}

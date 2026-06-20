@@ -37,6 +37,9 @@ function makePersistInput(overrides: Partial<PersistInput> = {}): PersistInput {
     difficulty: 'medium',
     difficultyTouched: false,
     aiFollowupsEnabled: true,
+    aiFollowupsTouched: false,
+    cameraInterviewModeEnabled: true,
+    cameraModeTouched: false,
     enabled: true,
     ...overrides,
   }

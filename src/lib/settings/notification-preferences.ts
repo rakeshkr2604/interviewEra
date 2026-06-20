@@ -13,7 +13,7 @@ export const defaultNotificationPreferences: NotificationPreferences = {
   interviewReminders: true,
   performanceReports: true,
   productUpdates: true,
-  marketingEmails: false,
+  marketingEmails: true,
 }
 
 export function parseNotificationPreferencesJson(

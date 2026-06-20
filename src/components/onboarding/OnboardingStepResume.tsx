@@ -41,6 +41,8 @@ import {
   Eye,
   Pencil,
   X,
+  Video,
+  Lightbulb,
 } from 'lucide-react'
 
 // ─── Local types (match page.tsx) ────────────────────────────────────────────
@@ -88,6 +90,14 @@ export interface OnboardingStepResumeProps {
   questionCount:           number
   onDifficultyChange:      (d: InterviewDifficulty) => void
   onMatchDifficultySettings: () => void
+  aiFollowupsEnabled:        boolean
+  aiFollowupsTouched:        boolean
+  cameraInterviewModeEnabled: boolean
+  cameraModeTouched:         boolean
+  onAiFollowupsChange:       (enabled: boolean) => void
+  onCameraModeChange:        (enabled: boolean) => void
+  onMatchAiFollowupsSettings: () => void
+  onMatchCameraModeSettings: () => void
 
   // CTA / navigation
   canBegin:          boolean
@@ -324,6 +334,105 @@ function ParsedSuccessCard({
   )
 }
 
+function SessionBooleanRow({
+  icon: Icon,
+  label,
+  enabled,
+  touched,
+  open,
+  onToggleOpen,
+  onChange,
+  onMatchSettings,
+}: {
+  icon: LucideIcon
+  label: string
+  enabled: boolean
+  touched: boolean
+  open: boolean
+  onToggleOpen: () => void
+  onChange: (enabled: boolean) => void
+  onMatchSettings: () => void
+}) {
+  return (
+    <>
+      <div className="col-span-1 flex items-center gap-2 border-b border-(--card-border)/50 py-1.5 last:border-0 sm:col-span-2 lg:col-span-1">
+        <div className="flex size-6 shrink-0 items-center justify-center rounded-md bg-(--accent-primary)/10">
+          <Icon className="size-3 text-(--accent-primary)" aria-hidden />
+        </div>
+        <p className="w-[5.25rem] shrink-0 text-[10px] leading-tight text-(--text-muted) sm:w-24 sm:text-[11px]">{label}</p>
+        <div className="flex min-w-0 flex-1 items-center gap-1">
+          <span
+            className={cn(
+              'truncate text-[12px] font-semibold',
+              enabled ? 'text-(--accent-primary)' : 'text-(--text-secondary)',
+            )}
+          >
+            {enabled ? 'On' : 'Off'}
+          </span>
+          {touched ? (
+            <span className="shrink-0 rounded-full border border-(--card-border) px-1 py-px text-[8px] font-medium text-(--text-muted) sm:text-[9px]">
+              custom
+            </span>
+          ) : null}
+        </div>
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          className="shrink-0 rounded-md border border-(--card-border) bg-(--card-bg) px-1.5 py-0.5 text-[9px] font-semibold text-(--text-secondary) hover:text-(--text-primary) transition-colors sm:rounded-lg sm:px-2 sm:py-1 sm:text-[10px]"
+        >
+          {open ? 'Done' : 'Change'}
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            key={`${label}-picker`}
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22 }}
+            className="col-span-1 overflow-hidden sm:col-span-2 lg:col-span-1"
+          >
+            <div className="flex flex-wrap items-center gap-1.5 pb-2 pt-0.5 sm:gap-2 sm:pb-2.5">
+              {([true, false] as const).map((value) => (
+                <button
+                  key={value ? 'on' : 'off'}
+                  type="button"
+                  onClick={() => {
+                    onChange(value)
+                    onToggleOpen()
+                  }}
+                  className={cn(
+                    'min-h-[36px] rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors sm:min-h-0 sm:px-3',
+                    enabled === value
+                      ? 'border-(--accent-primary) bg-(--accent-primary) text-white'
+                      : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary) hover:border-(--accent-primary)/40',
+                  )}
+                >
+                  {value ? 'On' : 'Off'}
+                </button>
+              ))}
+              {touched ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onMatchSettings()
+                    onToggleOpen()
+                  }}
+                  className="min-h-[36px] text-[10px] font-medium text-(--text-muted) underline hover:text-(--text-primary) sm:min-h-0"
+                >
+                  Match Settings
+                </button>
+              ) : null}
+            </div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </>
+  )
+}
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 export function OnboardingStepResume({
@@ -358,6 +467,14 @@ export function OnboardingStepResume({
   questionCount,
   onDifficultyChange,
   onMatchDifficultySettings,
+  aiFollowupsEnabled,
+  aiFollowupsTouched,
+  cameraInterviewModeEnabled,
+  cameraModeTouched,
+  onAiFollowupsChange,
+  onCameraModeChange,
+  onMatchAiFollowupsSettings,
+  onMatchCameraModeSettings,
   canBegin,
   startLoading,
   startError,
@@ -368,6 +485,8 @@ export function OnboardingStepResume({
   const [isDragOver,   setIsDragOver]   = useState(false)
   const [fileError,    setFileError]    = useState('')
   const [diffOpen,     setDiffOpen]     = useState(false)
+  const [followUpOpen, setFollowUpOpen] = useState(false)
+  const [cameraOpen,   setCameraOpen]   = useState(false)
 
   const getStatusHintMessage = () => {
     if (canBegin) {
@@ -765,11 +884,32 @@ export function OnboardingStepResume({
               {jdExtractError && (
                 <p className="text-[11px] text-(--accent-danger)" role="alert">{jdExtractError}</p>
               )}
+
+              <div
+                className="mt-2 rounded-xl border px-3 py-2.5 sm:mt-3 sm:px-3.5 sm:py-3"
+                style={{
+                  borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, var(--card-border))',
+                  background: 'color-mix(in srgb, var(--accent-primary) 6%, var(--bg-secondary))',
+                }}
+                role="note"
+                aria-label="Tips"
+              >
+                <div className="mb-1.5 flex items-center gap-1.5">
+                  <Lightbulb className="size-3.5 shrink-0 text-(--accent-primary)" aria-hidden />
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-(--accent-primary) sm:text-[11px]">
+                    Tips
+                  </p>
+                </div>
+                <p className="text-[11px] leading-relaxed text-(--text-secondary) sm:text-xs">
+                  English &amp; Hindi supported for a natural flow. Your interviewer encourages English answers to build
+                  confidence.
+                </p>
+              </div>
             </section>
           </div>
 
-          {/* ═══ RIGHT: Session summary + CTA (sticky CTA on desktop split) ═══ */}
-          <div className="flex flex-col gap-2 p-3 sm:gap-2.5 sm:p-4 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-hidden lg:pb-4 lg:pl-4">
+          {/* ═══ RIGHT: Session summary + CTA ═══ */}
+          <div className="flex min-h-0 flex-col gap-2 p-3 sm:gap-2.5 sm:p-4 max-lg:overflow-visible lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:overscroll-y-contain lg:pb-4 lg:pl-4">
 
             {/* Session preview card — denser grid on sm+ */}
             <section aria-label="Session preview" className="shrink-0">
@@ -807,7 +947,26 @@ export function OnboardingStepResume({
                   <SessionRow compact icon={MessageSquare}   label="Questions"  value={`${questionCount} questions`} />
                   <SessionRow compact icon={Clock}           label="Duration"   value={durationLabel} />
                   <SessionRow compact icon={Mic}             label="Voice"      value={interviewerName} />
-                  <SessionRow compact icon={Sparkles}        label="Follow-ups" value="Enabled" accent />
+                  <SessionBooleanRow
+                    icon={Sparkles}
+                    label="Adaptive follow-up"
+                    enabled={aiFollowupsEnabled}
+                    touched={aiFollowupsTouched}
+                    open={followUpOpen}
+                    onToggleOpen={() => setFollowUpOpen((v) => !v)}
+                    onChange={onAiFollowupsChange}
+                    onMatchSettings={onMatchAiFollowupsSettings}
+                  />
+                  <SessionBooleanRow
+                    icon={Video}
+                    label="Camera mode"
+                    enabled={cameraInterviewModeEnabled}
+                    touched={cameraModeTouched}
+                    open={cameraOpen}
+                    onToggleOpen={() => setCameraOpen((v) => !v)}
+                    onChange={onCameraModeChange}
+                    onMatchSettings={onMatchCameraModeSettings}
+                  />
                   {jdText.trim().length > 0 && (
                     <SessionRow
                       compact
@@ -885,12 +1044,12 @@ export function OnboardingStepResume({
               </div>
             </section>
 
-            {/* Error + CTA — sticky on desktop split so Start stays visible */}
+            {/* Error + CTA */}
             <div
               className={cn(
-                'shrink-0 space-y-2',
+                'mt-1 shrink-0 space-y-2',
                 'lg:sticky lg:bottom-0 lg:z-10 lg:mt-auto',
-                'lg:border-t lg:border-(--card-border)/40 lg:bg-(--card-bg)/95 lg:pt-2 lg:backdrop-blur-[2px]',
+                'lg:border-t lg:border-(--card-border)/40 lg:bg-(--card-bg)/95 lg:pt-2.5 lg:backdrop-blur-[2px]',
                 'pb-[max(0.25rem,env(safe-area-inset-bottom,0px))]',
               )}
             >

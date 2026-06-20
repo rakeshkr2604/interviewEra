@@ -36,7 +36,8 @@ import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { CreditBadge } from '@/components/layout/CreditBadge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { UserAvatar } from '@/components/profile/UserAvatar';
+import { resolveOAuthPictureUrl } from '@/lib/profile/user-display';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -64,6 +65,8 @@ interface NavUser {
   email: string;
   plan_tier: PlanTier;
   credits_remaining: number;
+  avatar_path: string | null;
+  oauth_picture_url: string | null;
 }
 
 type AuthVariant = 'loading' | 'anon' | 'student' | 'admin';
@@ -202,16 +205,6 @@ const ADMIN_NAV = [
 const BRAND_MARK = '/brand/logos/icon-only.svg';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getInitials(name: string | null, email: string): string {
-  if (name) {
-    const parts = name.trim().split(/\s+/);
-    return parts.length >= 2
-      ? `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-      : parts[0].slice(0, 2).toUpperCase();
-  }
-  return email.slice(0, 2).toUpperCase();
-}
 
 // ─── Shared shell (sticky + scroll-aware blur/shadow) ─────────────────────────
 
@@ -451,18 +444,14 @@ function AvatarMenu({
         aria-label="Open user menu"
         className="flex size-9 shrink-0 items-center justify-center rounded-full outline-none ring-2 ring-transparent transition-shadow hover:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)] focus-visible:ring-(--accent-primary)"
       >
-        <Avatar className="size-8 cursor-pointer">
-          <AvatarFallback
-            className="text-xs font-semibold"
-            style={{
-              background:
-                'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))',
-              color: '#fff',
-            }}
-          >
-            {getInitials(user.name, user.email)}
-          </AvatarFallback>
-        </Avatar>
+        <UserAvatar
+          name={user.name}
+          email={user.email}
+          avatarPath={user.avatar_path}
+          oauthPictureUrl={user.oauth_picture_url}
+          size="sm"
+          className="size-8 cursor-pointer"
+        />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
@@ -783,18 +772,14 @@ function StudentNav({ user }: { user: NavUser }) {
             <SheetHeader className="border-b border-border px-4 py-4 text-left">
               <SheetTitle className="sr-only">Navigation menu</SheetTitle>
               <div className="flex items-center gap-3">
-                <Avatar className="size-9">
-                  <AvatarFallback
-                    className="text-xs font-semibold"
-                    style={{
-                      background:
-                        'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))',
-                      color: '#fff',
-                    }}
-                  >
-                    {getInitials(user.name, user.email)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={user.name}
+                  email={user.email}
+                  avatarPath={user.avatar_path}
+                  oauthPictureUrl={user.oauth_picture_url}
+                  size="sm"
+                  className="size-9"
+                />
                 <div className="min-w-0">
                   <p
                     className="truncate text-sm font-semibold"
@@ -970,18 +955,14 @@ function AdminNav({ user }: { user: NavUser }) {
             <SheetHeader className="border-b border-border px-4 py-4 text-left">
               <SheetTitle className="sr-only">Admin navigation</SheetTitle>
               <div className="flex items-center gap-3">
-                <Avatar className="size-9">
-                  <AvatarFallback
-                    className="text-xs font-semibold"
-                    style={{
-                      background:
-                        'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))',
-                      color: '#fff',
-                    }}
-                  >
-                    {getInitials(user.name, user.email)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  name={user.name}
+                  email={user.email}
+                  avatarPath={user.avatar_path}
+                  oauthPictureUrl={user.oauth_picture_url}
+                  size="sm"
+                  className="size-9"
+                />
                 <div className="min-w-0">
                   <p
                     className="truncate text-sm font-semibold"
@@ -1127,10 +1108,14 @@ export function Navbar() {
           return;
         }
 
-        const resolveUser = async (uid: string, email: string) => {
+        const resolveUser = async (
+          uid: string,
+          email: string,
+          metadata?: Record<string, unknown>,
+        ) => {
           const { data: profile } = await supabase
             .from('users')
-            .select('name, plan_tier, credits_remaining')
+            .select('name, plan_tier, credits_remaining, avatar_path')
             .eq('id', uid)
             .maybeSingle();
           if (cancelled) return;
@@ -1140,6 +1125,9 @@ export function Navbar() {
             email,
             plan_tier: planTier,
             credits_remaining: profile?.credits_remaining ?? 0,
+            avatar_path:
+              profile && typeof profile.avatar_path === 'string' ? profile.avatar_path : null,
+            oauth_picture_url: resolveOAuthPictureUrl(metadata),
           });
           setVariant(planTier === 'campus_admin' ? 'admin' : 'student');
         };
@@ -1148,7 +1136,7 @@ export function Navbar() {
         if (!authUser) {
           if (!cancelled) setVariant('anon');
         } else {
-          await resolveUser(authUser.id, authUser.email ?? '');
+          await resolveUser(authUser.id, authUser.email ?? '', authUser.user_metadata);
         }
 
         // Listen for session changes (login / logout / token refresh)
@@ -1159,7 +1147,7 @@ export function Navbar() {
             setUser(null);
             return;
           }
-          await resolveUser(session.user.id, session.user.email ?? '');
+          await resolveUser(session.user.id, session.user.email ?? '', session.user.user_metadata);
         });
         unsubscribe = () => sub.subscription.unsubscribe();
       } catch {

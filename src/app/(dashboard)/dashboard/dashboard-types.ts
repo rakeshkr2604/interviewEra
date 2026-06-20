@@ -6,7 +6,7 @@ export type InterviewWithReportsRow = {
   status: string
   completed_at: string | null
   started_at: string | null
-  reports: { overall_score: number | null; generated_at: string | null }[] | null
+  reports: { id: string; overall_score: number | null; generated_at: string | null }[] | null
 }
 
 export type UserRow = {
@@ -17,4 +17,5 @@ export type UserRow = {
   plan_status: string | null
   placement_date: string | null
   created_at: string | null
+  avatar_path?: string | null
 }

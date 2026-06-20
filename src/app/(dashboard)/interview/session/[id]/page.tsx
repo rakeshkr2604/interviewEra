@@ -28,7 +28,7 @@ import { api } from '@/services/api'
 import { Mic, MicOff, SkipForward, RotateCcw, Send, X, Radio } from 'lucide-react'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
-import { readAnswerStyle } from '@/lib/settings/client-preferences'
+import { readAdaptiveFollowUpEnabled, readAnswerStyle, readCameraInterviewModeEnabled } from '@/lib/settings/client-preferences'
 import {
   TierUnlockCelebrationDialog,
   type TierCelebrationPayload,
@@ -1778,7 +1778,9 @@ export default function InterviewSessionPage() {
 
     // Only allow one orchestrator-driven follow-up per static question so the
     // interview length stays bounded (no infinite probe loops).
-    const followUpAllowed = followUpForIndexRef.current !== currentIndex
+    const followUpAllowed =
+      readAdaptiveFollowUpEnabled() &&
+      followUpForIndexRef.current !== currentIndex
 
     track('EVALUATION', 'evaluation_started', { source, mode: inputMode })
 
@@ -2674,9 +2676,10 @@ export default function InterviewSessionPage() {
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <CandidatePreview
                 cameraActive={
-                  phase === 'candidate_answering' ||
+                  readCameraInterviewModeEnabled() &&
+                  (phase === 'candidate_answering' ||
                   phase === 'submitting' ||
-                  phase === 'feedback'
+                  phase === 'feedback')
                 }
                 isListening={isListening || webSpeechActive || dgListening}
                 micArmed={micArmed}

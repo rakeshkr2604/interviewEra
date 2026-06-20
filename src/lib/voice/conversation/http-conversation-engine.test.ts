@@ -15,6 +15,9 @@ class FakeApi implements ConversationApiClient {
   answerCalls: AnswerApiBody[] = []
   processCalls: ProcessAnswerApiBody[] = []
   completeCalls: number = 0
+  answerSignals: AbortSignal[] = []
+  processSignals: AbortSignal[] = []
+  completeSignals: AbortSignal[] = []
   answerResponse: AnswerApiResponse = { evaluationId: 'e1', score: 7, feedback: 'good' }
   processResponse: ProcessAnswerApiResponse | null = { type: 'next_question', text: '' }
   processThrows = false
@@ -22,19 +25,25 @@ class FakeApi implements ConversationApiClient {
   // ordering probe
   order: string[] = []
 
-  async postAnswer(body: AnswerApiBody): Promise<AnswerApiResponse> {
+  async postAnswer(body: AnswerApiBody, signal?: AbortSignal): Promise<AnswerApiResponse> {
     this.answerCalls.push(body)
+    if (signal) this.answerSignals.push(signal)
     this.order.push('answer')
     return this.answerResponse
   }
-  async postProcessAnswer(body: ProcessAnswerApiBody): Promise<ProcessAnswerApiResponse | null> {
+  async postProcessAnswer(
+    body: ProcessAnswerApiBody,
+    signal?: AbortSignal,
+  ): Promise<ProcessAnswerApiResponse | null> {
     this.processCalls.push(body)
+    if (signal) this.processSignals.push(signal)
     this.order.push('process')
     if (this.processThrows) throw new Error('process boom')
     return this.processResponse
   }
-  async postComplete(): Promise<CompleteApiResponse> {
+  async postComplete(_body: { interviewId: string }, signal?: AbortSignal): Promise<CompleteApiResponse> {
     this.completeCalls++
+    if (signal) this.completeSignals.push(signal)
     return this.completeResponse
   }
 }
@@ -143,8 +152,58 @@ describe('HttpConversationEngine', () => {
     // Q2 → complete
     await engine.scoreAnswer({ ctx: ctxFor(1), answerText: 'b' })
     const done = await engine.resolveNextTurn({ ctx: ctxFor(1), lastScore: { overallScore: 8 } })
-    expect(done).toEqual({ done: true, reportId: 'rep-1' })
+    expect(done).toEqual({ done: true, reportId: 'rep-1', completion: expect.any(Object) })
     expect(api.completeCalls).toBe(1)
+  })
+
+  it('returns retention and funnel payload from /complete', async () => {
+    api.processResponse = { type: 'next_question', text: '' }
+    api.completeResponse = {
+      reportId: 'rep-2',
+      funnelComplete: { interviewId: 'iv1', score: 8 },
+      retention: {
+        streak: 3,
+        tierUnlocked: true,
+        newTier: 2,
+        newBadges: ['first_win'],
+      } as CompleteApiResponse['retention'],
+      badgesUnlocked: ['first_win'],
+    }
+    const engine = makeEngine(api)
+    await engine.scoreAnswer({ ctx: ctxFor(0), answerText: 'a' })
+    await engine.resolveNextTurn({ ctx: ctxFor(0), lastScore: { overallScore: 7 } })
+    await engine.scoreAnswer({ ctx: ctxFor(1), answerText: 'b' })
+    const done = await engine.resolveNextTurn({ ctx: ctxFor(1), lastScore: { overallScore: 8 } })
+    expect(done.completion?.funnelComplete).toEqual({ interviewId: 'iv1', score: 8 })
+    expect(done.completion?.badgesUnlocked).toEqual(['first_win'])
+  })
+
+  it('aborts in-flight answer and process requests', async () => {
+    const engine = makeEngine(api)
+    let rejectAnswer!: (err: unknown) => void
+    const answerPromise = new Promise<AnswerApiResponse>((_res, reject) => {
+      rejectAnswer = reject
+    })
+    api.postAnswer = async (_body, signal) => {
+      if (signal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError')
+      }
+      return new Promise<AnswerApiResponse>((_res, reject) => {
+        signal?.addEventListener('abort', () => {
+          reject(new DOMException('Aborted', 'AbortError'))
+        })
+        void answerPromise.catch(reject)
+      })
+    }
+
+    const scorePromise = engine.scoreAnswer({ ctx: ctxFor(0), answerText: 'a' })
+    await Promise.resolve()
+    expect(api.processSignals.length).toBeGreaterThan(0)
+    engine.abort()
+    expect(api.processSignals[0]?.aborted).toBe(true)
+
+    rejectAnswer(new DOMException('Aborted', 'AbortError'))
+    await expect(scorePromise).rejects.toMatchObject({ name: 'AbortError' })
   })
 
   it('treats process-answer failure as non-fatal (advances to next static question)', async () => {

@@ -121,12 +121,13 @@ export interface VoiceSessionOrchestratorConfig {
   scheduler?: Scheduler
   /** Max time a candidate may answer one question (ms). Default 60s. */
   answerTimeoutMs?: number
-  /** Watchdog for each LLM step (ms). Default 30s. */
+  /** Watchdog for each LLM step (ms). Default 55s — aligned with /complete budget. */
   processingTimeoutMs?: number
 }
 
 const DEFAULT_ANSWER_TIMEOUT = 60_000
-const DEFAULT_PROCESSING_TIMEOUT = 30_000
+/** Matches server /complete maxDuration (60s) minus client fetch overhead. */
+const DEFAULT_PROCESSING_TIMEOUT = 55_000
 
 export class VoiceSessionOrchestrator {
   private readonly cfg: VoiceSessionOrchestratorConfig
@@ -231,6 +232,7 @@ export class VoiceSessionOrchestrator {
     })
     this.currentCtx = ctx
     const myTurn = ++this.turnSeq
+    this.cfg.conversation.abort?.()
 
     this.cfg.audio.setContext?.(ctx)
     this.cfg.tts.setContext?.(ctx)
@@ -340,7 +342,12 @@ export class VoiceSessionOrchestrator {
       if (next.done || !next.question) {
         this.reportId = next.reportId ?? null
         if (this.fsm.send('INTERVIEW_DONE', ctx)) {
-          this.bus.emit('InterviewCompleted', { reportId: this.reportId }, { ctx })
+          this.bus.emit('InterviewCompleted', {
+            reportId: this.reportId,
+            retention: next.completion?.retention ?? null,
+            funnelComplete: next.completion?.funnelComplete ?? null,
+            badgesUnlocked: next.completion?.badgesUnlocked ?? [],
+          }, { ctx })
           await this.quiesce('completed')
         }
         return
@@ -350,6 +357,7 @@ export class VoiceSessionOrchestrator {
     } catch (err) {
       if (myTurn !== this.turnSeq) return
       this.clearProcessingWatchdog()
+      if (err instanceof DOMException && err.name === 'AbortError') return
       this.fail(err instanceof Error ? err.message : String(err))
     }
   }
@@ -384,6 +392,7 @@ export class VoiceSessionOrchestrator {
     this.clearAnswerTimer()
     this.clearProcessingWatchdog()
     this.turnSeq++ // invalidate in-flight async for this turn
+    this.cfg.conversation.abort?.()
     this.cfg.tts.cancel()
     this.cfg.stt.pause()
     this.cfg.audio.disableMic()
@@ -414,6 +423,7 @@ export class VoiceSessionOrchestrator {
   async dispose(reason = 'dispose'): Promise<void> {
     if (this.fsm.getState() === 'destroyed') return
     this.turnSeq++
+    this.cfg.conversation.abort?.()
     this.clearAnswerTimer()
     this.clearProcessingWatchdog()
     this.fsm.send('DESTROY', this.currentCtx)
@@ -430,6 +440,7 @@ export class VoiceSessionOrchestrator {
       this.cfg.stt.dispose(),
       this.cfg.audio.dispose(reason),
     ])
+    this.cfg.conversation.abort?.()
     this.fsm.dispose()
     this.logger.info('session_disposed', this.currentCtx, { reason })
   }

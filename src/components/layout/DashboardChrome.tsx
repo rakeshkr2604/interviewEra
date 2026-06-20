@@ -159,23 +159,26 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
 
         <main
           className={cn(
-            'ie-landing-premium ie-landing-type relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden',
-            isImmersiveViewport ? 'overflow-y-auto lg:overflow-hidden' : 'overflow-y-auto',
+            'ie-landing-premium ie-landing-type relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden',
+            isImmersiveViewport
+              ? 'ie-touch-scroll ie-overscroll-contain min-h-0 overflow-y-auto lg:overflow-hidden'
+              : 'overflow-y-visible',
           )}
           style={{
             background: 'var(--page-gradient)',
             color: 'var(--text-primary)',
-            scrollbarGutter: isImmersiveViewport ? 'stable' : 'stable',
+            scrollbarGutter: isImmersiveViewport ? 'stable' : undefined,
           }}
         >
           <div
             className={cn(
-              'relative flex min-h-0 min-w-0 flex-col',
+              'relative flex min-w-0 flex-col',
+              isImmersiveViewport && 'min-h-0 flex-1',
               isOnboarding
-                ? 'flex-1 px-4 sm:px-5 py-2 md:py-3 lg:py-1.5 lg:pt-2'
+                ? 'px-4 py-2 sm:px-5 md:py-3 lg:py-1.5 lg:pt-2'
                 : isInterviewSession
                   ? 'flex-1 p-0'
-                  : 'flex-1 px-4 sm:px-5 py-8 sm:py-10 md:py-12',
+                  : 'px-4 sm:px-5 py-5 sm:py-8 md:py-10 lg:py-12',
               isInterviewSession ? 'w-full min-w-0 max-w-none' : LANDING_PAGE_CONTAINER,
             )}
           >
@@ -188,6 +191,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
               style={{
                 borderColor: 'var(--card-border)',
                 background: 'color-mix(in srgb, var(--card-bg) 35%, transparent)',
+                paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
               }}
             >
               <div className={cn(LANDING_PAGE_CONTAINER)}>

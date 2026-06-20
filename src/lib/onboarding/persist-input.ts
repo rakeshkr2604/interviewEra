@@ -12,6 +12,9 @@ export type PersistInput = {
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
   aiFollowupsEnabled: boolean
+  aiFollowupsTouched: boolean
+  cameraInterviewModeEnabled: boolean
+  cameraModeTouched: boolean
   /** Skip while upload/parse is in-flight to avoid overwriting with stale resumeId. */
   enabled: boolean
 }

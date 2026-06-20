@@ -13,7 +13,7 @@ export interface VoiceEventPayloads {
   InterviewStarted: { interviewId: string }
   QuestionGenerated: { questionIndex: number; isFollowUp: boolean; text: string }
   QuestionPlaying: { engine: 'elevenlabs' | 'browser'; textLength: number }
-  QuestionFinished: { reason: 'completed' | 'failed' | 'canceled' }
+  QuestionFinished: { reason: 'completed' | 'failed' | 'canceled' | 'fallback_completed' }
   ListeningStarted: { engine: 'deepgram' | 'browser' }
   SpeechDetected: Record<string, never>
   TranscriptUpdated: { interim: string }
@@ -23,7 +23,12 @@ export interface VoiceEventPayloads {
   LLMCompleted: { kind: 'score' | 'process'; latencyMs: number; ok: boolean }
   PlaybackStarted: { durationSec: number | null }
   PlaybackCompleted: { reason: 'ended' | 'canceled' }
-  InterviewCompleted: { reportId: string | null }
+  InterviewCompleted: {
+    reportId: string | null
+    retention?: unknown
+    funnelComplete?: unknown
+    badgesUnlocked?: string[]
+  }
   InterviewDestroyed: { reason: string }
   // Internal / observability events
   StateTransition: { from: VoiceSessionState; to: VoiceSessionState; event: VoiceSessionEvent }

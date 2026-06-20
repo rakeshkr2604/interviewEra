@@ -33,6 +33,9 @@ export type OnboardingHydration = {
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
   aiFollowupsEnabled: boolean
+  aiFollowupsTouched: boolean
+  cameraInterviewModeEnabled: boolean
+  cameraModeTouched: boolean
 }
 
 function resumeStateFromDbStatus(
@@ -176,5 +179,8 @@ export async function loadOnboardingHydration(): Promise<OnboardingHydration | n
     difficulty: draft?.difficulty ?? DEFAULT_INTERVIEW_DIFFICULTY,
     difficultyTouched: draft?.difficultyTouched ?? false,
     aiFollowupsEnabled: draft?.aiFollowupsEnabled ?? true,
+    aiFollowupsTouched: draft?.aiFollowupsTouched ?? false,
+    cameraInterviewModeEnabled: draft?.cameraInterviewModeEnabled ?? true,
+    cameraModeTouched: draft?.cameraModeTouched ?? false,
   }
 }

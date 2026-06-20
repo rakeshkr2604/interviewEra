@@ -7,15 +7,21 @@ import {
   Languages as LanguagesIcon,
   Gauge,
   TextQuote,
+  Sparkles,
+  Video,
 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
 import {
   STORAGE_KEYS,
-  readDefaultDifficulty,
+  readAdaptiveFollowUpEnabled,
   readAnswerStyle,
+  readCameraInterviewModeEnabled,
+  readDefaultDifficulty,
   readInterviewLanguage,
-  UPCOMING_INTERVIEW_LANGUAGE,
+  writeAdaptiveFollowUpEnabled,
+  writeCameraInterviewModeEnabled,
+  writeInterviewLanguage,
+  INTERVIEW_LANGUAGE_LABELS,
   type AnswerStyle,
   type InterviewLanguageCode,
 } from '@/lib/settings/client-preferences'
@@ -86,12 +92,85 @@ function FieldHeader({
   )
 }
 
+function BooleanPrefToggle({
+  id,
+  label,
+  description,
+  icon: Icon,
+  enabled,
+  onChange,
+}: {
+  id: string
+  label: string
+  description: string
+  icon: LucideIcon
+  enabled: boolean
+  onChange: (next: boolean) => void
+}) {
+  return (
+    <div
+      className="flex flex-col gap-3 rounded-2xl border-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3.5"
+      style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-[var(--card-border)] bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)] text-[var(--accent-primary)]"
+            aria-hidden
+          >
+            <Icon className="size-4" strokeWidth={2} />
+          </span>
+          <Label htmlFor={id} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {label}
+          </Label>
+        </div>
+        <p className="mt-1.5 pl-10 text-xs leading-relaxed sm:pl-0 sm:text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          {description}
+        </p>
+      </div>
+      <div
+        id={id}
+        role="group"
+        aria-label={label}
+        className="flex shrink-0 gap-1.5 self-end sm:self-center"
+      >
+        {(['On', 'Off'] as const).map((option) => {
+          const isOn = option === 'On'
+          const active = enabled === isOn
+          return (
+            <button
+              key={option}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(isOn)}
+              className={cn(
+                'min-h-9 min-w-[3.25rem] rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                active
+                  ? 'border-[var(--accent-primary)] bg-[var(--accent-primary)] text-white'
+                  : 'border-[var(--card-border)] bg-[color-mix(in_srgb,var(--card-bg)_88%,transparent)] text-[var(--text-secondary)] hover:border-[var(--accent-primary)]/40',
+              )}
+            >
+              {option}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 export function InterviewPreferencesPanel() {
   const [interviewLanguage, setInterviewLanguage] = useState<InterviewLanguageCode>(() =>
     readInterviewLanguage(),
   )
   const [difficulty, setDifficulty] = useState<InterviewDifficulty>(() => readDefaultDifficulty())
   const [answerStyle, setAnswerStyle] = useState<AnswerStyle>(() => readAnswerStyle())
+  const [adaptiveFollowUpEnabled, setAdaptiveFollowUpEnabled] = useState(() =>
+    readAdaptiveFollowUpEnabled(),
+  )
+  const [cameraInterviewModeEnabled, setCameraInterviewModeEnabled] = useState(() =>
+    readCameraInterviewModeEnabled(),
+  )
 
   return (
     <div className="space-y-6">
@@ -114,46 +193,22 @@ export function InterviewPreferencesPanel() {
                   onChange={(e) => {
                     const v = e.target.value as InterviewLanguageCode
                     setInterviewLanguage(v)
-                    localStorage.setItem(STORAGE_KEYS.interviewLanguage, v)
+                    writeInterviewLanguage(v)
                   }}
                   className={selectClassName}
                 >
-                  <option value="en">English</option>
-                  <option disabled value={UPCOMING_INTERVIEW_LANGUAGE.hinglish}>
-                    Hindi–English mix (Hinglish) — coming soon
-                  </option>
+                  {(Object.keys(INTERVIEW_LANGUAGE_LABELS) as InterviewLanguageCode[]).map((code) => (
+                    <option key={code} value={code}>
+                      {INTERVIEW_LANGUAGE_LABELS[code]}
+                    </option>
+                  ))}
                 </select>
                 <SelectChevron />
               </div>
-              <div
-                className="flex flex-col gap-3 rounded-xl border-2 border-dashed px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4 sm:py-3"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, var(--card-border))',
-                  background: 'color-mix(in srgb, var(--accent-primary) 5%, var(--card-bg))',
-                }}
-                role="note"
-                aria-label="Hinglish language mode, coming soon"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-                      Hindi–English (Hinglish)
-                    </p>
-                    <Badge
-                      variant="secondary"
-                      className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
-                    >
-                      Coming soon
-                    </Badge>
-                  </div>
-                  <p className="mt-1 text-xs leading-relaxed sm:text-[13px]" style={{ color: 'var(--text-muted)' }}>
-                    Code-mixed questions and feedback for how many students actually interview. After English quality is
-                    locked in.
-                  </p>
-                </div>
-              </div>
               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                Questions and scoring are optimized for English today.
+                {interviewLanguage === 'hinglish'
+                  ? 'You can answer in English, Hindi, or a natural mix. The interviewer replies in English and scoring does not penalise Hinglish.'
+                  : 'Questions and interviewer replies stay in English. You can still mix Hindi while speaking — we understand Hinglish.'}
               </p>
             </div>
 
@@ -241,9 +296,34 @@ export function InterviewPreferencesPanel() {
 
       <div className="space-y-3">
         <SectionGroupLabel>Session behavior</SectionGroupLabel>
+        <div className="space-y-3">
+          <BooleanPrefToggle
+            id="pref-adaptive-follow-up"
+            icon={Sparkles}
+            label="Adaptive follow-up"
+            description="After each answer, the AI may ask one extra probe based on what you said. Turn off for a fixed question list only."
+            enabled={adaptiveFollowUpEnabled}
+            onChange={(next) => {
+              setAdaptiveFollowUpEnabled(next)
+              writeAdaptiveFollowUpEnabled(next)
+            }}
+          />
+          <BooleanPrefToggle
+            id="pref-camera-mode"
+            icon={Video}
+            label="Camera interview mode"
+            description="Show your camera preview while you answer — like a real video interview. Mic-only when off."
+            enabled={cameraInterviewModeEnabled}
+            onChange={(next) => {
+              setCameraInterviewModeEnabled(next)
+              writeCameraInterviewModeEnabled(next)
+            }}
+          />
+        </div>
         <div
           className="rounded-2xl border-2 px-3.5 py-3 sm:px-4"
           style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+          role="note"
         >
           <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Progress is saved when you submit
@@ -252,23 +332,6 @@ export function InterviewPreferencesPanel() {
             Each answer is written to your account immediately. You can close the tab and reopen the interview — you
             resume at the next unanswered question. There is nothing extra to turn on.
           </p>
-        </div>
-        <div
-          className="flex flex-col gap-2 rounded-2xl border-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-4"
-          style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
-        >
-          <div className="min-w-0">
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Follow-up questioning
-            </p>
-            <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-              Extra drill-down prompts after your main answer are not generated yet — interviews use a fixed question
-              list today.
-            </p>
-          </div>
-          <Badge variant="secondary" className="w-fit shrink-0">
-            Coming soon
-          </Badge>
         </div>
       </div>
     </div>

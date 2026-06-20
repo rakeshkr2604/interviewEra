@@ -49,10 +49,10 @@ const QUICK_ACTIONS: QuickAction[] = [
 
 export function QuickActionsGrid() {
   return (
-    <section className="mb-4 sm:mb-5">
-      <div className="mb-3 flex items-center gap-2 px-0.5">
+    <section className="mb-4 sm:mb-5 lg:mb-8">
+      <div className="mb-3 flex items-center gap-2 px-0.5 lg:mb-4">
         <div
-          className="flex size-7 items-center justify-center rounded-lg"
+          className="flex size-7 items-center justify-center rounded-lg lg:size-8"
           style={{
             background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
             color: 'var(--accent-primary)',
@@ -60,12 +60,12 @@ export function QuickActionsGrid() {
         >
           <Zap size={14} aria-hidden />
         </div>
-        <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <h2 className="text-base font-semibold lg:text-lg" style={{ color: 'var(--text-primary)' }}>
           Quick actions
         </h2>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4 lg:gap-4">
         {QUICK_ACTIONS.map((action) => {
           const Icon = action.icon;
           const isPrimary = action.accent === 'primary';
@@ -73,7 +73,7 @@ export function QuickActionsGrid() {
             <Link
               key={action.label}
               href={action.href}
-              className="dashboard-premium-card block min-h-[5.5rem] px-3.5 py-3.5 transition-all duration-200 hover:-translate-y-0.5 sm:min-h-[6rem] sm:px-4 sm:py-4"
+              className="dashboard-premium-card dashboard-hover-lift block min-h-[5.25rem] px-3 py-3 transition-all duration-200 active:opacity-95 sm:min-h-0 sm:px-4 sm:py-4 lg:px-4 lg:py-4"
               style={{ textDecoration: 'none' }}
             >
               <div

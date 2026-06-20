@@ -32,6 +32,7 @@ export function SettingsPageClient({
   profileName,
   profileEmail,
   profileJoinedAt,
+  profileAvatarPath,
   planTier,
   creditsRemaining,
   creditsUsedThisMonth,
@@ -45,6 +46,7 @@ export function SettingsPageClient({
   profileName: string | null
   profileEmail: string
   profileJoinedAt: string
+  profileAvatarPath: string | null
   planTier: PlanTier
   creditsRemaining: number
   creditsUsedThisMonth: number
@@ -154,15 +156,17 @@ export function SettingsPageClient({
             className="lg:col-span-2"
             eyebrow="Profile"
             title="Account management"
-            description="Your details and data exports."
+            description="Profile photo, display name, and data exports."
             density="compact"
           >
             <div className={SETTINGS_CARD_SHELL}>
               <AccountManagementPanel
+                authUser={authUser}
                 displayName={profileName}
                 email={profileEmail}
                 joinedAt={profileJoinedAt}
                 accountId={authUser.id}
+                initialAvatarPath={profileAvatarPath}
               />
             </div>
           </SettingsSection>

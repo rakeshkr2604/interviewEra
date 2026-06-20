@@ -14,6 +14,9 @@ import { Mic, Loader2, AlertTriangle, Play } from 'lucide-react'
 import { TimerCircle } from '@/components/interview/TimerCircle'
 import { useVoiceSession } from '@/hooks/useVoiceSession'
 import { readAnswerStyle } from '@/lib/settings/client-preferences'
+import {
+  TierUnlockCelebrationDialog,
+} from '@/components/retention/TierUnlockCelebrationDialog'
 import type { StaticQuestion } from '@/lib/voice/conversation/http-conversation-engine'
 import type { TTSOptions } from '@/lib/voice/tts-client'
 
@@ -37,7 +40,7 @@ export function VoiceSessionView(props: VoiceSessionViewProps) {
   const router = useRouter()
   const totalSeconds = Math.round((props.answerTimeoutMs ?? DEFAULT_ANSWER_MS) / 1000)
 
-  const { view, start, submit, recover } = useVoiceSession({
+  const { view, start, submit, recover, celebration, dismissCelebration } = useVoiceSession({
     interviewId: props.interviewId,
     interviewerId: props.interviewerId,
     role: props.role,
@@ -79,16 +82,33 @@ export function VoiceSessionView(props: VoiceSessionViewProps) {
     else el.pause()
   }, [isSpeaking])
 
-  // Redirect to the report once complete.
+  // Redirect to the report once complete (unless a tier celebration is showing).
   useEffect(() => {
-    if (view.state === 'completed' && view.reportId) {
+    if (view.state === 'completed' && view.reportId && celebration === null) {
       router.push(`/report/${view.reportId}`)
     }
-  }, [view.state, view.reportId, router])
+  }, [view.state, view.reportId, celebration, router])
+
+  const celebrationDialog = (
+    <TierUnlockCelebrationDialog
+      key={celebration ? `${celebration.newTier}-${celebration.reportHref}` : 'idle'}
+      open={celebration !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          const href = celebration?.reportHref
+          dismissCelebration()
+          if (href) router.push(href)
+        }
+      }}
+      data={celebration}
+    />
+  )
 
   const liveTranscript = [view.transcript, view.interimTranscript].filter(Boolean).join(' ').trim()
 
   return (
+    <>
+      {celebrationDialog}
     <div className="mx-auto flex min-h-[100dvh] max-w-3xl flex-col gap-6 px-4 py-8 text-[var(--text-primary)]">
       <header className="flex items-center justify-between">
         <div>
@@ -175,5 +195,6 @@ export function VoiceSessionView(props: VoiceSessionViewProps) {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -9,12 +9,12 @@ import { DashboardMain } from './DashboardMain'
 import { UserSummaryCard } from '@/components/dashboard/UserSummaryCard'
 import { CreditsOverviewCard } from '@/components/dashboard/CreditsOverviewCard'
 import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
-import { ProgressStatsGrid } from '@/components/dashboard/ProgressStatsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
 import { formatDateEnIn } from '@/lib/datetime/ist'
+import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
 import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
 import type { UserProgressRow } from '@/lib/retention/types'
 import type { PlanTier } from '@/types/app.types'
@@ -39,6 +39,7 @@ export default async function DashboardPage() {
         completed_at,
         started_at,
         reports (
+          id,
           overall_score,
           generated_at
         )
@@ -51,7 +52,7 @@ export default async function DashboardPage() {
   ] = await Promise.all([
     supabase
       .from('users')
-      .select('name, plan_tier, credits_remaining, plan_expires_at, plan_status, placement_date, created_at')
+      .select('name, plan_tier, credits_remaining, plan_expires_at, plan_status, placement_date, created_at, avatar_path')
       .eq('id', user.id)
       .single(),
     supabase
@@ -106,12 +107,20 @@ export default async function DashboardPage() {
   const planTier = (userData?.plan_tier ?? 'free') as PlanTier
   const currentStreak = retentionDashboardSnap?.current_streak ?? 0
 
+  const profileEmail = user.email ?? ''
+  const avatarPath =
+    userData && typeof userData.avatar_path === 'string' ? userData.avatar_path : null
+  const oauthPictureUrl = resolveOAuthPictureUrl(user.user_metadata)
+
+  const inProgressInterview = rows.find((row) => row.status !== 'completed') ?? null
+
   return (
     <>
       <RetentionProgressRefreshListener />
       <Suspense fallback={null}>
         <PaymentSuccessBanner />
       </Suspense>
+      <div className="dashboard-page-shell min-w-0">
       <DashboardPageHeader
         eyebrow={
           <>
@@ -119,7 +128,7 @@ export default async function DashboardPage() {
           </>
         }
         title="Dashboard"
-        subtitle="Track your interview performance and keep your prep on track."
+        subtitle="Your prep hub — practice, track progress, and improve."
         action={
           <DashboardHeaderActions
             creditsRemaining={creditsRemaining}
@@ -130,36 +139,43 @@ export default async function DashboardPage() {
         }
       />
 
-      <UserSummaryCard
-        userData={userData}
-        displayName={displayName}
-        memberSince={memberSince}
-        completedCount={completedCount}
-      />
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:mb-5 sm:gap-4 lg:mb-8 lg:grid-cols-2 lg:items-stretch lg:gap-6 xl:gap-8">
+        <UserSummaryCard
+          userData={userData}
+          displayName={displayName}
+          memberSince={memberSince}
+          completedCount={completedCount}
+          avgScore={avgScore}
+          currentStreak={currentStreak}
+          email={profileEmail}
+          avatarPath={avatarPath}
+          oauthPictureUrl={oauthPictureUrl}
+          inProgressInterview={
+            inProgressInterview
+              ? { id: inProgressInterview.id, role: inProgressInterview.role }
+              : null
+          }
+        />
 
-      <CreditsOverviewCard
-        creditsRemaining={creditsRemaining}
-        completedCount={completedCount}
-        planTier={planTier}
-        planExpiresAt={userData?.plan_expires_at ?? null}
-        planStatus={userData?.plan_status ?? null}
-      />
+        <CreditsOverviewCard
+          creditsRemaining={creditsRemaining}
+          planTier={planTier}
+          planExpiresAt={userData?.plan_expires_at ?? null}
+          planStatus={userData?.plan_status ?? null}
+        />
+      </div>
 
       <QuickActionsGrid />
 
-      <ProgressStatsGrid
-        completedCount={completedCount}
-        avgScore={avgScore}
-        currentStreak={currentStreak}
-        creditsRemaining={creditsRemaining}
-        planTier={planTier}
-        planExpiresAt={userData?.plan_expires_at ?? null}
-        planStatus={userData?.plan_status ?? null}
-      />
-
       <RetentionProgressCard snap={retentionDashboardSnap} />
 
-      <DashboardMain rows={rows} userData={userData} />
+      <DashboardMain
+        rows={rows}
+        userData={userData}
+        avgScore={avgScore}
+        currentStreak={currentStreak}
+      />
+      </div>
     </>
   )
 }

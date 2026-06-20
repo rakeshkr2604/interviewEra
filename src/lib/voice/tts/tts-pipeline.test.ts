@@ -4,6 +4,7 @@ import {
   TtsFallbackError,
   type TtsSynthesizer,
   type TtsAudioSink,
+  type TtsFallbackSpeaker,
 } from '@/lib/voice/tts/tts-pipeline'
 import type { AudioPlaybackCallbacks } from '@/lib/voice/audio/audio-driver'
 import type { TTSOptions } from '@/lib/voice/tts-client'
@@ -60,10 +61,10 @@ class FakeSink implements TtsAudioSink {
   }
 }
 
-function setup(chunker?: (t: string) => string[]) {
+function setup(chunker?: (t: string) => string[], fallbackSpeaker?: TtsFallbackSpeaker) {
   const synth = new FakeSynth()
   const sink = new FakeSink()
-  const pipeline = new TtsPipeline({ synthesizer: synth, sink, chunker })
+  const pipeline = new TtsPipeline({ synthesizer: synth, sink, chunker, fallbackSpeaker })
   return { synth, sink, pipeline }
 }
 
@@ -139,6 +140,55 @@ describe('TtsPipeline', () => {
     await p
     expect(onFallback).toHaveBeenCalledWith('quota exhausted')
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('speaks via browser fallback after ElevenLabs 429', async () => {
+    const fallbackSpeak = vi.fn(async () => {})
+    const fallback: TtsFallbackSpeaker = {
+      isAvailable: () => true,
+      speak: fallbackSpeak,
+      cancel: vi.fn(),
+    }
+    const { synth, pipeline } = setup(() => ['only chunk'], fallback)
+    const onComplete = vi.fn()
+    const onFallback = vi.fn()
+    const p = pipeline.speak('Question text', OPTS, { onComplete, onFallback })
+    await flush()
+    synth.reject(0, new TtsFallbackError('rate limited', 429))
+    await p
+    expect(onFallback).toHaveBeenCalledWith('rate limited')
+    expect(fallbackSpeak).toHaveBeenCalledTimes(1)
+    expect(onComplete).toHaveBeenCalledTimes(1)
+  })
+
+  it('speaks via browser fallback after ElevenLabs timeout', async () => {
+    const fallbackSpeak = vi.fn(async () => {})
+    const fallback: TtsFallbackSpeaker = {
+      isAvailable: () => true,
+      speak: fallbackSpeak,
+      cancel: vi.fn(),
+    }
+    const { synth, pipeline } = setup(() => ['only chunk'], fallback)
+    const p = pipeline.speak('Question text', OPTS)
+    await flush()
+    synth.reject(0, new TtsFallbackError('TTS timed out', 504))
+    await p
+    expect(fallbackSpeak).toHaveBeenCalledTimes(1)
+  })
+
+  it('speaks via browser fallback after network failure', async () => {
+    const fallbackSpeak = vi.fn(async () => {})
+    const fallback: TtsFallbackSpeaker = {
+      isAvailable: () => true,
+      speak: fallbackSpeak,
+      cancel: vi.fn(),
+    }
+    const { synth, pipeline } = setup(() => ['only chunk'], fallback)
+    const p = pipeline.speak('Question text', OPTS)
+    await flush()
+    synth.reject(0, new TtsFallbackError('network error'))
+    await p
+    expect(fallbackSpeak).toHaveBeenCalledTimes(1)
   })
 
   it('reports hard errors via onError', async () => {

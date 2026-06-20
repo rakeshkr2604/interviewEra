@@ -157,7 +157,27 @@ export class SttPipeline {
         },
         onUtteranceEnd: (fullText) => {
           if (myGen !== this.generation) return
-          if (fullText.trim()) this.assembler.appendFinal(fullText)
+          const trimmed = fullText.trim()
+          if (trimmed) {
+            const currentFinal = this.assembler.final()
+            if (!currentFinal) {
+              // Utterance-end only — no prior is_final segments.
+              this.assembler.appendFinal(trimmed)
+            } else {
+              const normalizedCurrent = currentFinal.replace(/\s+/g, ' ').trim()
+              const normalizedIncoming = trimmed.replace(/\s+/g, ' ').trim()
+              if (normalizedIncoming === normalizedCurrent) {
+                // Deepgram re-sends the full concatenation — ignore duplicate.
+              } else if (
+                normalizedIncoming.startsWith(normalizedCurrent) &&
+                trimmed.length > currentFinal.length
+              ) {
+                // Cumulative utterance-end superset — replace, never append.
+                this.assembler.restore(trimmed)
+              }
+              // Else segments already captured the turn; utterance-end is redundant.
+            }
+          }
           const merged = this.assembler.merged()
           if (!merged) return
           this.logger.info('stt_utterance_end', this.ctx, { chars: merged.length })

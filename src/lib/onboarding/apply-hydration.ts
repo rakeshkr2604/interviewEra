@@ -24,6 +24,9 @@ export type OnboardingPageSnapshot = {
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
   aiFollowupsEnabled: boolean
+  aiFollowupsTouched: boolean
+  cameraInterviewModeEnabled: boolean
+  cameraModeTouched: boolean
 }
 
 /** Merge server hydration into a page snapshot (used on refresh / client fallback). */
@@ -55,6 +58,10 @@ export function mergeOnboardingHydration(
     difficulty: hydration.difficulty ?? current.difficulty,
     difficultyTouched: hydration.difficultyTouched ?? current.difficultyTouched,
     aiFollowupsEnabled: hydration.draft?.aiFollowupsEnabled ?? current.aiFollowupsEnabled,
+    aiFollowupsTouched: hydration.draft?.aiFollowupsTouched ?? current.aiFollowupsTouched,
+    cameraInterviewModeEnabled:
+      hydration.draft?.cameraInterviewModeEnabled ?? current.cameraInterviewModeEnabled,
+    cameraModeTouched: hydration.draft?.cameraModeTouched ?? current.cameraModeTouched,
   }
 }
 
@@ -78,6 +85,9 @@ export function emptyOnboardingPageSnapshot(): OnboardingPageSnapshot {
     difficulty: DEFAULT_INTERVIEW_DIFFICULTY,
     difficultyTouched: false,
     aiFollowupsEnabled: true,
+    aiFollowupsTouched: false,
+    cameraInterviewModeEnabled: true,
+    cameraModeTouched: false,
   }
 }
 
@@ -102,5 +112,8 @@ export function snapshotFromHydration(hydration: OnboardingHydration): Onboardin
     difficulty: hydration.difficulty,
     difficultyTouched: hydration.difficultyTouched,
     aiFollowupsEnabled: hydration.draft?.aiFollowupsEnabled ?? true,
+    aiFollowupsTouched: hydration.draft?.aiFollowupsTouched ?? false,
+    cameraInterviewModeEnabled: hydration.draft?.cameraInterviewModeEnabled ?? true,
+    cameraModeTouched: hydration.draft?.cameraModeTouched ?? false,
   }
 }

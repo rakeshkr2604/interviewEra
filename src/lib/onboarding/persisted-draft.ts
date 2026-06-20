@@ -31,8 +31,12 @@ export const onboardingPersistedDraftSchema = z.object({
   jdParseStatus: z.enum(['idle', 'parsing', 'ready', 'failed']).optional(),
   difficulty: difficultySchema.optional(),
   difficultyTouched: z.boolean().optional(),
-  /** Session summary — AI follow-ups (always enabled in MVP). */
+  /** Session summary — adaptive AI follow-ups after each answer. */
   aiFollowupsEnabled: z.boolean().optional(),
+  aiFollowupsTouched: z.boolean().optional(),
+  /** Selfie camera preview during answer phase. */
+  cameraInterviewModeEnabled: z.boolean().optional(),
+  cameraModeTouched: z.boolean().optional(),
   updatedAt: z.string().datetime(),
 })
 
@@ -48,6 +52,9 @@ export function buildPersistedDraft(input: {
   difficulty: InterviewDifficulty
   difficultyTouched: boolean
   aiFollowupsEnabled?: boolean
+  aiFollowupsTouched?: boolean
+  cameraInterviewModeEnabled?: boolean
+  cameraModeTouched?: boolean
 }): OnboardingPersistedDraft {
   return {
     version: 1,
@@ -65,6 +72,9 @@ export function buildPersistedDraft(input: {
     difficulty: input.difficulty,
     difficultyTouched: input.difficultyTouched,
     aiFollowupsEnabled: input.aiFollowupsEnabled ?? true,
+    aiFollowupsTouched: input.aiFollowupsTouched ?? false,
+    cameraInterviewModeEnabled: input.cameraInterviewModeEnabled ?? true,
+    cameraModeTouched: input.cameraModeTouched ?? false,
     updatedAt: new Date().toISOString(),
   }
 }

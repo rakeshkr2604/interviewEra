@@ -14,7 +14,7 @@ import { OnboardingStepResume } from '@/components/onboarding/OnboardingStepResu
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
 import type { InterviewDifficulty, ParsedJobDescription, ParsedResume } from '@/types/app.types'
 import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count'
-import { readDefaultDifficulty, readPreferredInterviewerId } from '@/lib/settings/client-preferences'
+import { readDefaultDifficulty, readPreferredInterviewerId, readAdaptiveFollowUpEnabled, readCameraInterviewModeEnabled, writeAdaptiveFollowUpEnabled, writeCameraInterviewModeEnabled, resolveSessionBooleanPreference } from '@/lib/settings/client-preferences'
 import { useResolvedInterviewSetupPreferences } from '@/lib/interview/use-resolved-interview-setup-preferences'
 import { getInterviewerById } from '@/lib/config/interviewers'
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json'
@@ -112,6 +112,26 @@ export default function OnboardingPage() {
   const [difficultyTouched, setDifficultyTouched] = useState(
     () => serverHydration?.difficultyTouched ?? false,
   )
+  const [aiFollowupsEnabled, setAiFollowupsEnabled] = useState(() =>
+    resolveSessionBooleanPreference(
+      readAdaptiveFollowUpEnabled(),
+      serverHydration?.aiFollowupsEnabled,
+      serverHydration?.aiFollowupsTouched,
+    ),
+  )
+  const [aiFollowupsTouched, setAiFollowupsTouched] = useState(
+    () => serverHydration?.aiFollowupsTouched ?? false,
+  )
+  const [cameraInterviewModeEnabled, setCameraInterviewModeEnabled] = useState(() =>
+    resolveSessionBooleanPreference(
+      readCameraInterviewModeEnabled(),
+      serverHydration?.cameraInterviewModeEnabled,
+      serverHydration?.cameraModeTouched,
+    ),
+  )
+  const [cameraModeTouched, setCameraModeTouched] = useState(
+    () => serverHydration?.cameraModeTouched ?? false,
+  )
   const [startLoading, setStartLoading] = useState(false)
   const [startError, setStartError] = useState('')
   const [jdText, setJdText] = useState(() => serverHydration?.jdText ?? '')
@@ -145,7 +165,10 @@ export default function OnboardingPage() {
     jdParseStatus,
     difficulty,
     difficultyTouched,
-    aiFollowupsEnabled: true,
+    aiFollowupsEnabled,
+    aiFollowupsTouched,
+    cameraInterviewModeEnabled,
+    cameraModeTouched,
     enabled: persistEnabled,
   })
 
@@ -173,6 +196,22 @@ export default function OnboardingPage() {
         setJdParseStatus(snap.jdParseStatus)
         setDifficulty(snap.difficulty)
         setDifficultyTouched(snap.difficultyTouched)
+        setAiFollowupsEnabled(
+          resolveSessionBooleanPreference(
+            readAdaptiveFollowUpEnabled(),
+            snap.aiFollowupsEnabled,
+            snap.aiFollowupsTouched,
+          ),
+        )
+        setAiFollowupsTouched(snap.aiFollowupsTouched)
+        setCameraInterviewModeEnabled(
+          resolveSessionBooleanPreference(
+            readCameraInterviewModeEnabled(),
+            snap.cameraInterviewModeEnabled,
+            snap.cameraModeTouched,
+          ),
+        )
+        setCameraModeTouched(snap.cameraModeTouched)
         if (snap.data.goal != null) setGoal(snap.data.goal)
         setRole(snap.data.role)
         setExperienceYears(snap.data.experienceYears)
@@ -239,19 +278,37 @@ export default function OnboardingPage() {
     }
   }, [data.interviewerId, setInterviewerId])
 
-  /** Same-tab Settings edits do not emit `storage`; refresh on the resume step. */
+  /** Same-tab Settings edits do not emit `storage`; refresh + re-sync on step 2. */
   useEffect(() => {
     if (step >= 2) refreshResolvedPreferences()
   }, [step, refreshResolvedPreferences])
 
-  /** Align session difficulty with Settings only when entering step 2 — not on refresh. */
+  useEffect(() => {
+    if (step < 2) return
+    if (!aiFollowupsTouched) {
+      setAiFollowupsEnabled(resolved.adaptiveFollowUpEnabled)
+    }
+    if (!cameraModeTouched) {
+      setCameraInterviewModeEnabled(resolved.cameraInterviewModeEnabled)
+    }
+  }, [
+    step,
+    resolved.adaptiveFollowUpEnabled,
+    resolved.cameraInterviewModeEnabled,
+    aiFollowupsTouched,
+    cameraModeTouched,
+  ])
+
+  /** Align session prefs with Settings when entering step 2 — not on refresh. */
   useEffect(() => {
     const prev = prevStepRef.current
     prevStepRef.current = step
-    if (prev !== 1 || step !== 2 || difficultyTouched) return
+    if (prev !== 1 || step !== 2) return
     refreshResolvedPreferences()
-    setDifficulty(readDefaultDifficulty())
-  }, [step, difficultyTouched, refreshResolvedPreferences])
+    if (!difficultyTouched) setDifficulty(readDefaultDifficulty())
+    if (!aiFollowupsTouched) setAiFollowupsEnabled(readAdaptiveFollowUpEnabled())
+    if (!cameraModeTouched) setCameraInterviewModeEnabled(readCameraInterviewModeEnabled())
+  }, [step, difficultyTouched, aiFollowupsTouched, cameraModeTouched, refreshResolvedPreferences])
 
   const runJdParse = useCallback(async (textOverride?: string) => {
     const source = textOverride ?? jdText
@@ -932,6 +989,34 @@ export default function OnboardingPage() {
           questionCount={difficultyQuestionCount(difficulty)}
           onDifficultyChange={(d) => { setDifficulty(d); setDifficultyTouched(true); setStartError('') }}
           onMatchDifficultySettings={() => { refreshResolvedPreferences(); setDifficulty(readDefaultDifficulty()); setDifficultyTouched(false); setStartError('') }}
+          aiFollowupsEnabled={aiFollowupsEnabled}
+          aiFollowupsTouched={aiFollowupsTouched}
+          cameraInterviewModeEnabled={cameraInterviewModeEnabled}
+          cameraModeTouched={cameraModeTouched}
+          onAiFollowupsChange={(enabled) => {
+            setAiFollowupsEnabled(enabled)
+            setAiFollowupsTouched(true)
+            writeAdaptiveFollowUpEnabled(enabled)
+            setStartError('')
+          }}
+          onCameraModeChange={(enabled) => {
+            setCameraInterviewModeEnabled(enabled)
+            setCameraModeTouched(true)
+            writeCameraInterviewModeEnabled(enabled)
+            setStartError('')
+          }}
+          onMatchAiFollowupsSettings={() => {
+            refreshResolvedPreferences()
+            setAiFollowupsEnabled(readAdaptiveFollowUpEnabled())
+            setAiFollowupsTouched(false)
+            setStartError('')
+          }}
+          onMatchCameraModeSettings={() => {
+            refreshResolvedPreferences()
+            setCameraInterviewModeEnabled(readCameraInterviewModeEnabled())
+            setCameraModeTouched(false)
+            setStartError('')
+          }}
           canBegin={canBegin}
           startLoading={startLoading}
           startError={startError}

@@ -3,23 +3,38 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { ProfilePhotoEditor } from '@/components/settings/ProfilePhotoEditor'
+import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
 import { cn } from '@/lib/utils'
 import { Copy, Check } from 'lucide-react'
+import type { User } from '@supabase/supabase-js'
 
 export function AccountManagementPanel({
+  authUser,
   displayName,
   email,
   joinedAt,
   accountId,
+  initialAvatarPath,
 }: {
+  authUser: User
   displayName: string | null
   email: string
   joinedAt: string
   accountId: string
+  initialAvatarPath: string | null
 }) {
   const [copied, setCopied] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportStatus, setExportStatus] = useState<{ tone: 'ok' | 'err'; message: string } | null>(null)
+  const [nameDraft, setNameDraft] = useState(displayName ?? '')
+  const [savedName, setSavedName] = useState(displayName ?? '')
+  const [savingName, setSavingName] = useState(false)
+  const [nameStatus, setNameStatus] = useState<{ tone: 'ok' | 'err'; message: string } | null>(null)
+  const [avatarPath, setAvatarPath] = useState(initialAvatarPath)
+
+  const oauthPictureUrl = resolveOAuthPictureUrl(authUser.user_metadata)
 
   const copyId = async () => {
     try {
@@ -29,6 +44,32 @@ export function AccountManagementPanel({
     } catch {
       setExportStatus({ tone: 'err', message: 'Could not copy to clipboard.' })
       window.setTimeout(() => setExportStatus(null), 3000)
+    }
+  }
+
+  const saveName = async () => {
+    setSavingName(true)
+    setNameStatus(null)
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameDraft.trim() }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string; name?: string } | null
+      if (!res.ok) {
+        setNameStatus({ tone: 'err', message: data?.error ?? 'Could not update name.' })
+        return
+      }
+      const next = data?.name ?? nameDraft.trim()
+      setSavedName(next)
+      setNameDraft(next)
+      setNameStatus({ tone: 'ok', message: 'Name updated.' })
+      window.setTimeout(() => setNameStatus(null), 3000)
+    } catch {
+      setNameStatus({ tone: 'err', message: 'Network error. Try again.' })
+    } finally {
+      setSavingName(false)
     }
   }
 
@@ -57,20 +98,71 @@ export function AccountManagementPanel({
     }
   }
 
+  const nameDirty = nameDraft.trim() !== savedName.trim()
+
   return (
-    <div className="space-y-4">
-      <dl className="grid gap-3 sm:grid-cols-2">
-        <div
-          className="rounded-xl border px-4 py-3"
-          style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
-        >
-          <dt className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-            Full name
-          </dt>
-          <dd className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            {displayName?.trim() || '—'}
-          </dd>
+    <div className="space-y-6">
+      <ProfilePhotoEditor
+        name={savedName || displayName}
+        email={email}
+        initialAvatarPath={avatarPath}
+        oauthPictureUrl={oauthPictureUrl}
+        onAvatarPathChange={setAvatarPath}
+      />
+
+      <div
+        className="h-px w-full"
+        style={{ background: 'var(--card-border)' }}
+        aria-hidden
+      />
+
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Display name
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Used in greetings, reports, and your interview sessions.
+          </p>
         </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <Input
+            value={nameDraft}
+            onChange={(e) => setNameDraft(e.target.value)}
+            maxLength={50}
+            autoComplete="name"
+            placeholder="Your name"
+            className="sm:max-w-xs"
+          />
+          <Button
+            type="button"
+            size="sm"
+            disabled={!nameDirty || savingName || nameDraft.trim().length < 2}
+            onClick={() => void saveName()}
+          >
+            {savingName ? 'Saving…' : 'Save name'}
+          </Button>
+        </div>
+        {nameStatus ? (
+          <p
+            role="status"
+            className={cn(
+              'text-xs font-medium',
+              nameStatus.tone === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive',
+            )}
+          >
+            {nameStatus.message}
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        className="h-px w-full"
+        style={{ background: 'var(--card-border)' }}
+        aria-hidden
+      />
+
+      <dl className="grid gap-3 sm:grid-cols-2">
         <div
           className="rounded-xl border px-4 py-3"
           style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
@@ -83,7 +175,7 @@ export function AccountManagementPanel({
           </dd>
         </div>
         <div
-          className="rounded-xl border px-4 py-3 sm:col-span-2"
+          className="rounded-xl border px-4 py-3"
           style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
         >
           <dt className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>

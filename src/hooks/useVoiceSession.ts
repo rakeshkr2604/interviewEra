@@ -19,6 +19,10 @@ import {
 } from '@/lib/voice/orchestrator/create-voice-session'
 import type { VoiceSessionOrchestrator } from '@/lib/voice/orchestrator/voice-session-orchestrator'
 import type { VoiceSessionState } from '@/lib/voice/core/session-state'
+import type { TierCelebrationPayload } from '@/components/retention/TierUnlockCelebrationDialog'
+import type { InterviewCompleteRetentionPayload } from '@/lib/retention/interview-complete-retention'
+import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge'
+import { trackMockInterviewCompletedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
 
 export interface VoiceSessionView {
   state: VoiceSessionState
@@ -48,6 +52,8 @@ const INITIAL_VIEW: VoiceSessionView = {
 
 export interface UseVoiceSessionResult {
   view: VoiceSessionView
+  celebration: TierCelebrationPayload | null
+  dismissCelebration: () => void
   /** Call from a click handler (gesture unlock). Brings the session up + asks Q1. */
   start: () => void
   /** Explicitly submit the current answer (mic button). */
@@ -60,6 +66,8 @@ export function useVoiceSession(input: CreateVoiceSessionInput): UseVoiceSession
   const orchRef = useRef<VoiceSessionOrchestrator | null>(null)
   const inputRef = useRef(input)
   const [view, setView] = useState<VoiceSessionView>(INITIAL_VIEW)
+  const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null)
+  const completionTrackedRef = useRef(false)
 
   useEffect(() => {
     inputRef.current = input
@@ -89,6 +97,48 @@ export function useVoiceSession(input: CreateVoiceSessionInput): UseVoiceSession
       }))
     }
 
+    const handleInterviewCompleted = (payload: {
+      reportId?: string | null
+      retention?: InterviewCompleteRetentionPayload | null
+      funnelComplete?: FunnelCompleteGa4Payload | null
+      badgesUnlocked?: string[]
+    }) => {
+      const reportId = payload.reportId
+      if (!reportId) return
+
+      if (payload.funnelComplete && !completionTrackedRef.current) {
+        completionTrackedRef.current = true
+        void trackMockInterviewCompletedGa4(payload.funnelComplete)
+      }
+
+      const retention = payload.retention ?? null
+      if (
+        typeof window !== 'undefined' &&
+        retention &&
+        typeof retention.streak === 'number'
+      ) {
+        window.dispatchEvent(
+          new CustomEvent('ie-streak-updated', { detail: { streak: retention.streak } }),
+        )
+      }
+
+      const href = `/report/${reportId}`
+      if (
+        retention?.tierUnlocked &&
+        typeof retention.newTier === 'number' &&
+        retention.newTier != null
+      ) {
+        setCelebration({
+          newTier: retention.newTier,
+          newBadges: [...(payload.badgesUnlocked ?? retention.newBadges ?? [])],
+          reportHref: href,
+          progressHint: retention.progress ?? null,
+          nextTierNumber: retention.nextTierNumber ?? null,
+          nextTierProgressPercent: retention.nextTierProgressPercent ?? 0,
+        })
+      }
+    }
+
     const offs = [
       bus.onAny(() => refresh()),
       bus.on('TranscriptUpdated', (e) => {
@@ -97,6 +147,15 @@ export function useVoiceSession(input: CreateVoiceSessionInput): UseVoiceSession
       }),
       bus.on('TranscriptFinalized', () => {
         interim = ''
+        refresh()
+      }),
+      bus.on('InterviewCompleted', (e) => {
+        handleInterviewCompleted({
+          reportId: e.payload.reportId,
+          retention: e.payload.retention as InterviewCompleteRetentionPayload | null | undefined,
+          funnelComplete: e.payload.funnelComplete as FunnelCompleteGa4Payload | null | undefined,
+          badgesUnlocked: e.payload.badgesUnlocked,
+        })
         refresh()
       }),
     ]
@@ -108,6 +167,10 @@ export function useVoiceSession(input: CreateVoiceSessionInput): UseVoiceSession
       orchRef.current = null
     }
     // Build exactly once per mount; live values are read via inputRef.
+  }, [])
+
+  const dismissCelebration = useCallback(() => {
+    setCelebration(null)
   }, [])
 
   const start = useCallback(() => {
@@ -123,5 +186,5 @@ export function useVoiceSession(input: CreateVoiceSessionInput): UseVoiceSession
     void orchRef.current?.recover()
   }, [])
 
-  return { view, start, submit, recover }
+  return { view, celebration, dismissCelebration, start, submit, recover }
 }

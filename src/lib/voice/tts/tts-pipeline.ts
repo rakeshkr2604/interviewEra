@@ -38,6 +38,13 @@ export interface TtsSynthesizer {
   speak(text: string, options: TTSOptions, signal: AbortSignal): Promise<ArrayBuffer>
 }
 
+/** Audible fallback when ElevenLabs returns a soft failure. */
+export interface TtsFallbackSpeaker {
+  isAvailable(): boolean
+  speak(text: string, options: TTSOptions, signal: AbortSignal): Promise<void>
+  cancel(): void
+}
+
 export interface TtsAudioSink {
   playAudio(buffer: ArrayBuffer, callbacks: AudioPlaybackCallbacks): Promise<void>
   stopAudio(): void
@@ -53,6 +60,8 @@ export interface TtsSpeakCallbacks {
 export interface TtsPipelineOptions {
   synthesizer: TtsSynthesizer
   sink: TtsAudioSink
+  /** Invoked after ElevenLabs soft-failure so the question is still audible. */
+  fallbackSpeaker?: TtsFallbackSpeaker
   logger?: VoiceLogger
   bus?: VoiceEventBus
   chunker?: (text: string) => string[]
@@ -66,6 +75,7 @@ function isAbortError(err: unknown): boolean {
 export class TtsPipeline {
   private readonly synthesizer: TtsSynthesizer
   private readonly sink: TtsAudioSink
+  private readonly fallbackSpeaker?: TtsFallbackSpeaker
   private readonly logger: VoiceLogger
   private readonly bus?: VoiceEventBus
   private readonly chunker: (text: string) => string[]
@@ -75,10 +85,13 @@ export class TtsPipeline {
   private controller: AbortController | null = null
   private speaking = false
   private currentText = ''
+  /** True while the browser fallback is active for the current utterance. */
+  private fallbackActive = false
 
   constructor(opts: TtsPipelineOptions) {
     this.synthesizer = opts.synthesizer
     this.sink = opts.sink
+    this.fallbackSpeaker = opts.fallbackSpeaker
     this.logger = opts.logger ?? createVoiceLogger('tts')
     this.bus = opts.bus
     this.chunker = opts.chunker ?? ((t) => splitIntoSpeechChunks(t))
@@ -152,8 +165,31 @@ export class TtsPipeline {
       this.finish(myGen)
       if (err instanceof TtsFallbackError) {
         this.logger.warn('tts_fallback', this.ctx, { message: err.message, status: err.httpStatus })
-        this.bus?.emit('QuestionFinished', { reason: 'failed' }, { ctx: this.ctx })
         callbacks.onFallback?.(err.message)
+        if (
+          myGen === this.generation &&
+          this.fallbackSpeaker?.isAvailable() &&
+          !controller.signal.aborted
+        ) {
+          try {
+            this.fallbackActive = true
+            await this.fallbackSpeaker.speak(clean, options, controller.signal)
+            if (myGen !== this.generation || controller.signal.aborted) return
+            this.finish(myGen)
+            this.bus?.emit('QuestionFinished', { reason: 'fallback_completed' }, { ctx: this.ctx })
+            callbacks.onComplete?.()
+          } catch (fallbackErr) {
+            if (myGen !== this.generation || isAbortError(fallbackErr)) return
+            const message =
+              fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)
+            this.logger.error('tts_browser_fallback_failed', this.ctx, { message })
+            callbacks.onError?.(message)
+          } finally {
+            this.fallbackActive = false
+          }
+          return
+        }
+        this.bus?.emit('QuestionFinished', { reason: 'failed' }, { ctx: this.ctx })
         return
       }
       const message = err instanceof Error ? err.message : String(err)
@@ -201,6 +237,10 @@ export class TtsPipeline {
       } catch {
         /* */
       }
+    }
+    if (this.fallbackActive) {
+      this.fallbackSpeaker?.cancel()
+      this.fallbackActive = false
     }
     this.sink.stopAudio()
     if (wasSpeaking) {

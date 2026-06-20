@@ -53,6 +53,7 @@ export class BrowserAudioDriver implements AudioDriver {
   private captureStream: MediaStream | null = null
   private captureContext: AudioContext | null = null
   private activeSource: AudioBufferSourceNode | null = null
+  private visibilityHandler: (() => void) | null = null
 
   unlock(): void {
     unlockAudioForInterview()
@@ -88,6 +89,8 @@ export class BrowserAudioDriver implements AudioDriver {
     processor.connect(silentSink)
     silentSink.connect(ctx.destination)
 
+    this.installCaptureVisibilityResume(ctx)
+
     log.info('capture_started', null, { sampleRate: ctx.sampleRate })
 
     let stopped = false
@@ -122,9 +125,50 @@ export class BrowserAudioDriver implements AudioDriver {
         }
         if (this.captureStream === stream) this.captureStream = null
         if (this.captureContext === ctx) this.captureContext = null
+        this.removeCaptureVisibilityResume()
         log.info('capture_stopped', null, {})
       },
     }
+  }
+
+  private installCaptureVisibilityResume(ctx: AudioContext): void {
+    if (typeof document === 'undefined') return
+    this.removeCaptureVisibilityResume()
+    const handler = () => {
+      if (document.visibilityState !== 'visible') return
+      void this.resumeCaptureContext(ctx)
+    }
+    this.visibilityHandler = handler
+    document.addEventListener('visibilitychange', handler)
+    window.addEventListener('pageshow', handler)
+  }
+
+  private removeCaptureVisibilityResume(): void {
+    if (typeof document === 'undefined' || !this.visibilityHandler) return
+    document.removeEventListener('visibilitychange', this.visibilityHandler)
+    window.removeEventListener('pageshow', this.visibilityHandler)
+    this.visibilityHandler = null
+  }
+
+  private async resumeCaptureContext(ctx: AudioContext): Promise<boolean> {
+    if (ctx.state === 'closed') return false
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume()
+      } catch {
+        log.warn('capture_context_resume_failed', null, { state: ctx.state })
+        return false
+      }
+    }
+    const running = ctx.state === 'running'
+    if (running) log.info('capture_context_resumed', null, { state: ctx.state })
+    return running
+  }
+
+  async resumeCapture(): Promise<boolean> {
+    const ctx = this.captureContext
+    if (!ctx) return false
+    return this.resumeCaptureContext(ctx)
   }
 
   async resumePlayback(): Promise<boolean> {
@@ -202,6 +246,7 @@ export class BrowserAudioDriver implements AudioDriver {
     }
     if (this.captureContext) {
       try {
+        this.removeCaptureVisibilityResume()
         await this.captureContext.close()
       } catch {
         /* */

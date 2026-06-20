@@ -13,24 +13,34 @@ export const STORAGE_KEYS = {
   ttsRate: 'ie-tts-rate',
   aiVoiceEnabled: 'ie-ai-voice-enabled',
   noiseCancellation: 'ie-noise-cancellation',
+  adaptiveFollowUpEnabled: 'ie-adaptive-follow-up-enabled',
+  cameraInterviewModeEnabled: 'ie-camera-interview-mode-enabled',
 } as const
 
-export type InterviewLanguageCode = 'en'
+export type InterviewLanguageCode = 'en' | 'hinglish'
 
-/** Display-only id for roadmap language modes (not persisted yet). */
-export const UPCOMING_INTERVIEW_LANGUAGE = {
-  hinglish: 'hinglish',
-} as const
+export const INTERVIEW_LANGUAGE_LABELS: Record<InterviewLanguageCode, string> = {
+  en: 'English',
+  hinglish: 'English + Hindi (Hinglish)',
+}
 
 export function readInterviewLanguage(): InterviewLanguageCode {
   if (typeof window === 'undefined') return 'en'
   try {
     const v = localStorage.getItem(STORAGE_KEYS.interviewLanguage)
-    if (v === 'en') return 'en'
+    if (v === 'en' || v === 'hinglish') return v
     return 'en'
   } catch {
-    // localStorage can throw in restricted browser modes; keep deterministic fallback.
     return 'en'
+  }
+}
+
+export function writeInterviewLanguage(code: InterviewLanguageCode): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(STORAGE_KEYS.interviewLanguage, code)
+  } catch {
+    /* restricted storage */
   }
 }
 
@@ -98,4 +108,53 @@ export function readAnswerStyle(): AnswerStyle {
   const v = localStorage.getItem(STORAGE_KEYS.answerStyle)
   if (v === 'concise' || v === 'balanced' || v === 'detailed') return v
   return 'balanced'
+}
+
+function readBooleanPref(key: string, defaultValue: boolean): boolean {
+  if (typeof window === 'undefined') return defaultValue
+  try {
+    const v = localStorage.getItem(key)
+    if (v === '0' || v === 'false') return false
+    if (v === '1' || v === 'true') return true
+    return defaultValue
+  } catch {
+    return defaultValue
+  }
+}
+
+export function writeBooleanPref(key: string, enabled: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, enabled ? '1' : '0')
+  } catch {
+    /* restricted storage */
+  }
+}
+
+/** Adaptive AI follow-ups after each answer (default on). */
+export function readAdaptiveFollowUpEnabled(): boolean {
+  return readBooleanPref(STORAGE_KEYS.adaptiveFollowUpEnabled, true)
+}
+
+export function writeAdaptiveFollowUpEnabled(enabled: boolean): void {
+  writeBooleanPref(STORAGE_KEYS.adaptiveFollowUpEnabled, enabled)
+}
+
+/** Selfie camera preview during the answer phase (default on). */
+export function readCameraInterviewModeEnabled(): boolean {
+  return readBooleanPref(STORAGE_KEYS.cameraInterviewModeEnabled, true)
+}
+
+export function writeCameraInterviewModeEnabled(enabled: boolean): void {
+  writeBooleanPref(STORAGE_KEYS.cameraInterviewModeEnabled, enabled)
+}
+
+/** Session override wins when touched; otherwise use Settings (localStorage). */
+export function resolveSessionBooleanPreference(
+  settingsValue: boolean,
+  draftValue: boolean | undefined,
+  touched: boolean | undefined,
+): boolean {
+  if (touched && draftValue !== undefined) return draftValue
+  return settingsValue
 }

@@ -46,6 +46,9 @@ export interface AudioDriver {
   /** Resume the playback AudioContext (autoplay policy). Returns running state. */
   resumePlayback(): Promise<boolean>
 
+  /** Resume the capture AudioContext after tab/lock-screen backgrounding. */
+  resumeCapture(): Promise<boolean>
+
   /** Release audio focus before capture (Android suspends playback context). */
   prepareForCapture(): Promise<void>
 

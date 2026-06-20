@@ -1,4 +1,14 @@
-import { User, CalendarDays, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
+import {
+  BarChart2,
+  CalendarDays,
+  CheckCircle2,
+  Flame,
+  History,
+  Settings,
+  TrendingUp,
+} from 'lucide-react';
+import { UserAvatar } from '@/components/profile/UserAvatar';
 import { PlacementCountdown } from '@/components/layout/PlacementCountdown';
 import { CurrentPlanBadge } from '@/components/pricing/CurrentPlanBadge';
 import { planExpiresCopy } from '@/lib/pricing/copy';
@@ -11,20 +21,37 @@ import { DashboardMetricTile } from '@/components/dashboard/DashboardMetricTile'
 import { ProfileActions } from '@/components/dashboard/ProfileActions';
 import type { UserRow } from '@/app/(dashboard)/dashboard/dashboard-types';
 import type { PlanTier } from '@/types/app.types';
-import Link from 'next/link';
 
 interface UserSummaryCardProps {
   userData: UserRow | null;
   displayName: string;
   memberSince: string;
   completedCount: number;
+  avgScore: string | null;
+  currentStreak: number;
+  email: string;
+  avatarPath?: string | null;
+  oauthPictureUrl?: string | null;
+  inProgressInterview?: { id: string; role: string } | null;
 }
+
+const QUICK_LINKS = [
+  { href: '/history', label: 'History', icon: History },
+  { href: '/analytics', label: 'Analytics', icon: BarChart2 },
+  { href: '/settings', label: 'Settings', icon: Settings },
+] as const;
 
 export function UserSummaryCard({
   userData,
   displayName,
   memberSince,
   completedCount,
+  avgScore,
+  currentStreak,
+  email,
+  avatarPath = null,
+  oauthPictureUrl = null,
+  inProgressInterview = null,
 }: UserSummaryCardProps) {
   const planTier = (userData?.plan_tier ?? 'free') as PlanTier;
   const planExpiresAt = userData?.plan_expires_at ?? null;
@@ -37,23 +64,41 @@ export function UserSummaryCard({
       ? planExpiryStatusLine(planExpiresAt, isPaidActive)
       : null;
 
-  return (
-    <section className="dashboard-premium-card mb-4 px-4 py-4 sm:mb-5 sm:px-6 sm:py-5">
-      <div className="flex flex-col gap-4 min-[360px]:flex-row min-[360px]:items-start min-[360px]:justify-between min-[360px]:gap-3 sm:gap-4">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <div
-            className="flex size-12 shrink-0 items-center justify-center rounded-full sm:size-14"
-            style={{
-              background: 'color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary))',
-              color: 'var(--accent-primary)',
-            }}
-            aria-hidden
-          >
-            <User size={22} aria-hidden />
-          </div>
+  const streakLabel = currentStreak === 1 ? '1 day' : `${currentStreak} days`;
 
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <h2 className="text-lg font-semibold leading-tight sm:text-xl" style={{ color: 'var(--text-primary)' }}>
+  return (
+    <section className="dashboard-premium-card relative mb-4 flex flex-col overflow-hidden px-4 py-4 sm:mb-5 sm:px-6 sm:py-5 lg:mb-0 lg:h-full lg:px-7 lg:py-6">
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+        style={{
+          background:
+            'linear-gradient(90deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 40%, transparent))',
+        }}
+        aria-hidden
+      />
+
+      <div className="flex flex-col gap-4 sm:gap-4 lg:gap-5">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-3.5 lg:gap-4">
+          <Link
+            href="/settings#settings-account"
+            className="shrink-0 rounded-full outline-none ring-2 ring-transparent transition-shadow hover:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]"
+            aria-label="Edit profile photo in settings"
+          >
+            <UserAvatar
+              name={displayName}
+              email={email}
+              avatarPath={avatarPath}
+              oauthPictureUrl={oauthPictureUrl}
+              size="lg"
+              className="size-12 ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_18%,transparent)] sm:size-14 lg:size-16"
+            />
+          </Link>
+
+          <div className="min-w-0 flex-1 space-y-1.5 lg:space-y-2">
+            <h2
+              className="text-lg font-semibold leading-tight sm:text-xl lg:text-2xl"
+              style={{ color: 'var(--text-primary)' }}
+            >
               Hi, {displayName}
             </h2>
 
@@ -62,14 +107,20 @@ export function UserSummaryCard({
                 <>
                   <CurrentPlanBadge />
                   {expiryLine ? (
-                    <span className="text-xs font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
+                    <span
+                      className={`text-xs font-medium tabular-nums lg:text-sm ${
+                        isPaidActive
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
                       {expiryLine}
                     </span>
                   ) : null}
                 </>
               ) : planTier === 'free' ? (
                 <span
-                  className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold"
+                  className="rounded-full border px-2.5 py-0.5 text-[11px] font-semibold lg:text-xs"
                   style={{
                     borderColor: 'var(--card-border)',
                     color: 'var(--text-secondary)',
@@ -82,13 +133,26 @@ export function UserSummaryCard({
                 <>
                   <CurrentPlanBadge />
                   {expiryLine ? (
-                    <span className="text-xs font-medium tabular-nums text-emerald-700 dark:text-emerald-400">
+                    <span
+                      className={`text-xs font-medium tabular-nums lg:text-sm ${
+                        isPaidActive
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-amber-700 dark:text-amber-400'
+                      }`}
+                    >
                       {expiryLine}
                     </span>
                   ) : null}
                 </>
               ) : null}
             </div>
+
+            {memberSince ? (
+              <p className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                <CalendarDays size={13} className="shrink-0 opacity-70" aria-hidden />
+                Member since {memberSince}
+              </p>
+            ) : null}
 
             {userData?.placement_date ? (
               <div className="pt-0.5">
@@ -108,26 +172,74 @@ export function UserSummaryCard({
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:gap-3">
-        <DashboardMetricTile label="Member since" value={memberSince || '—'} icon={CalendarDays} />
-        <DashboardMetricTile
-          label="Interviews completed"
-          value={completedCount}
-          icon={CheckCircle2}
-        />
+      <div className="mt-4 flex flex-col gap-4 lg:mt-6 lg:flex-1 lg:justify-end">
+        {inProgressInterview ? (
+          <Link
+            href={`/interview/session/${inProgressInterview.id}`}
+            className="dashboard-hover-lift flex items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))',
+              background: 'color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary))',
+              textDecoration: 'none',
+            }}
+          >
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-primary)' }}>
+                Resume session
+              </p>
+              <p className="mt-0.5 truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                {inProgressInterview.role}
+              </p>
+            </div>
+            <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              Continue →
+            </span>
+          </Link>
+        ) : null}
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          <DashboardMetricTile label="Completed" value={completedCount} icon={CheckCircle2} compact />
+          <DashboardMetricTile
+            label="Avg score"
+            value={avgScore ? `${avgScore}/10` : '—'}
+            icon={TrendingUp}
+            compact
+          />
+          <DashboardMetricTile label="Streak" value={streakLabel} icon={Flame} compact />
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+          {QUICK_LINKS.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="dashboard-hover-lift flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border-2 px-1.5 py-2.5 text-center transition-all duration-200 active:opacity-90 sm:gap-1.5 sm:px-2 sm:py-3"
+              style={{
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--card-bg) 90%, transparent)',
+                textDecoration: 'none',
+              }}
+            >
+              <Icon size={18} style={{ color: 'var(--accent-primary)' }} aria-hidden />
+              <span className="text-[11px] font-semibold sm:text-xs" style={{ color: 'var(--text-primary)' }}>
+                {label}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {isPaidActive && planExpiresAt ? (
-        <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-4 text-xs leading-relaxed lg:hidden" style={{ color: 'var(--text-muted)' }}>
           {planExpiresCopy(planExpiresAt, true)}{' '}
           <span style={{ color: 'var(--text-secondary)' }}>One-time payment · no auto-renewal.</span>
         </p>
       ) : planTier === 'free' ? (
-        <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-4 text-xs leading-relaxed lg:hidden" style={{ color: 'var(--text-muted)' }}>
           Pay once for 30-day Starter or Pro access when you need more credits and features.
         </p>
       ) : isPaidTier && planExpiresAt && !isPaidActive ? (
-        <p className="mt-3 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+        <p className="mt-4 text-xs leading-relaxed lg:hidden" style={{ color: 'var(--text-muted)' }}>
           Your {formatPlanTierName(planTier)} access has ended.{' '}
           <Link
             href="/upgrade"

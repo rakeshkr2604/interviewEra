@@ -38,6 +38,14 @@ export interface NextTurnResult {
   done: boolean
   reportId?: string | null
   question?: NextQuestion
+  /** Populated when `done` is true — retention + analytics from /complete. */
+  completion?: InterviewCompletionPayload
+}
+
+export interface InterviewCompletionPayload {
+  retention?: unknown
+  funnelComplete?: unknown
+  badgesUnlocked?: string[]
 }
 
 export interface ConversationEngine {
@@ -45,4 +53,6 @@ export interface ConversationEngine {
   scoreAnswer(input: ScoreAnswerInput): Promise<ScoredAnswer>
   /** Decide whether the interview continues and, if so, the next question. */
   resolveNextTurn(input: ResolveNextTurnInput): Promise<NextTurnResult>
+  /** Abort in-flight HTTP requests (navigation, dispose, superseded turn). */
+  abort?(): void
 }

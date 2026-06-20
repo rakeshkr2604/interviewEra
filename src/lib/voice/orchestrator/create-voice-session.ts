@@ -17,6 +17,7 @@ import { DeepgramTransport } from '@/lib/voice/stt/deepgram-transport'
 import { BrowserSttTransport } from '@/lib/voice/stt/browser-stt-transport'
 import { TtsPipeline } from '@/lib/voice/tts/tts-pipeline'
 import { createElevenLabsSynthesizer } from '@/lib/voice/tts/elevenlabs-synthesizer'
+import { createBrowserSpeechFallbackForInterviewer } from '@/lib/voice/tts/browser-speech-synthesizer'
 import {
   HttpConversationEngine,
   createHttpConversationApi,
@@ -25,6 +26,7 @@ import {
 import { VoiceSessionOrchestrator } from '@/lib/voice/orchestrator/voice-session-orchestrator'
 import { VoiceEventBus } from '@/lib/voice/core/event-bus'
 import type { TTSOptions } from '@/lib/voice/tts-client'
+import type { InterviewerId } from '@/lib/config/interviewers'
 import type { AnswerStyle } from '@/lib/settings/client-preferences'
 
 export interface CreateVoiceSessionInput {
@@ -58,6 +60,9 @@ export function createVoiceSession(input: CreateVoiceSessionInput): VoiceSession
   const tts = new TtsPipeline({
     synthesizer: createElevenLabsSynthesizer(),
     sink: audio,
+    fallbackSpeaker: createBrowserSpeechFallbackForInterviewer(
+      input.interviewerId as InterviewerId | null,
+    ),
     bus,
   })
 
@@ -83,5 +88,6 @@ export function createVoiceSession(input: CreateVoiceSessionInput): VoiceSession
     firstQuestion: { text: first.questionText, questionIndex: 0, isFollowUp: false },
     bus,
     answerTimeoutMs: input.answerTimeoutMs,
+    processingTimeoutMs: 55_000,
   })
 }
