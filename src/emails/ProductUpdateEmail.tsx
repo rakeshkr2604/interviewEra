@@ -22,7 +22,7 @@ const defaultProps: Required<Omit<ProductUpdateEmailProps, 'previewImageUrl' | '
   name: 'there',
   creditsAdded: 3,
   dashboardUrl: 'https://interviewera.com/dashboard',
-  interviewUrl: 'https://interviewera.com/dashboard',
+  interviewUrl: 'https://interviewera.com/interview',
   feedbackUrl: 'https://interviewera.com/feedback',
   previewImageUrl: 'https://interviewera.com/blog/react-interview-hero.webp',
   showPreviewImage: true,

@@ -1,6 +1,6 @@
 import { sendCampaignBatches } from './batch-sender';
 import { confirmCampaignSend } from './confirmation';
-import { PRODUCT_UPDATE_FROM, PRODUCT_UPDATE_REPLY_TO } from './email-config';
+import { PRODUCT_UPDATE_FROM, PRODUCT_UPDATE_REPLY_TO, PRODUCT_UPDATE_SUBJECT } from './email-config';
 import { writeFailureCsv } from './failure-csv';
 import {
   appendCampaignLogEntry,
@@ -8,7 +8,7 @@ import {
   writeCampaignLogHeader,
 } from './log-file';
 import { printPreviewSummary, writePreviewHtml } from './preview';
-import { verifyResendApiKey } from './preflight';
+import { runPreflightChecks } from './preflight';
 import {
   printCampaignHeader,
   printFinalReport,
@@ -16,17 +16,36 @@ import {
 } from './progress-logger';
 import { fetchEligibleRecipients } from './recipients';
 import { loadFailedRecipientsFromCsv } from './retry-failed';
-import { getCampaignAppBaseUrl } from './env';
-import type { CampaignOptions, CampaignSummary } from './types';
+import type { CampaignOptions, CampaignSendResult, CampaignSummary } from './types';
 
 function buildSummary(
-  total: number,
-  success: number,
-  failed: number,
-  dryRun: number,
+  results: CampaignSendResult[],
   durationMs: number,
 ): CampaignSummary {
-  return { total, success, failed, dryRun, durationMs };
+  let success = 0;
+  let retriedSuccess = 0;
+  let failed = 0;
+  let dryRun = 0;
+
+  for (const result of results) {
+    if (result.status === 'success') {
+      success += 1;
+      if (result.retried) retriedSuccess += 1;
+    } else if (result.status === 'failed') {
+      failed += 1;
+    } else {
+      dryRun += 1;
+    }
+  }
+
+  return {
+    total: results.length,
+    success,
+    retriedSuccess,
+    failed,
+    dryRun,
+    durationMs,
+  };
 }
 
 export async function runProductUpdateCampaign(options: CampaignOptions): Promise<number> {
@@ -39,6 +58,8 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
       console.error('No failed recipients in failed-emails.csv.');
       return 1;
     }
+    console.log(`Retry mode: ${recipients.length} recipient(s) from failed-emails.csv`);
+    console.log('');
   } else {
     const fetched = await fetchEligibleRecipients();
     recipients = fetched.recipients;
@@ -53,13 +74,6 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
   if (recipients.length === 0) {
     console.error('No eligible recipients found (email present, credits_remaining = 3).');
     return 1;
-  }
-
-  const appUrl = getCampaignAppBaseUrl();
-  if (options.retryFailed) {
-    console.log(`Retry mode: ${recipients.length} recipient(s) from failed-emails.csv`);
-    console.log(`CTA links: ${appUrl}/dashboard`);
-    console.log('');
   }
 
   if (options.preview) {
@@ -77,20 +91,12 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
         recipients,
         { dryRun: true, preview: false, retryFailed: options.retryFailed },
         (result, index, total) => {
-        appendCampaignLogEntry(logPath, result);
-        printSendProgress(result, index, total);
-      });
-
-      printFinalReport(
-        buildSummary(
-          results.length,
-          0,
-          0,
-          results.length,
-          Date.now() - startedAt,
-        ),
-        true,
+          appendCampaignLogEntry(logPath, result);
+          printSendProgress(result, index, total);
+        },
       );
+
+      printFinalReport(buildSummary(results, Date.now() - startedAt), true);
       console.log(`Log file: ${logPath}`);
     }
 
@@ -101,19 +107,21 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
 
   if (!options.dryRun) {
     requireEnvKeys();
+
     console.log(`From: ${PRODUCT_UPDATE_FROM}`);
     console.log(`Reply-To: ${PRODUCT_UPDATE_REPLY_TO}`);
-    console.log(`Links: ${appUrl}/dashboard`);
+    console.log(`Subject: ${PRODUCT_UPDATE_SUBJECT}`);
     console.log('');
+
+    await runPreflightChecks(recipients[0]);
+
     const confirmed = await confirmCampaignSend(recipients.length);
     if (!confirmed) {
       console.log('Campaign cancelled.');
       return 0;
     }
-    console.log('');
-    console.log('Verifying Resend API key…');
-    await verifyResendApiKey();
-    console.log('✓ Resend API key OK');
+
+    console.log('Starting Campaign...');
     console.log('');
   } else {
     const previewPath = writePreviewHtml(recipients[0]);
@@ -124,27 +132,12 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
   const logPath = getCampaignLogPath();
   writeCampaignLogHeader(logPath, recipients.length, options.dryRun);
 
-  let success = 0;
-  let failed = 0;
-  let dryRun = 0;
+  const results = await sendCampaignBatches(recipients, options, (result, index, total) => {
+    appendCampaignLogEntry(logPath, result);
+    printSendProgress(result, index, total);
+  });
 
-  const results = await sendCampaignBatches(
-    recipients,
-    options,
-    (result, index, total) => {
-      appendCampaignLogEntry(logPath, result);
-      printSendProgress(result, index, total);
-
-      if (result.status === 'success') success += 1;
-      else if (result.status === 'failed') failed += 1;
-      else dryRun += 1;
-    },
-  );
-
-  printFinalReport(
-    buildSummary(results.length, success, failed, dryRun, Date.now() - startedAt),
-    options.dryRun,
-  );
+  printFinalReport(buildSummary(results, Date.now() - startedAt), options.dryRun);
 
   console.log('');
   console.log(`Log file: ${logPath}`);
@@ -156,7 +149,7 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
     }
   }
 
-  return failed > 0 ? 1 : 0;
+  return results.some((r) => r.status === 'failed') ? 1 : 0;
 }
 
 function requireEnvKeys(): void {

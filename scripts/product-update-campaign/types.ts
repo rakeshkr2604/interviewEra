@@ -11,11 +11,14 @@ export interface CampaignSendResult {
   status: 'success' | 'failed' | 'dry-run';
   messageId?: string;
   error?: string;
+  retried?: boolean;
+  retryAttempts?: number;
 }
 
 export interface CampaignSummary {
   total: number;
   success: number;
+  retriedSuccess: number;
   failed: number;
   dryRun: number;
   durationMs: number;

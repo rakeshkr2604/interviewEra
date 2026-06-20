@@ -1,17 +1,19 @@
 /**
- * One-time InterviewEra product update email campaign.
+ * One-time InterviewEra product update email campaign (final production run).
  *
  * Usage:
- *   npm run send-product-update                 # live send (confirmation required)
+ *   npm run send-product-update                 # live send to all 55 eligible users
  *   npm run send-product-update -- --dry-run    # simulate sends + preview HTML
  *   npm run send-product-update -- --preview    # render preview only (first recipient)
- *   npm run send-product-update -- --dry-run --preview
+ *   npm run send-product-update -- --retry-failed  # legacy: failed-emails.csv only
  *
- * Requires `.env.local` with Supabase + Resend keys. Does not modify the database.
+ * Preflight validates Resend, domain, production URLs, and zero localhost in HTML.
  *
- * Optional sender overrides (defaults match official InterviewEra addresses):
- *   PRODUCT_UPDATE_FROM=InterviewEra <hello@interviewera.com>
+ * Env (see .env.example):
+ *   PRODUCT_UPDATE_APP_URL=https://interviewera.com
+ *   PRODUCT_UPDATE_FROM=Rakesh Kumar, Founder, InterviewEra <founder@interviewera.com>
  *   PRODUCT_UPDATE_REPLY_TO=founder@interviewera.com
+ *   PRODUCT_UPDATE_SUBJECT=InterviewEra just got better — your account has been updated
  */
 import { loadCampaignEnv } from './product-update-campaign/env';
 import { runProductUpdateCampaign } from './product-update-campaign/run';
@@ -31,9 +33,9 @@ async function main(): Promise<void> {
   const options = parseOptions(process.argv.slice(2));
 
   if (!options.dryRun && !options.preview && !options.retryFailed) {
-    console.log('Live campaign mode. Use --dry-run to simulate without sending.');
-    console.log('Use --preview to write logs/product-update-preview.html.');
-    console.log('Use --retry-failed to resend failed-emails.csv only.');
+    console.log('Final production campaign — resends to ALL eligible users (credits_remaining = 3).');
+    console.log('Preflight checks run automatically before send.');
+    console.log('Use --dry-run or --preview to validate without sending.');
     console.log('');
   }
 

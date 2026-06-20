@@ -46,7 +46,7 @@ export class TemplateRegistry {
     });
     this.register('product_update', {
       name: 'product_update',
-      subject: 'InterviewEra product update — your interview credits have been updated',
+      subject: 'InterviewEra just got better — your account has been updated',
       component: ProductUpdateEmail as React.ComponentType,
     });
   }

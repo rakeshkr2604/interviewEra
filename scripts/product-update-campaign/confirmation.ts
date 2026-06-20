@@ -9,7 +9,8 @@ export async function confirmCampaignSend(recipientCount: number): Promise<boole
   console.log('');
   console.log(`Recipients: ${recipientCount}`);
   console.log('');
-  console.log('Emails will be sent using Resend.');
+  console.log('Resending corrected email to ALL eligible users.');
+  console.log('Previous sends are not skipped.');
   console.log('');
   console.log('Continue?');
   console.log('(y/N)');

@@ -8,13 +8,21 @@ export interface SendProductUpdateResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  /** Number of send attempts after the first failure (0 = succeeded on first try). */
+  retryAttempts?: number;
 }
 
-const MAX_ATTEMPTS = 4;
-const RETRYABLE = /too many requests|rate limit|429/i;
+const MAX_ATTEMPTS = 6;
+const RETRY_BACKOFF_MS = [2000, 4000, 8000, 8000, 8000];
+const RETRYABLE =
+  /too many requests|rate limit|429|timeout|timed out|network|fetch failed|econnreset|enotfound|unable to fetch|temporary/i;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isRetryable(error: string): boolean {
+  return RETRYABLE.test(error);
 }
 
 export async function sendProductUpdateEmail(
@@ -23,6 +31,7 @@ export async function sendProductUpdateEmail(
 ): Promise<SendProductUpdateResult> {
   const resend = new Resend(requireEnv('RESEND_API_KEY'));
   let lastError = 'Send failed';
+  let retryAttempts = 0;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
     try {
@@ -36,23 +45,25 @@ export async function sendProductUpdateEmail(
 
       if (response.error) {
         lastError = response.error.message || JSON.stringify(response.error);
-        if (RETRYABLE.test(lastError) && attempt < MAX_ATTEMPTS) {
-          await sleep(1500 * attempt);
+        if (isRetryable(lastError) && attempt < MAX_ATTEMPTS) {
+          retryAttempts += 1;
+          await sleep(RETRY_BACKOFF_MS[Math.min(retryAttempts - 1, RETRY_BACKOFF_MS.length - 1)]);
           continue;
         }
-        return { success: false, error: lastError };
+        return { success: false, error: lastError, retryAttempts };
       }
 
-      return { success: true, messageId: response.data?.id };
+      return { success: true, messageId: response.data?.id, retryAttempts };
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
-      if (RETRYABLE.test(lastError) && attempt < MAX_ATTEMPTS) {
-        await sleep(1500 * attempt);
+      if (isRetryable(lastError) && attempt < MAX_ATTEMPTS) {
+        retryAttempts += 1;
+        await sleep(RETRY_BACKOFF_MS[Math.min(retryAttempts - 1, RETRY_BACKOFF_MS.length - 1)]);
         continue;
       }
-      return { success: false, error: lastError };
+      return { success: false, error: lastError, retryAttempts };
     }
   }
 
-  return { success: false, error: lastError };
+  return { success: false, error: lastError, retryAttempts };
 }
