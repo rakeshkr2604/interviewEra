@@ -1,0 +1,82 @@
+import { NextResponse, type NextRequest } from 'next/server';
+import { z } from 'zod';
+import { createServiceClient } from '@/lib/supabase/server';
+import { sendSignupVerificationEmail } from '@/lib/email/lifecycle/send-verification';
+import { checkRateLimit } from '@/lib/redis/rate-limit';
+
+const bodySchema = z.object({
+  email: z.string().trim().email('Enter a valid email address.'),
+});
+
+const GENERIC_SUCCESS =
+  'If your account needs verification, we sent a new confirmation email. Check your inbox and spam folder.';
+
+function clientIp(request: NextRequest): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip')?.trim() ??
+    'unknown'
+  );
+}
+
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  let raw: unknown;
+  try {
+    raw = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid request.' }, { status: 400 });
+  }
+
+  const parsed = bodySchema.safeParse(raw);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? 'Invalid email.' },
+      { status: 400 },
+    );
+  }
+
+  const ip = clientIp(request);
+  const email = parsed.data.email.trim().toLowerCase();
+
+  const rlIp = await checkRateLimit(`resend-verification:${ip}`, 3600, 5);
+  const rlEmail = await checkRateLimit(`resend-verification:${email}`, 3600, 3);
+  if (!rlIp.allowed || !rlEmail.allowed) {
+    return NextResponse.json(
+      {
+        error: 'Too many requests. Please wait before requesting another email.',
+        code: 'RATE_LIMITED',
+      },
+      { status: 429 },
+    );
+  }
+
+  if (!process.env.RESEND_API_KEY?.trim()) {
+    return NextResponse.json(
+      { error: 'Email service is temporarily unavailable.' },
+      { status: 503 },
+    );
+  }
+
+  try {
+    const service = createServiceClient();
+    const { data: linkData } = await service.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+    });
+
+    const user = linkData?.user;
+    if (!user || user.email_confirmed_at) {
+      return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
+    }
+
+    const name =
+      typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : undefined;
+
+    await sendSignupVerificationEmail(email, { name });
+
+    return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
+  } catch (err) {
+    console.error('[auth/resend-verification] error', err);
+    return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
+  }
+}

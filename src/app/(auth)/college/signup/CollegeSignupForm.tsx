@@ -1,9 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
 
 export function CollegeSignupForm() {
   const [collegeName, setCollegeName] = useState('');
@@ -14,7 +12,6 @@ export function CollegeSignupForm() {
   const [password, setPassword] = useState('');
   const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const inputStyle = {
     border: '1.5px solid var(--card-border)',
@@ -53,25 +50,30 @@ export function CollegeSignupForm() {
         return;
       }
 
-      const supabase = createClient();
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name: officerName,
-            role: 'college_admin',
-          },
-        },
+      const signupResponse = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          name: officerName,
+          next: '/college/dashboard',
+          metadata: { role: 'college_admin' },
+        }),
       });
 
-      if (signUpError) {
-        setFeedback({ kind: 'error', text: signUpError.message });
+      const signupBody = (await signupResponse.json()) as {
+        error?: string;
+        userId?: string;
+        message?: string;
+      };
+
+      if (!signupResponse.ok) {
+        setFeedback({ kind: 'error', text: signupBody.error ?? 'Signup failed.' });
         return;
       }
 
-      if (!data.user) {
+      if (!signupBody.userId) {
         setFeedback({ kind: 'error', text: 'Account creation failed.' });
         return;
       }
@@ -80,7 +82,7 @@ export function CollegeSignupForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: data.user.id,
+          userId: signupBody.userId,
           collegeName,
           studentCount: parseInt(studentCount),
         }),
@@ -94,12 +96,10 @@ export function CollegeSignupForm() {
 
       setFeedback({
         kind: 'success',
-        text: 'Account created! Redirecting to your dashboard...',
+        text:
+          signupBody.message ??
+          'Account created! Check your email to verify before signing in.',
       });
-
-      setTimeout(() => {
-        router.push('/college/dashboard');
-      }, 1500);
     } catch (err) {
       setFeedback({
         kind: 'error',

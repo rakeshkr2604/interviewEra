@@ -22,7 +22,7 @@ export async function sendCampaignBatches(
   for (let i = 0; i < recipients.length; i += 1) {
     const recipient = recipients[i];
     const displayName = getDisplayName(recipient.name, recipient.email);
-    const rendered = renderProductUpdateEmail(recipient, urls);
+    const rendered = await renderProductUpdateEmail(recipient, urls);
 
     let result: CampaignSendResult;
 

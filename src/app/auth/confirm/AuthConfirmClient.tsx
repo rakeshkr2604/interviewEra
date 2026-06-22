@@ -65,13 +65,30 @@ export function AuthConfirmClient() {
       if (error) {
         const code = error.message.toLowerCase();
         setPhase('error');
+        const isSignupFlow = rawType === 'signup' || rawType === 'magiclink';
         if (code.includes('expired') || code.includes('invalid')) {
-          setMessage('This reset link has expired or was already used. Request a new one.');
+          setMessage(
+            isSignupFlow
+              ? 'This verification link has expired or was already used. Request a new confirmation email.'
+              : 'This reset link has expired or was already used. Request a new one.',
+          );
         } else {
-          setMessage('We could not verify this link. Please request a new password reset email.');
+          setMessage(
+            isSignupFlow
+              ? 'We could not verify this link. Please request a new confirmation email.'
+              : 'We could not verify this link. Please request a new password reset email.',
+          );
         }
         console.error('[auth/confirm] verifyOtp failed', error);
         return;
+      }
+
+      if (rawType === 'signup' || rawType === 'magiclink') {
+        try {
+          await fetch('/api/email/welcome', { method: 'POST', credentials: 'same-origin' });
+        } catch (err) {
+          console.error('[auth/confirm] welcome email trigger failed', err);
+        }
       }
 
       setPhase('success');

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { renderToStaticMarkup } from 'react-dom/server';
+import { render as renderEmail } from '@react-email/render';
 
 // Import templates
 import WelcomeEmail from '../../../emails/WelcomeEmail';
@@ -59,15 +59,14 @@ export class TemplateRegistry {
     return this.registry.get(name);
   }
 
-  render(name: string, props: Record<string, unknown>): { html: string; subject: string } {
+  async render(name: string, props: Record<string, unknown>): Promise<{ html: string; subject: string }> {
     const definition = this.get(name);
     if (!definition) {
       throw new Error(`Template '${name}' is not registered`);
     }
 
     const element = React.createElement(definition.component as React.ComponentType<Record<string, unknown>>, props);
-    // Include doctype wrapper standard for emails
-    const html = '<!DOCTYPE html>' + renderToStaticMarkup(element);
+    const html = `<!DOCTYPE html>${await renderEmail(element)}`;
     const subject = typeof definition.subject === 'function'
       ? definition.subject(props)
       : definition.subject;

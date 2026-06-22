@@ -6,22 +6,22 @@ import { getDisplayName } from './recipients';
 import { assertNoLocalhostInHtml, buildCampaignUrls, printCampaignUrls } from './url-validation';
 import type { CampaignRecipient } from './types';
 
-export function writePreviewHtml(recipient: CampaignRecipient): string {
+export async function writePreviewHtml(recipient: CampaignRecipient): Promise<string> {
   const logsDir = path.join(getProjectRoot(), 'logs');
   fs.mkdirSync(logsDir, { recursive: true });
 
   const filePath = path.join(logsDir, 'product-update-preview.html');
   const urls = buildCampaignUrls();
-  const rendered = renderProductUpdateEmail(recipient, urls);
+  const rendered = await renderProductUpdateEmail(recipient, urls);
   assertNoLocalhostInHtml(rendered.html);
   fs.writeFileSync(filePath, rendered.html, 'utf8');
 
   return filePath;
 }
 
-export function printPreviewSummary(recipient: CampaignRecipient, filePath: string): void {
+export async function printPreviewSummary(recipient: CampaignRecipient, filePath: string): Promise<void> {
   const urls = buildCampaignUrls();
-  const rendered = renderProductUpdateEmail(recipient, urls);
+  const rendered = await renderProductUpdateEmail(recipient, urls);
   const displayName = getDisplayName(recipient.name, recipient.email);
 
   console.log('Preview generated');

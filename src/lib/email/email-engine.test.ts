@@ -53,9 +53,9 @@ describe('Email Automation Engine Unit Tests', () => {
   });
 
   describe('Template Registry Renders', () => {
-    it('should lookup and render template markup with props', () => {
-      const result = templateRegistry.render('welcome', {
-        candidateName: 'Rakesh',
+    it('should lookup and render template markup with props', async () => {
+      const result = await templateRegistry.render('welcome', {
+        name: 'Rakesh',
       });
       
       expect(result.html).toContain('<!DOCTYPE html>');

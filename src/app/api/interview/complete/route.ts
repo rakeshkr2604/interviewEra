@@ -13,6 +13,7 @@ import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge
 import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete';
 import type { UserProgressRow } from '@/lib/retention/types';
 import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity';
+import { sendInterviewCompletedEmail } from '@/lib/email/lifecycle/send-interview-completed';
 
 type RetentionResponsePayload = InterviewCompleteRetentionPayload;
 
@@ -306,7 +307,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    const { reportId } = await aggregateReport(interviewId, user.id);
+    const { reportId, overallScore, radarData } = await aggregateReport(interviewId, user.id);
+
+    if (user.email) {
+      void sendInterviewCompletedEmail({
+        interviewId,
+        userId: user.id,
+        reportId,
+        overallScore,
+        radarData,
+        recipientEmail: user.email,
+      }).catch((emailErr) => {
+        console.error('[interview/complete] interview completed email failed:', emailErr);
+      });
+    }
 
     let retentionPayload: RetentionResponsePayload | null = null;
     try {

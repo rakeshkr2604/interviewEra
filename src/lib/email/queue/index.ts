@@ -48,7 +48,7 @@ export class EmailQueueWorker {
 
       try {
         // Render template content
-        const { html: rawHtml, subject } = templateRegistry.render(
+        const { html: rawHtml, subject } = await templateRegistry.render(
           job.template_name,
           job.payload
         );

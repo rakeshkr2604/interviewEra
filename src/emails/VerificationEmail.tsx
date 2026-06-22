@@ -10,7 +10,7 @@ interface VerificationEmailProps {
 
 export default function VerificationEmail({
   name = 'there',
-  verificationUrl = 'https://interviewera.com/auth/verify',
+  verificationUrl = 'https://interviewera.com/auth/confirm?type=signup',
 }: VerificationEmailProps) {
   return (
     <EmailLayout
@@ -53,7 +53,7 @@ export default function VerificationEmail({
         margin: '24px 0 0 0',
         textAlign: 'center',
       }} className="text-secondary">
-        This link expires in <strong>24 hours</strong>. If you did not sign up for an account, you can safely ignore this email.
+        This link expires in <strong>1 hour</strong>. If you did not sign up for an account, you can safely ignore this email.
       </p>
 
       {/* Fallback URL */}

@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Check, ChevronDown } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
 import { cn } from '@/lib/utils';
@@ -87,7 +85,6 @@ export function SignupForm({ next }: SignupFormProps) {
   const [placementYear, setPlacementYear] = useState('');
   const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const passwordChecks = PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) }));
   const passwordValid = passwordChecks.every((c) => c.met);
@@ -124,41 +121,46 @@ export function SignupForm({ next }: SignupFormProps) {
         return;
       }
 
-      const supabase = createClient();
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name: safeName } },
+      const signupResponse = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          name: safeName,
+          next: next ?? '/dashboard',
+          ...(placementMonth && placementYear
+            ? {
+                placementDate: `${placementYear}-${(MONTHS.indexOf(placementMonth as (typeof MONTHS)[number]) + 1).toString().padStart(2, '0')}-01`,
+              }
+            : {}),
+        }),
       });
 
-      if (signUpError) {
-        setFeedback({ kind: 'error', text: signUpError.message });
+      const signupBody = (await signupResponse.json()) as {
+        error?: string;
+        userId?: string;
+        needsVerification?: boolean;
+        message?: string;
+      };
+
+      if (!signupResponse.ok) {
+        setFeedback({ kind: 'error', text: signupBody.error ?? 'Signup failed.' });
         return;
       }
 
-      if (data.session && data.user && placementMonth && placementYear) {
-        const monthIndex = MONTHS.indexOf(placementMonth as (typeof MONTHS)[number]) + 1;
-        const dateStr = `${placementYear}-${monthIndex.toString().padStart(2, '0')}-01`;
-        await supabase.from('users').update({ placement_date: dateStr }).eq('id', data.user.id);
-      }
-
-      if (data.user) {
+      if (signupBody.userId) {
         trackFunnelEvent('signup_completed', {
-          userId: data.user.id,
+          userId: signupBody.userId,
           source: 'email',
-          method: data.session ? 'email' : 'email_confirm_pending',
+          method: 'email_confirm_pending',
         });
       }
 
-      if (data.session) {
-        router.push(next ?? '/dashboard');
-      } else {
-        setFeedback({
-          kind: 'success',
-          text: 'Account created! Check your email to confirm before signing in.',
-        });
-      }
+      setFeedback({
+        kind: 'success',
+        text: signupBody.message ?? 'Account created! Check your email to confirm before signing in.',
+      });
     } catch {
       setFeedback({ kind: 'error', text: 'An unexpected error occurred. Please try again.' });
     } finally {

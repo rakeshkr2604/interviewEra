@@ -56,11 +56,11 @@ async function verifyDomainVerified(): Promise<void> {
   }
 }
 
-function verifyEmailTemplate(sampleRecipient: CampaignRecipient): void {
+async function verifyEmailTemplate(sampleRecipient: CampaignRecipient): Promise<void> {
   const urls = buildCampaignUrls();
   assertProductionUrls(urls);
 
-  const rendered = renderProductUpdateEmail(sampleRecipient, urls);
+  const rendered = await renderProductUpdateEmail(sampleRecipient, urls);
   assertNoLocalhostInHtml(rendered.html);
 
   if (!rendered.html.includes('<!DOCTYPE html>') && !rendered.html.includes('<html')) {
@@ -102,7 +102,7 @@ export async function runPreflightChecks(sampleRecipient: CampaignRecipient): Pr
     assertProductionUrls(urls);
     result.productionUrlsVerified = true;
 
-    verifyEmailTemplate(sampleRecipient);
+    await verifyEmailTemplate(sampleRecipient);
     result.emailTemplateOk = true;
   } catch (err) {
     printPreflightChecks(result);

@@ -5,6 +5,7 @@ import {
   parseAttributionFromSearchParams,
 } from '@/lib/analytics/attribution';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
+import { sendWelcomeEmailIfNeeded } from '@/lib/email/lifecycle/send-welcome';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -35,6 +36,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           { userId, source: 'oauth', method: 'oauth' },
           { ga4: false, attribution },
         );
+
+        if (userId) {
+          void sendWelcomeEmailIfNeeded(userId).catch((err) => {
+            console.error('[auth/callback] welcome email failed:', err);
+          });
+        }
       }
 
       const redirectUrl = new URL(next, origin);

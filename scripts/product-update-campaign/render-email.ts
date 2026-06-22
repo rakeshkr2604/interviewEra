@@ -11,13 +11,13 @@ export interface RenderedProductUpdateEmail {
   urls: CampaignUrls;
 }
 
-export function renderProductUpdateEmail(
+export async function renderProductUpdateEmail(
   recipient: CampaignRecipient,
   urls: CampaignUrls = buildCampaignUrls(),
-): RenderedProductUpdateEmail {
+): Promise<RenderedProductUpdateEmail> {
   const firstName = extractFirstName(recipient.name);
 
-  const { html } = templateRegistry.render('product_update', {
+  const { html } = await templateRegistry.render('product_update', {
     name: firstName,
     creditsAdded: 3,
     dashboardUrl: urls.secondaryCta,

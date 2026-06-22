@@ -79,8 +79,8 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
   if (options.preview) {
     printCampaignHeader(recipients.length, 'preview');
     const sample = recipients[0];
-    const previewPath = writePreviewHtml(sample);
-    printPreviewSummary(sample, previewPath);
+    const previewPath = await writePreviewHtml(sample);
+    await printPreviewSummary(sample, previewPath);
 
     if (options.dryRun) {
       printCampaignHeader(recipients.length, 'dry-run');
@@ -124,8 +124,8 @@ export async function runProductUpdateCampaign(options: CampaignOptions): Promis
     console.log('Starting Campaign...');
     console.log('');
   } else {
-    const previewPath = writePreviewHtml(recipients[0]);
-    printPreviewSummary(recipients[0], previewPath);
+    const previewPath = await writePreviewHtml(recipients[0]);
+    await printPreviewSummary(recipients[0], previewPath);
     console.log('');
   }
 
