@@ -7,9 +7,11 @@ export function hasQuestionInsightContent(question: SeoQuestion): boolean {
   return Boolean(
     question.expertAnswer ||
       question.tip ||
+      question.whyAsked ||
       question.evaluates ||
       question.strategy ||
       question.mistakes ||
+      question.answerTime ||
       (question.followUps && question.followUps.length > 0),
   )
 }
@@ -18,9 +20,11 @@ export function QuestionInsight({ question }: { question: SeoQuestion }) {
   const expertAnswer = question.expertAnswer ?? question.tip
   const hasBody =
     expertAnswer ||
+    question.whyAsked ||
     question.evaluates ||
     question.strategy ||
     question.mistakes ||
+    question.answerTime ||
     (question.followUps && question.followUps.length > 0)
 
   if (!hasBody) return null
@@ -37,6 +41,22 @@ export function QuestionInsight({ question }: { question: SeoQuestion }) {
         className="ie-question-insight__body mt-2 space-y-2 border-l-2 pl-3 text-sm leading-relaxed"
         style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))' }}
       >
+        {question.answerTime ? (
+          <p className="m-0 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <span className="font-semibold" style={sectionLabelStyle}>
+              Suggested answer time:{' '}
+            </span>
+            {question.answerTime}
+          </p>
+        ) : null}
+        {question.whyAsked ? (
+          <p className="m-0" style={bodyStyle}>
+            <span className="font-semibold" style={sectionLabelStyle}>
+              Why interviewers ask this:{' '}
+            </span>
+            {question.whyAsked}
+          </p>
+        ) : null}
         {expertAnswer ? (
           <p className="m-0" style={bodyStyle}>
             <span className="font-semibold" style={sectionLabelStyle}>

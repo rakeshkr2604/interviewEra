@@ -161,8 +161,12 @@ export interface SeoQuestion {
   readonly tip?: string
   /** Model answer for hub pages (50–120 words). Preferred over `tip` in expanded cards and FAQ schema. */
   readonly expertAnswer?: string
+  /** Why the panel asks this question (hub pages with expanded answers). */
+  readonly whyAsked?: string
   /** What the interviewer is grading (hub pages with expanded answers). */
   readonly evaluates?: string
+  /** Suggested time to answer aloud in a live interview (e.g. "2–3 min"). */
+  readonly answerTime?: string
   /** How to structure a strong answer. */
   readonly strategy?: string
   /** Common mistakes that weaken the response. */

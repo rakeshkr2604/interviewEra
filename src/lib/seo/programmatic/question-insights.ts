@@ -2,7 +2,7 @@ import type { SeoQuestion } from './types'
 
 type InsightExtension = Pick<
   SeoQuestion,
-  'expertAnswer' | 'evaluates' | 'strategy' | 'mistakes' | 'followUps'
+  'expertAnswer' | 'whyAsked' | 'evaluates' | 'strategy' | 'mistakes' | 'followUps'
 >
 
 const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
@@ -623,6 +623,95 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
       'Saying “CEO in five years,” vague ambitions, or a plan that implies leaving TCS immediately after skilling up.',
     followUps: ['Which certification path interests you first?', 'How do you plan to grow in your first year on ILP?'],
   },
+  'Write a SQL query to find the second-highest salary from an Employee table.': {
+    expertAnswer:
+      'Approach 1 (subquery): SELECT MAX(salary) AS second_highest FROM Employee WHERE salary < (SELECT MAX(salary) FROM Employee). Approach 2 (window): SELECT salary FROM (SELECT salary, DENSE_RANK() OVER (ORDER BY salary DESC) AS rnk FROM Employee) t WHERE rnk = 2. Mention tie-handling: DENSE_RANK returns all rows tied at second place; LIMIT 1 alone may drop valid ties.',
+    whyAsked:
+      'Ranking queries are the most common live SQL task in Wipro DA panels — they test subquery thinking, dialect awareness, and edge-case discussion under time pressure.',
+    evaluates:
+      'Subquery vs window-function fluency, duplicate-salary handling, and whether you narrate logic before typing.',
+    strategy:
+      'State two valid approaches, write one cleanly, then discuss ties and NULL salaries before the panel asks.',
+    mistakes:
+      'Using LIMIT/OFFSET without naming SQL dialect, forgetting NULLs, or unable to explain why the subquery works.',
+    followUps: ['Find the Nth highest salary', 'What if all salaries are identical?'],
+  },
+  'Use a window function to rank employees by salary within each department.': {
+    expertAnswer:
+      'SELECT employee_id, department, salary, DENSE_RANK() OVER (PARTITION BY department ORDER BY salary DESC) AS dept_salary_rank FROM Employee ORDER BY department, dept_salary_rank. Filter top 3 per department with QUALIFY (BigQuery/Snowflake) or a CTE: WHERE dept_salary_rank <= 3.',
+    evaluates:
+      'PARTITION BY correctness, function choice (RANK vs DENSE_RANK vs ROW_NUMBER), and ability to filter ranked results.',
+    strategy:
+      'Explain PARTITION BY department first, pick DENSE_RANK for tie-friendly ranking, show optional top-N filter.',
+    mistakes:
+      'Using GROUP BY instead of window functions, or picking RANK without explaining gap behavior after ties.',
+    followUps: ['RANK vs ROW_NUMBER for unique ranks?', 'Running total by department with SUM() OVER?'],
+  },
+  'What is the Software Testing Life Cycle (STLC)? List and explain each phase.': {
+    expertAnswer:
+      'STLC phases: Requirement Analysis (understand scope and testability), Test Planning (strategy, resources, schedule, entry/exit criteria), Test Case Design (scripts, data, traceability), Environment Setup, Test Execution (run cases, log defects), Test Closure (metrics, sign-off, lessons learned). QA involvement starts at requirements — defects found late cost far more to fix.',
+    whyAsked:
+      'STLC opens most Wipro QA technical rounds — panels expect phase-by-phase clarity with real examples, not a memorized bullet list.',
+    evaluates:
+      'Testing process maturity, phase ownership, and whether you connect STLC to release risk.',
+    strategy:
+      'Walk phases in order, name QA deliverables per phase, and cite one project example for planning or closure.',
+    mistakes:
+      'Skipping requirement analysis, conflating STLC with SDLC, or listing phases without deliverables.',
+    followUps: ['What are entry and exit criteria for test execution?', 'How do you handle scope creep in test planning?'],
+  },
+  'What is Selenium WebDriver? What are its key limitations?': {
+    expertAnswer:
+      'Selenium WebDriver drives browsers via the W3C WebDriver protocol — simulating real user interactions. Limitations: timing flakiness (mitigate with explicit waits, never Thread.sleep), no built-in test runner or reporting, slower than API or component tests, and maintenance overhead on dynamic UIs. Playwright improves auto-waiting and debugging but Selenium remains common in Wipro legacy suites.',
+    whyAsked:
+      'Selenium is the default automation stack in many Wipro client accounts — panels probe practical depth beyond tool name-dropping.',
+    evaluates:
+      'Automation fundamentals, flakiness awareness, and tool trade-off judgment.',
+    strategy:
+      'Define WebDriver first, list 2–3 limitations with fixes, mention explicit waits and when you would choose Playwright.',
+    mistakes:
+      'Claiming Selenium has no limitations, recommending Thread.sleep, or unable to name locator strategies.',
+    followUps: ['Explicit vs implicit waits?', 'How would you structure a Page Object Model?'],
+  },
+  'How do you test a REST API? What aspects do you check and what tools do you use?': {
+    expertAnswer:
+      'I validate status codes (200, 201, 400, 401, 403, 404, 500), response schema and required fields, boundary and negative payloads, auth headers and token expiry, idempotency for PUT/DELETE, and performance under expected load. Tools: Postman for exploration and collections, REST Assured or pytest for automated suites, and optional contract tests. I log defects with request/response snippets for reproducibility.',
+    whyAsked:
+      'Wipro client projects increasingly pair UI and API validation — API depth differentiates fresher QA candidates.',
+    evaluates:
+      'API test design, status-code literacy, negative-case thinking, and tool familiarity.',
+    strategy:
+      'Structure answer as aspects checked → tools → one concrete defect example from a Postman collection.',
+    mistakes:
+      'Only checking happy-path 200 responses, ignoring auth errors, or naming tools without test scenarios.',
+    followUps: ['How do you test pagination APIs?', 'What is contract testing vs integration testing?'],
+  },
+  'What is the difference between INNER JOIN and LEFT JOIN?': {
+    expertAnswer:
+      'INNER JOIN returns only rows where the join condition matches in both tables. LEFT JOIN returns all rows from the left table; non-matching right columns are NULL. Example: all customers LEFT JOIN orders shows customers with zero orders as NULL order fields — useful for gap analysis.',
+    whyAsked:
+      'SQL JOIN fluency is a top filter in Wipro SWE panels — service-company projects are database-heavy and weak SQL eliminates strong coders.',
+    evaluates:
+      'Relational query understanding, NULL semantics, and when to preserve non-matching rows.',
+    strategy:
+      'Define both, draw mental Venn diagram, give one business example (customers without orders).',
+    mistakes:
+      'Confusing LEFT with RIGHT JOIN, or unable to explain NULL behavior for non-matches.',
+    followUps: ['RIGHT JOIN vs LEFT JOIN?', 'INNER JOIN with WHERE vs ON clause?'],
+  },
+  'Given an array of integers, how would you find two numbers that sum to a target?': {
+    expertAnswer:
+      'Optimal: one pass with a hash map storing value → index. For each x, check if (target - x) exists; if yes return indices. O(n) time, O(n) space. For sorted arrays, two-pointer approach also works in O(n). Always state approach and complexity before coding.',
+    whyAsked:
+      'Two-sum is the most common live coding pattern in Wipro NLTH and technical rounds — tests hash map thinking under time pressure.',
+    evaluates:
+      'Algorithm optimization, edge-case handling, and narrated problem-solving.',
+    strategy:
+      'Start with brute force O(n²), optimize to hash map O(n), mention duplicate and negative number handling.',
+    mistakes:
+      'Silent coding, wrong index on duplicates, or no complexity analysis.',
+    followUps: ['Three-sum extension?', 'What if array is sorted?'],
+  },
 }
 
 export function mergeQuestionInsights(question: SeoQuestion): SeoQuestion {
@@ -631,6 +720,7 @@ export function mergeQuestionInsights(question: SeoQuestion): SeoQuestion {
   return {
     ...question,
     expertAnswer: ext.expertAnswer ?? question.expertAnswer,
+    whyAsked: ext.whyAsked ?? question.whyAsked,
     evaluates: ext.evaluates ?? question.evaluates,
     strategy: ext.strategy ?? question.strategy,
     mistakes: ext.mistakes ?? question.mistakes,

@@ -13,6 +13,10 @@ import { MicrosoftSeHubArticle } from '@/components/programmatic/MicrosoftSeHubA
 import { InfosysJavaHubArticle } from '@/components/programmatic/InfosysJavaHubArticle'
 import { InfosysSeHubArticle } from '@/components/programmatic/InfosysSeHubArticle'
 import { FreshworksFeHubArticle } from '@/components/programmatic/FreshworksFeHubArticle'
+import { WiproDaHubArticle } from '@/components/programmatic/WiproDaHubArticle'
+import { WiproQaHubArticle } from '@/components/programmatic/WiproQaHubArticle'
+import { WiproSweHubArticle } from '@/components/programmatic/WiproSweHubArticle'
+import { WiproJavaHubArticle } from '@/components/programmatic/WiproJavaHubArticle'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
 import {
   getCompanyBySlug,
@@ -128,6 +132,90 @@ import {
   FRESHWORKS_FE_QUESTIONS,
   isFreshworksFrontendDeveloperHub,
 } from '@/lib/seo/programmatic/freshworks-fe-hub'
+import {
+  WIPRO_DA_FAQ_ITEMS,
+  WIPRO_DA_HERO_ALT,
+  WIPRO_DA_HERO_HEIGHT,
+  WIPRO_DA_HERO_PATH,
+  WIPRO_DA_HERO_WIDTH,
+  WIPRO_DA_META_TITLE,
+  WIPRO_DA_DESCRIPTION,
+  WIPRO_DA_CANONICAL_PATH,
+  WIPRO_DA_LAST_UPDATED,
+  WIPRO_DA_PUBLISHED_DATE,
+  WIPRO_DA_AUTHOR_NAME,
+  WIPRO_DA_REVIEWED_DATE,
+  WIPRO_DA_REVIEWER_NAME,
+  WIPRO_DA_PROCESS_ALT,
+  WIPRO_DA_PROCESS_HEIGHT,
+  WIPRO_DA_PROCESS_PATH,
+  WIPRO_DA_PROCESS_WIDTH,
+  WIPRO_DA_QUESTIONS,
+  isWiproDataAnalystHub,
+} from '@/lib/seo/programmatic/wipro-da-hub'
+import {
+  WIPRO_QA_FAQ_ITEMS,
+  WIPRO_QA_HERO_ALT,
+  WIPRO_QA_HERO_HEIGHT,
+  WIPRO_QA_HERO_PATH,
+  WIPRO_QA_HERO_WIDTH,
+  WIPRO_QA_META_TITLE,
+  WIPRO_QA_DESCRIPTION,
+  WIPRO_QA_CANONICAL_PATH,
+  WIPRO_QA_LAST_UPDATED,
+  WIPRO_QA_PUBLISHED_DATE,
+  WIPRO_QA_AUTHOR_NAME,
+  WIPRO_QA_REVIEWED_DATE,
+  WIPRO_QA_REVIEWER_NAME,
+  WIPRO_QA_PROCESS_ALT,
+  WIPRO_QA_PROCESS_HEIGHT,
+  WIPRO_QA_PROCESS_PATH,
+  WIPRO_QA_PROCESS_WIDTH,
+  WIPRO_QA_QUESTIONS,
+  isWiproQaEngineerHub,
+} from '@/lib/seo/programmatic/wipro-qa-hub'
+import {
+  WIPRO_SWE_FAQ_ITEMS,
+  WIPRO_SWE_HERO_ALT,
+  WIPRO_SWE_HERO_HEIGHT,
+  WIPRO_SWE_HERO_PATH,
+  WIPRO_SWE_HERO_WIDTH,
+  WIPRO_SWE_META_TITLE,
+  WIPRO_SWE_DESCRIPTION,
+  WIPRO_SWE_CANONICAL_PATH,
+  WIPRO_SWE_LAST_UPDATED,
+  WIPRO_SWE_PUBLISHED_DATE,
+  WIPRO_SWE_AUTHOR_NAME,
+  WIPRO_SWE_REVIEWED_DATE,
+  WIPRO_SWE_REVIEWER_NAME,
+  WIPRO_SWE_PROCESS_ALT,
+  WIPRO_SWE_PROCESS_HEIGHT,
+  WIPRO_SWE_PROCESS_PATH,
+  WIPRO_SWE_PROCESS_WIDTH,
+  WIPRO_SWE_QUESTIONS,
+  isWiproSoftwareEngineerHub,
+} from '@/lib/seo/programmatic/wipro-swe-hub'
+import {
+  WIPRO_JAVA_FAQ_ITEMS,
+  WIPRO_JAVA_HERO_ALT,
+  WIPRO_JAVA_HERO_HEIGHT,
+  WIPRO_JAVA_HERO_PATH,
+  WIPRO_JAVA_HERO_WIDTH,
+  WIPRO_JAVA_META_TITLE,
+  WIPRO_JAVA_DESCRIPTION,
+  WIPRO_JAVA_CANONICAL_PATH,
+  WIPRO_JAVA_LAST_UPDATED,
+  WIPRO_JAVA_PUBLISHED_DATE,
+  WIPRO_JAVA_AUTHOR_NAME,
+  WIPRO_JAVA_REVIEWED_DATE,
+  WIPRO_JAVA_REVIEWER_NAME,
+  WIPRO_JAVA_PROCESS_ALT,
+  WIPRO_JAVA_PROCESS_HEIGHT,
+  WIPRO_JAVA_PROCESS_PATH,
+  WIPRO_JAVA_PROCESS_WIDTH,
+  WIPRO_JAVA_QUESTIONS,
+  isWiproJavaDeveloperHub,
+} from '@/lib/seo/programmatic/wipro-java-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildIntersectionPageLinks } from '@/lib/seo/internal-linking'
 import '../../../../blog/blog.css'
@@ -237,6 +325,86 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     })
   }
 
+  if (isWiproDataAnalystHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: WIPRO_DA_META_TITLE,
+      description: WIPRO_DA_DESCRIPTION,
+      path: WIPRO_DA_CANONICAL_PATH,
+      keywords: [
+        'Wipro Data Analyst interview questions',
+        'Wipro DA interview 2026',
+        'Wipro NLTH data analyst',
+        'Wipro SQL interview',
+        'Wipro data analyst salary',
+        'Wipro data analyst fresher',
+        'Wipro analytics interview India',
+      ],
+      ogImage: `${getCanonicalSiteOrigin()}${WIPRO_DA_HERO_PATH}`,
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
+  if (isWiproQaEngineerHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: WIPRO_QA_META_TITLE,
+      description: WIPRO_QA_DESCRIPTION,
+      path: WIPRO_QA_CANONICAL_PATH,
+      keywords: [
+        'Wipro QA Engineer interview questions',
+        'Wipro QA interview 2026',
+        'Wipro NLTH QA engineer',
+        'Wipro Selenium interview',
+        'Wipro QA salary',
+        'Wipro QA fresher',
+        'Wipro manual testing interview India',
+      ],
+      ogImage: `${getCanonicalSiteOrigin()}${WIPRO_QA_HERO_PATH}`,
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
+  if (isWiproSoftwareEngineerHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: WIPRO_SWE_META_TITLE,
+      description: WIPRO_SWE_DESCRIPTION,
+      path: WIPRO_SWE_CANONICAL_PATH,
+      keywords: [
+        'Wipro Software Engineer interview questions',
+        'Wipro SWE interview 2026',
+        'Wipro NLTH software engineer',
+        'Wipro DSA interview',
+        'Wipro SWE salary',
+        'Wipro SWE fresher',
+        'Wipro coding interview India',
+      ],
+      ogImage: `${getCanonicalSiteOrigin()}${WIPRO_SWE_HERO_PATH}`,
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
+  if (isWiproJavaDeveloperHub(company.slug, role.slug)) {
+    return baseGenerateMetadata({
+      title: WIPRO_JAVA_META_TITLE,
+      description: WIPRO_JAVA_DESCRIPTION,
+      path: WIPRO_JAVA_CANONICAL_PATH,
+      keywords: [
+        'Wipro Java Developer interview questions',
+        'Wipro Java interview 2026',
+        'Wipro NLTH Java developer',
+        'Wipro Spring Boot interview',
+        'Wipro Java salary',
+        'Wipro Java fresher',
+        'Wipro Core Java interview India',
+      ],
+      ogImage: `${getCanonicalSiteOrigin()}${WIPRO_JAVA_HERO_PATH}`,
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
   if (isMicrosoftSoftwareEngineerHub(company.slug, role.slug)) {
     return baseGenerateMetadata({
       title: MICROSOFT_SE_META_TITLE,
@@ -274,7 +442,11 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
   const isInfosysJavaHub = isInfosysJavaDeveloperHub(company.slug, role.slug)
   const isInfosysSeHub = isInfosysSoftwareEngineerHub(company.slug, role.slug)
   const isFreshworksFeHubPage = isFreshworksFeHub(company.slug, role.slug)
-  const isEditorialHub = isAmazonHub || isMicrosoftHub || isInfosysJavaHub || isInfosysSeHub || isFreshworksFeHubPage
+  const isWiproDaHub = isWiproDataAnalystHub(company.slug, role.slug)
+  const isWiproQaHub = isWiproQaEngineerHub(company.slug, role.slug)
+  const isWiproSweHub = isWiproSoftwareEngineerHub(company.slug, role.slug)
+  const isWiproJavaHub = isWiproJavaDeveloperHub(company.slug, role.slug)
+  const isEditorialHub = isAmazonHub || isMicrosoftHub || isInfosysJavaHub || isInfosysSeHub || isFreshworksFeHubPage || isWiproDaHub || isWiproQaHub || isWiproSweHub || isWiproJavaHub
   const questions = isAmazonHub
     ? getCompanyQuestionsFlat('amazon')
     : isMicrosoftHub
@@ -285,7 +457,15 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           ? getRoleQuestionsFlat('java-developer')
           : isFreshworksFeHubPage
             ? FRESHWORKS_FE_QUESTIONS
-            : getRoleQuestionsFlat(role.slug)
+            : isWiproDaHub
+              ? WIPRO_DA_QUESTIONS
+              : isWiproQaHub
+                ? WIPRO_QA_QUESTIONS
+                : isWiproSweHub
+                  ? WIPRO_SWE_QUESTIONS
+                  : isWiproJavaHub
+                    ? WIPRO_JAVA_QUESTIONS
+                    : getRoleQuestionsFlat(role.slug)
   const faqPairs = buildFaqPairs(questions)
 
   const BREADCRUMB_LD = breadcrumbListJsonLd(
@@ -302,7 +482,15 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           ? faqPageJsonLd([...INFOSYS_FAQ_ITEMS])
           : isFreshworksFeHubPage
             ? faqPageJsonLd([...FRESHWORKS_FAQ_ITEMS])
-            : faqPairs.length > 0
+            : isWiproDaHub
+              ? faqPageJsonLd([...WIPRO_DA_FAQ_ITEMS])
+              : isWiproQaHub
+                ? faqPageJsonLd([...WIPRO_QA_FAQ_ITEMS])
+                : isWiproSweHub
+                  ? faqPageJsonLd([...WIPRO_SWE_FAQ_ITEMS])
+                  : isWiproJavaHub
+                    ? faqPageJsonLd([...WIPRO_JAVA_FAQ_ITEMS])
+                    : faqPairs.length > 0
           ? faqPageJsonLd(faqPairs)
           : null
 
@@ -691,6 +879,354 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
+  const WIPRO_DA_PAGE_LD = isWiproDaHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-da-author`,
+            name: WIPRO_DA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-da-reviewer`,
+            name: WIPRO_DA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_DA_HERO_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_DA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_DA_HERO_PATH}`,
+            caption: WIPRO_DA_HERO_ALT,
+            width: WIPRO_DA_HERO_WIDTH,
+            height: WIPRO_DA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_DA_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_DA_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_DA_PROCESS_PATH}`,
+            caption: WIPRO_DA_PROCESS_ALT,
+            width: WIPRO_DA_PROCESS_WIDTH,
+            height: WIPRO_DA_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(WIPRO_DA_CANONICAL_PATH),
+            url: canonicalUrl(WIPRO_DA_CANONICAL_PATH),
+            name: WIPRO_DA_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_DA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(WIPRO_DA_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(WIPRO_DA_CANONICAL_PATH)}#article`,
+            headline: WIPRO_DA_META_TITLE,
+            description: WIPRO_DA_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_DA_CANONICAL_PATH) },
+            url: canonicalUrl(WIPRO_DA_CANONICAL_PATH),
+            datePublished: WIPRO_DA_PUBLISHED_DATE,
+            dateModified: WIPRO_DA_LAST_UPDATED,
+            dateReviewed: WIPRO_DA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#wipro-da-author` },
+            reviewedBy: { '@id': `${ORIGIN}#wipro-da-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${WIPRO_DA_HERO_PATH}#image` },
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: [
+                'h1',
+                '#wipro-da-overview',
+                '#wipro-da-hiring-process',
+                '#wipro-da-salary',
+                '#wipro-da-questions',
+              ],
+            },
+          },
+        ],
+      }
+    : null
+
+  const WIPRO_QA_PAGE_LD = isWiproQaHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-qa-author`,
+            name: WIPRO_QA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-qa-reviewer`,
+            name: WIPRO_QA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_QA_HERO_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_QA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_QA_HERO_PATH}`,
+            caption: WIPRO_QA_HERO_ALT,
+            width: WIPRO_QA_HERO_WIDTH,
+            height: WIPRO_QA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_QA_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_QA_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_QA_PROCESS_PATH}`,
+            caption: WIPRO_QA_PROCESS_ALT,
+            width: WIPRO_QA_PROCESS_WIDTH,
+            height: WIPRO_QA_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(WIPRO_QA_CANONICAL_PATH),
+            url: canonicalUrl(WIPRO_QA_CANONICAL_PATH),
+            name: WIPRO_QA_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_QA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(WIPRO_QA_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(WIPRO_QA_CANONICAL_PATH)}#article`,
+            headline: WIPRO_QA_META_TITLE,
+            description: WIPRO_QA_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_QA_CANONICAL_PATH) },
+            url: canonicalUrl(WIPRO_QA_CANONICAL_PATH),
+            datePublished: WIPRO_QA_PUBLISHED_DATE,
+            dateModified: WIPRO_QA_LAST_UPDATED,
+            dateReviewed: WIPRO_QA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#wipro-qa-author` },
+            reviewedBy: { '@id': `${ORIGIN}#wipro-qa-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${WIPRO_QA_HERO_PATH}#image` },
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: [
+                'h1',
+                '#wipro-qa-overview',
+                '#wipro-qa-hiring-process',
+                '#wipro-qa-salary',
+                '#wipro-qa-questions',
+              ],
+            },
+          },
+        ],
+      }
+    : null
+
+  const WIPRO_SWE_PAGE_LD = isWiproSweHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-swe-author`,
+            name: WIPRO_SWE_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-swe-reviewer`,
+            name: WIPRO_SWE_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_SWE_HERO_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_SWE_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_SWE_HERO_PATH}`,
+            caption: WIPRO_SWE_HERO_ALT,
+            width: WIPRO_SWE_HERO_WIDTH,
+            height: WIPRO_SWE_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_SWE_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_SWE_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_SWE_PROCESS_PATH}`,
+            caption: WIPRO_SWE_PROCESS_ALT,
+            width: WIPRO_SWE_PROCESS_WIDTH,
+            height: WIPRO_SWE_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
+            url: canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
+            name: WIPRO_SWE_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_SWE_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(WIPRO_SWE_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(WIPRO_SWE_CANONICAL_PATH)}#article`,
+            headline: WIPRO_SWE_META_TITLE,
+            description: WIPRO_SWE_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_SWE_CANONICAL_PATH) },
+            url: canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
+            datePublished: WIPRO_SWE_PUBLISHED_DATE,
+            dateModified: WIPRO_SWE_LAST_UPDATED,
+            dateReviewed: WIPRO_SWE_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#wipro-swe-author` },
+            reviewedBy: { '@id': `${ORIGIN}#wipro-swe-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${WIPRO_SWE_HERO_PATH}#image` },
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: [
+                'h1',
+                '#wipro-swe-overview',
+                '#wipro-swe-hiring-process',
+                '#wipro-swe-salary',
+                '#wipro-swe-questions',
+              ],
+            },
+          },
+        ],
+      }
+    : null
+
+  const WIPRO_JAVA_PAGE_LD = isWiproJavaHub
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-java-author`,
+            name: WIPRO_JAVA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#wipro-java-reviewer`,
+            name: WIPRO_JAVA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_JAVA_HERO_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_JAVA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_JAVA_HERO_PATH}`,
+            caption: WIPRO_JAVA_HERO_ALT,
+            width: WIPRO_JAVA_HERO_WIDTH,
+            height: WIPRO_JAVA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${WIPRO_JAVA_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${WIPRO_JAVA_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${WIPRO_JAVA_PROCESS_PATH}`,
+            caption: WIPRO_JAVA_PROCESS_ALT,
+            width: WIPRO_JAVA_PROCESS_WIDTH,
+            height: WIPRO_JAVA_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
+            url: canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
+            name: WIPRO_JAVA_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_JAVA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${canonicalUrl(WIPRO_JAVA_CANONICAL_PATH)}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${canonicalUrl(WIPRO_JAVA_CANONICAL_PATH)}#article`,
+            headline: WIPRO_JAVA_META_TITLE,
+            description: WIPRO_JAVA_DESCRIPTION,
+            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_JAVA_CANONICAL_PATH) },
+            url: canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
+            datePublished: WIPRO_JAVA_PUBLISHED_DATE,
+            dateModified: WIPRO_JAVA_LAST_UPDATED,
+            dateReviewed: WIPRO_JAVA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#wipro-java-author` },
+            reviewedBy: { '@id': `${ORIGIN}#wipro-java-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${WIPRO_JAVA_HERO_PATH}#image` },
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: [
+                'h1',
+                '#wipro-java-overview',
+                '#wipro-java-hiring-process',
+                '#wipro-java-salary',
+                '#wipro-java-questions',
+              ],
+            },
+          },
+        ],
+      }
+    : null
+
   const ITEM_LIST_LD =
     isEditorialHub && questions.length > 0
       ? {
@@ -722,6 +1258,10 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       {INFOSYS_JAVA_PAGE_LD ? <JsonLdScript id="intersection-infosys-java-page-ld" data={INFOSYS_JAVA_PAGE_LD} /> : null}
       {INFOSYS_SE_PAGE_LD ? <JsonLdScript id="intersection-infosys-se-page-ld" data={INFOSYS_SE_PAGE_LD} /> : null}
       {FRESHWORKS_FE_PAGE_LD ? <JsonLdScript id="intersection-freshworks-fe-page-ld" data={FRESHWORKS_FE_PAGE_LD} /> : null}
+      {WIPRO_DA_PAGE_LD ? <JsonLdScript id="intersection-wipro-da-page-ld" data={WIPRO_DA_PAGE_LD} /> : null}
+      {WIPRO_QA_PAGE_LD ? <JsonLdScript id="intersection-wipro-qa-page-ld" data={WIPRO_QA_PAGE_LD} /> : null}
+      {WIPRO_SWE_PAGE_LD ? <JsonLdScript id="intersection-wipro-swe-page-ld" data={WIPRO_SWE_PAGE_LD} /> : null}
+      {WIPRO_JAVA_PAGE_LD ? <JsonLdScript id="intersection-wipro-java-page-ld" data={WIPRO_JAVA_PAGE_LD} /> : null}
 
       {isAmazonHub ? (
         <AmazonSeHubArticle company={company} role={role} questions={questions} />
@@ -733,6 +1273,14 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
         <InfosysJavaHubArticle company={company} role={role} questions={questions} />
       ) : isFreshworksFeHubPage ? (
         <FreshworksFeHubArticle company={company} role={role} questions={questions} />
+      ) : isWiproDaHub ? (
+        <WiproDaHubArticle company={company} role={role} questions={questions} />
+      ) : isWiproQaHub ? (
+        <WiproQaHubArticle company={company} role={role} questions={questions} />
+      ) : isWiproSweHub ? (
+        <WiproSweHubArticle company={company} role={role} questions={questions} />
+      ) : isWiproJavaHub ? (
+        <WiproJavaHubArticle company={company} role={role} questions={questions} />
       ) : (
         <>
           <section
