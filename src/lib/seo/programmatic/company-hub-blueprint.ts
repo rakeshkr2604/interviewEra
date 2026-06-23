@@ -78,6 +78,44 @@ export const TCS_HUB_SECTION_ANCHORS = {
   relatedGuides: 'tcs-contextual-links',
 } as const
 
+/** Wipro anchor IDs mapped to blueprint keys (company careers pillar hub). */
+export const WIPRO_HUB_SECTION_ANCHORS = {
+  overview: 'wipro-hub-overview',
+  hiringStatus: 'wipro-hub-hiring-status',
+  eliteNlth: 'wipro-hub-elite-nlth',
+  nlth: 'wipro-hub-nlth',
+  wilp: 'wipro-hub-wilp',
+  turbo: 'wipro-hub-turbo',
+  onCampus: 'wipro-hub-on-campus',
+  offCampus: 'wipro-hub-off-campus',
+  experienced: 'wipro-hub-experienced',
+  internship: 'wipro-hub-internship',
+  apprenticeship: 'wipro-hub-apprenticeship',
+  recruitmentCalendar: 'wipro-hub-recruitment-calendar',
+  hiringTimeline: 'wipro-hub-hiring-timeline',
+  hiringLocations: 'wipro-hub-hiring-locations',
+  onlineTest: 'wipro-hub-online-test',
+  technicalInterview: 'wipro-hub-technical-interview',
+  hrInterview: 'wipro-hub-hr-interview',
+  eligibility: 'wipro-hub-eligibility',
+  salary: 'wipro-hub-salary',
+  roleGuides: 'wipro-hub-role-guides',
+  questions: 'wipro-hub-questions',
+  roadmap15: 'wipro-hub-roadmap-15',
+  roadmap30: 'wipro-hub-roadmap-30',
+  roadmap60: 'wipro-hub-roadmap-60',
+  documents: 'wipro-hub-documents',
+  offerJoining: 'wipro-hub-offer-joining',
+  training: 'wipro-hub-training',
+  careerGrowth: 'wipro-hub-career-growth',
+  workCulture: 'wipro-hub-work-culture',
+  companyOverview: 'wipro-hub-company-overview',
+  trends2026: 'wipro-hub-2026-trends',
+  faq: 'wipro-hub-faq',
+  mockCta: 'wipro-hub-mock-cta',
+  related: 'wipro-hub-related',
+} as const
+
 // ── Question card standard (company hubs) ───────────────────────────────────
 
 /**

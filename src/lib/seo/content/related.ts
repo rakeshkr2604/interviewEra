@@ -10,6 +10,7 @@ const RELATED_TAG_MAP: Record<string, readonly string[]> = {
   '/interview-questions/companies/freshworks/frontend-developer': ['freshworks', 'frontend-developer', 'react', 'javascript'],
   '/interview-questions/companies/infosys/java-developer': ['infosys', 'java-developer', 'spring'],
   '/interview-questions/companies/infosys/software-engineer': ['infosys', 'software-engineer', 'dsa'],
+  '/interview-questions/companies/wipro': ['wipro', 'nlth', 'wilp', 'campus-placement', 'turbo', 'hiring'],
   '/interview-questions/companies/wipro/data-analyst': ['wipro', 'data-analyst', 'sql', 'python', 'nlth', 'analytics'],
   '/interview-questions/companies/wipro/qa-engineer': ['wipro', 'qa-engineer', 'selenium', 'manual-testing', 'nlth', 'automation'],
   '/interview-questions/companies/wipro/software-engineer': ['wipro', 'software-engineer', 'dsa', 'oop', 'nlth', 'coding'],

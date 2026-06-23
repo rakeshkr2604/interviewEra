@@ -1347,6 +1347,25 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   }
 }
 
+.ie-landing-premium .ie-hub-geo-summary {
+  margin-top: 0.75rem;
+  max-width: 48rem;
+  padding: 0.875rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--accent-primary) 6%, var(--card-bg));
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+}
+
+@media (min-width: 640px) {
+  .ie-landing-premium .ie-hub-geo-summary {
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+  }
+}
+
 /* TCS hub — process flow mobile */
 @media (max-width: 767px) {
   .ie-tcs-process-flow__item {

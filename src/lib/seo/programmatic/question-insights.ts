@@ -712,6 +712,84 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
       'Silent coding, wrong index on duplicates, or no complexity analysis.',
     followUps: ['Three-sum extension?', 'What if array is sorted?'],
   },
+  'What is the Wipro NLTH (National Level Talent Hunt) and what does it test?': {
+    expertAnswer:
+      'NLTH is Wipro\'s primary fresher online assessment in India. Sections include English Communication, Quantitative Aptitude, Analytical & Logical Reasoning, Technical MCQs (programming logic, OOP, DBMS basics), and Written Communication. Turbo/Elite drives may add coding. Shortlisted candidates proceed to combined technical and HR interviews — failed NLTH ends the pipeline at most drives.',
+    whyAsked:
+      'Recruiters and panels verify you understand Wipro\'s hiring funnel before investing interview slots — confusion with TCS NQT or Infosys InfyTQ signals weak company research.',
+    evaluates:
+      'Awareness of NLTH sections, elimination mechanics, and post-assessment interview stages.',
+    strategy:
+      'Name NLTH, list all sections in order, mention Tech+HR follows shortlist, note Turbo coding variant.',
+    mistakes:
+      'Omitting written communication, confusing NLTH with ILP/WILP, or not mentioning online test as primary filter.',
+    followUps: ['What is Turbo vs standard NLTH?', 'How do you prepare for NLTH quant under time pressure?'],
+  },
+  'Write a program to check if a string is a palindrome.': {
+    expertAnswer:
+      'Two-pointer approach: compare characters at start and end indices moving inward until pointers meet or mismatch. O(n) time, O(1) space. Handle empty string as palindrome. Wipro variants may ask case-insensitive comparison or ignoring spaces/punctuation — state your normalization approach before coding.',
+    whyAsked:
+      'Standard warm-up in NLTH coding sections and technical rounds — tests string manipulation without advanced algorithms.',
+    evaluates:
+      'Two-pointer logic, edge-case handling, and complexity narration under time pressure.',
+    strategy:
+      'State O(n)/O(1) upfront, code two-pointer loop, mention case-insensitive and ignore-spaces variants.',
+    mistakes:
+      'O(n²) substring checks, forgetting empty string, silent coding without complexity.',
+    followUps: ['Longest palindromic substring?', 'Check palindrome in a linked list?'],
+  },
+  'Explain the MVC architecture pattern with an example.': {
+    expertAnswer:
+      'Model holds data and business logic (User entity, validation). View renders UI (HTML templates, React components). Controller handles input and orchestrates Model + View — e.g. login form submit → Controller validates → Model authenticates → View shows success or error. Separation keeps UI changes independent from business rules.',
+    whyAsked:
+      'Wipro enterprise client projects commonly use MVC or MVC-inspired patterns — tests architecture literacy beyond syntax.',
+    evaluates:
+      'Separation of concerns understanding with a concrete web application mapping.',
+    strategy:
+      'Define M/V/C with one form-submit web app example; mention REST API layer if probed.',
+    mistakes:
+      'Confusing MVC with three-tier architecture, or abstract definitions without example.',
+    followUps: ['MVC vs MVVM?', 'Where does a REST API fit in MVC?'],
+  },
+  'What is WILP eligibility at Wipro and who should apply?': {
+    expertAnswer:
+      'WILP (Work Integrated Learning Program) is a 3–4 year work-study pathway: you work at Wipro while earning a sponsored M.Tech. Eligibility often includes diploma holders and select B.Tech graduates seeking postgraduate education without leaving employment. It is NOT ILP — ILP is 2–4 month post-offer fresher training for all standard NLTH/Turbo hires. Standard campus B.Tech candidates should pursue NLTH unless explicitly invited to WILP.',
+    whyAsked:
+      'WILP/ILP confusion is a common disqualifier — recruiters screen for long-term commitment and correct program understanding.',
+    evaluates:
+      'Distinction between WILP work-study and ILP onboarding, eligibility fit, and commitment awareness.',
+    strategy:
+      'Define WILP, contrast with ILP explicitly, list who should and should not apply, note multi-year commitment.',
+    mistakes:
+      'Using WILP and ILP interchangeably, applying to WILP when NLTH/Turbo eligible, underestimating duration.',
+    followUps: ['WILP salary during M.Tech study?', 'Can WILP graduates move to architect track faster?'],
+  },
+  'What is the difference between Wipro Elite NLTH and regular NLTH?': {
+    expertAnswer:
+      'Elite NLTH is a premium fresher band (typically ₹6–7 LPA) for top NLTH percentile scorers at select tier-1 campuses, with deeper technical interviews and priority ILP cohorts. Regular NLTH is the standard mass hiring path (₹3.5–5 LPA) with combined Tech+HR after shortlist. Elite slots are limited and not available at every college drive — perform at Elite level even when targeting standard NLTH.',
+    whyAsked:
+      'Panels and HR verify you researched package bands and track differences — critical for salary expectation answers.',
+    evaluates:
+      'Track awareness, CTC band knowledge, and realistic self-positioning by NLTH performance.',
+    strategy:
+      'Contrast CTC bands, interview depth, campus availability, and advise preparing at Elite level regardless.',
+    mistakes:
+      'Assuming Elite at every campus, confusing Elite with Turbo, or not knowing CTC ranges.',
+    followUps: ['How does Turbo differ from Elite?', 'Can standard NLTH be upgraded to Turbo post-offer?'],
+  },
+  'Who qualifies for Wipro Turbo hiring and what is the process?': {
+    expertAnswer:
+      'Turbo targets strong NLTH performers (high aptitude percentile plus technical MCQ accuracy) and candidates who clear deeper technical interviews with easy-medium DSA and Core CS. Typical Turbo CTC is ₹5.5–6.5 LPA with intensive ILP and priority digital engineering project mapping. Process: NLTH → technical panel (harder than standard) → HR → offer with Turbo label on letter. Limited seats per batch.',
+    whyAsked:
+      'Turbo is Wipro\'s premium fresher track — panels test whether candidates understand elevated expectations versus standard NLTH.',
+    evaluates:
+      'Turbo eligibility criteria, process awareness, and preparation depth alignment.',
+    strategy:
+      'Define Turbo CTC band, NLTH score expectations, harder technical depth, limited seats, ILP focus.',
+    mistakes:
+      'Treating Turbo as separate company, unaware of coding depth, or expecting Turbo without strong NLTH scores.',
+    followUps: ['Turbo vs TCS Digital?', 'What DSA topics matter most for Turbo?'],
+  },
 }
 
 export function mergeQuestionInsights(question: SeoQuestion): SeoQuestion {

@@ -2,10 +2,14 @@ import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
+import { WiproHubArticle } from '@/components/programmatic/WiproHubArticle'
 import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld'
-import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
+import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 import { SeoCrossLinksSection } from '@/components/seo/SeoCrossLinksSection'
+import { RelatedGuidesSection } from '@/components/content/RelatedGuidesSection'
 import { QuestionsList } from '@/components/programmatic/QuestionsList'
+import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
+import { schemaIds } from '@/lib/seo/metadata'
 import {
   getCompanyBySlug,
   allCompanyParams,
@@ -19,9 +23,31 @@ import {
   getCompanyQuestionsFlat,
   buildFaqPairs,
 } from '@/lib/seo/programmatic/questions'
+import {
+  WIPRO_AUTHOR_NAME,
+  WIPRO_CANONICAL_PATH,
+  WIPRO_DESCRIPTION,
+  WIPRO_FAQ_ITEMS,
+  WIPRO_HERO_ALT,
+  WIPRO_HERO_HEIGHT,
+  WIPRO_HERO_PATH,
+  WIPRO_HERO_WIDTH,
+  WIPRO_HUB_QUESTIONS,
+  WIPRO_LAST_UPDATED,
+  WIPRO_META_TITLE,
+  WIPRO_PROCESS_ALT,
+  WIPRO_PROCESS_HEIGHT,
+  WIPRO_PROCESS_PATH,
+  WIPRO_PROCESS_WIDTH,
+  WIPRO_PUBLISHED_DATE,
+  WIPRO_REVIEWED_DATE,
+  WIPRO_REVIEWER_NAME,
+  isWiproCompanyHub,
+} from '@/lib/seo/programmatic/wipro-hub'
 import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
 import { buildCompanyPageLinks } from '@/lib/seo/internal-linking'
 import type { CompanySlug, CompanyTier } from '@/lib/seo/programmatic'
+import '../../../blog/blog.css'
 
 export function generateStaticParams() {
   return allCompanyParams()
@@ -33,6 +59,30 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { company: companySlug } = await params
   const company = getCompanyBySlug(companySlug)
   if (!company) return {}
+
+  if (isWiproCompanyHub(company.slug)) {
+    return baseGenerateMetadata({
+      title: WIPRO_META_TITLE,
+      description: WIPRO_DESCRIPTION,
+      path: WIPRO_CANONICAL_PATH,
+      ogImage: `${ORIGIN}${WIPRO_HERO_PATH}`,
+      keywords: [
+        'Wipro hiring 2026',
+        'Wipro recruitment',
+        'Wipro NLTH',
+        'Wipro WILP',
+        'Wipro Turbo',
+        'Wipro interview questions',
+        'Wipro off campus',
+        'Wipro salary fresher',
+        'Wipro eligibility',
+        'Wipro careers India',
+      ],
+      openGraphType: 'article',
+      noIndex: false,
+    })
+  }
+
   return companyPageMetadata(company)
 }
 
@@ -45,6 +95,150 @@ export default async function CompanyQuestionsPage({ params }: Props) {
 
   if (company.slug === 'tcs') {
     redirect('/interview-questions/tcs')
+  }
+
+  if (isWiproCompanyHub(company.slug)) {
+    const hubQuestions = WIPRO_HUB_QUESTIONS
+    const linkSections = buildCompanyPageLinks(company)
+
+    const BREADCRUMB_LD = breadcrumbListJsonLd(
+      [
+        { name: 'Interview Questions', path: questionsHubPath() },
+        { name: company.label, path: WIPRO_CANONICAL_PATH },
+      ],
+      ORIGIN,
+    )
+
+    const FAQ_LD = faqPageJsonLd([...WIPRO_FAQ_ITEMS])
+
+    const ITEM_LIST_LD = {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      itemListOrder: 'https://schema.org/ItemListOrderAscending',
+      name: `${company.label} interview questions`,
+      url: canonicalUrl(WIPRO_CANONICAL_PATH),
+      numberOfItems: hubQuestions.length,
+      itemListElement: hubQuestions.map((q, idx) => ({
+        '@type': 'ListItem',
+        position: idx + 1,
+        name: q.question,
+      })),
+    }
+
+    const WIPRO_PAGE_LD = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'WebSite',
+          '@id': `${ORIGIN}#website`,
+          url: ORIGIN,
+          name: 'InterviewEra',
+          publisher: { '@id': schemaIds.organization },
+          inLanguage: 'en-IN',
+        },
+        {
+          '@type': 'Organization',
+          '@id': schemaIds.organization,
+          name: 'InterviewEra',
+          url: ORIGIN,
+        },
+        {
+          '@type': 'Person',
+          '@id': `${ORIGIN}#wipro-author`,
+          name: WIPRO_AUTHOR_NAME,
+          worksFor: { '@id': schemaIds.organization },
+        },
+        {
+          '@type': 'Person',
+          '@id': `${ORIGIN}#wipro-reviewer`,
+          name: WIPRO_REVIEWER_NAME,
+          worksFor: { '@id': schemaIds.organization },
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image`,
+          url: `${ORIGIN}${WIPRO_HERO_PATH}`,
+          contentUrl: `${ORIGIN}${WIPRO_HERO_PATH}`,
+          caption: WIPRO_HERO_ALT,
+          width: WIPRO_HERO_WIDTH,
+          height: WIPRO_HERO_HEIGHT,
+        },
+        {
+          '@type': 'ImageObject',
+          '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image`,
+          url: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
+          contentUrl: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
+          caption: WIPRO_PROCESS_ALT,
+          width: WIPRO_PROCESS_WIDTH,
+          height: WIPRO_PROCESS_HEIGHT,
+        },
+        {
+          '@type': 'WebPage',
+          '@id': canonicalUrl(WIPRO_CANONICAL_PATH),
+          url: canonicalUrl(WIPRO_CANONICAL_PATH),
+          name: WIPRO_META_TITLE,
+          isPartOf: { '@id': `${ORIGIN}#website` },
+          primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
+          mainEntity: { '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#article` },
+          inLanguage: 'en-IN',
+        },
+        {
+          '@type': 'CollectionPage',
+          '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#collection`,
+          name: `${company.label} Role Interview Guides`,
+          about: [
+            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/software-engineer` },
+            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/java-developer` },
+            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/data-analyst` },
+            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/qa-engineer` },
+          ],
+        },
+        {
+          '@type': 'Article',
+          '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#article`,
+          headline: WIPRO_META_TITLE,
+          description: WIPRO_DESCRIPTION,
+          mainEntityOfPage: { '@id': canonicalUrl(WIPRO_CANONICAL_PATH) },
+          url: canonicalUrl(WIPRO_CANONICAL_PATH),
+          datePublished: WIPRO_PUBLISHED_DATE,
+          dateModified: WIPRO_LAST_UPDATED,
+          dateReviewed: WIPRO_REVIEWED_DATE,
+          author: { '@id': `${ORIGIN}#wipro-author` },
+          reviewedBy: { '@id': `${ORIGIN}#wipro-reviewer` },
+          publisher: { '@id': schemaIds.organization },
+          image: [
+            { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
+            { '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image` },
+          ],
+          speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: [
+              'h1',
+              '#wipro-hub-overview',
+              '#wipro-hub-recruitment-calendar',
+              '#wipro-hub-salary',
+              '#wipro-hub-questions',
+            ],
+          },
+        },
+      ],
+    }
+
+    return (
+      <>
+        <JsonLdScript id="wipro-breadcrumb-ld" data={BREADCRUMB_LD} />
+        <JsonLdScript id="wipro-faq-ld" data={FAQ_LD} />
+        <JsonLdScript id="wipro-question-itemlist-ld" data={ITEM_LIST_LD} />
+        <JsonLdScript id="wipro-page-ld" data={WIPRO_PAGE_LD} />
+
+        <WiproHubArticle company={company} questions={hubQuestions} />
+
+        <RelatedGuidesSection path={WIPRO_CANONICAL_PATH} />
+        {linkSections.map((section) => (
+          <SeoCrossLinksSection key={section.heading} heading={section.heading} links={section.links} />
+        ))}
+      </>
+    )
   }
 
   const questions = getCompanyQuestionsFlat(company.slug as CompanySlug)

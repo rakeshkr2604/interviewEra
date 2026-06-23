@@ -339,6 +339,10 @@ export const WIPRO_DA_PREP_RESOURCE_LINKS = [
 ] as const
 
 export const WIPRO_DA_CONTEXTUAL_LINKS = [
+  { href: '/interview-questions/companies/wipro', label: 'Wipro Careers Hub' },
+  { href: '/interview-questions/companies/wipro/software-engineer', label: 'Wipro SWE Questions' },
+  { href: '/interview-questions/companies/wipro/java-developer', label: 'Wipro Java Questions' },
+  { href: '/interview-questions/companies/wipro/qa-engineer', label: 'Wipro QA Questions' },
   { href: '/interview-questions/companies/tcs/data-analyst', label: 'TCS DA Questions' },
   { href: '/interview-questions/companies/infosys/data-analyst', label: 'Infosys DA Questions' },
   { href: '/interview-questions/companies/accenture/data-analyst', label: 'Accenture DA Questions' },
