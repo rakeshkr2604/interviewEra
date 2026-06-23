@@ -209,7 +209,7 @@ export function skillPageMetadata(skill: Skill): Metadata {
   const fresherSuffix = skill.fresherRelevant ? ' for Freshers' : ''
 
   return generateMetadata({
-    title: `${skill.label} Interview Questions${fresherSuffix} ${PLACEMENT_YEAR}`,
+    title: `${skill.shortLabel} Interview Qs${fresherSuffix} ${PLACEMENT_YEAR}`,
     description: buildSkillDescription(skill),
     path,
     keywords: buildSkillKeywords(skill),
@@ -311,7 +311,7 @@ export function toolStarTopicMetadata(topic: StarTopic): Metadata {
   const path = toolStarTopicPath(topic.slug)
 
   return generateMetadata({
-    title: `STAR: ${topic.label} Answer Example`,
+    title: `STAR: ${topic.label} Example`,
     description: `${topic.description} Free STAR builder with a worked example, scoring rubric, and prep tips.`,
     path,
     keywords: [

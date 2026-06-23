@@ -203,7 +203,7 @@ export const WIPRO_JAVA_VS_PEER_ROWS = [
 
 export const WIPRO_JAVA_PREP_RESOURCE_LINKS = [
   { href: '/interview-questions/java-developer', label: 'Java Developer Interview Questions' },
-  { href: '/interview-questions/topics/spring', label: 'Spring Interview Questions' },
+  { href: '/interview-questions/topics/spring-boot', label: 'Spring Boot Interview Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Interview Questions' },
   { href: '/interview-questions/companies/wipro/software-engineer', label: 'Wipro Software Engineer Questions' },
   { href: '/interview-questions/companies/wipro/data-analyst', label: 'Wipro Data Analyst Questions' },
@@ -223,7 +223,7 @@ export const WIPRO_JAVA_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/wipro/data-analyst', label: 'Wipro DA Questions' },
   { href: '/interview-questions/companies/wipro/qa-engineer', label: 'Wipro QA Questions' },
   { href: '/interview-questions/companies/wipro', label: 'Wipro Company Hub' },
-  { href: '/interview-questions/topics/spring', label: 'Spring Questions' },
+  { href: '/interview-questions/topics/spring-boot', label: 'Spring Boot Questions' },
   { href: '/interview-questions/companies/infosys/java-developer', label: 'Infosys Java Questions' },
   { href: '/interview-questions/companies/tcs/java-developer', label: 'TCS Java Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Questions' },

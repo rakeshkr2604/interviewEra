@@ -422,7 +422,7 @@ export const FRESHWORKS_PREP_RESOURCE_LINKS = [
   { href: '/interview-questions/frontend-developer', label: 'Frontend Developer Interview Questions' },
   { href: '/interview-questions/topics/javascript', label: 'JavaScript Interview Questions' },
   { href: '/interview-questions/topics/react', label: 'React Interview Questions' },
-  { href: '/interview-questions/topics/css', label: 'CSS Interview Questions' },
+  { href: '/interview-questions/topics/html-css', label: 'HTML & CSS Interview Questions' },
   { href: '/blog/top-dsa-interview-questions', label: 'DSA Interview Questions' },
   { href: '/blog/hr-interview-answer-tips-and-tricks', label: 'HR Interview Questions' },
 ] as const
@@ -432,7 +432,7 @@ export const FRESHWORKS_FE_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/topics/javascript', label: 'JavaScript Interview Questions' },
   { href: '/interview-questions/frontend-developer', label: 'Frontend Developer Questions' },
   { href: '/interview-questions/software-engineer', label: 'Software Engineer Questions' },
-  { href: '/interview-questions/topics/css', label: 'CSS Interview Questions' },
+  { href: '/interview-questions/topics/html-css', label: 'HTML & CSS Interview Questions' },
   { href: '/interview-questions/topics/system-design', label: 'System Design Questions' },
   { href: '/blog/hr-interview-answer-tips-and-tricks', label: 'HR Interview Questions' },
   { href: '/interview-questions/companies/freshworks/software-engineer', label: 'Freshworks SWE Questions' },

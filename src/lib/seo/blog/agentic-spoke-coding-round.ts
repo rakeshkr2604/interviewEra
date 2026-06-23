@@ -6,7 +6,7 @@ export const AGENTIC_CODING_ROUND_PATH = '/blog/agentic-coding-round'
 export const AGENTIC_CODING_ROUND_CONFIG: AgenticSpokeConfig = {
   category: 'Agentic AI',
   singleTitle: 'What Is an Agentic Coding Round? Format, Rubric & Examples',
-  metaTitle: 'Agentic Coding Round: Format & How to Pass (2026)',
+  metaTitle: 'Agentic Coding Round: Format & Prep 2026',
   description:
     'Agentic coding round explained — live format, what interviewers evaluate, tool policies, weak vs strong signals, and how to prepare for AI-assisted technical interviews.',
   canonicalPath: AGENTIC_CODING_ROUND_PATH,

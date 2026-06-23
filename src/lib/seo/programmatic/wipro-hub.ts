@@ -12,7 +12,7 @@ export const WIPRO_PROCESS_ALT =
 export const WIPRO_PROCESS_WIDTH = 1672
 export const WIPRO_PROCESS_HEIGHT = 941
 
-export const WIPRO_META_TITLE = 'Wipro Careers, Hiring & Interview Hub (2026)'
+export const WIPRO_META_TITLE = 'Wipro Careers & Interview Hub 2026'
 export const WIPRO_CANONICAL_PATH = '/interview-questions/companies/wipro'
 export const WIPRO_DESCRIPTION =
   'Wipro careers hub 2026 — NLTH, Elite NLTH, WILP, Turbo hiring, salary bands, recruitment calendar, eligibility rules, and interview roadmaps for India freshers.'
@@ -520,7 +520,7 @@ export const WIPRO_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/software-engineer', label: 'Software Engineer Hub' },
   { href: '/interview-questions/java-developer', label: 'Java Developer Hub' },
   { href: '/interview-questions/frontend-developer', label: 'Frontend Developer Hub' },
-  { href: '/interview-questions/topics/dsa', label: 'DSA Topic Questions' },
+  { href: '/interview-questions/topics/algorithms', label: 'DSA Topic Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Interview Questions' },
   { href: '/interview-questions/topics/java', label: 'Java Interview Questions' },
   { href: '/interview-questions/topics/react', label: 'React Interview Questions' },

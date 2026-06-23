@@ -204,7 +204,7 @@ export const WIPRO_SWE_VS_PEER_ROWS = [
 
 export const WIPRO_SWE_PREP_RESOURCE_LINKS = [
   { href: '/interview-questions/software-engineer', label: 'Software Engineer Interview Questions' },
-  { href: '/interview-questions/topics/dsa', label: 'DSA Interview Questions' },
+  { href: '/interview-questions/topics/algorithms', label: 'DSA Interview Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Interview Questions' },
   { href: '/interview-questions/companies/wipro/java-developer', label: 'Wipro Java Developer Questions' },
   { href: '/interview-questions/companies/wipro/data-analyst', label: 'Wipro Data Analyst Questions' },
@@ -224,7 +224,7 @@ export const WIPRO_SWE_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/wipro/data-analyst', label: 'Wipro DA Questions' },
   { href: '/interview-questions/companies/wipro/qa-engineer', label: 'Wipro QA Questions' },
   { href: '/interview-questions/companies/wipro', label: 'Wipro Company Hub' },
-  { href: '/interview-questions/topics/dsa', label: 'DSA Questions' },
+  { href: '/interview-questions/topics/algorithms', label: 'DSA Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Questions' },
   { href: '/interview-questions/companies/tcs/software-engineer', label: 'TCS SWE Questions' },
   { href: '/interview-questions/companies/infosys/software-engineer', label: 'Infosys SWE Questions' },

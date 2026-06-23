@@ -405,7 +405,7 @@ export function FreshworksFeHubArticle({
           </div>
           <p className="mt-4 max-w-3xl text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
             Practice with{' '}
-            <Link href="/interview-questions/topics/css" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+            <Link href="/interview-questions/topics/html-css" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
               CSS interview questions
             </Link>
             .

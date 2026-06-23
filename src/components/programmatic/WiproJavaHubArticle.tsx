@@ -293,7 +293,7 @@ export function WiproJavaHubArticle({
               Java Developer interview questions
             </Link>{' '}
             and{' '}
-            <Link href="/interview-questions/topics/spring" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+            <Link href="/interview-questions/topics/spring-boot" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
               Spring interview questions
             </Link>{' '}
             alongside this guide.

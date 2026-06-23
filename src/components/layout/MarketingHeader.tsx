@@ -17,7 +17,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
-import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
+import { NAV_TOOLS_LINKS, NAV_RESOURCE_ITEMS } from '@/lib/seo/content/nav';
 import { cn } from '@/lib/utils';
 
 type DropdownKey = 'tools' | 'questions' | 'resources';
@@ -42,12 +42,7 @@ const NAV_DROPDOWNS = [
   {
     key: 'resources' as DropdownKey,
     label: 'Resources',
-    items: [
-      { href: '/blog', label: 'Blog' },
-      { href: '/blog/agentic-ai-interview-round-2026', label: 'Agentic AI Interview Guide' },
-      { href: '/help', label: 'Help Center' },
-      { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Interview Guides' },
-    ],
+    items: NAV_RESOURCE_ITEMS.map((item) => ({ href: item.href, label: item.label })),
   },
 ] as const;
 

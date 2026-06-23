@@ -16,7 +16,7 @@ const ORIGIN = getCanonicalSiteOrigin();
 export const metadata: Metadata = generateMetadata({
   title: STAR_META_TITLE,
   description:
-    'Learn the STAR method for behavioral interviews. Includes 5 full STAR examples for common questions like "Tell me about a time you failed" and "Describe a conflict."',
+    'Learn the STAR method for behavioral interviews. Five full STAR examples for questions like failure, conflict, and leadership — with India placement tips.',
   path: STAR_CANONICAL_PATH,
   socialTitle: brandArticleOgTitle(STAR_META_TITLE),
   keywords:

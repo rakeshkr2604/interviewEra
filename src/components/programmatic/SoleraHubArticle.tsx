@@ -372,7 +372,7 @@ export function SoleraHubArticle({
               Solera QA Engineer guide
             </Link>
             . Strengthen fundamentals via{' '}
-            <Link href="/interview-questions/topics/dsa" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+            <Link href="/interview-questions/topics/algorithms" className="font-medium underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
               DSA topic questions
             </Link>
             ,{' '}

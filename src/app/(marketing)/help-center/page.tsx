@@ -6,7 +6,7 @@ import { generateMetadata, schemaIds, siteConfig } from '@/lib/seo/metadata';
 
 const PAGE_PATH = '/help-center';
 const PAGE_DESCRIPTION =
-  'The InterviewEra Help Center — guides and answers for getting started, interview sessions, resume & ATS, scoring & feedback, billing, and account support.';
+  'InterviewEra Help Center — guides and answers for getting started, interview sessions, resume & ATS, scoring, billing, and account support.';
 
 export const metadata: Metadata = generateMetadata({
   title: 'Help Center',

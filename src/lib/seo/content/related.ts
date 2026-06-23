@@ -37,6 +37,9 @@ const RELATED_TAG_MAP: Record<string, readonly string[]> = {
   '/blog/top-interview-questions-for-software-engineers': ['software-engineer', 'dsa'],
   '/blog/overcome-interview-anxiety-mock-interviews': ['anxiety', 'mock-interview', 'behavioral'],
   '/blog/ai-mock-interviews-smartest-prep-2026': ['mock-interview', 'ai', 'agentic-ai', 'behavioral', 'placement'],
+  '/blog/english-confidence-interviews': ['english', 'behavioral', 'hr', 'communication', 'confidence'],
+  '/blog/how-to-get-internship-opportunities': ['internship', 'placement', 'campus', 'fresher', 'career'],
+  '/blog/top-10-interview-questions-freshers-india-2026': ['fresher', 'placement', 'campus', 'hr', 'software-engineer'],
 }
 
 function scoreRelated(entry: ContentEntry, tags: readonly string[], currentPath: string): number {

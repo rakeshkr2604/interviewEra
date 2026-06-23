@@ -18,6 +18,7 @@ import {
   NAV_RESOURCE_ITEMS,
 } from '../src/lib/seo/content/nav'
 import { canonicalUrl, getCanonicalSiteOrigin } from '../src/lib/seo/site-url'
+import { ROLES, COMPANIES, SKILLS, companyQuestionsPath, roleQuestionsPath, skillQuestionsPath } from '../src/lib/seo/programmatic'
 
 const ROOT = join(import.meta.dirname ?? __dirname, '..')
 const APP = join(ROOT, 'src', 'app')
@@ -245,6 +246,45 @@ function checkMetadataInPages(): string[] {
   return warnings
 }
 
+function checkHubHrefSlugs(): string[] {
+  const broken: string[] = []
+  const validPaths = new Set<string>([
+    '/interview-questions',
+    '/interview-questions/tcs',
+    '/interview-questions/solera',
+    '/blog/top-dsa-interview-questions',
+    ...ROLES.map((r) => roleQuestionsPath(r.slug)),
+    ...COMPANIES.map((c) => companyQuestionsPath(c.slug)),
+    ...SKILLS.map((s) => skillQuestionsPath(s.slug)),
+  ])
+
+  const scanDirs = [
+    join(ROOT, 'src', 'lib', 'seo', 'programmatic'),
+    join(ROOT, 'src', 'components', 'programmatic'),
+  ]
+
+  const hrefRe = /href:\s*['"](\/interview-questions\/[^'"]+)['"]/g
+
+  for (const dir of scanDirs) {
+    if (!existsSync(dir)) continue
+    for (const file of readdirSync(dir, { recursive: true })) {
+      const filePath = typeof file === 'string' ? join(dir, file) : join(dir, String(file))
+      if (!filePath.endsWith('.ts') && !filePath.endsWith('.tsx')) continue
+      const content = readFileSync(filePath, 'utf8')
+      let m: RegExpExecArray | null
+      while ((m = hrefRe.exec(content)) !== null) {
+        const href = m[1].split('?')[0].split('#')[0]
+        if (validPaths.has(href)) continue
+        const isIntersection = /^\/interview-questions\/companies\/[^/]+\/[^/]+$/.test(href)
+        if (isIntersection) continue
+        broken.push(`${relative(ROOT, filePath)}: invalid hub href ${href}`)
+      }
+    }
+  }
+
+  return broken
+}
+
 function checkJsonLd(): { count: number; warnings: string[] } {
   const warnings: string[] = []
   let count = 0
@@ -265,6 +305,7 @@ function main() {
   const pageFiles = findPageFiles(APP)
   const staticPages = pageFiles.filter((f) => !routeFromPageFile(f)?.includes('['))
   const { broken, warnings: linkWarnings } = checkInternalLinks()
+  const hubHrefIssues = checkHubHrefSlugs()
   const sitemap = checkSitemap()
   const imageIssues = checkImages()
   const metaWarnings = checkMetadataInPages()
@@ -287,6 +328,7 @@ function main() {
   console.log(`Sitemap indexable URLs: ${sitemap.count}`)
   console.log(`Pages with JSON-LD: ${schema.count}`)
   console.log(`Broken internal links: ${broken.length}`)
+  console.log(`Invalid hub hrefs: ${hubHrefIssues.length}`)
   console.log(`Image issues: ${imageIssues.length}`)
   console.log(`Sitemap duplicates: ${sitemap.duplicates.length}`)
   console.log(`Sitemap orphans (registry): ${sitemap.orphans.length}`)
@@ -303,6 +345,10 @@ function main() {
     console.log('\n--- BROKEN LINKS ---')
     broken.forEach((b) => console.log('  ✗', b))
   }
+  if (hubHrefIssues.length) {
+    console.log('\n--- INVALID HUB HREFS ---')
+    hubHrefIssues.forEach((b) => console.log('  ✗', b))
+  }
   if (imageIssues.length) {
     console.log('\n--- IMAGE ISSUES ---')
     imageIssues.forEach((i) => console.log('  ✗', i))
@@ -318,6 +364,7 @@ function main() {
 
   const pass =
     broken.length === 0 &&
+    hubHrefIssues.length === 0 &&
     imageIssues.length === 0 &&
     sitemap.duplicates.length === 0
 
