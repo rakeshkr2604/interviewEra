@@ -1,4 +1,5 @@
 import type { CommunityPlatformId } from './types';
+import { notifyCommunityStorageChange } from './storage-events';
 
 const KEYS = {
   bannerDismissed: 'ie-community-banner-dismissed-at',
@@ -47,6 +48,7 @@ export function markPlatformJoined(id: CommunityPlatformId): void {
   const current = getJoinedPlatforms();
   if (current.includes(id)) return;
   writeStorage(KEYS.joinedPlatforms, JSON.stringify([...current, id]));
+  notifyCommunityStorageChange();
 }
 
 export function hasJoinedCommunity(): boolean {
@@ -63,6 +65,7 @@ export function isBannerDismissed(): boolean {
 
 export function dismissBanner(): void {
   writeStorage(KEYS.bannerDismissed, String(Date.now()));
+  notifyCommunityStorageChange();
 }
 
 export function isWidgetDismissed(): boolean {
@@ -71,6 +74,7 @@ export function isWidgetDismissed(): boolean {
 
 export function dismissWidget(): void {
   writeStorage(KEYS.widgetDismissed, '1');
+  notifyCommunityStorageChange();
 }
 
 export function isDashboardCardDismissed(): boolean {
@@ -79,6 +83,7 @@ export function isDashboardCardDismissed(): boolean {
 
 export function dismissDashboardCard(): void {
   writeStorage(KEYS.dashboardCardDismissed, '1');
+  notifyCommunityStorageChange();
 }
 
 /** Per-session: avoid repeating the same inline CTA placement */

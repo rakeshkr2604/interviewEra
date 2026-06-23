@@ -1,14 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import { COMMUNITY_COPY, COMMUNITY_HUB_PATH } from '@/lib/community/community';
 import { trackCommunityView, trackCommunityInteraction } from '@/lib/community/analytics';
-import {
-  dismissBanner,
-  shouldShowBanner,
-} from '@/lib/community/storage';
+import { dismissBanner, shouldShowBanner } from '@/lib/community/storage';
+import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 import { cn } from '@/lib/utils';
 
@@ -22,27 +20,30 @@ export function CommunityBanner({
   className,
 }: CommunityBannerProps) {
   const pathname = usePathname() ?? '';
-  const [show, setShow] = useState(false);
+  const storageShow = useCommunityStorageSnapshot(shouldShowBanner, () => false);
+  const [dismissedLocally, setDismissedLocally] = useState(false);
+  const viewedRef = useRef(false);
+
+  const onCommunityHub =
+    pathname === COMMUNITY_HUB_PATH || pathname.startsWith(`${COMMUNITY_HUB_PATH}/`);
+  const show = !onCommunityHub && storageShow && !dismissedLocally;
 
   useEffect(() => {
-    if (pathname === COMMUNITY_HUB_PATH || pathname.startsWith(`${COMMUNITY_HUB_PATH}/`)) {
-      return;
-    }
-    const visible = shouldShowBanner();
-    setShow(visible);
-    if (visible) {
-      const wasDismissed = typeof window !== 'undefined' && localStorage.getItem('ie-community-banner-dismissed-at');
-      trackCommunityView(placement, {
-        banner_return: wasDismissed ? 'true' : 'false',
-      });
-    }
-  }, [placement, pathname]);
+    if (!show || viewedRef.current) return;
+    viewedRef.current = true;
+    const wasDismissed =
+      typeof window !== 'undefined' &&
+      Boolean(localStorage.getItem('ie-community-banner-dismissed-at'));
+    trackCommunityView(placement, {
+      banner_return: wasDismissed ? 'true' : 'false',
+    });
+  }, [show, placement]);
 
   if (!show) return null;
 
   function dismiss() {
     dismissBanner();
-    setShow(false);
+    setDismissedLocally(true);
     trackCommunityInteraction('community_banner_dismiss', {
       platform: 'dismiss',
       placement,

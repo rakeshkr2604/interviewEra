@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Users } from 'lucide-react';
 import { COMMUNITY_COPY } from '@/lib/community/community';
 import {
-  hasJoinedCommunity,
-  shouldShowInlineCta,
   markPlacementShown,
+  shouldShowInlineCta,
 } from '@/lib/community/storage';
+import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 import { cn } from '@/lib/utils';
 
@@ -26,14 +26,17 @@ export function CommunityCTA({
   subtitle,
   className,
 }: CommunityCTAProps) {
-  const [visible, setVisible] = useState(false);
+  const visible = useCommunityStorageSnapshot(
+    () => shouldShowInlineCta(placement),
+    () => false,
+  );
+  const markedRef = useRef(false);
 
   useEffect(() => {
-    if (hasJoinedCommunity()) return;
-    if (!shouldShowInlineCta(placement)) return;
-    setVisible(true);
+    if (!visible || markedRef.current) return;
+    markedRef.current = true;
     markPlacementShown(placement);
-  }, [placement]);
+  }, [visible, placement]);
 
   if (!visible) return null;
 

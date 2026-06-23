@@ -1,6 +1,5 @@
 'use client';
 
-import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 
 export function CommunityNotificationsStrip() {

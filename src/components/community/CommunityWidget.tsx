@@ -5,11 +5,11 @@ import { ChevronUp, MessageCircle, X } from 'lucide-react';
 import { COMMUNITY_COPY } from '@/lib/community/community';
 import { getClickablePlatformsForSurface } from '@/lib/community/selectors';
 import { trackCommunityInteraction } from '@/lib/community/analytics';
+import { dismissWidget, shouldShowWidget } from '@/lib/community/storage';
 import {
-  dismissWidget,
-  isWidgetDismissed,
-  shouldShowWidget,
-} from '@/lib/community/storage';
+  useCommunityStorageSnapshot,
+  usePrefersReducedMotion,
+} from '@/lib/community/use-community-storage';
 import { CommunityPlatformIcon } from '@/components/community/CommunityIcons';
 import { CommunityLink } from '@/components/community/CommunityLink';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
@@ -23,24 +23,23 @@ export function CommunityWidget({ className }: CommunityWidgetProps) {
   const panelId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const [visible, setVisible] = useState(false);
+  const widgetEnabled = useCommunityStorageSnapshot(shouldShowWidget, () => false);
+  const reducedMotion = usePrefersReducedMotion();
+  const [dismissedLocally, setDismissedLocally] = useState(false);
   const [open, setOpen] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(false);
+  const impressedRef = useRef(false);
 
   const widgetItems = getClickablePlatformsForSurface('widget');
+  const visible = widgetEnabled && !dismissedLocally && widgetItems.length > 0;
 
   useEffect(() => {
-    if (!shouldShowWidget()) return;
-    setVisible(true);
+    if (!visible || impressedRef.current) return;
+    impressedRef.current = true;
     trackCommunityInteraction('community_widget_impression', {
       platform: 'all',
       placement: 'floating_widget',
     });
-  }, []);
-
-  useEffect(() => {
-    setReducedMotion(window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  }, []);
+  }, [visible]);
 
   useEffect(() => {
     if (!open) return;
@@ -77,7 +76,7 @@ export function CommunityWidget({ className }: CommunityWidgetProps) {
     };
   }, [open]);
 
-  if (!visible || widgetItems.length === 0 || isWidgetDismissed()) return null;
+  if (!visible) return null;
 
   function toggle() {
     const next = !open;
@@ -90,7 +89,7 @@ export function CommunityWidget({ className }: CommunityWidgetProps) {
 
   function handleDismiss() {
     dismissWidget();
-    setVisible(false);
+    setDismissedLocally(true);
     trackCommunityInteraction('community_widget_close', {
       platform: 'dismiss',
       placement: 'floating_widget',

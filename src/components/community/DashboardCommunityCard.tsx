@@ -1,23 +1,21 @@
 'use client';
 
-import { Users } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Users, X } from 'lucide-react';
+import { useState } from 'react';
 import { COMMUNITY_COPY } from '@/lib/community/community';
 import {
   dismissDashboardCard,
   shouldShowDashboardCard,
 } from '@/lib/community/storage';
+import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
-import { X } from 'lucide-react';
 
 export function DashboardCommunityCard() {
-  const [visible, setVisible] = useState(false);
+  const storageShow = useCommunityStorageSnapshot(shouldShowDashboardCard, () => false);
+  const [dismissedLocally, setDismissedLocally] = useState(false);
+  const show = storageShow && !dismissedLocally;
 
-  useEffect(() => {
-    setVisible(shouldShowDashboardCard());
-  }, []);
-
-  if (!visible) return null;
+  if (!show) return null;
 
   return (
     <section className="relative mb-4 sm:mb-5" aria-labelledby="dashboard-community-heading">
@@ -25,7 +23,7 @@ export function DashboardCommunityCard() {
         type="button"
         onClick={() => {
           dismissDashboardCard();
-          setVisible(false);
+          setDismissedLocally(true);
         }}
         className="absolute right-3 top-3 rounded-md p-1 opacity-50 transition-opacity hover:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_40%,transparent)]"
         aria-label="Dismiss community card"
