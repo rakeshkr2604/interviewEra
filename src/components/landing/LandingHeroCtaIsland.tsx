@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import { CommunityCTA } from '@/components/community/CommunityCTA';
 
 /**
  * Minimal client island so the homepage stays static (better bfcache): primary CTA href
@@ -72,7 +73,8 @@ export default function LandingHeroCtaIsland() {
   }, []);
 
   return (
-    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '28px' }}>
+    <>
+      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
       <TrackedCtaLink
         href={primaryHref}
         ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
@@ -122,6 +124,8 @@ export default function LandingHeroCtaIsland() {
       >
         See how it works
       </TrackedCtaLink>
-    </div>
+      </div>
+      <CommunityCTA placement="landing_hero" className="mb-7 block" />
+    </>
   );
 }

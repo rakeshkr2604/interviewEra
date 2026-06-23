@@ -2,8 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { T, Reveal, CountUp } from '@/components/landing/landing-home-shared';
-import { AmbientLayer } from '@/components/landing/AmbientLayer';
+import { T, Reveal } from '@/components/landing/landing-home-shared';
 
 /* ─── 5. SCORING ENGINE ─── */
 function ScoringEngineSection() {
@@ -107,100 +106,7 @@ function ScoringEngineSection() {
   );
 }
 
-/* ─── 6. EARLY ACCESS ─── */
-function SocialProofSection() {
-  return (
-    <section style={{ padding: '88px 0 96px', background: 'transparent', position: 'relative', overflow: 'hidden' }}>
-      <AmbientLayer variant="early-access" />
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative', zIndex: 1 }}>
-        <Reveal>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
-              Early access
-            </span>
-            <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(26px,3.4vw,42px)', fontWeight: 800, marginBottom: '18px', color: T.text, letterSpacing: '-0.028em', lineHeight: 1.06 }}>
-              Now in early access — join free while we onboard the first cohort.
-            </h2>
-            <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto 28px' }}>
-              Structured mocks, resume-aware questions, and rubric scoring. No paid testimonials and no
-              borrowed company logos — product proof only.
-            </p>
-            <Link
-              href="/signup"
-              className="v3-btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '14px 28px',
-                borderRadius: '12px',
-                background: T.acc,
-                color: '#fff',
-                fontSize: '15px',
-                fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif",
-                textDecoration: 'none',
-              }}
-            >
-              Join the waitlist →
-            </Link>
-          </div>
-        </Reveal>
-
-        <Reveal delay={0.08}>
-          <div
-            className="strip-responsive"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3,1fr)',
-              gap: '1px',
-              background: T.bord,
-              border: `1px solid ${T.bord2}`,
-              borderRadius: '16px',
-              overflow: 'hidden',
-              marginTop: '52px',
-            }}
-          >
-            {[
-              {
-                label: 'Example score lift across a structured practice loop (illustrative)',
-                render: (
-                  <>
-                    <CountUp to={4.6} decimals={1} duration={0.8} />
-                    <span style={{ color: T.text3, margin: '0 10px', fontWeight: 600 }}>→</span>
-                    <CountUp to={7.4} decimals={1} duration={0.9} delay={0.55} />
-                  </>
-                ),
-              },
-              {
-                label: 'Five weighted dimensions scored on every answer',
-                render: <span style={{ fontSize: 'clamp(26px,3.4vw,38px)', letterSpacing: '-0.02em' }}>5</span>,
-              },
-              {
-                label: 'From signup to your first scored answer',
-                render: (
-                  <>
-                    <CountUp to={60} duration={0.9} />
-                    <span style={{ color: T.acc2 }}>s</span>
-                  </>
-                ),
-              },
-            ].map((item) => (
-              <div key={item.label} style={{ background: T.card, padding: '28px', textAlign: 'center' }}>
-                <div style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: '38px', fontWeight: 800, color: T.text, lineHeight: 1, marginBottom: '6px' }}>
-                  {item.render}
-                </div>
-                <div style={{ fontSize: '13.5px', color: T.text2, lineHeight: 1.55 }}>{item.label}</div>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-      </div>
-    </section>
-  );
-}
-
-/* ─── 7. CTA ─── */
+/* ─── 6. CTA ─── */
 function CTASection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
 
@@ -243,7 +149,6 @@ export default function LandingHomeBelowFold({ isLoggedIn }: { isLoggedIn: boole
   return (
     <>
       <ScoringEngineSection />
-      <SocialProofSection />
       <CTASection isLoggedIn={isLoggedIn} />
     </>
   );

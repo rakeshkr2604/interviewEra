@@ -65,6 +65,7 @@ export const FOOTER_INTERVIEW_QUESTIONS_LINKS: readonly SeoTextLink[] = [
 ] as const
 
 export const FOOTER_RESOURCES_LINKS: readonly SeoTextLink[] = [
+  { href: '/community', label: 'Community Hub' },
   { href: '/resources', label: 'All Resources' },
   { href: '/blog', label: 'Blog' },
   { href: '/blog/agentic-ai-interview-round-2026', label: 'Agentic AI Interview Guide' },

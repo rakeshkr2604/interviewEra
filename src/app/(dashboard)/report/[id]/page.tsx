@@ -10,6 +10,7 @@ import { ScoreCard } from '@/components/report/ScoreCard';
 import { ReportPanel } from '@/components/report/ReportPanel';
 import { BlurredSection } from '@/components/report/BlurredSection';
 import { ShareCard } from '@/components/report/ShareCard';
+import { CommunityCTA } from '@/components/community/CommunityCTA';
 import { ReportViewTracker } from '@/components/report/ReportViewTracker';
 import { RadarChart, TrendChart } from '@/components/report/ReportDynamicCharts';
 import type {
@@ -888,6 +889,15 @@ export default async function ReportPage({ params }: ReportPageProps) {
         role={interview.role as string}
         reportId={interview.id as string}
       />
+
+      <div className="mt-4">
+        <CommunityCTA
+          placement="report_page"
+          variant="compact"
+          title="Discuss your prep with peers"
+          subtitle="Share strategies, ask doubts, and get daily placement alerts in our WhatsApp community."
+        />
+      </div>
 
       {/* Practice again CTA */}
       <div

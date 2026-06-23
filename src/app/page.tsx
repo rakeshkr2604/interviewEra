@@ -6,6 +6,7 @@ import { LandingWhyFail } from '@/components/landing/LandingWhyFail';
 import { LandingInterviewDemo } from '@/components/landing/LandingInterviewDemo';
 import { LandingBeforeAfter } from '@/components/landing/LandingBeforeAfter';
 import { LandingFaq } from '@/components/landing/LandingFaq';
+import { CommunitySection } from '@/components/community/CommunitySection';
 import { PAGE_SEO } from '@/lib/seo/metadata';
 
 export const metadata = PAGE_SEO.home;
@@ -29,6 +30,7 @@ export default function Page() {
         <LandingInterviewDemo />
         <LandingBeforeAfter />
         <LandingHomeClient />
+        <CommunitySection />
         <LandingFaq />
         <HomeMoneyPageLinks />
       </main>

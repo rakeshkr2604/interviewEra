@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
+import { CommunityCTA } from '@/components/community/CommunityCTA'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
@@ -71,6 +72,9 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
             >
               Start Interview
             </Link>
+            <div className="mt-6 flex justify-center">
+              <CommunityCTA placement="dashboard_empty_state" />
+            </div>
           </div>
         ) : (
           filteredItems.map((interview) => {

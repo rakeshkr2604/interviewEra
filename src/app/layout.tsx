@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
 import { NavbarSlot } from "@/components/layout/NavbarSlot";
+import { CommunityGlobalSlot } from "@/components/community/CommunityGlobalSlot";
 import { AuthStateWatcher } from "@/components/shared/AuthStateWatcher";
 import { AuthHashCallbackHandler } from "@/components/shared/AuthHashCallbackHandler";
 import { PostAuthRedirect } from "@/components/shared/PostAuthRedirect";
@@ -168,6 +169,7 @@ export default function RootLayout({
           <AuthHashCallbackHandler />
           <OfflineBanner />
           {children}
+          <CommunityGlobalSlot />
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
         <DeferredWebManifest />

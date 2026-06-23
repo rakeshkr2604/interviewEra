@@ -11,6 +11,7 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { PricingSection } from './PricingSection';
 import { CreditExhaustedSection } from './CreditExhaustedSection';
 import { UpgradePageFooter } from '@/components/pricing/UpgradePageFooter';
+import { CommunityCTA } from '@/components/community/CommunityCTA';
 import type { PlanTier, RadarDataPoint } from '@/types/app.types';
 
 export default async function UpgradePage() {
@@ -94,6 +95,13 @@ export default async function UpgradePage() {
         userEmail={email}
         planExpiresAt={planExpiresAt}
         planStatus={planStatus}
+      />
+
+      <CommunityCTA
+        placement="credits_page"
+        variant="compact"
+        title="Free job alerts while you decide"
+        subtitle="Join our WhatsApp channel for placement updates — no purchase required."
       />
 
       <UpgradePageFooter />

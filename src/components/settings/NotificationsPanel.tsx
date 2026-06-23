@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { SettingsSwitch } from '@/components/settings/SettingsSwitch'
+import { CommunityNotificationsStrip } from '@/components/community/CommunityNotificationsStrip'
 import type { NotificationPreferences } from '@/lib/settings/notification-preferences'
 
 type RowProps = {
@@ -142,6 +143,8 @@ export function NotificationsPanel({
           void patch({ weeklyImprovementSummary: next }, () => setWeekly(prev))
         }}
       />
+
+      <CommunityNotificationsStrip />
 
       {status ? (
         <p

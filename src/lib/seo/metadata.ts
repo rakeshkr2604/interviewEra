@@ -43,6 +43,7 @@ export const schemaIds = {
 export const BRAND_LINKEDIN_URL = 'https://www.linkedin.com/company/interviewera/' as const
 export const BRAND_X_URL = 'https://x.com/InterviewEra' as const
 export const BRAND_GITHUB_URL = 'https://github.com/InterviewEraHQ' as const
+export const BRAND_REDDIT_URL = 'https://www.reddit.com/user/InterviewEra/' as const
 export const FOUNDER_LINKEDIN_URL = 'https://www.linkedin.com/in/rakeshkumar2604/' as const
 export const FOUNDER_GITHUB_URL = 'https://github.com/rakesh2604' as const
 
@@ -54,7 +55,7 @@ export const FOUNDER_GITHUB_URL = 'https://github.com/rakesh2604' as const
  * InterviewEra entity: company LinkedIn, official X, and the GitHub organization.
  */
 export const siteOrganizationStructured = {
-  sameAs: [BRAND_LINKEDIN_URL, BRAND_X_URL, BRAND_GITHUB_URL],
+  sameAs: [BRAND_LINKEDIN_URL, BRAND_X_URL, BRAND_GITHUB_URL, BRAND_REDDIT_URL],
   /** Topics the entity is an authority on — anchors InterviewEra to its real subject area. */
   knowsAbout: [
     'AI mock interviews',

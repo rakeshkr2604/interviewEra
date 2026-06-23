@@ -10,6 +10,7 @@ import { UserSummaryCard } from '@/components/dashboard/UserSummaryCard'
 import { CreditsOverviewCard } from '@/components/dashboard/CreditsOverviewCard'
 import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
+import { DashboardCommunityCard } from '@/components/community/DashboardCommunityCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
@@ -166,6 +167,8 @@ export default async function DashboardPage() {
       </div>
 
       <QuickActionsGrid />
+
+      <DashboardCommunityCard />
 
       <RetentionProgressCard snap={retentionDashboardSnap} />
 

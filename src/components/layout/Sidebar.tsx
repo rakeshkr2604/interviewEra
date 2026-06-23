@@ -20,6 +20,7 @@ import { performClientLogout } from '@/lib/supabase/client-logout'
 import type { PlanTier } from '@/types/app.types'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
+import { SidebarCommunityLinks } from '@/components/community/SidebarCommunityLinks'
 
 const BRAND_MARK = '/brand/logos/icon-only.svg'
 
@@ -235,6 +236,7 @@ export function Sidebar({
             </ul>
           </div>
         ))}
+        <SidebarCommunityLinks onNavigate={onNavigate} />
       </nav>
 
       {/* Bottom: Theme + Logout */}
