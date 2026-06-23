@@ -25,12 +25,18 @@ const RELATED_TAG_MAP: Record<string, readonly string[]> = {
   '/interview-questions/frontend-developer': ['frontend-developer', 'react', 'javascript'],
   '/interview-questions/java-developer': ['java-developer', 'spring', 'oop'],
   '/interview-questions/business-analyst': ['business-analyst', 'sql', 'hr'],
-  '/blog/top-dsa-interview-questions': ['dsa', 'software-engineer', 'coding', 'leetcode'],
+  '/blog/agentic-ai-interview-round-2026': ['agentic-ai', 'ai-coding', 'software-engineer', 'mock-interview', 'ai'],
+  '/blog/what-is-agentic-ai': ['agentic-ai', 'ai-coding', 'software-engineer'],
+  '/blog/agentic-coding-round': ['agentic-ai', 'ai-coding', 'mock-interview', 'software-engineer'],
+  '/blog/ai-prompt-engineering-interview': ['agentic-ai', 'ai-coding', 'software-engineer'],
+  '/blog/cursor-ai-interview-guide': ['agentic-ai', 'ai-coding', 'cursor', 'software-engineer'],
+  '/blog/top-dsa-interview-questions': ['dsa', 'software-engineer', 'coding', 'leetcode', 'agentic-ai'],
   '/blog/how-to-prepare-for-placement-interviews': ['placement', 'campus', 'fresher', 'dsa'],
   '/blog/what-is-star-method-with-examples': ['star', 'behavioral', 'hr', 'amazon'],
   '/blog/hr-interview-answer-tips-and-tricks': ['hr', 'behavioral', 'star'],
   '/blog/top-interview-questions-for-software-engineers': ['software-engineer', 'dsa'],
   '/blog/overcome-interview-anxiety-mock-interviews': ['anxiety', 'mock-interview', 'behavioral'],
+  '/blog/ai-mock-interviews-smartest-prep-2026': ['mock-interview', 'ai', 'agentic-ai', 'behavioral', 'placement'],
 }
 
 function scoreRelated(entry: ContentEntry, tags: readonly string[], currentPath: string): number {

@@ -37,6 +37,11 @@ export const NAV_TOOLS_ITEMS: readonly NavResourceItem[] = [
 export const NAV_RESOURCE_ITEMS: readonly NavResourceItem[] = [
   { label: 'All Resources', href: '/resources', desc: 'Central guide and hub directory' },
   { label: 'Blog', href: '/blog', desc: 'Interview prep articles and guides' },
+  {
+    label: 'Agentic AI Interview Guide',
+    href: '/blog/agentic-ai-interview-round-2026',
+    desc: 'AI-assisted coding interviews, rubrics, and prep roadmaps',
+  },
   { label: 'Placement Guide', href: '/blog/how-to-prepare-for-placement-interviews', desc: 'Step-by-step campus prep playbook' },
   { label: 'STAR Method Guide', href: '/blog/what-is-star-method-with-examples', desc: 'Master behavioral answers' },
   { label: 'DSA Topic Map', href: '/blog/top-dsa-interview-questions', desc: 'Patterns, roadmap, and top 50 problems' },
@@ -62,6 +67,7 @@ export const FOOTER_INTERVIEW_QUESTIONS_LINKS: readonly SeoTextLink[] = [
 export const FOOTER_RESOURCES_LINKS: readonly SeoTextLink[] = [
   { href: '/resources', label: 'All Resources' },
   { href: '/blog', label: 'Blog' },
+  { href: '/blog/agentic-ai-interview-round-2026', label: 'Agentic AI Interview Guide' },
   { href: '/blog/top-dsa-interview-questions', label: 'DSA Topic Map' },
   { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
   { href: '/blog/what-is-star-method-with-examples', label: 'STAR Guide' },

@@ -29,6 +29,23 @@ export type ContentType =
   | 'questions-hub'
   | 'resource-index'
 
+export type ContentConceptLink = {
+  label: string
+  href: string
+}
+
+export type ContentLearnNextLink = {
+  label: string
+  href: string
+  description?: string
+}
+
+export type ContentToolLink = {
+  label: string
+  href: string
+  description?: string
+}
+
 export type ContentEntry = {
   id: string
   path: string
@@ -42,6 +59,12 @@ export type ContentEntry = {
   featured?: boolean
   popular?: boolean
   tags: readonly string[]
+  /** Contextual concept chips — interview types, skills, formats. */
+  relatedConcepts?: readonly ContentConceptLink[]
+  /** Ordered learning path from this page. */
+  learnNext?: readonly ContentLearnNextLink[]
+  /** InterviewEra tools to recommend on this page. */
+  recommendedTools?: readonly ContentToolLink[]
 }
 
 export const CONTENT_CATEGORIES: readonly ContentCategory[] = [

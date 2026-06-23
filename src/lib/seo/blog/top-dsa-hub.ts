@@ -277,6 +277,7 @@ export const TOP_DSA_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/infosys/java-developer', label: 'Infosys Java Questions' },
   { href: '/interview-questions/companies/tcs/java-developer', label: 'TCS Java Questions' },
   { href: '/interview-questions/topics/algorithms', label: 'Algorithms Interview Questions' },
+  { href: '/blog/agentic-ai-interview-round-2026', label: 'Agentic AI Interview Round Guide' },
   { href: '/interview-questions/topics/system-design', label: 'System Design Questions' },
   { href: '/interview-questions/topics/javascript', label: 'JavaScript Interview Questions' },
   { href: '/interview-questions/topics/react', label: 'React Interview Questions' },

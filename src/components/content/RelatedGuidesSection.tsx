@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
+import { ContentRelationshipsSection } from '@/components/content/ContentRelationshipsSection'
 import { getRelatedContent } from '@/lib/seo/content/related'
 import { cn } from '@/lib/utils'
 
@@ -21,7 +22,9 @@ export function RelatedGuidesSection({
   if (related.length === 0) return null
 
   return (
-    <section
+    <>
+      <ContentRelationshipsSection path={path} />
+      <section
       className={cn('border-t py-10 sm:py-12', className)}
       style={{
         borderColor: 'var(--card-border)',
@@ -65,5 +68,6 @@ export function RelatedGuidesSection({
         </ul>
       </div>
     </section>
+    </>
   )
 }

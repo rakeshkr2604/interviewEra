@@ -8,6 +8,8 @@ export function BlogEditorialHeader({
   description,
   readTime,
   updatedLabel,
+  /** When set, replaces the read-time line (e.g. chapter count). */
+  metaLine,
   heroSrc,
   heroAlt,
 }: {
@@ -21,6 +23,7 @@ export function BlogEditorialHeader({
   description?: string;
   readTime: string;
   updatedLabel: string;
+  metaLine?: string;
   heroSrc: string;
   heroAlt: string;
 }) {
@@ -48,7 +51,7 @@ export function BlogEditorialHeader({
           className="ie-blog-article-meta flex flex-wrap gap-2 text-sm"
           style={{ color: 'var(--text-muted)' }}
         >
-          <span>{readTime}</span>
+          <span>{metaLine ?? readTime}</span>
           <span aria-hidden>·</span>
           <span>{updatedLabel}</span>
         </div>
@@ -86,9 +89,25 @@ export function BlogEditorialToc({
 
 export function BlogEditorialFaq({
   items,
+  accordion = false,
 }: {
   items: readonly { question: string; answer: string }[];
+  /** Collapsible FAQ rows — answers stay in DOM for SEO and JSON-LD parity. */
+  accordion?: boolean;
 }) {
+  if (accordion) {
+    return (
+      <div className="ie-blog-faq-stack ie-blog-faq-stack--accordion">
+        {items.map((item) => (
+          <details key={item.question} className="ie-blog-faq-item ie-blog-faq-item--accordion">
+            <summary className="ie-blog-faq-item__question">{item.question}</summary>
+            <p className="ie-blog-faq-item__answer">{item.answer}</p>
+          </details>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="ie-blog-faq-stack">
       {items.map((item) => (

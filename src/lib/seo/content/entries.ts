@@ -1,6 +1,46 @@
 import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub'
+import { AGENTIC_CANONICAL_PATH, AGENTIC_LAST_UPDATED } from '@/lib/seo/blog/agentic-ai-hub'
+import { AGENTIC_CODING_ROUND_PATH } from '@/lib/seo/blog/agentic-spoke-coding-round'
+import { AI_PROMPT_ENGINEERING_PATH } from '@/lib/seo/blog/agentic-spoke-prompt-engineering'
+import { CURSOR_AI_INTERVIEW_PATH } from '@/lib/seo/blog/agentic-spoke-cursor'
+import { WHAT_IS_AGENTIC_AI_PATH } from '@/lib/seo/blog/agentic-spoke-what-is'
 import { ANDROID_LAST_UPDATED } from '@/lib/seo/programmatic/android-developer-hub'
 import type { ContentEntry } from '@/lib/seo/content/types'
+
+/** Shared concept, tool, and learn-next presets — referenced from entry metadata. */
+const CONCEPT = {
+  agentic: { label: 'Agentic AI', href: WHAT_IS_AGENTIC_AI_PATH },
+  agenticGuide: { label: 'Agentic AI Guide', href: AGENTIC_CANONICAL_PATH },
+  codingRound: { label: 'Agentic Coding Round', href: AGENTIC_CODING_ROUND_PATH },
+  promptEng: { label: 'Prompt Engineering', href: AI_PROMPT_ENGINEERING_PATH },
+  cursor: { label: 'Cursor Interview', href: CURSOR_AI_INTERVIEW_PATH },
+  dsa: { label: 'DSA', href: '/blog/top-dsa-interview-questions' },
+  star: { label: 'STAR Method', href: '/blog/what-is-star-method-with-examples' },
+  behavioral: { label: 'Behavioral Interviews', href: '/blog/hr-interview-answer-tips-and-tricks' },
+  sql: { label: 'SQL', href: '/interview-questions/topics/sql' },
+  systemDesign: { label: 'System Design', href: '/interview-questions/software-engineer' },
+  resume: { label: 'Resume / ATS', href: '/tools/ats-checker' },
+  placement: { label: 'Placement Prep', href: '/blog/how-to-prepare-for-placement-interviews' },
+  mockBlog: { label: 'Mock Interviews', href: '/blog/ai-mock-interviews-smartest-prep-2026' },
+  swe: { label: 'Software Engineer', href: '/interview-questions/software-engineer' },
+} as const
+
+const TOOL = {
+  mock: { label: 'AI Mock Interview', href: '/signup', description: 'Timed mocks with rubric-style feedback' },
+  ats: { label: 'ATS Resume Checker', href: '/tools/ats-checker', description: 'Improve resume keyword match' },
+  star: { label: 'STAR Answer Builder', href: '/tools/star-builder', description: 'Structure behavioral stories' },
+  qgen: { label: 'Question Generator', href: '/tools/question-generator', description: 'Role-specific practice problems' },
+} as const
+
+const BLOG_TOOLS = [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star] as const
+
+const AGENTIC_PATH = [
+  { label: 'What Is Agentic AI?', href: WHAT_IS_AGENTIC_AI_PATH, description: 'Definitions, myths, and interview context' },
+  { label: 'Agentic Coding Round', href: AGENTIC_CODING_ROUND_PATH, description: 'Live format and what interviewers score' },
+  { label: 'AI Prompt Engineering', href: AI_PROMPT_ENGINEERING_PATH, description: 'Poor vs strong prompt examples' },
+  { label: 'Cursor Interview Guide', href: CURSOR_AI_INTERVIEW_PATH, description: 'Composer, Chat, and live-round tactics' },
+  { label: 'AI Mock Interview', href: '/signup', description: 'Practice with scored feedback' },
+] as const
 
 /** Editorial guides and blog posts — single source for index, nav, and related content. */
 export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
@@ -17,6 +57,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['placement', 'campus', 'fresher', 'roadmap'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.dsa, CONCEPT.star, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Patterns and topic frequency' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Behavioral answer structure' },
+      { label: 'Top Fresher Questions', href: '/blog/top-10-interview-questions-freshers-india-2026', description: 'Campus HR and technical prep' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Practice under pressure' },
+    ],
+    recommendedTools: [...BLOG_TOOLS],
   },
   {
     id: 'blog-dsa-topic-map',
@@ -31,6 +79,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['dsa', 'coding', 'leetcode', 'patterns', 'software-engineer'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.agentic, CONCEPT.systemDesign, CONCEPT.swe],
+    learnNext: [
+      { label: 'Software Engineer Hub', href: CONCEPT.swe.href, description: 'Full SWE loop context' },
+      { label: 'What Is Agentic AI?', href: CONCEPT.agentic.href, description: 'AI-assisted rounds in 2026' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Apply patterns under time pressure' },
+    ],
+    recommendedTools: [TOOL.qgen, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'blog-swe-questions',
@@ -44,6 +99,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-01',
     featured: true,
     tags: ['software-engineer', 'dsa', 'system-design'],
+    relatedConcepts: [CONCEPT.swe, CONCEPT.dsa, CONCEPT.systemDesign, CONCEPT.agentic, CONCEPT.star],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Topic frequency and patterns' },
+      { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'AI-assisted coding rounds' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Scored technical + behavioral practice' },
+    ],
+    recommendedTools: [...BLOG_TOOLS],
   },
   {
     id: 'role-android-developer',
@@ -72,6 +134,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['software-engineer', 'dsa', 'system-design'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.systemDesign, CONCEPT.agentic, CONCEPT.star, CONCEPT.behavioral],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Core patterns and topic frequency' },
+      { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'AI-assisted technical rounds' },
+      { label: 'Amazon SDE Guide', href: '/interview-questions/companies/amazon/software-engineer', description: 'Company-specific loop' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Scored practice sessions' },
+    ],
+    recommendedTools: [TOOL.qgen, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-amazon-swe',
@@ -86,6 +156,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['amazon', 'software-engineer', 'leadership-principles', 'bar-raiser'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.star, CONCEPT.behavioral, CONCEPT.agentic, CONCEPT.systemDesign],
+    learnNext: [
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Leadership Principles stories' },
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'OA and coding round prep' },
+      { label: 'Agentic Coding Round', href: CONCEPT.codingRound.href, description: 'AI-assisted technical screens' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Bar Raiser-style practice' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.star, TOOL.qgen, TOOL.ats],
   },
   {
     id: 'hub-microsoft-swe',
@@ -100,6 +178,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['microsoft', 'software-engineer', 'system-design'],
+    relatedConcepts: [CONCEPT.systemDesign, CONCEPT.dsa, CONCEPT.agentic, CONCEPT.star, CONCEPT.behavioral, CONCEPT.sql],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding and OA preparation' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Behavioral and growth mindset' },
+      { label: 'AI Prompt Engineering', href: CONCEPT.promptEng.href, description: 'AI-assisted coding screens' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Timed loop practice' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.star, TOOL.ats],
   },
   {
     id: 'hub-freshworks-fe',
@@ -113,6 +199,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-06',
     featured: true,
     tags: ['freshworks', 'frontend-developer', 'react', 'javascript'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.agentic, CONCEPT.star, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Frontend Developer Hub', href: '/interview-questions/frontend-developer', description: 'React and JS fundamentals' },
+      { label: 'AI Prompt Engineering', href: CONCEPT.promptEng.href, description: 'Live coding with AI tools' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Product-style mock loop' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.star, TOOL.ats],
   },
   {
     id: 'hub-infosys-java',
@@ -126,6 +219,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-06',
     featured: true,
     tags: ['infosys', 'java-developer', 'spring'],
+    relatedConcepts: [CONCEPT.swe, CONCEPT.dsa, CONCEPT.sql, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Java Developer Hub', href: '/interview-questions/java-developer', description: 'Core Java and Spring fundamentals' },
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding round preparation' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Simulate technical rounds' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-tcs',
@@ -140,6 +240,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['tcs', 'nqt', 'aptitude', 'campus-placement'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.dsa, CONCEPT.sql, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Campus roadmap' },
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding round patterns' },
+      { label: 'Top Fresher Questions', href: '/blog/top-10-interview-questions-freshers-india-2026', description: 'HR and aptitude context' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Simulate interview pressure' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-solera',
@@ -153,6 +261,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-23',
     featured: true,
     tags: ['solera', 'automotive', 'cognitive-assessment', 'off-campus', 'java', 'hiring'],
+    relatedConcepts: [CONCEPT.swe, CONCEPT.dsa, CONCEPT.agentic, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Software Engineer Hub', href: CONCEPT.swe.href, description: 'Technical round context' },
+      { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'Product-style AI rounds' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Practice narration and coding' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats],
   },
   {
     id: 'hub-infosys-se',
@@ -166,6 +281,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-06',
     featured: true,
     tags: ['infosys', 'software-engineer'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.dsa, CONCEPT.sql, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Campus and InfyTQ context' },
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding round preparation' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Simulate technical rounds' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-wipro',
@@ -180,6 +302,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['wipro', 'nlth', 'wilp', 'turbo', 'campus-placement', 'hiring'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.dsa, CONCEPT.sql, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Wipro Software Engineer Guide', href: '/interview-questions/companies/wipro/software-engineer', description: 'NLTH and coding rounds' },
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Campus strategy' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Practice under time pressure' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-wipro-da',
@@ -193,6 +322,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-23',
     featured: true,
     tags: ['wipro', 'data-analyst', 'sql', 'python', 'nlth', 'analytics'],
+    relatedConcepts: [CONCEPT.sql, CONCEPT.behavioral, CONCEPT.placement, CONCEPT.resume, CONCEPT.star],
+    learnNext: [
+      { label: 'SQL Interview Questions', href: CONCEPT.sql.href, description: 'Query and analytics drills' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Behavioral scenarios' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Practice case-style answers' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.star, TOOL.ats],
   },
   {
     id: 'hub-wipro-qa',
@@ -219,6 +355,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-23',
     featured: true,
     tags: ['wipro', 'software-engineer', 'dsa', 'oop', 'nlth', 'coding'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.sql, CONCEPT.placement, CONCEPT.agentic, CONCEPT.behavioral],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding round patterns' },
+      { label: 'Agentic Coding Round', href: CONCEPT.codingRound.href, description: 'AI-assisted technical screens' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'NLTH-style practice' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'hub-wipro-java',
@@ -257,6 +400,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-11',
     popular: true,
     tags: ['frontend-developer', 'react', 'javascript', 'css'],
+    relatedConcepts: [CONCEPT.dsa, CONCEPT.agentic, CONCEPT.star, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Freshworks Frontend Guide', href: '/interview-questions/companies/freshworks/frontend-developer', description: 'Product company loop' },
+      { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'AI-assisted coding rounds' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Frontend mock sessions' },
+    ],
+    recommendedTools: [TOOL.qgen, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'role-java-developer',
@@ -270,6 +420,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-21',
     popular: true,
     tags: ['java-developer', 'spring', 'oop'],
+    relatedConcepts: [CONCEPT.swe, CONCEPT.dsa, CONCEPT.sql, CONCEPT.systemDesign, CONCEPT.resume],
+    learnNext: [
+      { label: 'DSA Topic Map', href: CONCEPT.dsa.href, description: 'Coding interview patterns' },
+      { label: 'Software Engineer Hub', href: CONCEPT.swe.href, description: 'Broader SWE question bank' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Backend technical practice' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
   },
   {
     id: 'blog-star-method',
@@ -284,6 +441,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     featured: true,
     popular: true,
     tags: ['star', 'behavioral', 'hr'],
+    relatedConcepts: [CONCEPT.star, CONCEPT.behavioral, CONCEPT.mockBlog, CONCEPT.resume, CONCEPT.placement],
+    learnNext: [
+      { label: 'HR Interview Tips', href: CONCEPT.behavioral.href, description: 'Delivery frameworks' },
+      { label: 'STAR Answer Builder', href: '/tools/star-builder', description: 'Draft stories interactively' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Behavioral practice with feedback' },
+    ],
+    recommendedTools: [TOOL.star, TOOL.mock, TOOL.ats],
   },
   {
     id: 'blog-hr-tips',
@@ -297,6 +461,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-01',
     featured: true,
     tags: ['hr', 'behavioral', 'communication'],
+    relatedConcepts: [CONCEPT.behavioral, CONCEPT.star, CONCEPT.mockBlog, CONCEPT.resume, CONCEPT.placement],
+    learnNext: [
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Structure behavioral answers' },
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Full campus roadmap' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'HR round practice' },
+    ],
+    recommendedTools: [TOOL.star, TOOL.mock, TOOL.ats],
   },
   {
     id: 'blog-internships',
@@ -310,6 +481,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-31',
     popular: true,
     tags: ['internship', 'career', 'campus'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.resume, CONCEPT.behavioral, CONCEPT.star],
+    learnNext: [
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Campus hiring roadmap' },
+      { label: 'Resume / ATS Tips', href: CONCEPT.resume.href, description: 'Improve internship applications' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Practice before interviews' },
+    ],
+    recommendedTools: [...BLOG_TOOLS],
   },
   {
     id: 'blog-english-confidence',
@@ -322,6 +500,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     readTime: '11 min read',
     lastModified: '2026-05-31',
     tags: ['communication', 'confidence', 'english'],
+    relatedConcepts: [CONCEPT.behavioral, CONCEPT.star, CONCEPT.mockBlog, CONCEPT.placement],
+    learnNext: [
+      { label: 'HR Interview Tips', href: CONCEPT.behavioral.href, description: 'Delivery frameworks' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Structure clear answers' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Build speaking confidence' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.star, TOOL.qgen],
   },
   {
     id: 'blog-interview-anxiety',
@@ -335,6 +520,13 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-31',
     popular: true,
     tags: ['anxiety', 'mock-interview', 'behavioral'],
+    relatedConcepts: [CONCEPT.mockBlog, CONCEPT.behavioral, CONCEPT.star, CONCEPT.placement],
+    learnNext: [
+      { label: 'AI Mock Interview Guide', href: CONCEPT.mockBlog.href, description: 'Why mocks reduce anxiety' },
+      { label: 'Start Mock Interview', href: '/signup', description: 'Practice under pressure' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Memorize answer structure' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.star, TOOL.qgen],
   },
   {
     id: 'blog-fresher-top-10',
@@ -348,6 +540,95 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-05-01',
     popular: true,
     tags: ['fresher', 'campus', 'hr'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.dsa, CONCEPT.star, CONCEPT.behavioral, CONCEPT.resume],
+    learnNext: [
+      { label: 'Placement Interview Guide', href: CONCEPT.placement.href, description: 'Full fresher roadmap' },
+      { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Behavioral answer structure' },
+      { label: 'AI Mock Interview', href: '/signup', description: 'Campus mock practice' },
+    ],
+    recommendedTools: [...BLOG_TOOLS],
+  },
+  {
+    id: 'blog-agentic-ai-hub',
+    path: '/blog/agentic-ai-interview-round-2026',
+    title: 'Agentic AI Interview Round (2026): The Ultimate Guide',
+    description:
+      'Master agentic AI interview rounds — evaluation rubrics, 50+ questions, India trends, prep roadmaps, and sample workflows for AI-assisted coding interviews.',
+    category: 'Interview Strategy',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '52 min read',
+    lastModified: AGENTIC_LAST_UPDATED,
+    featured: true,
+    popular: true,
+    tags: ['agentic-ai', 'ai-coding', 'software-engineer', 'mock-interview'],
+    relatedConcepts: [CONCEPT.agentic, CONCEPT.codingRound, CONCEPT.promptEng, CONCEPT.cursor, CONCEPT.dsa, CONCEPT.star],
+    learnNext: [...AGENTIC_PATH],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
+  },
+  {
+    id: 'blog-what-is-agentic-ai',
+    path: WHAT_IS_AGENTIC_AI_PATH,
+    title: 'What Is Agentic AI? (Definition & Interview Guide 2026)',
+    description:
+      'Agentic AI explained — definition, examples, how it differs from autocomplete, and why companies test it in technical interviews.',
+    category: 'Interview Strategy',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '12 min read',
+    lastModified: '2026-06-23',
+    tags: ['agentic-ai', 'ai-coding', 'software-engineer'],
+    relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.codingRound, CONCEPT.promptEng, CONCEPT.dsa, CONCEPT.behavioral],
+    learnNext: AGENTIC_PATH.slice(1),
+    recommendedTools: [TOOL.mock, TOOL.qgen],
+  },
+  {
+    id: 'blog-agentic-coding-round',
+    path: AGENTIC_CODING_ROUND_PATH,
+    title: 'Agentic Coding Round: Format & How to Pass (2026)',
+    description:
+      'Agentic coding round format, rubric signals, tool policies, and preparation tactics for AI-assisted technical interviews.',
+    category: 'Interview Strategy',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '14 min read',
+    lastModified: '2026-06-23',
+    tags: ['agentic-ai', 'ai-coding', 'mock-interview', 'software-engineer'],
+    relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.promptEng, CONCEPT.cursor, CONCEPT.dsa, CONCEPT.star],
+    learnNext: AGENTIC_PATH.slice(2),
+    recommendedTools: [TOOL.mock, TOOL.qgen],
+  },
+  {
+    id: 'blog-ai-prompt-engineering-interview',
+    path: AI_PROMPT_ENGINEERING_PATH,
+    title: 'AI Prompt Engineering for Technical Interviews (2026)',
+    description:
+      'Interview prompt examples — poor vs good vs improved — for APIs, debugging, and code review in agentic rounds.',
+    category: 'Interview Strategy',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '15 min read',
+    lastModified: '2026-06-23',
+    tags: ['agentic-ai', 'ai-coding', 'software-engineer'],
+    relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.codingRound, CONCEPT.cursor, CONCEPT.dsa],
+    learnNext: AGENTIC_PATH.slice(3),
+    recommendedTools: [TOOL.qgen, TOOL.mock],
+  },
+  {
+    id: 'blog-cursor-ai-interview',
+    path: CURSOR_AI_INTERVIEW_PATH,
+    title: 'Cursor Interview Guide: AI Coding Interviews (2026)',
+    description:
+      'Prepare for interviews that allow Cursor — setup, Composer vs Chat, live-round tactics, and what interviewers evaluate.',
+    category: 'Interview Strategy',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '13 min read',
+    lastModified: '2026-06-23',
+    tags: ['agentic-ai', 'ai-coding', 'cursor', 'software-engineer'],
+    relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.promptEng, CONCEPT.codingRound, CONCEPT.dsa],
+    learnNext: [{ label: 'AI Mock Interview', href: '/signup', description: 'Practice Cursor workflows under pressure' }],
+    recommendedTools: [TOOL.mock, TOOL.qgen],
   },
   {
     id: 'blog-ai-mock',
@@ -360,6 +641,12 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     readTime: '6 min read',
     lastModified: '2026-05-01',
     tags: ['mock-interview', 'ai', 'practice'],
+    relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.star, CONCEPT.dsa, CONCEPT.placement, CONCEPT.behavioral],
+    learnNext: [
+      { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'Full rubric and roadmaps' },
+      { label: 'Start Mock Interview', href: '/signup', description: 'Run a scored session now' },
+    ],
+    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.star, TOOL.ats],
   },
   {
     id: 'questions-hub',
@@ -383,4 +670,4 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     lastModified: '2026-06-06',
     tags: ['resources', 'guides'],
   },
-] as const
+]

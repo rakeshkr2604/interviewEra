@@ -157,6 +157,12 @@ const RESOURCES_ITEMS = [
     desc: 'Interview prep articles and guides',
   },
   {
+    icon: Sparkles,
+    label: 'Agentic AI Interview Guide',
+    href: '/blog/agentic-ai-interview-round-2026',
+    desc: 'AI-assisted coding interviews, rubrics, and prep',
+  },
+  {
     icon: GraduationCap,
     label: 'Placement Guide',
     href: '/blog/how-to-prepare-for-placement-interviews',

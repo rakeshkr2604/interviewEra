@@ -34,6 +34,11 @@ import { MICROSOFT_SE_LAST_UPDATED } from '@/lib/seo/programmatic/microsoft-se-h
 import { INFOSYS_SE_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-se-hub';
 import { INFOSYS_JAVA_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-java-hub';
 import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub';
+import { AGENTIC_LAST_UPDATED } from '@/lib/seo/blog/agentic-ai-hub';
+import { WHAT_IS_AGENTIC_AI_CONFIG } from '@/lib/seo/blog/agentic-spoke-what-is';
+import { AGENTIC_CODING_ROUND_CONFIG } from '@/lib/seo/blog/agentic-spoke-coding-round';
+import { AI_PROMPT_ENGINEERING_CONFIG } from '@/lib/seo/blog/agentic-spoke-prompt-engineering';
+import { CURSOR_AI_INTERVIEW_CONFIG } from '@/lib/seo/blog/agentic-spoke-cursor';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
 export type SitemapSourceEntry = {
@@ -88,7 +93,37 @@ export const BLOG_POST_ROUTES: SitemapSourceEntry[] = [
     path: '/blog',
     changeFrequency: 'weekly',
     priority: 0.76,
-    lastModified: '2026-05-01',
+    lastModified: AGENTIC_LAST_UPDATED,
+  },
+  {
+    path: '/blog/agentic-ai-interview-round-2026',
+    changeFrequency: 'monthly',
+    priority: 0.88,
+    lastModified: AGENTIC_LAST_UPDATED,
+  },
+  {
+    path: '/blog/what-is-agentic-ai',
+    changeFrequency: 'monthly',
+    priority: 0.84,
+    lastModified: WHAT_IS_AGENTIC_AI_CONFIG.lastUpdated,
+  },
+  {
+    path: '/blog/agentic-coding-round',
+    changeFrequency: 'monthly',
+    priority: 0.84,
+    lastModified: AGENTIC_CODING_ROUND_CONFIG.lastUpdated,
+  },
+  {
+    path: '/blog/ai-prompt-engineering-interview',
+    changeFrequency: 'monthly',
+    priority: 0.84,
+    lastModified: AI_PROMPT_ENGINEERING_CONFIG.lastUpdated,
+  },
+  {
+    path: '/blog/cursor-ai-interview-guide',
+    changeFrequency: 'monthly',
+    priority: 0.83,
+    lastModified: CURSOR_AI_INTERVIEW_CONFIG.lastUpdated,
   },
   {
     path: '/blog/top-10-interview-questions-freshers-india-2026',

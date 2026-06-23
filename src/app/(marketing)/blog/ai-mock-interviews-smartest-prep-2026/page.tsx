@@ -19,6 +19,11 @@ const TOC_SECTIONS = [
 
 const RELATED_POSTS = [
   {
+    href: '/blog/agentic-ai-interview-round-2026',
+    title: 'Agentic AI Interview Round (2026)',
+    teaser: 'The definitive guide to AI-assisted coding interviews, rubrics, and prep roadmaps.',
+  },
+  {
     href: '/blog/how-to-prepare-for-placement-interviews',
     title: 'How to Prepare for Placement Interviews',
     teaser: 'DSA, HR rounds, and mock strategy for Indian students.',

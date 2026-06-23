@@ -44,6 +44,7 @@ const NAV_DROPDOWNS = [
     label: 'Resources',
     items: [
       { href: '/blog', label: 'Blog' },
+      { href: '/blog/agentic-ai-interview-round-2026', label: 'Agentic AI Interview Guide' },
       { href: '/help', label: 'Help Center' },
       { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Interview Guides' },
     ],

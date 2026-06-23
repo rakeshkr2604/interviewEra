@@ -37,7 +37,7 @@ export function RelatedGuidesStrip({ heading = 'Related Guides', className }: Re
             <li key={entry.path} className="p-0">
               <Link
                 href={entry.path}
-                className="group flex h-full flex-col rounded-xl border p-4 transition-colors hover:border-(--accent-primary)"
+                className="group flex h-full min-h-11 flex-col rounded-xl border p-4 transition-colors hover:border-(--accent-primary)"
                 style={{
                   borderColor: 'var(--card-border)',
                   background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',

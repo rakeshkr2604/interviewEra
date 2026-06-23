@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { BlogRelatedToolsStrip } from '@/components/seo/BlogRelatedToolsStrip';
+import { ContentRelationshipsStrip } from '@/components/content/ContentRelationshipsStrip';
 import { RelatedGuidesStrip } from '@/components/content/RelatedGuidesStrip';
 
 import { siteConfig } from '@/lib/seo/metadata';
@@ -21,8 +21,8 @@ export default function MarketingBlogLayout({ children }: { children: ReactNode 
   return (
     <>
       {children}
+      <ContentRelationshipsStrip />
       <RelatedGuidesStrip />
-      <BlogRelatedToolsStrip />
     </>
   );
 }
