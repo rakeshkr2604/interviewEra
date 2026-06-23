@@ -55,9 +55,10 @@ export function roleQuestionsPath(slug: RoleSlug): string {
   return `${PATHS.roleBase}/${slug}`
 }
 
-/** /interview-questions/tcs (pillar hub) or /interview-questions/companies/{slug} */
+/** /interview-questions/tcs or /interview-questions/solera (pillar hubs) or /interview-questions/companies/{slug} */
 export function companyQuestionsPath(slug: CompanySlug): string {
   if (slug === 'tcs') return '/interview-questions/tcs'
+  if (slug === 'solera') return '/interview-questions/solera'
   return `${PATHS.companyBase}/${slug}`
 }
 
@@ -285,6 +286,11 @@ export const HIGH_VALUE_INTERSECTIONS: readonly IntersectionPair[] = [
   { company: 'zoho', role: 'frontend-developer' },
   { company: 'freshworks', role: 'software-engineer' },
   { company: 'freshworks', role: 'frontend-developer' },
+  { company: 'solera', role: 'software-engineer' },
+  { company: 'solera', role: 'java-developer' },
+  { company: 'solera', role: 'frontend-developer' },
+  { company: 'solera', role: 'qa-engineer' },
+  { company: 'solera', role: 'data-analyst' },
   { company: 'cred', role: 'software-engineer' },
   { company: 'cred', role: 'backend-developer' },
   { company: 'groww', role: 'software-engineer' },

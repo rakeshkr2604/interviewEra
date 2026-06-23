@@ -16,6 +16,7 @@ export const COMPANY_HUB_REFERENCE_SLUG = 'tcs' as const
 
 export const COMPANY_HUB_PILLAR_SLUGS = [
   'tcs',
+  'solera',
   'infosys',
   'wipro',
   'accenture',
@@ -184,6 +185,7 @@ export const COMPANY_HUB_PAGE_SCHEMA_SHELL = [
 /** Company hubs that use a top-level pillar path instead of /companies/{slug}. */
 export function companyHubCanonicalPath(slug: CompanyHubPillarSlug): string {
   if (slug === 'tcs') return '/interview-questions/tcs'
+  if (slug === 'solera') return '/interview-questions/solera'
   return `/interview-questions/companies/${slug}`
 }
 

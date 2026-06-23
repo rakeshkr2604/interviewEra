@@ -47,6 +47,8 @@ export const NAV_RESOURCE_ITEMS: readonly NavResourceItem[] = [
 ] as const
 
 export const FOOTER_INTERVIEW_QUESTIONS_LINKS: readonly SeoTextLink[] = [
+  { href: '/interview-questions/companies/wipro', label: 'Wipro Careers Hub' },
+  { href: '/interview-questions/solera', label: 'Solera Careers Hub' },
   { href: '/interview-questions/companies/amazon/software-engineer', label: 'Amazon SDE Questions' },
   { href: '/interview-questions/companies/microsoft/software-engineer', label: 'Microsoft SDE Questions' },
   { href: '/interview-questions/companies/infosys/software-engineer', label: 'Infosys SWE Questions' },

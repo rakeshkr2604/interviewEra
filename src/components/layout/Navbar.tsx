@@ -115,6 +115,18 @@ const INTERVIEW_QUESTIONS_ITEMS = [
     desc: 'NQT + technical + HR rounds',
   },
   {
+    icon: Building2,
+    label: 'Wipro Careers Hub',
+    href: '/interview-questions/companies/wipro',
+    desc: 'NLTH, WILP, Turbo hiring tracks',
+  },
+  {
+    icon: Building2,
+    label: 'Solera Careers Hub',
+    href: '/interview-questions/solera',
+    desc: 'Cognitive assessment + Java/SQL rounds',
+  },
+  {
     icon: Layers,
     label: 'React Interview Questions',
     href: '/interview-questions/topics/react',

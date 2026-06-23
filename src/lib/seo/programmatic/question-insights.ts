@@ -790,6 +790,32 @@ const INSIGHT_EXTENSIONS: Record<string, InsightExtension> = {
       'Treating Turbo as separate company, unaware of coding depth, or expecting Turbo without strong NLTH scores.',
     followUps: ['Turbo vs TCS Digital?', 'What DSA topics matter most for Turbo?'],
   },
+  'What is the Solera cognitive assessment and what does it test?': {
+    expertAnswer:
+      'Solera\'s cognitive assessment is typically a ~30-minute online screen with aptitude (logical, quantitative, verbal) and a short personality section for cultural fit. Some drives add a separate Java coding round. Shortlisted candidates proceed to technical and HR interviews. Treat personality responses consistently — contradictory answers flag integrity concerns.',
+    whyAsked:
+      'Solera eliminates most applicants at the cognitive stage — understanding sections prevents surprise on assessment day.',
+    evaluates:
+      'Awareness of Solera screening format and preparation priorities before live interviews.',
+    strategy:
+      'List aptitude + personality sections, mention optional Java coding, note timed nature and honesty on personality items.',
+    mistakes:
+      'Skipping aptitude prep, random personality answers, or confusing cognitive assessment with full technical interview.',
+    followUps: ['Does Solera have negative marking?', 'What Java topics follow the assessment?'],
+  },
+  'What does Solera do and what engineering problems do India teams work on?': {
+    expertAnswer:
+      'Solera is a global vehicle lifecycle management SaaS company — insurance claims (Audatex), collision repair estimating, fleet solutions, and AI-powered digital triage. India engineering teams in Bengaluru and Hyderabad build cloud platforms processing claims workflows, repair estimates, and automotive data services used by insurers and repair networks worldwide.',
+    whyAsked:
+      'HR and manager rounds test domain motivation — generic IT answers fail at product companies with specialized domains.',
+    evaluates:
+      'Company research depth and genuine interest in automotive + insurance technology.',
+    strategy:
+      'Define vehicle lifecycle SaaS, name Audatex/claims context, tie to India engineering ownership, mention AI initiatives in India market.',
+    mistakes:
+      'Calling Solera a generic IT services firm, no product knowledge, or unable to explain why automotive tech interests you.',
+    followUps: ['What is Audatex?', 'How does Solera use AI in India?'],
+  },
 }
 
 export function mergeQuestionInsights(question: SeoQuestion): SeoQuestion {

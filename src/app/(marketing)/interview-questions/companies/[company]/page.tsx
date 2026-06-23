@@ -97,6 +97,10 @@ export default async function CompanyQuestionsPage({ params }: Props) {
     redirect('/interview-questions/tcs')
   }
 
+  if (company.slug === 'solera') {
+    redirect('/interview-questions/solera')
+  }
+
   if (isWiproCompanyHub(company.slug)) {
     const hubQuestions = WIPRO_HUB_QUESTIONS
     const linkSections = buildCompanyPageLinks(company)

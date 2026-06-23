@@ -287,6 +287,20 @@ export const COMPANIES = [
       'Freshworks interviews evaluate full-stack development capability, product awareness, and collaborative problem-solving skills.',
   },
   {
+    slug: 'solera',
+    label: 'Solera',
+    fullName: 'Solera Holdings, LLC',
+    tier: 'product',
+    headquartersCity: 'Bengaluru',
+    avgPackageRange: '5–12 LPA',
+    typicalRounds: 4,
+    interviewStyle: 'Cognitive Assessment → Coding → Technical × 2 → HR',
+    sitemapPriority: 0.74,
+    fresherHiring: true,
+    description:
+      'Solera builds vehicle lifecycle management SaaS for automotive insurance, claims, and repair. India engineering teams in Bengaluru and Hyderabad hire Associate Software Engineers through cognitive assessments and Java/SQL-focused technical interviews.',
+  },
+  {
     slug: 'browserstack',
     label: 'BrowserStack',
     fullName: 'BrowserStack Inc.',

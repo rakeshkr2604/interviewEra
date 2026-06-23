@@ -4313,6 +4313,96 @@ Object.assign(SKILL_QUESTION_REGISTRY, SKILL_QUESTIONS)
         },
       ] satisfies readonly SeoQuestion[],
     },
+
+    solera: {
+      lastUpdated: '2026-06-23',
+      questions: [
+        {
+          question: 'What does Solera do and what engineering problems do India teams work on?',
+          category: 'hr',
+          difficulty: 'easy',
+          tip: 'Solera is a global vehicle lifecycle management SaaS company — insurance claims (Audatex), collision repair estimating, fleet solutions, and AI-powered digital triage. India engineering in Bengaluru and Hyderabad builds and maintains platforms used by insurers, repairers, and fleet operators worldwide. Mention domain interest in automotive + insurance tech.',
+          keywords: ['Solera', 'vehicle lifecycle', 'Audatex', 'insurance claims', 'automotive SaaS', 'India engineering'],
+        },
+        {
+          question: 'What is the Solera cognitive assessment and what does it test?',
+          category: 'aptitude',
+          difficulty: 'easy',
+          tip: 'Solera\'s initial screen often includes a ~30-minute cognitive assessment: aptitude (logical, quant, verbal) plus a short personality section for cultural fit. Some drives add a separate coding round in Java. Prepare timed aptitude drills and honest, consistent personality responses.',
+          keywords: ['Solera cognitive assessment', 'aptitude', 'personality test', 'off-campus'],
+        },
+        {
+          question: 'Write a Java program to check whether a number is prime.',
+          category: 'technical',
+          difficulty: 'easy',
+          tip: 'Loop to sqrt(n), check divisibility. Handle 0, 1, negatives. Solera coding rounds frequently use Java — narrate approach, edge cases, and O(sqrt n) complexity before coding.',
+          keywords: ['prime number', 'Java', 'coding round', 'control flow'],
+        },
+        {
+          question: 'Explain Java Collections — Lists, Sets, and Maps with use cases.',
+          category: 'technical',
+          difficulty: 'medium',
+          tip: 'List: ordered, allows duplicates (ArrayList for random access). Set: no duplicates (HashSet for uniqueness checks). Map: key-value pairs (HashMap for lookups). Solera panels probe Collections after resume claims — give duplicate-detection via Set.add() example.',
+          keywords: ['Java Collections', 'List', 'Set', 'Map', 'HashSet', 'ArrayList'],
+        },
+        {
+          question: 'Write SQL to count records grouped by a category and sort results.',
+          category: 'technical',
+          difficulty: 'easy',
+          tip: 'SELECT category, COUNT(*) FROM table GROUP BY category ORDER BY COUNT(*) DESC. Solera technical rounds often include live SQL — insurance/repair data models use heavy relational schemas.',
+          keywords: ['SQL', 'GROUP BY', 'ORDER BY', 'COUNT', 'aggregates'],
+        },
+        {
+          question: 'What is the difference between INNER JOIN and LEFT JOIN?',
+          category: 'technical',
+          difficulty: 'easy',
+          tip: 'INNER JOIN returns matching rows only. LEFT JOIN keeps all left-table rows with NULLs for non-matches. Use LEFT JOIN when you need all primary entities even without related records — common in claims data gap analysis.',
+          keywords: ['INNER JOIN', 'LEFT JOIN', 'SQL', 'NULL'],
+        },
+        {
+          question: 'Given an array, find the longest arithmetic subsequence.',
+          category: 'technical',
+          difficulty: 'hard',
+          tip: 'DP approach: for each pair (i,j) track length of arithmetic sequence ending at j with difference A[j]-A[i]. O(n²) typical. Solera coding rounds include medium DSA — narrate brute force then optimisation.',
+          keywords: ['arithmetic sequence', 'dynamic programming', 'array', 'DSA'],
+        },
+        {
+          question: 'What is REST and how would you design APIs for an insurance claims workflow?',
+          category: 'technical',
+          difficulty: 'medium',
+          tip: 'REST: stateless HTTP resources with standard verbs. Claims API: POST /claims (FNOL), GET /claims/{id}, PATCH /claims/{id}/status, POST /claims/{id}/estimates. Use proper status codes, idempotency keys for payments, and versioning (/v1/).',
+          keywords: ['REST API', 'insurance claims', 'HTTP methods', 'API design'],
+        },
+        {
+          question: 'Explain OOP pillars with examples relevant to enterprise Java services.',
+          category: 'technical',
+          difficulty: 'easy',
+          tip: 'Encapsulation (private fields + getters), Inheritance (shared claim base class), Polymorphism (processClaim() per claim type), Abstraction (ClaimProcessor interface). Tie examples to domain objects insurers understand.',
+          keywords: ['OOP', 'encapsulation', 'polymorphism', 'Java', 'enterprise'],
+        },
+        {
+          question: 'Minimum number of platforms required for train arrival/departure — approach?',
+          category: 'technical',
+          difficulty: 'medium',
+          tip: 'Sort events by time; sweep line: +1 on arrival, -1 on departure; track max concurrent trains = platforms needed. Classic interval problem — Solera panels use LeetCode-style questions at medium difficulty.',
+          keywords: ['platforms', 'intervals', 'sweep line', 'LeetCode', 'DSA'],
+        },
+        {
+          question: 'Describe a production bug you found before release and how you handled it.',
+          category: 'behavioral',
+          difficulty: 'medium',
+          tip: 'Use STAR. Solera values collaborative engineering — show communication with QA, root-cause analysis, fix verification, and post-mortem learning. Mention regression tests added.',
+          keywords: ['production bug', 'STAR', 'root cause', 'regression', 'collaboration'],
+        },
+        {
+          question: 'Why do you want to join Solera as a fresher or early-career engineer?',
+          category: 'hr',
+          difficulty: 'easy',
+          tip: 'Anchor on automotive + insurance domain scale, global SaaS impact, AI initiatives (visual intelligence, digital triage in India), structured bootcamp for graduates, and Bengaluru/Hyderabad engineering culture. Avoid generic "MNC" answers.',
+          keywords: ['why Solera', 'automotive tech', 'career goals', 'bootcamp', 'SaaS'],
+        },
+      ] satisfies readonly SeoQuestion[],
+    },
   }
   Object.assign(COMPANY_QUESTION_REGISTRY, extra)
 })()
