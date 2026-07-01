@@ -15,7 +15,7 @@ const ScoreTrendChart = dynamic(
   {
     loading: () => (
       <div
-        className="h-28 w-full animate-pulse rounded-lg"
+        className="h-28 w-full animate-pulse motion-reduce:animate-none rounded-lg"
         style={{ background: 'var(--bg-tertiary)' }}
         aria-hidden
       />
@@ -66,28 +66,27 @@ export function DashboardMain({
   const showTrend = completedCount >= 2
 
   return (
-    <div className={`grid grid-cols-1 gap-4 ${showTrend ? 'lg:grid-cols-2 lg:gap-6' : ''}`}>
+    <div className={`grid grid-cols-1 gap-3 sm:gap-4 ${showTrend ? 'lg:grid-cols-2 lg:gap-6' : ''}`}>
       {showTrend ? (
-        <div className="dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7">
-          <div className="mb-4 flex items-center justify-between gap-4">
+        <div className="dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7 lg:py-6">
+          <div className="mb-4 flex items-start justify-between gap-4">
             <div>
-              <p
-                className="text-[10px] font-bold uppercase tracking-[0.14em]"
-                style={{ color: 'var(--accent-primary)' }}
-              >
-                Performance
-              </p>
-              <p className="mt-1 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Score trend
-              </p>
+              <p className="dashboard-section-eyebrow">Performance</p>
+              <p className="dashboard-section-title">Score trend</p>
             </div>
             {avgScore ? (
               <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+                <p className="dashboard-section-eyebrow" style={{ color: 'var(--text-muted)' }}>
                   Average
                 </p>
-                <p className="mt-1 text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-                  {avgScore}/10
+                <p
+                  className="mt-0.5 text-2xl font-bold tabular-nums leading-none sm:text-3xl"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  {avgScore}
+                  <span className="text-base font-semibold sm:text-lg" style={{ color: 'var(--text-muted)' }}>
+                    /10
+                  </span>
                 </p>
               </div>
             ) : null}
@@ -98,23 +97,20 @@ export function DashboardMain({
         </div>
       ) : null}
 
-      <div className={`dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7 ${showTrend ? '' : 'lg:col-span-1'}`}>
-        <div className="mb-4 flex items-center justify-between gap-3">
+      <div className={`dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7 lg:py-6 ${showTrend ? '' : 'lg:col-span-1'}`}>
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Recent activity
-            </p>
-            <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Latest mocks — continue or review reports
-            </p>
+            <p className="dashboard-section-eyebrow">History</p>
+            <p className="dashboard-section-title">Recent activity</p>
+            <p className="dashboard-section-subtitle">Latest mocks — continue or review reports</p>
           </div>
           <Link
             href="/history"
-            className="dashboard-hover-lift rounded-xl border-2 px-3 py-1.5 text-xs font-semibold"
+            className="dashboard-hover-lift shrink-0 rounded-xl border px-3 py-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             style={{
               borderColor: 'var(--card-border)',
               background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-              color: 'var(--text-primary)',
+              color: 'var(--text-secondary)',
             }}
           >
             View all
@@ -137,7 +133,7 @@ export function DashboardMain({
         {hiddenCount > 0 ? (
           <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
             +{hiddenCount} more in{' '}
-            <Link href="/history" className="font-semibold hover:underline" style={{ color: 'var(--accent-primary)' }}>
+            <Link href="/history" className="font-medium hover:underline" style={{ color: 'var(--accent-primary)' }}>
               interview history
             </Link>
           </p>

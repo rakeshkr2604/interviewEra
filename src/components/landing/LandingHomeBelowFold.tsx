@@ -3,12 +3,16 @@
 import React from 'react';
 import Link from 'next/link';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
+import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/container';
 
 /* ─── 5. SCORING ENGINE ─── */
 function ScoringEngineSection() {
   return (
-    <section style={{ padding: '88px 0', background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}>
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
+    <section
+      className={LANDING_HOME_SECTION}
+      style={{ background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}
+    >
+      <div className={LANDING_HOME_INNER}>
         <Reveal>
           <div style={{ textAlign: 'center' }}>
             <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
@@ -111,29 +115,30 @@ function CTASection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
 
   return (
-    <div style={{ padding: '100px 0', textAlign: 'center', background: T.ctaBg, borderTop: `1px solid ${T.ctaBrd}` }}>
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
+    <div className="border-t py-24 text-center sm:py-28" style={{ background: T.ctaBg, borderColor: T.ctaBrd }}>
+      <div className={LANDING_HOME_INNER}>
         <Reveal>
-          <div style={{ display: 'inline-block', background: T.accdim, border: `1px solid ${T.accbrd}`, borderRadius: '99px', padding: '5px 16px', fontSize: '12px', fontWeight: 600, color: T.acc2, marginBottom: '20px' }}>
+          <div className="mb-5 inline-block rounded-full px-4 py-1.5 text-xs font-semibold" style={{ background: T.accdim, border: `1px solid ${T.accbrd}`, color: T.acc2 }}>
             Free to start — no card required
           </div>
-          <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(28px,4vw,48px)', fontWeight: 800, marginBottom: '16px', color: T.text, letterSpacing: '-0.028em' }}>
+          <h2 className="mb-4 font-[family-name:var(--font-bricolage)] text-[clamp(28px,4vw,48px)] font-extrabold tracking-tight" style={{ color: T.text, letterSpacing: '-0.028em' }}>
             Your next interview<br />shouldn&apos;t be a guess.
           </h2>
-          <p style={{ fontSize: '16px', color: T.text2, maxWidth: '460px', margin: '0 auto 36px' }}>
+          <p className="mx-auto mb-9 max-w-[29rem] text-base leading-relaxed" style={{ color: T.text2 }}>
             Run a scored mock from your actual resume and leave with measurable feedback — not a vague “you did fine.”
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div className="flex flex-wrap justify-center gap-3">
             <Link
               href={cta}
-              className="v3-btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '15px 32px', borderRadius: '12px', background: T.acc, color: '#fff', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textDecoration: 'none' }}
+              className="v3-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-[15px] font-semibold no-underline"
+              style={{ color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
             >
-              Start a scored interview — it&apos;s free →
+              Start Free
             </Link>
             <Link
               href="/pricing"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '15px 32px', borderRadius: '12px', background: 'transparent', color: T.text, fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", border: `1.5px solid ${T.ctaBrd}`, textDecoration: 'none' }}
+              className="v3-btn-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-7 py-3.5 text-[15px] font-semibold no-underline"
+              style={{ color: T.text, fontFamily: "'DM Sans', sans-serif", borderColor: T.ctaBrd }}
             >
               See pricing
             </Link>

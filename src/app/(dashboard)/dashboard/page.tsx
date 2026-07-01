@@ -140,7 +140,7 @@ export default async function DashboardPage() {
         }
       />
 
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:mb-5 sm:gap-4 lg:mb-8 lg:grid-cols-2 lg:items-stretch lg:gap-6 xl:gap-8">
+      <div className="dashboard-section grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:items-stretch lg:gap-6 xl:gap-8">
         <UserSummaryCard
           userData={userData}
           displayName={displayName}
@@ -163,6 +163,7 @@ export default async function DashboardPage() {
           planTier={planTier}
           planExpiresAt={userData?.plan_expires_at ?? null}
           planStatus={userData?.plan_status ?? null}
+          demotePracticeCta={Boolean(inProgressInterview)}
         />
       </div>
 
@@ -172,12 +173,14 @@ export default async function DashboardPage() {
 
       <RetentionProgressCard snap={retentionDashboardSnap} />
 
-      <DashboardMain
-        rows={rows}
-        userData={userData}
-        avgScore={avgScore}
-        currentStreak={currentStreak}
-      />
+      <div className="dashboard-section">
+        <DashboardMain
+          rows={rows}
+          userData={userData}
+          avgScore={avgScore}
+          currentStreak={currentStreak}
+        />
+      </div>
       </div>
     </>
   )

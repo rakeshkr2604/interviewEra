@@ -1,5 +1,6 @@
 import MarketingLayout from '@/app/(marketing)/layout';
 import { HomeMoneyPageLinks } from '@/components/seo/HomeMoneyPageLinks';
+import { AudiencePathSection } from '@/components/landing/AudiencePathSection';
 import LandingHero from '@/components/landing/LandingHero';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
 import { LandingWhyFail } from '@/components/landing/LandingWhyFail';
@@ -26,6 +27,7 @@ export default function Page() {
     <MarketingLayout>
       <main id="main-content">
         <LandingHero countPill={<HeroBetaPill />} />
+        <AudiencePathSection />
         <LandingWhyFail />
         <LandingInterviewDemo />
         <LandingBeforeAfter />

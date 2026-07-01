@@ -22,7 +22,7 @@ export function CommunityFooterLinks() {
         <li>
           <Link
             href={COMMUNITY_HUB_PATH}
-            className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] opacity-85 transition-all duration-200 hover:translate-x-0.5 hover:opacity-100"
+            className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] opacity-85 transition-[opacity,transform] duration-200 hover:translate-x-0.5 hover:opacity-100 motion-reduce:transform-none"
           >
             Community Hub
           </Link>
@@ -36,7 +36,7 @@ export function CommunityFooterLinks() {
               placement="landing_footer"
               analyticsEvent="footer_community_click"
               trackJoin={platform.category === 'community' || platform.category === 'channel'}
-              className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] opacity-85 transition-all duration-200 hover:translate-x-0.5 hover:opacity-100"
+              className="inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] opacity-85 transition-[opacity,transform] duration-200 hover:translate-x-0.5 hover:opacity-100 motion-reduce:transform-none"
             >
               <CommunityPlatformIcon platformId={platform.icon} className="size-3.5 shrink-0 opacity-70" />
               {platform.title}

@@ -1,9 +1,16 @@
 import Link from 'next/link';
 import { Home, RotateCcw, BookOpen } from 'lucide-react';
+import {
+  IE_FOCUS_VISIBLE,
+  IE_MARKETING_CTA_PRIMARY_CLASS,
+  IE_MARKETING_CTA_SECONDARY_CLASS,
+  IE_MARKETING_CTA_SECONDARY_STYLE,
+} from '@/lib/theme/component-classes';
+import { cn } from '@/lib/utils';
 
 export default function NotFound() {
   return (
-    <div
+    <main
       className="flex min-h-screen flex-col items-center justify-center px-4 text-center"
       style={{ background: 'var(--page-gradient, #f8fafc)' }}
     >
@@ -45,19 +52,28 @@ export default function NotFound() {
         <div className="flex flex-col items-center gap-3 pt-2 sm:flex-row sm:justify-center">
           <Link
             href="/dashboard"
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
-            style={{ background: 'var(--accent-primary, #6366f1)' }}
+            className={cn(
+              IE_MARKETING_CTA_PRIMARY_CLASS,
+              'rounded-[var(--ie-radius-md)] px-6 py-2.5',
+            )}
+            style={{
+              background: 'var(--accent-primary)',
+              boxShadow: '0 10px 28px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
+            }}
           >
             <Home className="h-4 w-4" aria-hidden />
             Go to Dashboard
           </Link>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl border-2 px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-80"
+            className={cn(
+              IE_MARKETING_CTA_SECONDARY_CLASS,
+              'rounded-[var(--ie-radius-md)] border-2 px-6 py-2.5',
+            )}
             style={{
-              borderColor: 'var(--card-border, #e5e7eb)',
-              background: 'color-mix(in srgb, var(--card-bg, #fff) 88%, transparent)',
-              color: 'var(--text-primary, #111827)',
+              ...IE_MARKETING_CTA_SECONDARY_STYLE,
+              background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+              color: 'var(--text-primary)',
             }}
           >
             <RotateCcw className="h-4 w-4" aria-hidden />
@@ -83,7 +99,10 @@ export default function NotFound() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-opacity hover:opacity-70"
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-opacity hover:opacity-70',
+                  IE_FOCUS_VISIBLE,
+                )}
                 style={{
                   borderColor: 'var(--card-border, #e5e7eb)',
                   color: 'var(--text-secondary, #6b7280)',
@@ -97,6 +116,6 @@ export default function NotFound() {
           </div>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

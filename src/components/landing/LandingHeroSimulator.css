@@ -12,7 +12,6 @@
  * ============================================================ */
 
 .sim-host {
-  /* fonts — self-hosted via next/font (JetBrains Mono + Instrument Serif), system fallbacks */
   --sim-sans: var(--font-dm-sans), system-ui, -apple-system, sans-serif;
   --sim-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
   --sim-serif: var(--font-instrument-serif), Georgia, 'Times New Roman', serif;

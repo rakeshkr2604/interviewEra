@@ -5,6 +5,7 @@ import { ArrowRight } from 'lucide-react';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
+import { IE_CARD_RADIUS_CLASS } from '@/lib/theme/component-classes';
 
 interface FreeToolFormCardProps {
   /** Small uppercase label (e.g. "Analyzer", "Generator") */
@@ -19,14 +20,12 @@ interface FreeToolFormCardProps {
   children: ReactNode;
 }
 
-const cardShell =
-  'overflow-hidden rounded-[22px] border-2 shadow-2xl lg:rounded-3xl';
+const cardShell = cn('overflow-hidden border-2 shadow-2xl', IE_CARD_RADIUS_CLASS);
 
 const cardShellStyle: CSSProperties = {
   borderColor: 'var(--card-border)',
   background: 'color-mix(in srgb, var(--card-bg) 94%, transparent)',
-  boxShadow:
-    'var(--card-shadow), 0 0 64px color-mix(in srgb, var(--accent-primary) 12%, transparent), 0 0 0 1px color-mix(in srgb, white 45%, transparent) inset',
+  boxShadow: 'var(--ie-shadow-card)',
 };
 
 const headerStripStyle: CSSProperties = {
@@ -88,12 +87,15 @@ export function FreeToolCtaBlock({
 }) {
   return (
     <div
-      className="relative overflow-hidden rounded-[22px] border-2 p-6 text-center sm:p-8 lg:rounded-3xl"
+      className={cn(
+        'relative overflow-hidden border-2 p-6 text-center sm:p-8',
+        IE_CARD_RADIUS_CLASS,
+      )}
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))',
         background:
           'linear-gradient(145deg, color-mix(in srgb, var(--accent-primary) 18%, var(--card-bg)) 0%, var(--card-bg) 55%)',
-        boxShadow: 'var(--card-shadow), 0 0 48px color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+        boxShadow: 'var(--ie-shadow-md), 0 0 48px color-mix(in srgb, var(--accent-primary) 14%, transparent)',
       }}
     >
       <p className="text-base font-semibold sm:text-lg" style={{ color: 'var(--text-primary)' }}>
@@ -107,7 +109,7 @@ export function FreeToolCtaBlock({
         ctaKey={CTA_KEYS.TOOL_CTA}
         ctaText={ctaLabel}
         section={section}
-        className="landing-cta-lift mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-[12px] px-6 text-sm font-semibold text-white sm:h-12 sm:px-8 sm:text-base"
+        className="landing-cta-lift mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-[var(--ie-radius-md)] px-6 text-sm font-semibold text-white sm:h-12 sm:px-8 sm:text-base"
         style={{
           background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
           boxShadow: '0 12px 36px color-mix(in srgb, var(--accent-primary) 30%, transparent)',

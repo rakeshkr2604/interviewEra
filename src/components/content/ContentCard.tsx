@@ -1,6 +1,11 @@
 import Link from 'next/link'
 import { ArrowRight, Clock, Sparkles } from 'lucide-react'
 import type { ContentEntry } from '@/lib/seo/content/types'
+import {
+  IE_CARD_RADIUS_CLASS,
+  IE_MARKETING_CTA_PRIMARY_CLASS,
+  IE_MARKETING_CTA_PRIMARY_STYLE,
+} from '@/lib/theme/component-classes'
 import { cn } from '@/lib/utils'
 
 interface ContentCardProps {
@@ -13,8 +18,9 @@ export function ContentCard({ entry, className, compact = false }: ContentCardPr
   return (
     <article
       className={cn(
-        'group flex h-full flex-col overflow-hidden rounded-[22px] border-2 transition-[transform,box-shadow] duration-200 lg:rounded-3xl',
+        'group flex h-full flex-col overflow-hidden border-2 transition-[transform,box-shadow] duration-200',
         'hover:-translate-y-1 hover:shadow-xl',
+        IE_CARD_RADIUS_CLASS,
         className,
       )}
       style={{
@@ -88,11 +94,8 @@ export function ContentCard({ entry, className, compact = false }: ContentCardPr
           )}
           <Link
             href={entry.path}
-            className="landing-cta-lift inline-flex h-9 items-center justify-center gap-2 rounded-[12px] px-4 text-sm font-semibold text-white sm:h-10 sm:px-5"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-              boxShadow: '0 12px 36px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
-            }}
+            className={cn(IE_MARKETING_CTA_PRIMARY_CLASS, 'h-9 sm:h-10 sm:px-5')}
+            style={IE_MARKETING_CTA_PRIMARY_STYLE}
           >
             Read guide
             <ArrowRight className="size-4" aria-hidden />

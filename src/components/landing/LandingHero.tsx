@@ -3,18 +3,18 @@ import { T } from '@/components/landing/landing-home-tokens';
 import { AmbientLayer } from '@/components/landing/AmbientLayer';
 import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
 import LandingHeroSimulator from '@/components/landing/LandingHeroSimulator';
+import { LANDING_HOME_INNER } from '@/lib/landing/container';
+import { cn } from '@/lib/utils';
 
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
   return (
     <>
-      <section style={{ position: 'relative', overflow: 'hidden', padding: '72px 0 88px' }}>
+      <section className="landing-hero-section relative overflow-hidden pt-[4.5rem] pb-[5.5rem] sm:pt-[4.75rem] sm:pb-24">
         <div
           aria-hidden
+          className="landing-hero-dot-grid pointer-events-none absolute inset-0"
           style={{
-            position: 'absolute',
-            inset: 0,
-            pointerEvents: 'none',
             backgroundImage: `radial-gradient(${T.bord2} 1px, transparent 1px)`,
             backgroundSize: '32px 32px',
             maskImage: 'radial-gradient(ellipse 80% 50% at 50% 0%, black 20%, transparent 80%)',
@@ -24,45 +24,36 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
         <AmbientLayer variant="hero" />
 
-        <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px', position: 'relative', zIndex: 1 }}>
-          <div className="hero-grid-responsive" style={{ display: 'grid', gridTemplateColumns: 'clamp(300px,46%,500px) 1fr', gap: '48px', alignItems: 'center' }}>
-            <div style={{ minWidth: 0 }}>
+        <div className={cn(LANDING_HOME_INNER, 'relative z-[1]')}>
+          <div
+            className="hero-grid-responsive grid items-center gap-10 lg:gap-12"
+            style={{ gridTemplateColumns: 'clamp(300px,46%,500px) 1fr' }}
+          >
+            <div className="hero-copy-col min-w-0">
               <div
+                className="mb-5 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold sm:mb-6"
                 style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '8px',
                   background: T.accdim,
                   border: `1px solid ${T.accbrd}`,
-                  borderRadius: '99px',
-                  padding: '5px 14px',
-                  fontSize: '12px',
-                  fontWeight: 600,
                   color: T.acc2,
-                  marginBottom: '24px',
                 }}
               >
                 <span
-                  style={{
-                    width: '6px',
-                    height: '6px',
-                    borderRadius: '50%',
-                    background: T.ok,
-                    flexShrink: 0,
-                    display: 'block',
-                  }}
+                  aria-hidden
+                  className="block size-1.5 shrink-0 rounded-full"
+                  style={{ background: T.ok }}
                 />
                 {countPill}
               </div>
 
               <h1
+                className="mb-5 sm:mb-6"
                 style={{
                   fontFamily: "'Bricolage Grotesque', sans-serif",
                   fontSize: 'clamp(36px, 4.4vw, 58px)',
                   fontWeight: 800,
                   lineHeight: 1.04,
                   letterSpacing: '-0.03em',
-                  marginBottom: '20px',
                   color: T.text,
                 }}
               >
@@ -74,14 +65,8 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               </h1>
 
               <p
-                style={{
-                  marginTop: '20px',
-                  fontSize: '16px',
-                  lineHeight: 1.8,
-                  color: T.text2,
-                  maxWidth: '460px',
-                  marginBottom: '32px',
-                }}
+                className="mb-8 max-w-[32rem] text-base leading-[1.75] sm:mb-9"
+                style={{ color: T.text2 }}
               >
                 <strong style={{ color: T.text, fontWeight: 700 }}>InterviewEra</strong> is an AI-powered mock
                 interview platform for Indian campus hiring. Upload your resume and sit a realistic, voice-based
@@ -91,29 +76,31 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
               <LandingHeroCtaIsland />
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', fontSize: '12.5px', color: T.text2 }}>
+              <ul
+                className="mt-6 flex list-none flex-wrap gap-x-5 gap-y-2.5 p-0 text-[12.5px] sm:mt-7"
+                style={{ color: T.text2 }}
+                aria-label="Trust indicators"
+              >
                 {[
                   { dot: T.ok, label: 'No credit card needed' },
                   { dot: T.acc, label: 'Under 60 seconds to start' },
                   { dot: T.ok, label: 'Free to begin' },
                 ].map((item) => (
-                  <span key={item.label} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <li key={item.label} className="flex items-center gap-1.5">
                     <span
-                      style={{
-                        width: '5px',
-                        height: '5px',
-                        borderRadius: '50%',
-                        background: item.dot,
-                        display: 'block',
-                      }}
+                      aria-hidden
+                      className="block size-[5px] shrink-0 rounded-full"
+                      style={{ background: item.dot }}
                     />
                     {item.label}
-                  </span>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
 
-            <LandingHeroSimulator />
+            <div className="hero-mockup-col min-w-0">
+              <LandingHeroSimulator />
+            </div>
           </div>
         </div>
       </section>

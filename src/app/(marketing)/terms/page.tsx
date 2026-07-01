@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { FileText } from 'lucide-react';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
+import { MarketingPageHeader } from '@/components/layout/MarketingPageHeader';
 import { generateMetadata } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
@@ -126,36 +127,33 @@ export default function TermsPage() {
   return (
     <BlogMarketingShell>
       {/* Page header */}
-      <div className="mx-auto mb-12 max-w-2xl text-center sm:mb-16">
-        <div
-          className="mx-auto mb-5 flex h-12 w-12 items-center justify-center rounded-2xl"
-          style={{
-            background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-            color: 'var(--accent-primary)',
-          }}
-        >
-          <FileText className="size-6" aria-hidden />
-        </div>
-        <p
-          className="mb-3 text-xs font-bold uppercase tracking-widest"
-          style={{ color: 'var(--accent-primary)' }}
-        >
-          Legal
-        </p>
-        <h1
-          className="text-3xl font-bold leading-tight tracking-tight sm:text-4xl md:text-5xl"
-          style={{ letterSpacing: '-0.028em' }}
-        >
-          Terms &amp; Conditions
-        </h1>
-        <p className="mt-4 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-          Effective date: <strong style={{ color: 'var(--text-primary)' }}>1 May 2026</strong>
-          &nbsp;·&nbsp; Last updated: <strong style={{ color: 'var(--text-primary)' }}>1 May 2026</strong>
-        </p>
-        <p className="mt-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          Please read these Terms carefully before using InterviewEra. By creating an account you agree to be bound by them.
-        </p>
-      </div>
+      <MarketingPageHeader
+        className="mb-12 sm:mb-16"
+        leading={
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-2xl"
+            style={{
+              background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+              color: 'var(--accent-primary)',
+            }}
+          >
+            <FileText className="size-6" aria-hidden />
+          </div>
+        }
+        eyebrow="Legal"
+        title="Terms & Conditions"
+        subtitle={
+          <>
+            <span className="block text-sm sm:text-base">
+              Effective date: <strong className="text-[var(--text-primary)]">1 May 2026</strong>
+              &nbsp;·&nbsp; Last updated: <strong className="text-[var(--text-primary)]">1 May 2026</strong>
+            </span>
+            <span className="mt-3 block text-sm leading-relaxed">
+              Please read these Terms carefully before using InterviewEra. By creating an account you agree to be bound by them.
+            </span>
+          </>
+        }
+      />
 
       {/* Content */}
       <div className="mx-auto max-w-2xl space-y-10">

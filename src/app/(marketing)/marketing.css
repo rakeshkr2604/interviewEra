@@ -110,10 +110,50 @@
   outline-offset: 3px;
 }
 
+/* Hero secondary CTA — clearly subordinate to primary without changing label/destination */
+.hero-v3-btn-secondary {
+  color: var(--text-secondary) !important;
+  background: color-mix(in srgb, var(--card-bg) 35%, transparent) !important;
+}
+.hero-v3-btn-secondary:hover {
+  color: var(--text-primary) !important;
+  background: color-mix(in srgb, var(--card-bg) 55%, transparent) !important;
+}
+
+/* ─── Hero atmosphere — soften dot grid so content stays primary ─── */
+.landing-hero-dot-grid {
+  opacity: 0.55;
+}
+html[data-theme="dark"] .landing-hero-dot-grid {
+  opacity: 0.42;
+}
+
+/* ─── Hero → first section: gentle bottom fade, no hard seam ─── */
+.landing-hero-section::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 64px;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    color-mix(in srgb, var(--bg-primary) 55%, transparent)
+  );
+}
+
 /* ─── Landing v3 responsive overrides ─── */
 @media (max-width: 860px) {
   .hero-grid-responsive {
     grid-template-columns: 1fr !important;
+    gap: 2.75rem !important;
+  }
+  .hero-mockup-col {
+    width: 100%;
+    max-width: min(520px, 100%);
+    margin-inline: auto;
   }
   .flow-steps-responsive {
     grid-template-columns: 1fr !important;

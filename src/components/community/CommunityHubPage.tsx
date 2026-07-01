@@ -3,6 +3,12 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { CommunityCard } from '@/components/community/CommunityCard';
 import { CommunityPageTracker } from '@/components/community/CommunityPageTracker';
 import { ConnectWithInterviewEra } from '@/components/community/ConnectWithInterviewEra';
+import { MarketingPageHeader } from '@/components/layout/MarketingPageHeader';
+import { MarketingSectionHeader } from '@/components/layout/MarketingSectionHeader';
+import {
+  IE_MARKETING_SURFACE_CARD_CLASS,
+  IE_MARKETING_SURFACE_CARD_STYLE,
+} from '@/lib/theme/component-classes';
 import {
   COMMUNITY_COPY,
   COMMUNITY_FAQ,
@@ -39,26 +45,11 @@ export function CommunityHubPage() {
     <BlogMarketingShell backHref="/" backLabel="Home">
       <CommunityPageTracker />
 
-      <header className="mx-auto max-w-3xl text-center">
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: 'var(--accent-hover)' }}
-        >
-          {COMMUNITY_COPY.sectionEyebrow}
-        </span>
-        <h1
-          className="mt-3 font-[family-name:var(--font-bricolage)] text-[clamp(2rem,4.5vw,3rem)] font-extrabold leading-tight tracking-tight"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          {COMMUNITY_COPY.hubTitle}
-        </h1>
-        <p
-          className="mx-auto mt-4 max-w-2xl text-base leading-relaxed sm:text-lg"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {COMMUNITY_COPY.hubSubtitle}
-        </p>
-      </header>
+      <MarketingPageHeader
+        eyebrow={COMMUNITY_COPY.sectionEyebrow}
+        title={COMMUNITY_COPY.hubTitle}
+        subtitle={COMMUNITY_COPY.hubSubtitle}
+      />
 
       <div className="mx-auto mt-14 max-w-4xl space-y-16">
         <ConnectWithInterviewEra placement="community_hub" />
@@ -69,18 +60,12 @@ export function CommunityHubPage() {
 
           return (
             <section key={section.id} aria-labelledby={`hub-section-${section.id}`}>
-              <div className="mb-6">
-                <h2
-                  id={`hub-section-${section.id}`}
-                  className="text-xl font-bold sm:text-2xl"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  {section.title}
-                </h2>
-                <p className="mt-2 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-                  {section.description}
-                </p>
-              </div>
+              <MarketingSectionHeader
+                id={`hub-section-${section.id}`}
+                title={section.title}
+                subtitle={section.description}
+                className="mb-6"
+              />
 
               {section.id === 'tips' ? (
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -88,11 +73,8 @@ export function CommunityHubPage() {
                     <Link
                       key={item.href}
                       href={item.href}
-                      className="rounded-2xl border p-4 transition-all duration-200 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))]"
-                      style={{
-                        borderColor: 'var(--card-border)',
-                        background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
-                      }}
+                      className={`p-4 ${IE_MARKETING_SURFACE_CARD_CLASS} hover:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))]`}
+                      style={IE_MARKETING_SURFACE_CARD_STYLE}
                     >
                       <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                         {item.title}

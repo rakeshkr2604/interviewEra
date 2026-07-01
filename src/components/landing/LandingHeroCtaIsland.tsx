@@ -10,8 +10,6 @@ import { CommunityCTA } from '@/components/community/CommunityCTA';
  * Minimal client island so the homepage stays static (better bfcache): primary CTA href
  * upgrades from /signup → /dashboard after idle Supabase check.
  */
-const HERO_PRIMARY_CTA = 'Start a scored interview — free →';
-
 export default function LandingHeroCtaIsland() {
   const [primaryHref, setPrimaryHref] = useState<'/signup' | '/dashboard'>('/signup');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -72,60 +70,49 @@ export default function LandingHeroCtaIsland() {
     };
   }, []);
 
+  const primaryLabel = isAuthenticated ? 'Dashboard' : 'Start Free';
+
   return (
-    <>
-      <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
-      <TrackedCtaLink
-        href={primaryHref}
-        ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
-        ctaText={HERO_PRIMARY_CTA}
-        section="hero"
-        authenticated={isAuthenticated}
-        className="v3-btn-primary"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '15px 32px',
-          borderRadius: '12px',
-          background: T.acc,
-          color: '#fff',
-          fontSize: '15px',
-          fontWeight: 600,
-          fontFamily: "'DM Sans', sans-serif",
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        {HERO_PRIMARY_CTA}
-      </TrackedCtaLink>
-      <TrackedCtaLink
-        href="/how-it-works"
-        ctaKey={CTA_KEYS.SEE_HOW_IT_WORKS}
-        ctaText="See how it works"
-        section="hero_secondary"
-        authenticated={isAuthenticated}
-        className="v3-btn-secondary"
-        style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          gap: '8px',
-          padding: '15px 32px',
-          borderRadius: '12px',
-          background: 'transparent',
-          color: T.text,
-          fontSize: '15px',
-          fontWeight: 600,
-          fontFamily: "'DM Sans', sans-serif",
-          border: `1.5px solid ${T.bord2}`,
-          textDecoration: 'none',
-          whiteSpace: 'nowrap',
-        }}
-      >
-        See how it works
-      </TrackedCtaLink>
+    <div className="max-w-[32rem]">
+      <div className="mb-5 flex flex-wrap gap-3">
+        <TrackedCtaLink
+          href={primaryHref}
+          ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
+          ctaText={primaryLabel}
+          section="hero"
+          authenticated={isAuthenticated}
+          className="v3-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-[15px] font-semibold no-underline"
+          style={{
+            color: '#fff',
+            fontFamily: "'DM Sans', sans-serif",
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {primaryLabel}
+        </TrackedCtaLink>
+        <TrackedCtaLink
+          href="/campus"
+          ctaKey={CTA_KEYS.FOR_COLLEGES}
+          ctaText="For Colleges"
+          section="hero_secondary"
+          authenticated={isAuthenticated}
+          className="v3-btn-secondary hero-v3-btn-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-7 py-3.5 text-[15px] font-semibold no-underline"
+          style={{
+            borderColor: T.bord2,
+            fontFamily: "'DM Sans', sans-serif",
+            whiteSpace: 'nowrap',
+          }}
+        >
+          For Colleges
+        </TrackedCtaLink>
       </div>
-      <CommunityCTA placement="landing_hero" className="mb-7 block" />
-    </>
+      <p
+        className="mb-3 text-[13px] leading-relaxed"
+        style={{ color: T.text2 }}
+      >
+        Students start free • Colleges run campus placements • Hiring teams coming soon.
+      </p>
+      <CommunityCTA placement="landing_hero" className="mb-0 block" />
+    </div>
   );
 }

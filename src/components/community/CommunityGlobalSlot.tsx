@@ -5,10 +5,25 @@ import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
 
-const CommunityWidget = dynamic(
-  () => import('@/components/community/CommunityWidget').then((m) => m.CommunityWidget),
-  { ssr: false },
-);
+const CommunityWidgetUnavailable = () => null;
+
+function loadCommunityWidget() {
+  return import('@/components/community/CommunityWidget')
+    .then((m) => m.CommunityWidget)
+    .catch((error: unknown) => {
+      const isChunkError =
+        error instanceof Error &&
+        (error.name === 'ChunkLoadError' || error.message.includes('Loading chunk'));
+      if (process.env.NODE_ENV === 'development' && isChunkError) {
+        console.warn(
+          '[CommunityWidget] Dev chunk is stale. Hard-refresh (Ctrl+Shift+R) or restart `npm run dev` after clearing `.next`.',
+        );
+      }
+      return CommunityWidgetUnavailable;
+    });
+}
+
+const CommunityWidget = dynamic(loadCommunityWidget, { ssr: false });
 
 const SUPPRESS_PREFIXES = [
   '/admin',

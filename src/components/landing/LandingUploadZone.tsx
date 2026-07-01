@@ -2,9 +2,16 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion, useReducedMotion } from 'motion/react';
-import { FileUp, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { FileUp } from 'lucide-react';
+import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import {
+  IE_UPLOAD_ICON_SHELL_CLASS,
+  IE_UPLOAD_ICON_SHELL_STYLE,
+  IE_UPLOAD_ZONE_CLASS,
+  IE_UPLOAD_ZONE_DRAG_STYLE,
+  IE_UPLOAD_ZONE_IDLE_STYLE,
+} from '@/lib/theme/component-classes';
 import { cn } from '@/lib/utils';
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
@@ -18,7 +25,6 @@ interface LandingUploadZoneProps {
 export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZoneProps) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
-  const reduce = useReducedMotion();
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -114,17 +120,25 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
           Takes less than 60 seconds · no manual typing
         </p>
       )}
-      <motion.div
+      <div
         className={cn(
-          'relative cursor-pointer rounded-2xl border-2 border-dashed px-6 py-10 text-center backdrop-blur-sm transition-colors sm:px-8 sm:py-12',
+          IE_UPLOAD_ZONE_CLASS,
+          'relative cursor-pointer backdrop-blur-sm',
+          isDragging && 'ring-0',
         )}
-        style={{
-          borderColor: isDragging ? 'var(--accent-primary)' : 'var(--card-border)',
-          background: isDragging
-            ? 'color-mix(in srgb, var(--accent-primary) 10%, transparent)'
-            : 'color-mix(in srgb, var(--card-bg) 65%, transparent)',
-          boxShadow: isDragging ? '0 0 0 3px color-mix(in srgb, var(--accent-primary) 20%, transparent)' : undefined,
-        }}
+        style={
+          isDragging
+            ? {
+                ...IE_UPLOAD_ZONE_DRAG_STYLE,
+                borderColor: 'var(--accent-primary)',
+                background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+              }
+            : {
+                ...IE_UPLOAD_ZONE_IDLE_STYLE,
+                borderColor: 'var(--card-border)',
+                background: 'color-mix(in srgb, var(--card-bg) 65%, transparent)',
+              }
+        }
         onDragOver={(e) => {
           e.preventDefault();
           setIsDragging(true);
@@ -132,8 +146,6 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
         onClick={() => inputRef.current?.click()}
-        whileHover={reduce ? undefined : { scale: 1.008 }}
-        whileTap={reduce ? undefined : { scale: 0.995 }}
       >
         <input
           ref={inputRef}
@@ -144,17 +156,12 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
         />
 
         <div className="flex flex-col items-center gap-3">
-          <motion.div
-            className="flex size-14 items-center justify-center rounded-2xl shadow-sm"
-            style={{
-              background: 'color-mix(in srgb, var(--accent-primary) 15%, transparent)',
-              color: 'var(--accent-primary)',
-            }}
-            animate={reduce || isDragging ? undefined : { y: [0, -4, 0] }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
+          <div
+            className={IE_UPLOAD_ICON_SHELL_CLASS}
+            style={IE_UPLOAD_ICON_SHELL_STYLE}
           >
-            <FileUp className="size-7" strokeWidth={1.5} />
-          </motion.div>
+            <FileUp className="size-7" strokeWidth={1.5} aria-hidden />
+          </div>
           {fileName ? (
             <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
               {fileName}
@@ -170,34 +177,22 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
             </>
           )}
         </div>
-      </motion.div>
+      </div>
 
-      {error && (
-        <p className="text-center text-sm" style={{ color: 'var(--accent-danger)' }} role="alert">
-          {error}
-        </p>
-      )}
+      {error ? <AuthErrorBanner message={error} className="text-center" /> : null}
 
-      <Button
-        className="landing-cta-lift h-12 w-full rounded-xl border-0 bg-indigo-600 text-base font-semibold text-white shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/40 disabled:opacity-60"
-        size="lg"
+      <FormSubmitButton
+        type="button"
+        loading={uploading}
+        loadingLabel="Uploading…"
         disabled={uploading}
         onClick={() => {
           if (fileName) return;
           inputRef.current?.click();
         }}
       >
-        {uploading ? (
-          <>
-            <Loader2 className="mr-2 size-4 animate-spin" />
-            Uploading…
-          </>
-        ) : isLoggedIn ? (
-          'Upload resume & start interview →'
-        ) : (
-          'Upload resume → get your first interview free'
-        )}
-      </Button>
+        {isLoggedIn ? 'Upload resume & start interview →' : 'Upload resume → get your first interview free'}
+      </FormSubmitButton>
 
       <p className="text-center text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Free tier · No credit card · Six tailored questions on your first session

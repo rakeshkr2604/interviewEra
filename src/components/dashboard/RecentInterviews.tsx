@@ -19,19 +19,24 @@ interface RecentInterviewsProps {
 }
 
 const actionBtnClass =
-  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity active:opacity-90 sm:px-4 sm:text-sm'
+  'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:opacity-90 sm:px-4 sm:text-sm'
 
 export function RecentInterviews({ interviews }: RecentInterviewsProps) {
   if (interviews.length === 0) {
     return (
-      <p className="py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-        No interviews yet — start your first one!
-      </p>
+      <div
+        className="rounded-xl px-4 py-6 text-center"
+        style={{ background: 'var(--bg-secondary)' }}
+      >
+        <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+          No interviews yet — start your first one!
+        </p>
+      </div>
     )
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       {interviews.map((interview) => {
         const isCompleted = interview.status === 'completed'
         const date = formatInterviewDateEnIn(interview.started_at, interview.completed_at)
@@ -41,11 +46,10 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
         return (
           <div
             key={interview.id}
-            className="dashboard-hover-row flex flex-col gap-3 rounded-xl border-2 px-4 py-3.5 transition-all duration-200 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5"
+            className="dashboard-hover-row flex flex-col gap-3 rounded-xl border px-4 py-3.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5"
             style={{
               borderColor: 'var(--card-border)',
               background: 'color-mix(in srgb, var(--card-bg) 82%, transparent)',
-              boxShadow: 'var(--card-shadow)',
             }}
           >
             <div className="min-w-0 flex-1">

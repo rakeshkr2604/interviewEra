@@ -2,7 +2,20 @@
 
 import { useRef, useActionState, useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, FileText, Loader2, Upload } from 'lucide-react';
+import { ArrowRight, FileText, Upload } from 'lucide-react';
+import { AuthErrorBanner, FormWarningBanner } from '@/components/auth/AuthErrorBanner';
+import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
+import {
+  IE_LABEL_CLASS,
+  IE_LABEL_OPTIONAL_CLASS,
+  IE_TEXTAREA_TOOL_CLASS,
+  IE_FIELD_SURFACE_STYLE,
+  IE_UPLOAD_ZONE_CLASS,
+  IE_UPLOAD_ZONE_DRAG_STYLE,
+  IE_UPLOAD_ZONE_IDLE_STYLE,
+  IE_UPLOAD_ICON_SHELL_CLASS,
+  IE_UPLOAD_ICON_SHELL_STYLE,
+} from '@/lib/theme/component-classes';
 import { Textarea } from '@/components/ui/textarea';
 import { checkAtsAction } from './actions';
 import { ATS_RESULT_STORAGE_KEY, serializeAtsResult } from './ats-result-storage';
@@ -86,8 +99,9 @@ export function AtsCheckerForm() {
           }}
         >
           <div className="space-y-2.5">
-            <label className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
-              Resume <span style={{ color: 'var(--text-muted)' }}>(PDF or TXT · max 5 MB)</span>
+            <label className={IE_LABEL_CLASS}>
+              Resume{' '}
+              <span className={IE_LABEL_OPTIONAL_CLASS}>(PDF or TXT · max 5 MB)</span>
             </label>
             <div
               role="button"
@@ -112,26 +126,10 @@ export function AtsCheckerForm() {
                 setDragOver(false);
               }}
               onDrop={onDrop}
-              className={cn(
-                'flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-10 transition-all sm:py-12',
-                dragOver && 'scale-[1.01]',
-              )}
-              style={{
-                borderColor: dragOver
-                  ? 'color-mix(in srgb, var(--accent-primary) 55%, var(--card-border))'
-                  : 'color-mix(in srgb, var(--card-border) 85%, transparent)',
-                background: dragOver
-                  ? 'color-mix(in srgb, var(--accent-primary) 8%, transparent)'
-                  : 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)',
-              }}
+              className={cn(IE_UPLOAD_ZONE_CLASS, dragOver && 'scale-[1.01]')}
+              style={dragOver ? IE_UPLOAD_ZONE_DRAG_STYLE : IE_UPLOAD_ZONE_IDLE_STYLE}
             >
-              <div
-                className="flex size-12 items-center justify-center rounded-2xl sm:size-14"
-                style={{
-                  background: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
-                  color: 'var(--accent-primary)',
-                }}
-              >
+              <div className={IE_UPLOAD_ICON_SHELL_CLASS} style={IE_UPLOAD_ICON_SHELL_STYLE}>
                 <Upload className="size-6 sm:size-7" aria-hidden />
               </div>
               <div className="text-center">
@@ -204,15 +202,8 @@ export function AtsCheckerForm() {
                 placeholder="Paste the job description here…"
                 rows={5}
                 maxLength={3000}
-                className={cn(
-                  'min-h-[120px] resize-y rounded-xl border-2 px-4 py-3 text-sm shadow-none transition-[color,box-shadow] sm:text-base',
-                  'placeholder:opacity-80 focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-                )}
-                style={{
-                  borderColor: 'var(--card-border)',
-                  background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-                  color: 'var(--text-primary)',
-                }}
+                className={IE_TEXTAREA_TOOL_CLASS}
+                style={IE_FIELD_SURFACE_STYLE}
               />
             ) : (
               <div
@@ -257,56 +248,22 @@ export function AtsCheckerForm() {
             )}
           </div>
 
-          {(clientError ?? state.error) && (
-            <p
-              className="rounded-xl border px-4 py-3 text-sm font-medium sm:text-base"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--accent-danger) 35%, var(--card-border))',
-                background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
-                color: 'var(--accent-danger)',
-              }}
-            >
-              {clientError ?? state.error}
-            </p>
-          )}
+          {(clientError ?? state.error) ? (
+            <AuthErrorBanner message={clientError ?? state.error ?? ''} />
+          ) : null}
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="landing-cta-lift inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] px-8 text-base font-semibold text-white disabled:pointer-events-none disabled:opacity-60 sm:h-[3.25rem] sm:text-lg"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-              boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-            }}
-          >
-            {isPending ? (
-              <>
-                <Loader2 className="size-5 animate-spin" aria-hidden />
-                Analyzing…
-              </>
-            ) : (
-              <>
-                Check my resume
-                <ArrowRight className="size-5" aria-hidden />
-              </>
-            )}
-          </button>
+          <FormSubmitButton loading={isPending} loadingLabel="Analyzing…" className="sm:text-lg">
+            <>
+              Check my resume
+              <ArrowRight className="size-5" aria-hidden />
+            </>
+          </FormSubmitButton>
         </form>
       </FreeToolFormCard>
 
       {inlineFallback && state.result && (
         <div className="mt-10 space-y-4">
-          <p
-            className="rounded-xl border px-4 py-3 text-center text-sm font-medium sm:text-base"
-            style={{
-              borderColor: 'var(--card-border)',
-              background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            Couldn&apos;t open the results page (browser storage blocked). Your score is shown below — try allowing
-            site data or use another browser next time.
-          </p>
+          <FormWarningBanner message="Couldn&apos;t open the results page (browser storage blocked). Your score is shown below — try allowing site data or use another browser next time." />
           <AtsResultsView result={state.result} showBackLink={false} root="section" />
         </div>
       )}

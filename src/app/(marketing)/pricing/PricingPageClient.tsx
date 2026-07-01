@@ -91,7 +91,7 @@ export function PricingPageClient() {
   const proPerDay    = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
 
   return (
-    <div style={{ color: 'var(--text-primary)', background: '#ffffff' }}>
+    <div style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
       <PricingPageViewTracker sourcePage="/pricing" />
       {/* ─── Responsive + cross-browser styles ─── */}
       <style>{`
@@ -114,7 +114,7 @@ export function PricingPageClient() {
         .pr-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
         .pr-card  {
           display: flex; flex-direction: column;
-          border-radius: 20px; border: 2px solid var(--card-border);
+          border-radius: var(--ie-radius-lg); border: 2px solid var(--card-border);
           background: var(--card-bg); padding: 28px 22px;
           box-shadow: 0 12px 40px -8px rgba(0,0,0,.25);
           transition: transform .3s ease, box-shadow .3s ease;
@@ -141,7 +141,7 @@ export function PricingPageClient() {
         /* CTA buttons — touch-friendly */
         .pr-btn {
           display: block; text-align: center;
-          padding: 14px 20px; border-radius: 12px;
+          padding: 14px 20px; border-radius: var(--ie-radius-md);
           font-size: 15px; font-weight: 600; font-family: 'DM Sans', sans-serif;
           text-decoration: none; cursor: pointer;
           -webkit-tap-highlight-color: transparent;
@@ -377,11 +377,11 @@ export function PricingPageClient() {
             <TrackedCtaLink
               href="/signup"
               ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
-              ctaText="Start a scored interview — it's free →"
+              ctaText="Start Free"
               section="pricing_bottom"
               className="pr-cta-link"
             >
-              Start a scored interview — it&apos;s free →
+              Start Free
             </TrackedCtaLink>
           </div>
         </div>

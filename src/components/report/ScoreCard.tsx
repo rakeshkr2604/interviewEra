@@ -33,17 +33,25 @@ export function ScoreCard({
       >
         Summary
       </p>
-      <h3 className="mt-1 text-base font-semibold sm:text-lg" style={{ color: 'var(--text-primary)' }}>
+      <h2 className="mt-1 text-base font-semibold sm:text-lg" style={{ color: 'var(--text-primary)' }}>
         Overall score
-      </h3>
-      <div className="mt-4 flex-1 flex flex-col min-h-0">
-        <div className="text-5xl font-bold tabular-nums" style={{ color: scoreColor }}>
-          {overallScore.toFixed(1)}
+      </h2>
+      <div className="mt-5 flex min-h-0 flex-1 flex-col">
+        <div
+          className="flex items-baseline gap-2"
+          aria-label={`Overall score ${overallScore.toFixed(1)} out of 10`}
+        >
+          <span className="text-5xl font-bold tabular-nums leading-none sm:text-6xl" style={{ color: scoreColor }}>
+            {overallScore.toFixed(1)}
+          </span>
+          <span className="text-base font-medium sm:text-lg" style={{ color: 'var(--text-muted)' }}>
+            / 10
+          </span>
         </div>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-          out of 10
-        </p>
-        <div className="mt-4 space-y-1 text-sm shrink-0" style={{ color: 'var(--text-secondary)' }}>
+        <div
+          className="mt-5 space-y-1.5 border-t pt-4 text-sm shrink-0"
+          style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+        >
           <p>
             <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
               Role:
@@ -60,46 +68,41 @@ export function ScoreCard({
 
         {scoreJustification ? (
           <div
-            className="mt-6 rounded-xl border p-4 text-left sm:flex-1 sm:min-h-0 sm:flex sm:flex-col"
+            className="mt-6 rounded-xl border-2 p-4 text-left sm:flex sm:min-h-0 sm:flex-1 sm:flex-col"
             style={{
               borderColor: 'var(--card-border)',
-              background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+              background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
             }}
           >
-            <div className="flex items-start gap-2 mb-3">
+            <div className="mb-4 flex items-start gap-2.5">
               <Lightbulb
-                className="shrink-0 mt-0.5 opacity-90"
+                className="mt-0.5 shrink-0 opacity-90"
                 size={16}
                 aria-hidden
                 style={{ color: 'var(--accent-primary)' }}
               />
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-xs font-semibold sm:text-sm" style={{ color: 'var(--text-primary)' }}>
                   Why this score?
                 </h3>
-                <p className="text-xs mt-1 leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                <p className="mt-1.5 max-w-prose text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {scoreJustification.why_this_score}
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 mt-1 flex-1">
+            <div className="mt-1 grid flex-1 grid-cols-1 gap-5 border-t pt-4 sm:grid-cols-2" style={{ borderColor: 'var(--card-border)' }}>
               <div>
                 <p
-                  className="text-[11px] font-semibold uppercase tracking-wide mb-2"
+                  className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]"
                   style={{ color: 'var(--accent-success)' }}
                 >
                   Key strengths
                 </p>
-                <ul
-                  className="text-[11px] sm:text-xs space-y-1.5 list-none pl-0"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
+                <ul className="space-y-2 text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {strengths.map((strength, i) => (
                     <li key={`${strength}-${i}`} className="flex gap-2">
-                      <span className="tabular-nums" style={{ color: 'var(--text-muted)' }} aria-hidden>
-                        •
-                      </span>
+                      <span className="mt-1.5 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-success)' }} aria-hidden />
                       <span>{strength}</span>
                     </li>
                   ))}
@@ -107,20 +110,15 @@ export function ScoreCard({
               </div>
               <div>
                 <p
-                  className="text-[11px] font-semibold uppercase tracking-wide mb-2"
+                  className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]"
                   style={{ color: 'var(--accent-warning)' }}
                 >
                   Areas to improve
                 </p>
-                <ul
-                  className="text-[11px] sm:text-xs space-y-1.5 list-none pl-0"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
+                <ul className="space-y-2 text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {improvements.map((area, i) => (
                     <li key={`${area}-${i}`} className="flex gap-2">
-                      <span className="tabular-nums" style={{ color: 'var(--text-muted)' }} aria-hidden>
-                        •
-                      </span>
+                      <span className="mt-1.5 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-warning)' }} aria-hidden />
                       <span>{area}</span>
                     </li>
                   ))}

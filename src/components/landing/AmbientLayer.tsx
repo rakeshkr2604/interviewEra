@@ -39,7 +39,7 @@ export function AmbientLayer({ variant }: { variant: AmbientVariant }) {
             width: '56%',
             height: '92%',
             background:
-              'radial-gradient(58% 55% at 62% 42%, color-mix(in srgb, var(--accent-primary) 20%, transparent), transparent 70%)',
+              'radial-gradient(58% 55% at 62% 42%, color-mix(in srgb, var(--accent-primary) 16%, transparent), transparent 70%)',
           })}
         />
         <div
@@ -49,7 +49,7 @@ export function AmbientLayer({ variant }: { variant: AmbientVariant }) {
             width: '36%',
             height: '64%',
             background:
-              'radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--accent-hover) 15%, transparent), transparent 72%)',
+              'radial-gradient(50% 50% at 50% 50%, color-mix(in srgb, var(--accent-hover) 11%, transparent), transparent 72%)',
           })}
         />
       </div>

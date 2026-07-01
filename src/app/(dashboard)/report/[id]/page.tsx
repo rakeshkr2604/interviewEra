@@ -34,7 +34,7 @@ import { sessionQualityFeedbackFromLogRow } from '@/lib/retention/quality-feedba
 import { SessionQualityNotice } from '@/components/retention/SessionQualityNotice';
 
 const exportPdfLinkClass =
-  'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[12px] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-all hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
+  'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[var(--ie-radius-md)] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
 
 const exportPdfLinkStyle: CSSProperties = {
   borderColor: 'var(--card-border)',
@@ -268,7 +268,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
     : 'N/A';
 
   return (
-    <div className="w-full max-w-[min(100%,1600px)] space-y-8 pb-4">
+    <div className="w-full max-w-[min(100%,1600px)] space-y-10 pb-6">
       <ReportViewTracker
         overallScore={report.overall_score as number}
         userPlan={planTier}
@@ -314,11 +314,11 @@ export default async function ReportPage({ params }: ReportPageProps) {
         }
       />
 
-      {/* AI Executive Summary */}
-      <ExecutiveSummaryPanel insights={insights} />
-
-      {/* Score + Radar */}
-      <div className="grid gap-6 lg:grid-cols-12 lg:gap-8">
+      {/* Score overview: overall result, dimensions, then recruiter context */}
+      <section
+        aria-label="Performance overview"
+        className="grid gap-4 lg:grid-cols-12 lg:gap-5"
+      >
         <div className="lg:col-span-4">
           <ScoreCard
             overallScore={report.overall_score as number}
@@ -328,27 +328,29 @@ export default async function ReportPage({ params }: ReportPageProps) {
           />
         </div>
         <ReportPanel
+          id="dimension-breakdown"
           className="lg:col-span-8"
           eyebrow="Performance"
           title="Dimension breakdown"
-          contentClassName="min-h-[260px]"
+          contentClassName="min-h-[220px] sm:min-h-[260px]"
         >
           <RadarChart data={radarData} />
         </ReportPanel>
-      </div>
+        <ExecutiveSummaryPanel insights={insights} className="lg:col-span-12" />
+      </section>
 
       {trendData && trendData.length >= 2 && (
-        <ReportPanel eyebrow="Progress" title="Your trend across interviews">
+        <ReportPanel id="score-trend" eyebrow="Progress" title="Your trend across interviews">
           <TrendChart data={trendData} />
         </ReportPanel>
       )}
 
-      <ReportPanel eyebrow="Delivery" title="Speech patterns" contentClassName="space-y-4">
-        <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+      <ReportPanel id="speech-patterns" eyebrow="Delivery" title="Speech patterns" contentClassName="space-y-5">
+        <p className="max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Filler word analysis from your interview session. Industry benchmark: fewer than 3 filler words per
           minute.
         </p>
-        <div className="grid gap-3 text-center grid-cols-2 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
           {[
             {
               label: 'Filler Words',
@@ -375,19 +377,19 @@ export default async function ReportPage({ params }: ReportPageProps) {
           ].map((item) => (
             <div
               key={item.label}
-              className="rounded-xl border-2 p-4"
+              className="rounded-xl border-2 px-3 py-4 sm:px-4"
               style={{
                 borderColor: 'var(--card-border)',
                 background: 'color-mix(in srgb, var(--card-bg) 75%, transparent)',
               }}
             >
-              <p className="text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-xl font-bold tabular-nums sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
                 {item.value}
               </p>
-              <p className="mt-1 text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+              <p className="mt-1.5 text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
                 {item.label}
               </p>
-              <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-0.5 text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>
                 {item.hint}
               </p>
             </div>
@@ -429,22 +431,27 @@ export default async function ReportPage({ params }: ReportPageProps) {
       </ReportPanel>
 
       {/* AI Candidate Intelligence — Pro-gated */}
-      <ReportPanel eyebrow="Intelligence" title="AI hiring intelligence" contentClassName="space-y-6">
+      <ReportPanel
+        id="ai-intelligence"
+        eyebrow="Intelligence"
+        title="AI hiring intelligence"
+        contentClassName="space-y-6"
+      >
         <BlurredSection
           userTier={planTier}
           requiredTier="pro"
           upgradeLabel="Upgrade to Pro to unlock AI hiring intelligence"
         >
-          <div className="space-y-6">
+          <div className="space-y-8">
             {insights.behavioral_patterns.length > 0 && (
               <div>
                 <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                   Behavioral Patterns
                 </p>
-                <ul className="space-y-2">
+                <ul className="space-y-2.5">
                   {insights.behavioral_patterns.map((pattern, i) => (
-                    <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="mt-0.5 shrink-0 text-[10px]" style={{ color: 'var(--accent-primary)' }}>◆</span>
+                    <li key={i} className="flex gap-2.5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-primary)' }} aria-hidden />
                       {pattern}
                     </li>
                   ))}
@@ -456,29 +463,35 @@ export default async function ReportPage({ params }: ReportPageProps) {
               <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                 Communication Intelligence
               </p>
-              <p className="mb-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <p className="mb-3 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {insights.communication.clarity_narrative}
               </p>
-              <p className="mb-3 text-sm leading-relaxed italic" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-4 max-w-3xl text-sm leading-relaxed italic" style={{ color: 'var(--text-muted)' }}>
                 {insights.communication.confidence_progression}
               </p>
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-5 sm:grid-cols-2">
                 {insights.communication.strengths.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-success)' }}>Strengths</p>
-                    <ul className="space-y-1">
+                    <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-success)' }}>Strengths</p>
+                    <ul className="space-y-2">
                       {insights.communication.strengths.map((s, i) => (
-                        <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {s}</li>
+                        <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-success)' }} aria-hidden />
+                          {s}
+                        </li>
                       ))}
                     </ul>
                   </div>
                 )}
                 {insights.communication.weaknesses.length > 0 && (
                   <div>
-                    <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-danger)' }}>To improve</p>
-                    <ul className="space-y-1">
+                    <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-danger)' }}>To improve</p>
+                    <ul className="space-y-2">
                       {insights.communication.weaknesses.map((w, i) => (
-                        <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {w}</li>
+                        <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                          <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-danger)' }} aria-hidden />
+                          {w}
+                        </li>
                       ))}
                     </ul>
                   </div>
@@ -490,27 +503,33 @@ export default async function ReportPage({ params }: ReportPageProps) {
               <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                 Technical Intelligence
               </p>
-              <p className="mb-3 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <p className="mb-4 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {insights.technical.depth_assessment}
               </p>
               {(insights.technical.strength_patterns.length > 0 || insights.technical.weak_patterns.length > 0) && (
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-5 sm:grid-cols-2">
                   {insights.technical.strength_patterns.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-success)' }}>Patterns</p>
-                      <ul className="space-y-1">
+                      <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-success)' }}>Patterns</p>
+                      <ul className="space-y-2">
                         {insights.technical.strength_patterns.map((s, i) => (
-                          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {s}</li>
+                          <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-success)' }} aria-hidden />
+                            {s}
+                          </li>
                         ))}
                       </ul>
                     </div>
                   )}
                   {insights.technical.weak_patterns.length > 0 && (
                     <div>
-                      <p className="mb-2 text-xs font-semibold" style={{ color: 'var(--accent-danger)' }}>Gaps</p>
-                      <ul className="space-y-1">
+                      <p className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-danger)' }}>Gaps</p>
+                      <ul className="space-y-2">
                         {insights.technical.weak_patterns.map((w, i) => (
-                          <li key={i} className="text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>• {w}</li>
+                          <li key={i} className="flex gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                            <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-danger)' }} aria-hidden />
+                            {w}
+                          </li>
                         ))}
                       </ul>
                     </div>
@@ -520,27 +539,27 @@ export default async function ReportPage({ params }: ReportPageProps) {
             </div>
 
             <div
-              className="rounded-xl border-2 p-4"
+              className="rounded-xl border-2 p-4 sm:p-5"
               style={{
                 borderColor: 'var(--card-border)',
                 background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
               }}
             >
-              <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                 Benchmarking
               </p>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent-primary)' }}>
+              <div className="mb-2 flex items-baseline gap-2">
+                <span className="text-3xl font-bold tabular-nums sm:text-4xl" style={{ color: 'var(--accent-primary)' }}>
                   {insights.benchmarking.percentile_estimate}th
                 </span>
                 <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                   percentile
                 </span>
               </div>
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <p className="max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {insights.benchmarking.comparison_narrative}
               </p>
-              <p className="mt-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
                 {insights.benchmarking.role_calibration}
               </p>
             </div>
@@ -548,9 +567,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
         </BlurredSection>
       </ReportPanel>
 
-      <div className="space-y-6">
+      <section aria-labelledby="question-breakdown-heading" className="space-y-6">
         <div
-          className="flex flex-col gap-2 border-b-2 pb-4 sm:flex-row sm:items-end sm:justify-between"
+          className="flex flex-col gap-2 border-b-2 pb-5 sm:flex-row sm:items-end sm:justify-between"
           style={{ borderColor: 'var(--card-border)' }}
         >
           <div>
@@ -560,7 +579,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
             >
               Breakdown
             </p>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+            <h2 id="question-breakdown-heading" className="mt-1 text-xl font-semibold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
               Question by question
             </h2>
           </div>
@@ -569,7 +588,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
           </p>
         </div>
         {breakdown.map((item, idx) => (
-          <div key={item.question.id} className="dashboard-premium-card overflow-hidden">
+          <article key={item.question.id} className="dashboard-premium-card overflow-hidden">
             <div className="grid gap-0 lg:grid-cols-12">
               <div
                 className="space-y-4 border-b p-5 md:p-6 lg:col-span-5 lg:border-b-0 lg:border-r lg:p-8"
@@ -605,24 +624,26 @@ export default async function ReportPage({ params }: ReportPageProps) {
                     }}
                   >
                     <p
-                      className="mb-2 text-xs font-bold uppercase tracking-[0.12em]"
-                      style={{ color: 'var(--text-primary)' }}
+                      className="mb-2.5 text-[10px] font-bold uppercase tracking-[0.12em]"
+                      style={{ color: 'var(--text-muted)' }}
                     >
                       Your answer
                     </p>
-                    <p className="leading-relaxed">{item.answer.answer_text}</p>
+                    <p className="max-w-prose break-words leading-relaxed">{item.answer.answer_text}</p>
                   </div>
                 )}
                 {item.evaluation ? (
                   <div
-                    className="rounded-xl border-2 p-4"
+                    className="rounded-xl border-2 px-4 py-3"
                     style={{
                       borderColor: 'var(--card-border)',
                       background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
                     }}
                   >
-                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                      Score{' '}
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+                      Score
+                    </p>
+                    <p className="mt-0.5 text-2xl font-bold tabular-nums">
                       <span
                         style={{
                           color:
@@ -633,8 +654,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
                                 : 'var(--accent-danger)',
                         }}
                       >
-                        {item.evaluation.overall_score.toFixed(1)} / 10
+                        {item.evaluation.overall_score.toFixed(1)}
                       </span>
+                      <span className="text-base font-medium" style={{ color: 'var(--text-muted)' }}> / 10</span>
                     </p>
                   </div>
                 ) : (
@@ -644,16 +666,16 @@ export default async function ReportPage({ params }: ReportPageProps) {
                 )}
               </div>
 
-              <div className="space-y-4 p-5 md:p-6 lg:col-span-7 lg:p-8">
+              <div className="space-y-5 p-5 md:p-6 lg:col-span-7 lg:p-8">
                 {item.evaluation ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
                     <p
-                      className="text-xs font-bold uppercase tracking-[0.12em]"
+                      className="text-[10px] font-bold uppercase tracking-[0.12em]"
                       style={{ color: 'var(--text-muted)' }}
                     >
                       Feedback
                     </p>
-                    <p className="text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
+                    <p className="max-w-prose text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                       {item.evaluation.feedback_text}
                     </p>
                   </div>
@@ -665,32 +687,32 @@ export default async function ReportPage({ params }: ReportPageProps) {
                     requiredTier="pro"
                     upgradeLabel="Upgrade to Pro to unlock detailed analysis"
                   >
-                    <div className="space-y-3 text-sm">
+                    <div className="space-y-4 text-sm">
                       {item.evaluation.detailed_analysis ? (
                         <>
                           <div>
-                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-success)' }}>
                               Strengths
                             </p>
-                            <ul
-                              className="mt-1 list-inside list-disc space-y-0.5"
-                              style={{ color: 'var(--text-secondary)' }}
-                            >
+                            <ul className="mt-2 space-y-2" style={{ color: 'var(--text-secondary)' }}>
                               {item.evaluation.detailed_analysis.strengths.map((s) => (
-                                <li key={s}>{s}</li>
+                                <li key={s} className="flex gap-2 leading-relaxed">
+                                  <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-success)' }} aria-hidden />
+                                  {s}
+                                </li>
                               ))}
                             </ul>
                           </div>
                           <div>
-                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-warning)' }}>
                               Improvements
                             </p>
-                            <ul
-                              className="mt-1 list-inside list-disc space-y-0.5"
-                              style={{ color: 'var(--text-secondary)' }}
-                            >
+                            <ul className="mt-2 space-y-2" style={{ color: 'var(--text-secondary)' }}>
                               {item.evaluation.detailed_analysis.improvements.map((s) => (
-                                <li key={s}>{s}</li>
+                                <li key={s} className="flex gap-2 leading-relaxed">
+                                  <span className="mt-2 size-1 shrink-0 rounded-full" style={{ background: 'var(--accent-warning)' }} aria-hidden />
+                                  {s}
+                                </li>
                               ))}
                             </ul>
                           </div>
@@ -729,13 +751,13 @@ export default async function ReportPage({ params }: ReportPageProps) {
                       className="rounded-xl border-2 p-4 text-sm"
                       style={{
                         borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))',
-                        background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                        background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
                       }}
                     >
-                      <p className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-primary)' }}>
                         Model answer
                       </p>
-                      <p className="mt-2 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <p className="mt-2.5 max-w-prose break-words leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                         {item.evaluation.detailed_analysis
                           ? item.evaluation.detailed_analysis.model_answer_hint
                           : 'A strong answer would clearly state the key concept, provide a concrete real-world example demonstrating practical application, and conclude with measurable impact or outcome.'}
@@ -820,12 +842,12 @@ export default async function ReportPage({ params }: ReportPageProps) {
                 )}
               </div>
             </div>
-          </div>
+          </article>
         ))}
-      </div>
+      </section>
 
       {/* Improvement Roadmap — Pro-gated */}
-      <ReportPanel eyebrow="Growth plan" title="Your 30-day improvement roadmap" contentClassName="space-y-5">
+      <ReportPanel id="improvement-roadmap" eyebrow="Growth plan" title="Your 30-day improvement roadmap" contentClassName="space-y-5">
         <BlurredSection
           userTier={planTier}
           requiredTier="pro"
@@ -851,29 +873,29 @@ export default async function ReportPage({ params }: ReportPageProps) {
                 ))}
               </div>
             </div>
-            <div className="grid gap-5 sm:grid-cols-2">
+            <div className="grid gap-6 sm:grid-cols-2">
               <div>
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
                   This week
                 </p>
                 <ul className="space-y-3">
                   {insights.improvement_roadmap.week_1.map((action, i) => (
-                    <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>{i + 1}. </span>
-                      {action}
+                    <li key={i} className="flex gap-2.5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="shrink-0 font-semibold tabular-nums" style={{ color: 'var(--accent-primary)' }}>{i + 1}.</span>
+                      <span>{action}</span>
                     </li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="mb-3 text-xs font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-primary)' }}>
                   30-day plan
                 </p>
                 <ul className="space-y-3">
                   {insights.improvement_roadmap.month_1.map((action, i) => (
-                    <li key={i} className="text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                      <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>{i + 1}. </span>
-                      {action}
+                    <li key={i} className="flex gap-2.5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="shrink-0 font-semibold tabular-nums" style={{ color: 'var(--accent-primary)' }}>{i + 1}.</span>
+                      <span>{action}</span>
                     </li>
                   ))}
                 </ul>
@@ -907,23 +929,23 @@ export default async function ReportPage({ params }: ReportPageProps) {
           background: 'color-mix(in srgb, var(--accent-primary) 6%, var(--card-bg))',
         }}
       >
-        <p className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <p className="text-lg font-semibold sm:text-xl" style={{ color: 'var(--text-primary)' }}>
           Ready to improve your score?
         </p>
-        <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
+        <p className="mx-auto mt-2 max-w-lg text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Each session targets your weak areas. Consistent practice builds placement readiness.
         </p>
-        <div className="mt-5 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+        <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
           <Link
             href="/interview/new"
-            className="inline-flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white transition-all hover:-translate-y-0.5"
+            className="landing-cta-lift inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]"
             style={{ background: 'var(--accent-primary)' }}
           >
             Start Another Interview
           </Link>
           <Link
             href="/history"
-            className="inline-flex items-center gap-2 rounded-xl border-2 px-6 py-2.5 text-sm font-semibold transition-colors hover:opacity-80"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border-2 px-6 py-2.5 text-sm font-semibold transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]"
             style={{
               borderColor: 'var(--card-border)',
               background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',

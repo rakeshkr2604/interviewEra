@@ -19,7 +19,7 @@ export function ActionCards({ cards }: ActionCardsProps) {
         <Link
           key={action.label}
           href={action.link}
-          className="dashboard-premium-card block px-5 py-5 transition-all duration-200 hover:-translate-y-0.5"
+          className="dashboard-premium-card dashboard-hover-lift block px-5 py-5"
           style={{ textDecoration: 'none' }}
         >
           <p

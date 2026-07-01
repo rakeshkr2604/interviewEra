@@ -1,4 +1,13 @@
 import { AmbientLayer } from '@/components/landing/AmbientLayer';
+import {
+  LANDING_HOME_EYEBROW,
+  LANDING_HOME_HEADER_BLOCK,
+  LANDING_HOME_HEADING,
+  LANDING_HOME_SECTION,
+  LANDING_HOME_SUBHEAD,
+  LANDING_PAGE_CONTAINER,
+} from '@/lib/landing/container';
+import { cn } from '@/lib/utils';
 
 /**
  * Grounded before/after comparison — observational, not motivational.
@@ -21,27 +30,25 @@ const AFTER = [
 
 export function LandingBeforeAfter() {
   return (
-    <section className="relative overflow-hidden px-5 py-20 sm:py-24">
+    <section className={cn(LANDING_HOME_SECTION, 'relative overflow-hidden')}>
       <AmbientLayer variant="before-after" />
-      <div className="relative z-1 mx-auto max-w-3xl text-center">
-        <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--accent-hover)' }}>
+      <div className={cn(LANDING_PAGE_CONTAINER, 'relative z-[1]')}>
+      <div className={LANDING_HOME_HEADER_BLOCK}>
+        <span className={LANDING_HOME_EYEBROW}>
           What changes
         </span>
-        <h2
-          className="mt-3.5 text-balance text-3xl font-extrabold tracking-tight sm:text-[42px] sm:leading-[1.08]"
-          style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
-        >
+        <h2 className={LANDING_HOME_HEADING}>
           The difference a few real sessions make
         </h2>
-        <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        <p className={LANDING_HOME_SUBHEAD}>
           Not a transformation story — just what tends to shift once practice is structured, repeated,
           and measured instead of improvised.
         </p>
       </div>
 
-      <div className="relative z-1 mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-2 md:gap-5">
+      <div className="mx-auto mt-12 grid max-w-4xl gap-4 md:grid-cols-2 md:gap-5">
         {/* Before */}
-        <div className="rounded-2xl border-2 p-6 sm:p-7" style={{ borderColor: 'var(--card-border)', background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)' }}>
+        <div className="rounded-2xl border p-6 sm:p-7" style={{ borderColor: 'var(--card-border)', background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)', boxShadow: 'var(--card-shadow)' }}>
           <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
             Without structured practice
           </h3>
@@ -57,8 +64,8 @@ export function LandingBeforeAfter() {
 
         {/* After */}
         <div
-          className="rounded-2xl border-2 p-6 sm:p-7"
-          style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, transparent)', background: 'color-mix(in srgb, var(--accent-primary) 7%, transparent)' }}
+          className="rounded-2xl border p-6 sm:p-7"
+          style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, transparent)', background: 'color-mix(in srgb, var(--accent-primary) 7%, transparent)', boxShadow: 'var(--card-shadow)' }}
         >
           <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--accent-primary)' }}>
             After a few InterviewEra sessions
@@ -74,6 +81,7 @@ export function LandingBeforeAfter() {
             ))}
           </ul>
         </div>
+      </div>
       </div>
     </section>
   );

@@ -12,6 +12,12 @@ export const CTA_KEYS = {
   UPGRADE_CTA: 'upgrade_cta',
   SEE_HOW_IT_WORKS: 'see_how_it_works',
   TOOL_CTA: 'tool_cta',
+  FOR_COLLEGES: 'for_colleges',
+  FOR_TEAMS: 'for_teams',
+  CAMPUS_WORKSPACE: 'campus_workspace',
+  AUDIENCE_STUDENTS: 'audience_students',
+  AUDIENCE_COLLEGES: 'audience_colleges',
+  AUDIENCE_HIRING_TEAMS: 'audience_hiring_teams',
 } as const;
 
 export type CtaKey = (typeof CTA_KEYS)[keyof typeof CTA_KEYS];

@@ -20,9 +20,14 @@ export function TimerCircle({ timeLeft, totalTime, size = 80 }: TimerCircleProps
     : 'var(--accent-danger)'
 
   return (
-    <div className="relative flex items-center justify-center"
-         style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
+    <div
+      className="relative flex items-center justify-center"
+      style={{ width: size, height: size }}
+      role="timer"
+      aria-live="off"
+      aria-label={`${timeLeft} seconds remaining`}
+    >
+      <svg width={size} height={size} className="-rotate-90 motion-reduce:transition-none" aria-hidden>
         <circle
           cx={size / 2} cy={size / 2} r={radius}
           fill="none" stroke="var(--bg-tertiary)" strokeWidth={strokeWidth}
@@ -33,12 +38,14 @@ export function TimerCircle({ timeLeft, totalTime, size = 80 }: TimerCircleProps
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
+          className="motion-reduce:transition-none"
           style={{ transition: 'stroke-dashoffset 1s linear, stroke 0.5s ease' }}
         />
       </svg>
       <span
         className="absolute font-bold tabular-nums leading-none"
         style={{ color, fontSize: innerFontPx }}
+        aria-hidden
       >
         {timeLeft}s
       </span>

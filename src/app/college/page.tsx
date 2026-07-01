@@ -1,5 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { createClient } from '@/lib/supabase/server';
 import { generateMetadata } from '@/lib/seo/metadata';
 import {
@@ -115,7 +117,7 @@ const PRICING = [
     seats: '50–100 students',
     perStudent: '≈ ₹500–1,000 per student',
     highlight: false,
-    cta: { label: 'Start Free Pilot', href: '/college/signup' },
+    cta: { label: 'Set up Campus Workspace', href: '/signup?intent=college' },
     features: [
       'Up to 100 student seats',
       'Unlimited AI mock interviews',
@@ -133,7 +135,7 @@ const PRICING = [
     perStudent: '≈ ₹500–1,000 per student',
     badge: 'Most Popular',
     highlight: true,
-    cta: { label: 'Start Free Pilot', href: '/college/signup' },
+    cta: { label: 'Set up Campus Workspace', href: '/signup?intent=college' },
     features: [
       'Up to 200 student seats',
       'Everything in Tier-3',
@@ -313,52 +315,6 @@ export default async function CollegeLandingPage() {
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
 
-      {/* ── Navbar ────────────────────────────────────────────────────────────── */}
-      <header
-        className="sticky top-0 z-30 border-b"
-        style={{
-          borderColor: 'var(--card-border)',
-          background: 'color-mix(in srgb, var(--bg-primary) 90%, transparent)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
-        }}
-      >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-          <Link href="/" className="flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
-            <span className="text-base font-bold">
-              Interview<span style={{ color: 'var(--accent-primary)' }}>Era</span>
-            </span>
-            <span
-              className="rounded-full border px-2 py-0.5 text-xs font-semibold"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, transparent)',
-                background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                color: 'var(--accent-primary)',
-              }}
-            >
-              Campus
-            </span>
-          </Link>
-
-          <nav className="hidden items-center gap-6 text-sm font-medium sm:flex" style={{ color: 'var(--text-secondary)' }}>
-            <a href="#solution" className="transition-opacity hover:opacity-70">Product</a>
-            <a href="#pricing" className="transition-opacity hover:opacity-70">Pricing</a>
-            <a href="#faq" className="transition-opacity hover:opacity-70">FAQ</a>
-            {/* No ?next param — LoginForm checks plan_tier and routes:
-                campus_admin → /college/dashboard | student → /dashboard */}
-            <Link href="/login" className="transition-opacity hover:opacity-70">Admin Login</Link>
-          </nav>
-
-          <Link
-            href="/college/signup"
-            className="rounded-lg px-4 py-2 text-sm font-bold text-white transition-all hover:-translate-y-0.5"
-            style={{ background: 'var(--accent-primary)' }}
-          >
-            Sign Up Your College
-          </Link>
-        </div>
-      </header>
-
       {/* ── SECTION 1: Hero ───────────────────────────────────────────────────── */}
       <section
         className="relative overflow-hidden px-4 py-16 sm:px-6 sm:py-24"
@@ -412,21 +368,24 @@ export default async function CollegeLandingPage() {
               ))}
             </ul>
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/college/signup"
-                className="inline-flex items-center justify-center gap-2 rounded-xl px-7 py-3.5 text-base font-bold text-white transition-all hover:-translate-y-0.5"
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+              <TrackedCtaLink
+                href="/signup?intent=college"
+                ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                ctaText="Set up Campus Workspace"
+                section="college_hero"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl px-7 py-3.5 text-base font-bold text-white transition-all hover:-translate-y-0.5"
                 style={{
                   background: 'var(--accent-primary)',
                   boxShadow: '0 10px 32px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
                 }}
               >
-                Start Free Pilot
+                Set up Campus Workspace
                 <ArrowRight className="h-4 w-4" aria-hidden />
-              </Link>
+              </TrackedCtaLink>
               <a
                 href="mailto:campus@interviewera.in?subject=Demo Request"
-                className="inline-flex items-center justify-center gap-2 rounded-xl border-2 px-7 py-3.5 text-base font-semibold transition-all hover:-translate-y-0.5"
+                className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border-2 px-7 py-3.5 text-base font-semibold transition-all hover:-translate-y-0.5"
                 style={{
                   borderColor: 'var(--card-border)',
                   color: 'var(--text-primary)',
@@ -440,12 +399,24 @@ export default async function CollegeLandingPage() {
             <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
               50 students &nbsp;·&nbsp; 3 months &nbsp;·&nbsp; No credit card
             </p>
-            <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Are you a student?{' '}
-              <span style={{ color: 'var(--text-secondary)' }}>
-                Check your email — your college will send an invite link directly to you.
-              </span>
-            </p>
+            <div
+              className="mt-4 rounded-xl border px-4 py-3"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            >
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Are you a student?
+              </p>
+              <Link
+                href="/help-center"
+                className="mt-1 inline-flex min-h-[44px] items-center text-sm font-semibold transition-opacity hover:opacity-80"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                Student Invitation
+              </Link>
+              <p className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                Students join using the invite email their college sends — check your inbox for the link.
+              </p>
+            </div>
           </div>
 
           {/* Right — mock dashboard */}
@@ -845,17 +816,30 @@ export default async function CollegeLandingPage() {
                   ))}
                 </ul>
 
-                <Link
-                  href={plan.cta.href}
-                  className="mt-8 block rounded-xl px-4 py-3 text-center text-sm font-bold transition-all hover:-translate-y-0.5"
-                  style={
-                    plan.highlight
-                      ? { background: 'var(--accent-primary)', color: '#fff' }
-                      : { border: '1.5px solid var(--card-border)', color: 'var(--text-primary)' }
-                  }
-                >
-                  {plan.cta.label}
-                </Link>
+                {plan.cta.href.startsWith('mailto:') ? (
+                  <a
+                    href={plan.cta.href}
+                    className="mt-8 block min-h-[44px] rounded-xl px-4 py-3 text-center text-sm font-bold transition-all hover:-translate-y-0.5"
+                    style={{ border: '1.5px solid var(--card-border)', color: 'var(--text-primary)' }}
+                  >
+                    {plan.cta.label}
+                  </a>
+                ) : (
+                  <TrackedCtaLink
+                    href={plan.cta.href}
+                    ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                    ctaText={plan.cta.label}
+                    section="college_pricing"
+                    className="mt-8 block min-h-[44px] rounded-xl px-4 py-3 text-center text-sm font-bold transition-all hover:-translate-y-0.5"
+                    style={
+                      plan.highlight
+                        ? { background: 'var(--accent-primary)', color: '#fff' }
+                        : { border: '1.5px solid var(--card-border)', color: 'var(--text-primary)' }
+                    }
+                  >
+                    {plan.cta.label}
+                  </TrackedCtaLink>
+                )}
               </div>
             ))}
           </div>
@@ -925,12 +909,15 @@ export default async function CollegeLandingPage() {
                     Book Your Pilot Demo
                     <ArrowRight className="h-4 w-4" aria-hidden />
                   </a>
-                  <Link
-                    href="/college/signup"
-                    className="flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:bg-white/20"
+                  <TrackedCtaLink
+                    href="/signup?intent=college"
+                    ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                    ctaText="Set up Campus Workspace"
+                    section="college_pilot"
+                    className="flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:bg-white/20"
                   >
-                    Or set up yourself — free
-                  </Link>
+                    Set up Campus Workspace
+                  </TrackedCtaLink>
                 </div>
               </div>
             </div>
@@ -1046,12 +1033,15 @@ export default async function CollegeLandingPage() {
               Book Free Pilot Demo
               <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
-            <Link
-              href="/college/signup"
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-indigo-400/50 bg-white/10 px-8 py-4 text-base font-semibold text-white transition-all hover:bg-white/20"
+            <TrackedCtaLink
+              href="/signup?intent=college"
+              ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+              ctaText="Set up Campus Workspace"
+              section="college_final_cta"
+              className="inline-flex min-h-[44px] items-center gap-2 rounded-xl border-2 border-indigo-400/50 bg-white/10 px-8 py-4 text-base font-semibold text-white transition-all hover:bg-white/20"
             >
-              Start Pilot Now
-            </Link>
+              Set up Campus Workspace
+            </TrackedCtaLink>
           </div>
 
           <div className="mt-10 flex flex-col items-center gap-2 sm:flex-row sm:justify-center sm:gap-6">

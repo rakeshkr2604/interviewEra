@@ -1,5 +1,14 @@
 import type { LucideIcon } from 'lucide-react';
 import { GitBranch, Layers, AudioLines, TrendingDown } from 'lucide-react';
+import {
+  LANDING_HOME_EYEBROW,
+  LANDING_HOME_HEADER_BLOCK,
+  LANDING_HOME_HEADING,
+  LANDING_HOME_SECTION,
+  LANDING_HOME_SUBHEAD,
+  LANDING_PAGE_CONTAINER,
+} from '@/lib/landing/container';
+import { cn } from '@/lib/utils';
 
 /**
  * Editorial "why candidates fail" section — the core positioning insight.
@@ -48,26 +57,17 @@ const FAILURE_MODES: FailureMode[] = [
 
 export function LandingWhyFail() {
   return (
-    <section className="px-5 py-20 sm:py-24">
-
+    <section className={LANDING_HOME_SECTION}>
+      <div className={LANDING_PAGE_CONTAINER}>
       {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="mx-auto max-w-3xl text-center">
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: 'var(--accent-hover)' }}
-        >
+      <div className={LANDING_HOME_HEADER_BLOCK}>
+        <span className={LANDING_HOME_EYEBROW}>
           The real reason
         </span>
-        <h2
-          className="mt-3.5 text-balance text-3xl font-extrabold leading-[1.08] tracking-tight sm:text-[42px]"
-          style={{ fontFamily: "'Bricolage Grotesque', sans-serif", color: 'var(--text-primary)' }}
-        >
+        <h2 className={LANDING_HOME_HEADING}>
           Most candidates don&rsquo;t fail because they lack knowledge
         </h2>
-        <p
-          className="mx-auto mt-4 max-w-xl text-base leading-relaxed sm:text-[17px]"
-          style={{ color: 'var(--text-secondary)' }}
-        >
+        <p className={cn(LANDING_HOME_SUBHEAD, 'sm:text-[17px]')}>
           They know the concepts. They have done the projects. They fail in the gap between knowing
           something and explaining it clearly, under pressure, while someone keeps asking
           &ldquo;why?&rdquo;.
@@ -79,11 +79,11 @@ export function LandingWhyFail() {
         {FAILURE_MODES.map((m) => (
           <div
             key={m.head}
-            className="rounded-2xl border p-6 transition-transform duration-200 hover:-translate-y-0.5"
+            className="rounded-2xl border p-6 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:transform-none"
             style={{
               borderColor: 'var(--card-border)',
               background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
-              boxShadow: '0 8px 28px -20px color-mix(in srgb, var(--text-primary) 40%, transparent)',
+              boxShadow: 'var(--card-shadow)',
             }}
           >
             {/* Icon tile */}
@@ -115,7 +115,7 @@ export function LandingWhyFail() {
 
       {/* ── Resolution band ─────────────────────────────────────────────── */}
       <div
-        className="mx-auto mt-6 max-w-4xl rounded-2xl border-l-2 px-6 py-5"
+        className="mx-auto mt-8 max-w-4xl rounded-2xl border-l-2 px-6 py-5"
         style={{
           borderColor: 'var(--accent-primary)',
           background: 'color-mix(in srgb, var(--accent-primary) 7%, var(--card-bg))',
@@ -129,6 +129,7 @@ export function LandingWhyFail() {
           <span style={{ color: 'var(--accent-primary)' }}>before the real interview does</span> —
           adaptive follow-ups, realistic pacing, and a score that shows you where the structure broke.
         </p>
+      </div>
       </div>
     </section>
   );

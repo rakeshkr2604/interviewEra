@@ -3,7 +3,16 @@ import Link from 'next/link'
 import { ArrowRight, BookOpen, Layers } from 'lucide-react'
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell'
 import { ContentCard } from '@/components/content/ContentCard'
+import { MarketingPageHeader } from '@/components/layout/MarketingPageHeader'
+import { MarketingSectionHeader } from '@/components/layout/MarketingSectionHeader'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
+import { MARKETING_SECTION_GAP } from '@/lib/landing/container'
+import {
+  IE_MARKETING_CTA_PRIMARY_CLASS,
+  IE_MARKETING_CTA_PRIMARY_STYLE,
+  IE_MARKETING_CTA_SECONDARY_CLASS,
+  IE_MARKETING_CTA_SECONDARY_STYLE,
+} from '@/lib/theme/component-classes'
 import { generateMetadata } from '@/lib/seo/metadata'
 import { breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld'
 import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
@@ -46,52 +55,35 @@ export default function ResourcesHubPage() {
     <>
       <JsonLdScript id="resources-breadcrumb-ld" data={RESOURCES_BREADCRUMB_LD} />
       <BlogMarketingShell>
-        <div className="space-y-12 sm:space-y-16 lg:space-y-20">
-          <header className="mx-auto max-w-3xl text-center lg:max-w-4xl">
-            <div
-              className="mx-auto mb-5 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide sm:mb-6"
-              style={{
-                borderColor: 'var(--card-border)',
-                background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                color: 'var(--text-primary)',
-              }}
+        <div className={MARKETING_SECTION_GAP}>
+          <MarketingPageHeader
+            eyebrow="Resource Hub"
+            eyebrowIcon={Layers}
+            title="Interview Preparation Resources"
+          >
+            <Link
+              href="/blog"
+              className={IE_MARKETING_CTA_PRIMARY_CLASS}
+              style={IE_MARKETING_CTA_PRIMARY_STYLE}
             >
-              <Layers className="size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-              Resource Hub
-            </div>
-            <h1 className="text-balance text-[2rem] font-bold leading-[1.08] tracking-tight sm:text-4xl md:text-5xl md:leading-[1.05]">
-              Interview Preparation Resources
-            </h1>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/blog"
-                className="landing-cta-lift inline-flex h-11 items-center gap-2 rounded-[12px] px-6 text-sm font-semibold text-white"
-                style={{
-                  background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-                  boxShadow: '0 12px 36px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
-                }}
-              >
-                <BookOpen className="size-4" aria-hidden />
-                Browse blog
-              </Link>
-              <Link
-                href="/interview-questions"
-                className="inline-flex h-11 items-center gap-2 rounded-[12px] border px-6 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
-                style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
-              >
-                Interview questions
-                <ArrowRight className="size-4" aria-hidden />
-              </Link>
-            </div>
-          </header>
+              <BookOpen className="size-4" aria-hidden />
+              Browse blog
+            </Link>
+            <Link
+              href="/interview-questions"
+              className={IE_MARKETING_CTA_SECONDARY_CLASS}
+              style={IE_MARKETING_CTA_SECONDARY_STYLE}
+            >
+              Interview questions
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          </MarketingPageHeader>
 
           <section>
-            <header className="mb-6 sm:mb-8">
-              <h2 className="text-xl font-bold tracking-tight sm:text-2xl">Featured Guides</h2>
-              <p className="mt-2 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-                Start with our most complete preparation hubs.
-              </p>
-            </header>
+            <MarketingSectionHeader
+              title="Featured Guides"
+              subtitle="Start with our most complete preparation hubs."
+            />
             <ul className="grid list-none gap-5 p-0 sm:grid-cols-2 xl:grid-cols-3 xl:gap-7">
               {featured.map((entry) => (
                 <li key={entry.id} className="p-0">

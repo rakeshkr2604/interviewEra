@@ -2,6 +2,13 @@ import Link from 'next/link';
 import { Minus, Plus, ChevronDown } from 'lucide-react';
 import { faqPageJsonLd } from '@/lib/seo/schema/jsonld';
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
+import {
+  LANDING_HOME_EYEBROW,
+  LANDING_HOME_HEADER_BLOCK,
+  LANDING_HOME_SECTION,
+  LANDING_HOME_SUBHEAD,
+  LANDING_PAGE_CONTAINER,
+} from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
 /** FAQs shown before the “Show more” expander */
@@ -149,32 +156,25 @@ export function LandingFaq() {
 
   return (
     <section
-      className="border-t px-5 py-20 sm:py-24"
+      className={cn(LANDING_HOME_SECTION, 'border-t')}
       style={{
         borderColor: 'color-mix(in srgb, var(--card-border) 80%, transparent)',
         background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
       }}
       aria-labelledby="home-faq-heading"
     >
-      <div className="mx-auto max-w-3xl">
-        <div className="text-center">
-          <span
-            className="text-[11px] font-bold uppercase tracking-[0.16em]"
-            style={{ color: 'var(--accent-hover)' }}
-          >
+      <div className={cn(LANDING_PAGE_CONTAINER, 'max-w-3xl')}>
+        <div className={LANDING_HOME_HEADER_BLOCK}>
+          <span className={LANDING_HOME_EYEBROW}>
             Questions
           </span>
           <h2
             id="home-faq-heading"
-            className="mt-3 font-[family-name:var(--font-bricolage)] text-[clamp(1.625rem,3.4vw,2.5rem)] font-extrabold leading-tight tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
+            className="mt-3 font-[family-name:var(--font-bricolage)] text-[clamp(1.625rem,3.4vw,2.5rem)] font-extrabold leading-tight tracking-tight text-[var(--text-primary)]"
           >
             Common questions
           </h2>
-          <p
-            className="mx-auto mt-4 max-w-xl text-base leading-relaxed"
-            style={{ color: 'var(--text-secondary)' }}
-          >
+          <p className={LANDING_HOME_SUBHEAD}>
             Everything you need to know before your first scored mock — product, scoring, pricing,
             privacy, and community.
           </p>

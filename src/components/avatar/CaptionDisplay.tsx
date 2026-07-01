@@ -28,8 +28,8 @@ export function CaptionDisplay({ fullText, currentWordIndex }: CaptionDisplayPro
   return (
     <div
       ref={scrollRef}
-      className="max-h-28 overflow-y-auto rounded-xl border border-(--card-border)
-                 bg-(--card-bg) px-4 py-3 text-sm leading-relaxed scroll-smooth"
+      className="mx-auto w-full max-w-prose max-h-36 overflow-y-auto rounded-xl border border-(--card-border)
+                 bg-(--card-bg) px-4 py-3.5 text-base leading-relaxed scroll-smooth motion-reduce:scroll-auto"
     >
       {words.map((word, index) => {
         const isActive  = index === currentWordIndex

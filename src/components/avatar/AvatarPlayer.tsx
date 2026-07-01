@@ -115,8 +115,8 @@ export function AvatarPlayer({
       )}
 
       {isSpeaking && (
-        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1 backdrop-blur-sm">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-success)" />
+        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-sm">
+          <span className="ie-status-pulse h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-success)" />
           <span className="text-xs font-medium text-white">Speaking</span>
         </div>
       )}

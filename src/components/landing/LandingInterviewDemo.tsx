@@ -1,4 +1,12 @@
 import { Captions, CircleDot } from 'lucide-react';
+import {
+  LANDING_HOME_EYEBROW,
+  LANDING_HOME_HEADER_BLOCK,
+  LANDING_HOME_HEADING,
+  LANDING_HOME_SECTION,
+  LANDING_HOME_SUBHEAD,
+  LANDING_PAGE_CONTAINER,
+} from '@/lib/landing/container';
 
 /**
  * Interview simulation showcase — communicates "this is not a static question bank".
@@ -81,26 +89,17 @@ const SCORES = [
 
 export function LandingInterviewDemo() {
   return (
-    <section className="px-5 py-20 sm:py-24">
-
+    <section className={LANDING_HOME_SECTION}>
+      <div className={LANDING_PAGE_CONTAINER}>
       {/* Section heading */}
-      <div className="mx-auto max-w-3xl text-center">
-        <span
-          className="text-[11px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: 'var(--accent-hover)' }}
-        >
+      <div className={LANDING_HOME_HEADER_BLOCK}>
+        <span className={LANDING_HOME_EYEBROW}>
           A live session, not a list
         </span>
-        <h2
-          className="mt-3.5 text-balance text-3xl font-extrabold tracking-tight sm:text-[42px] sm:leading-[1.08]"
-          style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
-        >
+        <h2 className={LANDING_HOME_HEADING}>
           It reads your answer, then asks the harder question
         </h2>
-        <p
-          className="mx-auto mt-4 max-w-xl text-base leading-relaxed"
-          style={{ color: 'var(--text-secondary)' }}
-        >
+        <p className={LANDING_HOME_SUBHEAD}>
           Every question comes from your resume, and every follow-up comes from what you just said.
           This is one real exchange — the kind a static question bank can never run.
         </p>
@@ -108,10 +107,11 @@ export function LandingInterviewDemo() {
 
       {/* ── Demo card ──────────────────────────────────────────────────────── */}
       <div
-        className="mx-auto mt-12 max-w-5xl overflow-hidden rounded-3xl border-2"
+        className="mx-auto mt-12 max-w-5xl overflow-hidden rounded-2xl border"
         style={{
           borderColor: 'var(--card-border)',
           background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+          boxShadow: 'var(--card-shadow)',
         }}
       >
 
@@ -150,8 +150,8 @@ export function LandingInterviewDemo() {
 
           {/* ── Left: conversation ───────────────────────────────────────── */}
           <div
-            className="space-y-3.5 p-5 sm:p-7"
-            style={{ borderRight: '1px solid var(--card-border)' }}
+            className="space-y-3.5 border-b p-5 sm:p-7 lg:border-b-0 lg:border-r"
+            style={{ borderColor: 'var(--card-border)' }}
           >
             {ITEMS.map((item, i) => {
 
@@ -409,11 +409,12 @@ export function LandingInterviewDemo() {
       </div>
 
       <p
-        className="mx-auto mt-4 max-w-5xl px-1 text-center text-xs"
+        className="mx-auto mt-5 max-w-5xl px-1 text-center text-xs"
         style={{ color: 'var(--text-muted)' }}
       >
         Illustrative exchange · scores shown are example values, not a guarantee of outcomes.
       </p>
+      </div>
     </section>
   );
 }

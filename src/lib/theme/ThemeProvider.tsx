@@ -1,6 +1,6 @@
 'use client'
 import { createContext, useContext, useEffect, useState } from 'react'
-import { DARK_TOKENS, LIGHT_TOKENS } from './tokens'
+import { tokensForTheme } from './tokens'
 
 export type Theme = 'dark' | 'light' | 'system'
 
@@ -29,7 +29,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const apply = () => {
       const resolved = resolve()
       queueMicrotask(() => setResolvedTheme(resolved))
-      const tokens = resolved === 'dark' ? DARK_TOKENS : LIGHT_TOKENS
+      const tokens = tokensForTheme(resolved)
       const root = document.documentElement
       Object.entries(tokens).forEach(([key, value]) => {
         root.style.setProperty(key, value)

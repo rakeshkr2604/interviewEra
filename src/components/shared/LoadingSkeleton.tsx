@@ -9,7 +9,7 @@ export function Skeleton({ className = '', count = 1 }: SkeletonProps) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className={`animate-pulse rounded-lg bg-(--bg-tertiary) ${className}`}
+          className={`animate-pulse rounded-lg bg-(--bg-tertiary) motion-reduce:animate-none ${className}`}
         />
       ))}
     </>

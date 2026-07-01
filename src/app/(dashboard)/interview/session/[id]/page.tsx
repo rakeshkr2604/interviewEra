@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { AvatarPlayer } from '@/components/avatar/AvatarPlayer'
 import { CaptionDisplay } from '@/components/avatar/CaptionDisplay'
 import { CandidateTranscript } from '@/components/interview/CandidateTranscript'
+import '@/components/interview/interview-effects.css'
 import { CandidatePreview } from '@/components/interview/CandidatePreview'
 import { TimerCircle } from '@/components/interview/TimerCircle'
 import { FillerWordBadge } from '@/components/interview/FillerWordBadge'
@@ -38,7 +39,15 @@ import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect
 import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interviewLog } from '@/lib/voice/lifecycle-log'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import type { RuntimePhase } from '@/lib/interview/runtime-phase'
+import { InterviewPhaseAnnouncer } from '@/components/interview/InterviewPhaseAnnouncer'
 import { progressRingLabel } from '@/lib/interview/runtime-phase'
+import {
+  IE_ALERT_BANNER_CLASS,
+  IE_ALERT_ERROR_STYLE,
+  IE_ALERT_WARNING_STYLE,
+  IE_FOCUS_VISIBLE,
+  IE_SPINNER_LG_CLASS,
+} from '@/lib/theme/component-classes'
 import { useInterviewSessionController } from '@/hooks/useInterviewSessionController'
 import { useInterviewAudio } from '@/hooks/useInterviewAudio'
 import { useInterviewAvatarSpeaking } from '@/hooks/useInterviewAvatarSpeaking'
@@ -2386,8 +2395,10 @@ export default function InterviewSessionPage() {
       <div className="flex min-h-dvh items-center justify-center p-4"
            style={{ background: 'var(--page-gradient)' }}>
         <div className="dashboard-premium-card w-full max-w-sm space-y-4 p-6 text-center sm:p-8">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full
-                          border-2 border-(--accent-primary) border-t-transparent" />
+          <div
+            className={`mx-auto h-10 w-10 rounded-full border-2 border-(--accent-primary) border-t-transparent ${IE_SPINNER_LG_CLASS}`}
+            aria-hidden
+          />
           <div className="space-y-1">
             <p className="text-sm font-semibold text-(--text-primary)">{startupLabel}</p>
             {startupSubtext ? (
@@ -2395,8 +2406,8 @@ export default function InterviewSessionPage() {
             ) : null}
           </div>
           {audioInitError ? (
-            <div className="space-y-2">
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+            <div className="space-y-3">
+              <p className={IE_ALERT_BANNER_CLASS} style={IE_ALERT_ERROR_STYLE}>
                 {audioInitError}
               </p>
               <button
@@ -2406,9 +2417,9 @@ export default function InterviewSessionPage() {
                   setAudioReady(false)
                   setStartupStep('initializing_audio')
                 }}
-                className="rounded-lg border border-(--card-border) bg-(--bg-secondary)
-                           px-3 py-1.5 text-xs font-semibold text-(--text-primary)
-                           hover:bg-(--bg-tertiary)"
+                className={`min-h-[44px] w-full rounded-lg border border-(--card-border) bg-(--bg-secondary)
+                           px-3 py-2 text-xs font-semibold text-(--text-primary)
+                           hover:bg-(--bg-tertiary) ${IE_FOCUS_VISIBLE}`}
               >
                 Retry audio setup
               </button>
@@ -2426,12 +2437,12 @@ export default function InterviewSessionPage() {
           className="flex min-h-dvh items-center justify-center"
           style={{ background: 'var(--page-gradient)' }}
         >
-          <div className="text-center space-y-3">
+          <div className="space-y-3 text-center" role="status" aria-live="polite" aria-busy="true">
             <div
-              className="mx-auto h-10 w-10 animate-spin rounded-full
-                          border-2 border-(--accent-success) border-t-transparent"
+              className={`mx-auto h-10 w-10 rounded-full border-2 border-(--accent-success) border-t-transparent ${IE_SPINNER_LG_CLASS}`}
+              aria-hidden
             />
-            <p className="text-(--text-secondary) text-sm">Generating your report...</p>
+            <p className="text-sm text-(--text-secondary)">Generating your report...</p>
           </div>
         </div>
         {celebrationDialog}
@@ -2497,7 +2508,7 @@ export default function InterviewSessionPage() {
           router.push('/dashboard')
         }
       }}
-      className="flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 sm:px-3"
+      className={`flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 sm:px-3 ${IE_FOCUS_VISIBLE}`}
       style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
       aria-label="Exit interview"
     >
@@ -2523,12 +2534,16 @@ export default function InterviewSessionPage() {
     </div>
   )
 
+  const showDominantAnswerTimer = phase === 'candidate_answering' && answerTimerArmed
+  const secondaryQuestionLabel = showDominantAnswerTimer ? undefined : avatarHeaderLabel
+
   return (
     <>
       <div
         className="flex h-full min-h-0 w-full min-w-0 flex-col lg:px-0"
         style={{ background: 'var(--page-gradient)' }}
       >
+        <InterviewPhaseAnnouncer phase={phase} />
 
         {/* ── Top Bar ── */}
         <div className="shrink-0 border-b border-(--card-border)/50 bg-(--card-bg)/90 backdrop-blur-sm">
@@ -2537,25 +2552,25 @@ export default function InterviewSessionPage() {
           <div className="flex flex-col gap-2.5 px-3 py-2.5 lg:hidden">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                  INTERVIEW SESSION
+                <p className="text-[10px] font-medium uppercase tracking-widest text-(--text-muted)/80">
+                  Interview session
                 </p>
-                <h1 className="text-base font-bold text-(--text-primary) sm:text-lg">
-                  Focus Mode
+                <h1 className="text-base font-semibold text-(--text-primary) sm:text-lg">
+                  Focus mode
                 </h1>
-                <p className="truncate text-[10px] text-(--text-secondary) sm:text-[11px]">
-                  Mode: {interviewModeLabel}&nbsp;·&nbsp;Skips used: {skipCount} / {MAX_SKIPS}
+                <p className="truncate text-[10px] text-(--text-muted) sm:text-[11px]">
+                  {interviewModeLabel}&nbsp;·&nbsp;Skips {skipCount}/{MAX_SKIPS}
                 </p>
               </div>
               {sessionExitButton}
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="flex shrink-0 items-center gap-1.5">
-                <span className="text-[10px] font-semibold text-(--text-secondary) sm:text-xs">
-                  Progress
-                </span>
-                {renderProgressRing(52)}
+              <div className="flex shrink-0 flex-col items-center gap-0.5">
+                {renderProgressRing(56)}
+                {showDominantAnswerTimer ? (
+                  <span className="text-[9px] font-medium text-(--text-muted)">Time left</span>
+                ) : null}
               </div>
               <div className="min-w-0 flex-1">{questionProgressMeter()}</div>
             </div>
@@ -2564,22 +2579,22 @@ export default function InterviewSessionPage() {
           {/* Desktop — three-column header */}
           <div className="hidden w-full min-w-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 px-3 py-2 lg:grid">
             <div className="min-w-0 space-y-0.5">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                INTERVIEW SESSION
+              <p className="text-[10px] font-medium uppercase tracking-widest text-(--text-muted)/80">
+                Interview session
               </p>
-              <h1 className="text-lg font-bold text-(--text-primary) sm:text-xl">
-                Focus Mode
+              <h1 className="text-lg font-semibold text-(--text-primary) sm:text-xl">
+                Focus mode
               </h1>
-              <p className="text-[11px] text-(--text-secondary)">
-                Mode: {interviewModeLabel}&nbsp;·&nbsp;Skips used: {skipCount} / {MAX_SKIPS}
+              <p className="text-[11px] text-(--text-muted)">
+                {interviewModeLabel}&nbsp;·&nbsp;Skips {skipCount}/{MAX_SKIPS}
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center justify-center gap-2 sm:gap-2.5">
-              <span className="text-xs font-semibold text-(--text-secondary) sm:text-sm">
-                Progress :
-              </span>
+            <div className="flex shrink-0 flex-col items-center justify-center gap-1">
               {renderProgressRing(72)}
+              {showDominantAnswerTimer ? (
+                <span className="text-[10px] font-medium text-(--text-muted)">Time left</span>
+              ) : null}
             </div>
 
             <div className="flex min-w-0 items-center justify-end gap-2 sm:gap-3">
@@ -2599,19 +2614,15 @@ export default function InterviewSessionPage() {
             <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
               <div className="session-flush-panel dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="flex shrink-0 items-center justify-between border-b border-(--card-border) px-2 py-2 sm:px-3 sm:py-2.5">
-                  <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
-                    <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-(--accent-primary) sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]">
-                      <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-(--accent-primary)" />
-                      <span className="truncate">AI Interviewer</span>
-                    </span>
-                    {audioActuallyStarted && (
-                      <span className="hidden items-center gap-1 rounded-full bg-(--accent-primary)/15 px-2 py-0.5 text-[10px] font-semibold text-(--accent-primary) sm:flex">
-                        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-primary)" />
-                        Speaking
-                      </span>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-[10px] font-semibold tabular-nums text-(--text-secondary) sm:text-xs">
+                  <span className="inline-flex max-w-full items-center gap-1 rounded-full border border-(--accent-primary)/25 bg-(--accent-primary)/12 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.12em] text-(--accent-primary) sm:gap-1.5 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.16em]">
+                    <span
+                      className={`h-1.5 w-1.5 shrink-0 rounded-full bg-(--accent-primary) ${
+                        audioActuallyStarted ? 'ie-status-pulse animate-pulse' : ''
+                      }`}
+                    />
+                    <span className="truncate">AI Interviewer</span>
+                  </span>
+                  <span className="ie-timer-secondary shrink-0 sm:text-[11px]">
                     {avatarHeaderLabel}
                   </span>
                 </div>
@@ -2642,22 +2653,27 @@ export default function InterviewSessionPage() {
                     </button>
                   )}
                   {showPlaybackRecovery && phase === 'avatar_speaking' && (
-                    <div className="absolute inset-x-0 bottom-0 z-10 space-y-2 border-t border-amber-200/80 bg-amber-50/95 p-3 backdrop-blur-sm">
-                      <p className="text-xs font-medium text-amber-900">
+                    <div
+                      className="absolute inset-x-0 bottom-0 z-10 space-y-3 border-t-2 p-3 backdrop-blur-sm"
+                      style={IE_ALERT_WARNING_STYLE}
+                      role="alertdialog"
+                      aria-labelledby="playback-recovery-title"
+                    >
+                      <p id="playback-recovery-title" className="text-xs font-medium">
                         {playbackFailureMessage}
                       </p>
                       <div className="flex flex-col gap-2">
                         <button
                           type="button"
                           onClick={retryAudio}
-                          className="rounded-lg border border-(--accent-primary) bg-white px-3 py-2 text-xs font-semibold text-(--accent-primary)"
+                          className={`min-h-[44px] rounded-lg border border-(--accent-primary) bg-white px-3 py-2 text-xs font-semibold text-(--accent-primary) ${IE_FOCUS_VISIBLE}`}
                         >
                           Retry Audio
                         </button>
                         <button
                           type="button"
                           onClick={continueWithoutAudio}
-                          className="rounded-lg bg-(--accent-primary) px-3 py-2 text-xs font-semibold text-white"
+                          className={`min-h-[44px] rounded-lg bg-(--accent-primary) px-3 py-2 text-xs font-semibold text-white ${IE_FOCUS_VISIBLE}`}
                         >
                           Continue Without Audio
                         </button>
@@ -2684,7 +2700,7 @@ export default function InterviewSessionPage() {
                 isListening={isListening || webSpeechActive || dgListening}
                 micArmed={micArmed}
                 userMicMuted={userMicMuted}
-                questionLabel={avatarHeaderLabel}
+                questionLabel={secondaryQuestionLabel}
               />
             </div>
           </div>
@@ -2698,11 +2714,11 @@ export default function InterviewSessionPage() {
               <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
 
               {phase === 'candidate_answering' && currentQuestion && (
-                <div className="shrink-0 rounded-xl border border-(--card-border)/60 bg-(--bg-secondary)/40 p-3 sm:p-4">
-                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                    Current Question
+                <div className="shrink-0 rounded-xl border border-(--card-border)/60 bg-(--bg-secondary)/50 p-3.5 sm:p-4">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                    Current question
                   </p>
-                  <p className="text-sm leading-relaxed text-(--text-primary)">
+                  <p className="text-base leading-relaxed text-(--text-primary) sm:text-[1.05rem] sm:leading-relaxed">
                     {currentQuestion.question_text}
                   </p>
                 </div>
@@ -2720,12 +2736,15 @@ export default function InterviewSessionPage() {
                     </div>
                   )}
                   {/* Deepgram live transcript */}
-                  <div className="min-h-[100px] rounded-xl border border-(--card-border) bg-(--bg-secondary) p-4">
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                      {dgListening
-                        ? `Live transcript · ${dgRecordingSeconds}s`
-                        : 'Your answer'}
-                    </p>
+                  <div className="mx-auto min-h-[100px] w-full max-w-prose rounded-xl border border-(--card-border) bg-(--bg-secondary) px-4 py-3.5">
+                    <div className="mb-2 flex items-baseline justify-between gap-2">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                        {dgListening ? 'Live transcript' : 'Your answer'}
+                      </p>
+                      {dgListening && !showDominantAnswerTimer ? (
+                        <span className="ie-timer-secondary">{dgRecordingSeconds}s</span>
+                      ) : null}
+                    </div>
                     {dgTranscript || dgInterim ? (
                       <p className="text-sm leading-relaxed text-(--text-primary)">
                         {dgTranscript}
@@ -2767,7 +2786,9 @@ export default function InterviewSessionPage() {
                     }}
                   />
                   {!dgVoiceShowActions && dgError && (
-                    <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{dgError}</p>
+                    <p className={IE_ALERT_BANNER_CLASS} style={IE_ALERT_ERROR_STYLE} role="alert">
+                      {dgError}
+                    </p>
                   )}
                   {/* Tone badge from last answer */}
                   {lastVoiceMeta && (
@@ -2793,29 +2814,33 @@ export default function InterviewSessionPage() {
               )}
 
               {phase === 'candidate_answering' && micFailed && (
-                <div className="session-flush-panel dashboard-premium-card space-y-2 p-4 border border-amber-200/80 bg-amber-50/80">
-                  <p className="text-sm font-medium text-amber-900">
+                <div
+                  className="session-flush-panel dashboard-premium-card space-y-3 border-2 p-4"
+                  style={IE_ALERT_WARNING_STYLE}
+                  role="alert"
+                >
+                  <p className="text-sm font-medium">
                     Voice connection lost. Tap Retry Mic or type your answer.
                   </p>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <button
                       type="button"
                       onClick={() => { void handleStartMic() }}
-                      className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
+                      className={`min-h-[44px] flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary) ${IE_FOCUS_VISIBLE}`}
                     >
                       Retry microphone
                     </button>
                     <button
                       type="button"
                       onClick={() => { void handleSwitchToAiVoice('mic_failed_banner') }}
-                      className="flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary)"
+                      className={`min-h-[44px] flex-1 rounded-lg border border-(--accent-primary) bg-white px-4 py-2 text-sm font-semibold text-(--accent-primary) ${IE_FOCUS_VISIBLE}`}
                     >
                       Use AI Voice
                     </button>
                     <button
                       type="button"
                       onClick={() => setInputMode('text')}
-                      className="flex-1 rounded-lg bg-(--accent-primary) px-4 py-2 text-sm font-semibold text-white"
+                      className={`min-h-[44px] flex-1 rounded-lg bg-(--accent-primary) px-4 py-2 text-sm font-semibold text-white ${IE_FOCUS_VISIBLE}`}
                     >
                       Type answer
                     </button>
@@ -2845,7 +2870,7 @@ export default function InterviewSessionPage() {
 
               {phase === 'candidate_answering' && useManualInput && (
                 <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-2">
-                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                  <p className={IE_ALERT_BANNER_CLASS} style={IE_ALERT_WARNING_STYLE} role="status">
                     {isMicSupported
                       ? 'Microphone unavailable right now. Please type your answer.'
                       : 'Speech input not supported. Please type your answer.'}
@@ -2875,13 +2900,13 @@ export default function InterviewSessionPage() {
 
               {phase === 'avatar_speaking' && (
                 <motion.div
-                  initial={{ opacity: 0, y: 8 }}
+                  initial={false}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden"
+                  className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden motion-reduce:transform-none"
                 >
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5 shrink-0">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent-primary)/40" />
+                      <span className="ie-status-ping absolute inline-flex h-full w-full animate-ping rounded-full bg-(--accent-primary)/40 motion-reduce:hidden" />
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-(--accent-primary)" />
                     </span>
                     <span className="text-xs font-semibold uppercase tracking-widest text-(--text-secondary)">
@@ -2901,10 +2926,9 @@ export default function InterviewSessionPage() {
               )}
 
               {phase === 'submitting' && (
-                <div className="flex-1 flex items-center justify-center">
+                <div className="flex flex-1 items-center justify-center" role="status" aria-live="polite" aria-busy="true">
                   <div className="flex flex-col items-center gap-4">
-                    {/* Waveform bars — audio-analysis feel, not a spinner */}
-                    <div className="flex items-end gap-[3px]" style={{ height: 32 }}>
+                    <div className="flex items-end gap-[3px]" style={{ height: 32 }} aria-hidden>
                       {THINKING_BAR_HEIGHTS.map((h, i) => (
                         <span
                           key={i}
@@ -2913,15 +2937,14 @@ export default function InterviewSessionPage() {
                         />
                       ))}
                     </div>
-                    {/* Animated message swap — feels like reasoning, not frozen */}
                     <AnimatePresence mode="wait">
                       <motion.p
                         key={thinkingMessage}
-                        initial={{ opacity: 0, y: 5 }}
+                        initial={false}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -5 }}
                         transition={{ duration: 0.25 }}
-                        className="text-sm text-(--text-secondary)"
+                        className="text-sm text-(--text-secondary) motion-reduce:transition-none"
                       >
                         {thinkingMessage}
                       </motion.p>
@@ -3007,8 +3030,12 @@ export default function InterviewSessionPage() {
 
             {/* ── Empty-payload warning (timer/auto-submit fallback only) ── */}
             {phase === 'candidate_answering' && showEmptyWarning && !hasAnswerPayload && (
-              <div className="session-flush-panel dashboard-premium-card w-full min-w-0 border border-amber-300 bg-amber-50/70 p-3">
-                <p className="text-xs font-semibold text-amber-800">
+              <div
+                className={`session-flush-panel dashboard-premium-card w-full min-w-0 border-2 p-3 ${IE_ALERT_BANNER_CLASS}`}
+                style={IE_ALERT_WARNING_STYLE}
+                role="status"
+              >
+                <p className="text-xs font-semibold">
                   We didn&apos;t catch your answer yet. Please speak (or type) before submitting.
                 </p>
               </div>
@@ -3090,57 +3117,51 @@ export default function InterviewSessionPage() {
                 paddingBottom: `calc(1rem + env(safe-area-inset-bottom) + ${keyboardBottomInset}px)`,
               }}
             >
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center justify-between gap-3 border-b border-(--card-border)/50 pb-3 mb-3">
                 <button
                   onClick={() => {
                     if (window.confirm('Restart this interview? Your progress will be lost.')) {
                       router.back()
                     }
                   }}
-                  className="flex items-center gap-1.5 text-xs text-(--text-muted)
-                             hover:text-(--text-secondary) transition-colors duration-200"
+                  className={`flex min-h-[44px] items-center gap-1.5 text-xs text-(--text-muted)
+                             hover:text-(--text-secondary) transition-colors duration-200 ${IE_FOCUS_VISIBLE}`}
                 >
-                  <RotateCcw size={12} />
-                  Restart Interview
+                  <RotateCcw size={12} aria-hidden />
+                  Restart interview
                 </button>
-                <div className="flex items-center gap-1.5 text-xs text-(--text-muted)">
+                <div className="flex min-h-[44px] items-center gap-1.5 text-xs text-(--text-muted)" aria-live="polite">
                   {voiceUi.showListeningIndicator
-                    ? <><span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" /> {voiceUi.label}</>
+                    ? <><span className="ie-status-pulse h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" aria-hidden /> {voiceUi.label}</>
                     : voiceUi.phase === 'starting_microphone' || micArmed
-                      ? <><Mic size={12} className={voiceUi.phase === 'starting_microphone' ? 'animate-pulse' : ''} /> {voiceUi.label}</>
-                      : <><MicOff size={12} /> {voiceUi.label}</>
+                      ? <><Mic size={12} className={voiceUi.phase === 'starting_microphone' ? 'ie-status-pulse animate-pulse' : ''} aria-hidden /> {voiceUi.label}</>
+                      : <><MicOff size={12} aria-hidden /> {voiceUi.label}</>
                   }
                 </div>
               </div>
 
               {micError && (
-                <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                <p className={`mb-3 ${IE_ALERT_BANNER_CLASS}`} style={IE_ALERT_ERROR_STYLE} role="alert">
                   {micError}
                 </p>
               )}
               {speechError && (
-                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <p className={`mb-3 ${IE_ALERT_BANNER_CLASS}`} style={IE_ALERT_WARNING_STYLE} role="status">
                   {speechError}
                 </p>
               )}
-              {/* ElevenLabs TTS errors (Deepgram mode) — same amber surface
-                  as browser TTS errors so the user has a single place to
-                  notice voice degradation regardless of which engine is in
-                  play. The hook resets the error at the start of every
-                  successful speak, so this banner self-clears on the next
-                  question if the underlying issue (quota, upstream) resolves. */}
               {inputMode === 'deepgram' && elTtsError && (
-                <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                <p className={`mb-3 ${IE_ALERT_BANNER_CLASS}`} style={IE_ALERT_WARNING_STYLE} role="status">
                   {elTtsError}
                 </p>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {inputMode !== 'text' && (
                   <button
                     type="button"
                     onClick={handleSwitchToTyping}
-                    className="rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary)"
+                    className={`min-h-[44px] rounded-xl border border-(--card-border) bg-(--bg-secondary) px-3 py-2 text-xs font-semibold text-(--text-secondary) hover:text-(--text-primary) ${IE_FOCUS_VISIBLE}`}
                     title="Switch to typing your answer"
                   >
                     Type answer
@@ -3155,18 +3176,19 @@ export default function InterviewSessionPage() {
                       useManualInput ||
                       permissionState === 'requesting'
                     }
-                    className={`flex h-12 w-12 items-center justify-center rounded-xl
-                                 border transition-all duration-200
+                    aria-label={isListening && !userMicMuted ? 'Mute microphone' : 'Enable microphone'}
+                    className={`ie-control-icon-btn flex h-11 w-11 items-center justify-center rounded-xl
+                                 border transition-all duration-200 motion-reduce:transition-none
                                  disabled:opacity-40 disabled:cursor-not-allowed
+                                 ${IE_FOCUS_VISIBLE}
                                  ${isListening && !userMicMuted
                                    ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
                                    : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
                                  }`}
                   >
-                    {isListening && !userMicMuted ? <Mic size={18} className="animate-pulse" /> : <MicOff size={18} />}
+                    {isListening && !userMicMuted ? <Mic size={18} className="ie-status-pulse animate-pulse" /> : <MicOff size={18} />}
                   </button>
                 )}
-                {/* Deepgram: manual mic toggle for when VAD doesn't auto-start */}
                 {inputMode === 'deepgram' && (
                   <button
                     onClick={() => {
@@ -3174,27 +3196,29 @@ export default function InterviewSessionPage() {
                       if (dgIsRecording) { stopDgListening() } else { void startDgListening() }
                     }}
                     disabled={phase !== 'candidate_answering' || elIsPlaying}
-                    className={`flex h-12 w-12 items-center justify-center rounded-xl
-                                 border transition-all duration-200
+                    aria-label={dgIsRecording ? 'Stop recording' : 'Start recording'}
+                    className={`ie-control-icon-btn flex h-11 w-11 items-center justify-center rounded-xl
+                                 border transition-all duration-200 motion-reduce:transition-none
                                  disabled:opacity-40 disabled:cursor-not-allowed
+                                 ${IE_FOCUS_VISIBLE}
                                  ${dgIsRecording
                                    ? 'border-(--accent-danger)/40 bg-(--accent-danger)/10 text-(--accent-danger)'
                                    : 'border-(--card-border) bg-(--bg-secondary) text-(--text-secondary)'
                                  }`}
                     title={dgIsRecording ? 'Stop recording' : 'Start Deepgram recording'}
                   >
-                    {dgIsRecording ? <Mic size={18} className="animate-pulse" /> : <Mic size={18} />}
+                    {dgIsRecording ? <Mic size={18} className="ie-status-pulse animate-pulse" /> : <Mic size={18} />}
                   </button>
                 )}
 
-                {/* Submit */}
                 <button
                   onClick={handleSubmitClick}
                   disabled={!canSubmitAnswer}
                   title={!hasAnswerPayload ? 'Speak or type your answer first' : undefined}
-                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl
-                             py-3 text-sm font-semibold transition-all duration-200
+                  className={`min-h-[44px] flex-1 flex items-center justify-center gap-2 rounded-xl
+                             px-3 py-3 text-sm font-semibold transition-all duration-200 motion-reduce:transition-none
                              disabled:cursor-not-allowed
+                             ${IE_FOCUS_VISIBLE}
                              ${canSubmitAnswer
                                ? 'text-white hover:opacity-95'
                                : 'text-(--text-secondary)'}`}
@@ -3204,36 +3228,38 @@ export default function InterviewSessionPage() {
                       : 'var(--bg-tertiary)',
                   }}
                 >
-                  <Send size={16} />
-                  Submit Answer
+                  <Send size={16} aria-hidden />
+                  Submit answer
                 </button>
 
-                {/* Retry — re-hear question */}
                 <button
                   onClick={handleRetry}
                   disabled={phase !== 'candidate_answering'}
-                  className="flex h-12 w-12 items-center justify-center rounded-xl
+                  aria-label="Re-hear question"
+                  className={`ie-control-icon-btn flex h-11 w-11 items-center justify-center rounded-xl
                              border border-(--card-border) bg-(--bg-secondary)
-                             text-(--text-secondary) transition-colors duration-200
+                             text-(--text-secondary) transition-colors duration-200 motion-reduce:transition-none
                              hover:text-(--text-primary)
-                             disabled:opacity-40 disabled:cursor-not-allowed"
+                             disabled:opacity-40 disabled:cursor-not-allowed
+                             ${IE_FOCUS_VISIBLE}`}
                   title="Re-hear question"
                 >
-                  <RotateCcw size={16} />
+                  <RotateCcw size={16} aria-hidden />
                 </button>
 
-                {/* Skip */}
                 <button
                   onClick={handleSkip}
                   disabled={phase !== 'candidate_answering' || skipCount >= MAX_SKIPS}
-                  className="flex h-12 w-12 items-center justify-center rounded-xl
+                  aria-label={`Skip question (${MAX_SKIPS - skipCount} remaining)`}
+                  className={`ie-control-icon-btn flex h-11 w-11 items-center justify-center rounded-xl
                              border border-(--card-border) bg-(--bg-secondary)
-                             text-(--text-secondary) transition-colors duration-200
+                             text-(--text-secondary) transition-colors duration-200 motion-reduce:transition-none
                              hover:text-(--text-primary)
-                             disabled:opacity-40 disabled:cursor-not-allowed"
+                             disabled:opacity-40 disabled:cursor-not-allowed
+                             ${IE_FOCUS_VISIBLE}`}
                   title={`Skip (${MAX_SKIPS - skipCount} remaining)`}
                 >
-                  <SkipForward size={16} />
+                  <SkipForward size={16} aria-hidden />
                 </button>
               </div>
             </div>

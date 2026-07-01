@@ -24,18 +24,11 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
   const atMaxTier = snap.current_tier >= MAX_TIER;
 
   return (
-    <div className="dashboard-premium-card mb-4 px-4 py-4 sm:mb-6 sm:px-6 sm:py-5">
+    <section className="dashboard-section dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7">
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
         <div className="min-w-0">
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.14em]"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Placement track
-          </p>
-          <p className="mt-1 text-lg font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-            {tierLabel}
-          </p>
+          <p className="dashboard-section-eyebrow">Placement track</p>
+          <p className="dashboard-section-title">{tierLabel}</p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           {[
@@ -45,7 +38,7 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
           ].map(({ icon: Icon, label }) => (
             <span
               key={label}
-              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold"
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium"
               style={{
                 background: 'var(--bg-secondary)',
                 color: 'var(--text-secondary)',
@@ -111,6 +104,6 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
           <SessionQualityNotice feedback={snap.lastSessionQualityFeedback} />
         </div>
       ) : null}
-    </div>
+    </section>
   );
 }

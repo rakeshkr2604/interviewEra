@@ -20,6 +20,8 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
@@ -959,6 +961,54 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Campus workspace bridge — qualified visitors toward activation */}
+      <section
+        className="border-t px-4 py-16 sm:px-6 md:py-20"
+        style={{ borderColor: 'var(--card-border)' }}
+        aria-labelledby="campus-workspace-bridge-heading"
+      >
+        <div className={cn('mx-auto max-w-3xl text-center', LANDING_PAGE_CONTAINER)}>
+          <Reveal>
+            <h2
+              id="campus-workspace-bridge-heading"
+              className="text-2xl font-bold tracking-tight text-balance sm:text-3xl"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Ready to set up your campus workspace?
+            </h2>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
+              <TrackedCtaLink
+                href="/signup?intent=college"
+                ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                ctaText="Set up Campus Workspace"
+                section="campus_bridge"
+                className={cn(
+                  buttonVariants({ size: 'lg' }),
+                  'inline-flex h-12 min-h-[44px] rounded-xl px-8 text-base font-semibold shadow-lg sm:h-[3.25rem] sm:text-lg',
+                )}
+                style={{ background: 'var(--accent-primary)', color: '#fff' }}
+              >
+                Set up Campus Workspace
+                <ArrowRight className="ml-2 size-4" aria-hidden />
+              </TrackedCtaLink>
+              <TrackedCtaLink
+                href="/college"
+                ctaKey={CTA_KEYS.FOR_COLLEGES}
+                ctaText="Learn about the campus platform"
+                section="campus_bridge"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'lg' }),
+                  'inline-flex h-12 min-h-[44px] rounded-xl px-8 text-base font-semibold sm:h-[3.25rem] sm:text-lg',
+                )}
+                style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+              >
+                Learn about the campus platform
+              </TrackedCtaLink>
+            </div>
+          </Reveal>
         </div>
       </section>
 

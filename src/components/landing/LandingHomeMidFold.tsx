@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/container';
+import { cn } from '@/lib/utils';
 
 function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
@@ -34,8 +36,8 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
   ];
 
   return (
-    <section id="how" style={{ padding: '80px 0', background: 'transparent' }}>
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
+    <section id="how" className={LANDING_HOME_SECTION}>
+      <div className={LANDING_HOME_INNER}>
         <Reveal instant>
           <div style={{ textAlign: 'center' }}>
             <span
@@ -176,39 +178,24 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
         </Reveal>
 
         <Reveal delay={0.15}>
-          <div style={{ marginTop: '40px', textAlign: 'center' }}>
+          <div className="mt-10 text-center sm:mt-12">
             <Link
               href={cta}
-              className="v3-btn-primary"
+              className="v3-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-[15px] font-semibold no-underline"
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '15px 32px',
-                borderRadius: '12px',
-                background: T.acc,
                 color: '#fff',
-                fontSize: '15px',
-                fontWeight: 600,
                 fontFamily: "'DM Sans', sans-serif",
-                textDecoration: 'none',
               }}
             >
-              Start a scored interview — it&apos;s free →
+              Start Free
             </Link>
-            <p style={{ fontSize: '13.5px', color: T.text2, marginTop: '12px' }}>
+            <p className="mt-3 text-[13.5px]" style={{ color: T.text2 }}>
               No credit card required · under 60 seconds to your first score
             </p>
             <Link
               href="/how-it-works"
-              style={{
-                display: 'inline-block',
-                marginTop: '14px',
-                fontSize: '13.5px',
-                fontWeight: 600,
-                color: T.acc2,
-                textDecoration: 'none',
-              }}
+              className="mt-3.5 inline-block text-[13.5px] font-semibold no-underline"
+              style={{ color: T.acc2 }}
             >
               See the full interview journey →
             </Link>
@@ -279,8 +266,8 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
   ];
 
   return (
-    <section style={{ padding: '88px 0', background: 'transparent' }}>
-      <div style={{ maxWidth: '1080px', margin: '0 auto', padding: '0 28px' }}>
+    <section className={LANDING_HOME_SECTION}>
+      <div className={LANDING_HOME_INNER}>
         <Reveal instant>
           <div style={{ textAlign: 'center' }}>
             <span
@@ -332,13 +319,13 @@ function EntrySection({ isLoggedIn }: { isLoggedIn: boolean }) {
                     authenticated: isLoggedIn,
                   });
                 }}
-                className={card.recommended ? 'ie-card-premium ie-card-premium--accent' : 'ie-card-premium'}
+                className={cn(card.recommended ? 'ie-card-premium ie-card-premium--accent' : 'ie-card-premium')}
                 style={{
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '14px',
                   border: `1px solid ${card.recommended ? T.accbrd : T.bord2}`,
-                  borderRadius: '18px',
+                  borderRadius: '16px',
                   padding: '28px',
                   cursor: 'pointer',
                   background: card.recommended ? T.accdim : T.card,

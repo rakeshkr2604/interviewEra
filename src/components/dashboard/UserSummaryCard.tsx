@@ -67,9 +67,12 @@ export function UserSummaryCard({
   const streakLabel = currentStreak === 1 ? '1 day' : `${currentStreak} days`;
 
   return (
-    <section className="dashboard-premium-card relative mb-4 flex flex-col overflow-hidden px-4 py-4 sm:mb-5 sm:px-6 sm:py-5 lg:mb-0 lg:h-full lg:px-7 lg:py-6">
+    <section
+      className="dashboard-premium-card relative flex h-full flex-col overflow-hidden px-4 py-4 sm:px-6 sm:py-5 lg:px-7 lg:py-6"
+      aria-labelledby="user-summary-heading"
+    >
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[2px]"
         style={{
           background:
             'linear-gradient(90deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 40%, transparent))',
@@ -77,7 +80,7 @@ export function UserSummaryCard({
         aria-hidden
       />
 
-      <div className="flex flex-col gap-4 sm:gap-4 lg:gap-5">
+      <div className="flex flex-col gap-4 lg:gap-5">
         <div className="flex min-w-0 items-start gap-3 sm:gap-3.5 lg:gap-4">
           <Link
             href="/settings#settings-account"
@@ -96,6 +99,7 @@ export function UserSummaryCard({
 
           <div className="min-w-0 flex-1 space-y-1.5 lg:space-y-2">
             <h2
+              id="user-summary-heading"
               className="text-lg font-semibold leading-tight sm:text-xl lg:text-2xl"
               style={{ color: 'var(--text-primary)' }}
             >
@@ -165,6 +169,28 @@ export function UserSummaryCard({
           </div>
         </div>
 
+        {inProgressInterview ? (
+          <Link
+            href={`/interview/session/${inProgressInterview.id}`}
+            className="dashboard-hover-lift flex min-h-12 items-center justify-between gap-3 rounded-xl border-2 px-4 py-3.5 shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--accent-primary) 45%, var(--card-border))',
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary))',
+              textDecoration: 'none',
+            }}
+          >
+            <div className="min-w-0">
+              <p className="dashboard-section-eyebrow">Resume session</p>
+              <p className="mt-0.5 truncate text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+                {inProgressInterview.role}
+              </p>
+            </div>
+            <span className="shrink-0 text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              Continue →
+            </span>
+          </Link>
+        ) : null}
+
         <ProfileActions
           planTier={planTier}
           isPaidActive={isPaidActive}
@@ -173,30 +199,6 @@ export function UserSummaryCard({
       </div>
 
       <div className="mt-4 flex flex-col gap-4 lg:mt-6 lg:flex-1 lg:justify-end">
-        {inProgressInterview ? (
-          <Link
-            href={`/interview/session/${inProgressInterview.id}`}
-            className="dashboard-hover-lift flex items-center justify-between gap-3 rounded-xl border-2 px-4 py-3 transition-all duration-200"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))',
-              background: 'color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary))',
-              textDecoration: 'none',
-            }}
-          >
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--accent-primary)' }}>
-                Resume session
-              </p>
-              <p className="mt-0.5 truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                {inProgressInterview.role}
-              </p>
-            </div>
-            <span className="shrink-0 text-xs font-semibold" style={{ color: 'var(--accent-primary)' }}>
-              Continue →
-            </span>
-          </Link>
-        ) : null}
-
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           <DashboardMetricTile label="Completed" value={completedCount} icon={CheckCircle2} compact />
           <DashboardMetricTile
@@ -208,25 +210,27 @@ export function UserSummaryCard({
           <DashboardMetricTile label="Streak" value={streakLabel} icon={Flame} compact />
         </div>
 
-        <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
-          {QUICK_LINKS.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="dashboard-hover-lift flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border-2 px-1.5 py-2.5 text-center transition-all duration-200 active:opacity-90 sm:gap-1.5 sm:px-2 sm:py-3"
-              style={{
-                borderColor: 'var(--card-border)',
-                background: 'color-mix(in srgb, var(--card-bg) 90%, transparent)',
-                textDecoration: 'none',
-              }}
-            >
-              <Icon size={18} style={{ color: 'var(--accent-primary)' }} aria-hidden />
-              <span className="text-[11px] font-semibold sm:text-xs" style={{ color: 'var(--text-primary)' }}>
-                {label}
-              </span>
-            </Link>
-          ))}
-        </div>
+        <nav aria-label="Quick navigation">
+          <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+            {QUICK_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="dashboard-hover-lift flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border px-1.5 py-2.5 text-center active:opacity-90 sm:gap-1.5 sm:px-2 sm:py-3"
+                style={{
+                  borderColor: 'var(--card-border)',
+                  background: 'color-mix(in srgb, var(--card-bg) 90%, transparent)',
+                  textDecoration: 'none',
+                }}
+              >
+                <Icon size={18} style={{ color: 'var(--text-muted)' }} aria-hidden />
+                <span className="text-[11px] font-medium sm:text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  {label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </nav>
       </div>
 
       {isPaidActive && planExpiresAt ? (

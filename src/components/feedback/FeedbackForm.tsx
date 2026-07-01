@@ -17,6 +17,16 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ScreenshotUploader } from '@/components/feedback/ScreenshotUploader'
 import { cn } from '@/lib/utils'
+import {
+  IE_FIELD_GROUP_CLASS,
+  IE_FIELD_SURFACE_STYLE,
+  IE_INPUT_TOOL_CLASS,
+  IE_LABEL_CLASS,
+  IE_SUBMIT_BUTTON_CLASS,
+  IE_SUBMIT_BUTTON_STYLE,
+  IE_TEXTAREA_TOOL_CLASS,
+  IE_SPINNER_CLASS,
+} from '@/lib/theme/component-classes'
 
 const MAX_TEXT = 2000
 
@@ -66,7 +76,7 @@ function RatingPicker({
 
 function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
   return (
-    <Label htmlFor={htmlFor} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+    <Label htmlFor={htmlFor} className={IE_LABEL_CLASS}>
       {children}
     </Label>
   )
@@ -202,13 +212,13 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
 
           <div className="space-y-5 p-5 sm:p-6">
             {/* Rating */}
-            <div className="space-y-2">
+            <div className={IE_FIELD_GROUP_CLASS}>
               <FieldLabel htmlFor="fb-rating">Overall rating</FieldLabel>
               <RatingPicker value={rating} onChange={setRating} disabled={submitting} />
             </div>
 
             {/* Name */}
-            <div className="space-y-2">
+            <div className={IE_FIELD_GROUP_CLASS}>
               <FieldLabel htmlFor="fb-name">Your name</FieldLabel>
               <input
                 id="fb-name"
@@ -218,12 +228,8 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
                 disabled={submitting}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="How should we address you?"
-                className="flex h-10 w-full rounded-lg border px-3 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/35 disabled:opacity-60"
-                style={{
-                  background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
-                  borderColor: 'var(--card-border)',
-                  color: 'var(--text-primary)',
-                }}
+                className={IE_INPUT_TOOL_CLASS}
+                style={IE_FIELD_SURFACE_STYLE}
               />
             </div>
 
@@ -313,15 +319,12 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
             <Button
               type="submit"
               disabled={submitting || screenshotUploading}
-              className="landing-cta-lift h-auto rounded-[14px] px-5 py-2.5 text-sm font-semibold text-white"
-              style={{
-                background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-                boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-              }}
+              className={cn(IE_SUBMIT_BUTTON_CLASS, 'h-auto w-auto px-5 py-2.5 text-sm')}
+              style={IE_SUBMIT_BUTTON_STYLE}
             >
               {submitting ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" aria-hidden />
+                  <Loader2 className={IE_SPINNER_CLASS} aria-hidden />
                   Sending…
                 </>
               ) : screenshotUploading ? (
@@ -353,7 +356,7 @@ function FeedbackTextarea({
   placeholder?: string
 }) {
   return (
-    <div className="space-y-2">
+    <div className={IE_FIELD_GROUP_CLASS}>
       <div className="flex items-center justify-between">
         <FieldLabel htmlFor={id}>{label}</FieldLabel>
         <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
@@ -367,12 +370,8 @@ function FeedbackTextarea({
         disabled={disabled}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="min-h-20 resize-y"
-        style={{
-          background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
-          borderColor: 'var(--card-border)',
-          color: 'var(--text-primary)',
-        }}
+        className={IE_TEXTAREA_TOOL_CLASS}
+        style={IE_FIELD_SURFACE_STYLE}
       />
     </div>
   )

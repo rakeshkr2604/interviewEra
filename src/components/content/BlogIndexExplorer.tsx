@@ -3,8 +3,15 @@
 import { useMemo, useState } from 'react'
 import { Search } from 'lucide-react'
 import { ContentCard } from '@/components/content/ContentCard'
+import { MarketingEmptyState } from '@/components/layout/MarketingEmptyState'
+import { MarketingSectionHeader } from '@/components/layout/MarketingSectionHeader'
 import type { ContentCategory, ContentEntry } from '@/lib/seo/content/types'
 import { CONTENT_CATEGORIES } from '@/lib/seo/content/types'
+import { MARKETING_SECTION_GAP } from '@/lib/landing/container'
+import {
+  IE_MARKETING_SURFACE_CARD_CLASS,
+  IE_MARKETING_SURFACE_CARD_STYLE,
+} from '@/lib/theme/component-classes'
 import { cn } from '@/lib/utils'
 
 interface BlogIndexExplorerProps {
@@ -40,7 +47,7 @@ export function BlogIndexExplorer({
   }, [allPosts, query, category])
 
   return (
-    <div className="space-y-12 sm:space-y-16 lg:space-y-20">
+    <div className={MARKETING_SECTION_GAP}>
       <div className="mx-auto max-w-2xl space-y-4">
         <label className="relative block">
           <span className="sr-only">Search articles</span>
@@ -101,9 +108,7 @@ export function BlogIndexExplorer({
         }
       >
         {filtered.length === 0 ? (
-          <p className="text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-            No articles match your search. Try a different keyword or category.
-          </p>
+          <MarketingEmptyState message="No articles match your search. Try a different keyword or category." />
         ) : (
           <ul className="grid list-none gap-5 p-0 sm:grid-cols-2 xl:grid-cols-3 xl:gap-7">
             {filtered.map((entry) => (
@@ -129,14 +134,7 @@ function Section({
 }) {
   return (
     <section>
-      <header className="mb-6 sm:mb-8">
-        <h2 className="text-xl font-bold tracking-tight sm:text-2xl">{title}</h2>
-        {subtitle ? (
-          <p className="mt-2 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-            {subtitle}
-          </p>
-        ) : null}
-      </header>
+      <MarketingSectionHeader title={title} subtitle={subtitle} />
       {children}
     </section>
   )
@@ -144,13 +142,7 @@ function Section({
 
 function SidebarList({ title, items }: { title: string; items: ContentEntry[] }) {
   return (
-    <aside
-      className="rounded-2xl border p-5 sm:p-6"
-      style={{
-        borderColor: 'var(--card-border)',
-        background: 'color-mix(in srgb, var(--card-bg) 85%, transparent)',
-      }}
-    >
+    <aside className={cn('p-5 sm:p-6', IE_MARKETING_SURFACE_CARD_CLASS)} style={IE_MARKETING_SURFACE_CARD_STYLE}>
       <h3 className="text-sm font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--text-muted)' }}>
         {title}
       </h3>

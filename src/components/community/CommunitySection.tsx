@@ -2,7 +2,14 @@ import Link from 'next/link';
 import { COMMUNITY_COPY, COMMUNITY_HUB_PATH } from '@/lib/community/community';
 import { getPlatformsForSurface } from '@/lib/community/selectors';
 import { CommunityCard } from '@/components/community/CommunityCard';
-import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import {
+  LANDING_HOME_EYEBROW,
+  LANDING_HOME_HEADER_BLOCK,
+  LANDING_HOME_HEADING,
+  LANDING_HOME_SECTION,
+  LANDING_HOME_SUBHEAD,
+  LANDING_PAGE_CONTAINER,
+} from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
 interface CommunitySectionProps {
@@ -22,28 +29,21 @@ export function CommunitySection({
 
   return (
     <section
-      className={cn('px-5 py-20 sm:py-24', className)}
+      className={cn(LANDING_HOME_SECTION, className)}
       aria-labelledby="community-stay-updated-heading"
     >
-      <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 sm:px-5')}>
-        <div className="mx-auto max-w-3xl text-center">
-          <span
-            className="text-[11px] font-bold uppercase tracking-[0.16em]"
-            style={{ color: 'var(--accent-hover)' }}
-          >
+      <div className={LANDING_PAGE_CONTAINER}>
+        <div className={LANDING_HOME_HEADER_BLOCK}>
+          <span className={LANDING_HOME_EYEBROW}>
             {COMMUNITY_COPY.sectionEyebrow}
           </span>
           <h2
             id="community-stay-updated-heading"
-            className="mt-3 font-[family-name:var(--font-bricolage)] text-[clamp(1.625rem,3.4vw,2.625rem)] font-extrabold leading-tight tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
+            className={LANDING_HOME_HEADING}
           >
             {COMMUNITY_COPY.sectionTitle}
           </h2>
-          <p
-            className="mx-auto mt-4 max-w-xl text-base leading-relaxed"
-            style={{ color: 'var(--text-secondary)' }}
-          >
+          <p className={LANDING_HOME_SUBHEAD}>
             {COMMUNITY_COPY.sectionSubtitle}
           </p>
         </div>

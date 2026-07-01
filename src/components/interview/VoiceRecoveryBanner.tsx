@@ -1,5 +1,10 @@
 'use client'
 
+import {
+  IE_ALERT_BANNER_CLASS,
+  IE_ALERT_ERROR_STYLE,
+  IE_FOCUS_VISIBLE,
+} from '@/lib/theme/component-classes'
 import type { VoiceRecoveryPhase, SavedVoiceMode } from '@/lib/voice/voice-recovery'
 
 interface VoiceRecoveryBannerProps {
@@ -30,7 +35,7 @@ export function VoiceRecoveryBanner({
       role="alertdialog"
       aria-labelledby="voice-recovery-title"
       aria-describedby="voice-recovery-body"
-      className="dashboard-premium-card mb-3 w-full min-w-0 border border-(--accent-primary)/30 bg-(--accent-primary)/5 p-4"
+      className="dashboard-premium-card mb-3 w-full min-w-0 space-y-3 border-2 border-(--accent-primary)/25 bg-(--accent-primary)/5 p-4"
     >
       <h2 id="voice-recovery-title" className="text-sm font-semibold text-(--text-primary)">
         Resume Voice Interview
@@ -43,17 +48,21 @@ export function VoiceRecoveryBanner({
       </p>
 
       {error ? (
-        <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700" role="alert">
+        <p
+          className={IE_ALERT_BANNER_CLASS}
+          style={IE_ALERT_ERROR_STYLE}
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <button
           type="button"
           onClick={onResumeVoice}
           disabled={resuming}
-          className="flex-1 rounded-lg bg-(--accent-primary) px-4 py-2.5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-60"
+          className={`min-h-[44px] flex-1 rounded-lg bg-(--accent-primary) px-4 py-2.5 text-sm font-semibold text-white hover:bg-(--accent-hover) disabled:opacity-60 ${IE_FOCUS_VISIBLE}`}
         >
           {resuming ? 'Reconnecting…' : `Resume ${modeLabel}`}
         </button>
@@ -62,7 +71,7 @@ export function VoiceRecoveryBanner({
             type="button"
             onClick={onRetry}
             disabled={resuming}
-            className="rounded-lg border border-(--card-border) bg-(--bg-secondary) px-4 py-2.5 text-sm font-semibold text-(--text-secondary) hover:text-(--text-primary) disabled:opacity-60"
+            className={`min-h-[44px] rounded-lg border border-(--card-border) bg-(--bg-secondary) px-4 py-2.5 text-sm font-semibold text-(--text-secondary) hover:text-(--text-primary) disabled:opacity-60 ${IE_FOCUS_VISIBLE}`}
           >
             Retry
           </button>
@@ -71,7 +80,7 @@ export function VoiceRecoveryBanner({
           type="button"
           onClick={onContinueTyping}
           disabled={resuming}
-          className="flex-1 rounded-lg border border-(--card-border) bg-(--bg-secondary) px-4 py-2.5 text-sm font-semibold text-(--text-secondary) hover:text-(--text-primary) disabled:opacity-60"
+          className={`min-h-[44px] flex-1 rounded-lg border border-(--card-border) bg-(--bg-secondary) px-4 py-2.5 text-sm font-semibold text-(--text-secondary) hover:text-(--text-primary) disabled:opacity-60 ${IE_FOCUS_VISIBLE}`}
         >
           Continue with Typing
         </button>

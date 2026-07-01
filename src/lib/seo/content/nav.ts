@@ -10,6 +10,29 @@ export type NavResourceItem = {
   desc: string
 }
 
+export const NAV_CAMPUS_ITEMS: readonly NavResourceItem[] = [
+  {
+    label: 'Campus Placements Overview',
+    href: '/campus',
+    desc: 'Structured mock interviews and cohort analytics for T&P teams',
+  },
+  {
+    label: 'Set up Campus Workspace',
+    href: '/signup?intent=college',
+    desc: 'Create your campus dashboard and invite your batch',
+  },
+  {
+    label: 'T&P Product & Pricing',
+    href: '/college',
+    desc: 'Pilot pricing, bulk onboarding, and placement tracking',
+  },
+  {
+    label: 'Student Invitation Help',
+    href: '/help-center',
+    desc: 'How to accept a campus invite and start practising',
+  },
+] as const
+
 export const NAV_TOOLS_LINKS: readonly SeoTextLink[] = [
   { href: '/tools/question-generator', label: 'Interview Question Generator' },
   { href: '/tools/ats-checker', label: 'ATS Resume Checker' },

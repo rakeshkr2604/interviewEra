@@ -3,6 +3,7 @@ import { ReportPanel } from '@/components/report/ReportPanel';
 
 interface ExecutiveSummaryPanelProps {
   insights: ReportInsights;
+  className?: string;
 }
 
 function signalStyle(strength: SignalStrength): { background: string; color: string } {
@@ -32,14 +33,20 @@ const SIGNAL_LABELS: Record<keyof ReportInsights['hiring_signals'], string> = {
   relevance:                 'Relevance',
 };
 
-export function ExecutiveSummaryPanel({ insights }: ExecutiveSummaryPanelProps) {
+export function ExecutiveSummaryPanel({ insights, className }: ExecutiveSummaryPanelProps) {
   const { executive_summary, hiring_signals } = insights;
   const hStyle = hiringSignalStyle(executive_summary.hiring_signal);
 
   return (
-    <ReportPanel eyebrow="Recruiter Assessment" title="Candidate intelligence" contentClassName="space-y-5">
+    <ReportPanel
+      id="executive-summary"
+      className={className}
+      eyebrow="Recruiter Assessment"
+      title="Candidate intelligence"
+      contentClassName="space-y-5"
+    >
       {/* Badges row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
         <span
           className="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide"
           style={hStyle}
@@ -64,15 +71,15 @@ export function ExecutiveSummaryPanel({ insights }: ExecutiveSummaryPanelProps) 
       </div>
 
       {/* Recruiter narrative */}
-      <p
-        className="text-sm leading-relaxed"
-        style={{ color: 'var(--text-primary)', fontStyle: 'italic' }}
+      <blockquote
+        className="max-w-3xl border-l-2 pl-4 text-sm leading-relaxed sm:text-[15px] sm:leading-relaxed"
+        style={{ borderColor: 'var(--accent-primary)', color: 'var(--text-primary)' }}
       >
         &ldquo;{executive_summary.narrative}&rdquo;
-      </p>
+      </blockquote>
 
       {/* Strongest / weakest */}
-      <div className="flex flex-wrap gap-4 text-xs">
+      <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
         <span style={{ color: 'var(--text-secondary)' }}>
           Strongest:{' '}
           <span className="font-semibold" style={{ color: 'var(--accent-success)' }}>
@@ -87,32 +94,35 @@ export function ExecutiveSummaryPanel({ insights }: ExecutiveSummaryPanelProps) 
         </span>
       </div>
 
-      {/* Hiring signals grid */}
-      <div>
+      {/* Hiring signals grid — supporting detail below the narrative */}
+      <div
+        className="border-t pt-5"
+        style={{ borderColor: 'var(--card-border)' }}
+      >
         <p
           className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em]"
           style={{ color: 'var(--text-muted)' }}
         >
           Hiring Signals
         </p>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
           {(Object.entries(hiring_signals) as [keyof ReportInsights['hiring_signals'], SignalStrength][]).map(
             ([key, strength]) => {
               const style = signalStyle(strength);
               return (
                 <div
                   key={key}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 text-xs"
+                  className="flex items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-xs sm:text-sm"
                   style={{
                     background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
                     border: '1.5px solid var(--card-border)',
                   }}
                 >
-                  <span style={{ color: 'var(--text-secondary)' }}>
+                  <span className="min-w-0 leading-snug" style={{ color: 'var(--text-secondary)' }}>
                     {SIGNAL_LABELS[key]}
                   </span>
                   <span
-                    className="ml-2 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold capitalize"
+                    className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold capitalize sm:text-[11px]"
                     style={style}
                   >
                     {strength}

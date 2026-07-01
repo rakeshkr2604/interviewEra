@@ -6,6 +6,11 @@ import { CommunityPlatformIcon } from '@/components/community/CommunityIcons';
 import { CommunityLink } from '@/components/community/CommunityLink';
 import { cn } from '@/lib/utils';
 import { sanitizeCommunityUrl } from '@/lib/community/urls';
+import {
+  IE_FOCUS_VISIBLE,
+  IE_MARKETING_SURFACE_CARD_CLASS,
+  IE_MARKETING_SURFACE_CARD_STYLE,
+} from '@/lib/theme/component-classes';
 
 interface CommunityCardProps {
   platform: CommunityPlatform;
@@ -29,17 +34,15 @@ export function CommunityCard({
   return (
     <article
       className={cn(
-        'group relative flex flex-col rounded-2xl border transition-all duration-200',
+        'group relative flex flex-col',
+        IE_MARKETING_SURFACE_CARD_CLASS,
         isActionable &&
-          'hover:-translate-y-0.5 hover:shadow-[0_12px_40px_color-mix(in_srgb,var(--accent-primary)_12%,transparent)]',
+          'hover:shadow-[0_12px_40px_color-mix(in_srgb,var(--accent-primary)_12%,transparent)]',
         platform.comingSoon && 'opacity-80',
         compact ? 'p-4' : 'p-5 sm:p-6',
         className,
       )}
-      style={{
-        borderColor: 'var(--card-border)',
-        background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
-      }}
+      style={IE_MARKETING_SURFACE_CARD_STYLE}
     >
       {platform.badge ? (
         <span
@@ -99,6 +102,7 @@ export function CommunityCard({
             'mt-auto inline-flex w-fit items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold',
             'text-[var(--accent-primary)] transition-colors duration-200',
             'group-hover:bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)]',
+            IE_FOCUS_VISIBLE,
           )}
         >
           {cta}

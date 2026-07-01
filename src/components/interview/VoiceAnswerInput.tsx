@@ -183,7 +183,7 @@ export function VoiceAnswerInput({
               }`}
             >
               {isListening && (
-                <span className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-20" />
+                <span className="absolute inset-0 animate-ping rounded-full bg-red-400 opacity-20 motion-reduce:animate-none" />
               )}
               {/* Microphone icon */}
               <svg
@@ -197,9 +197,16 @@ export function VoiceAnswerInput({
               </svg>
             </button>
             <p className="text-sm font-medium text-muted-foreground">
-              {isListening
-                ? `Recording... ${formatTimer(recordingSeconds)}`
-                : 'Tap mic to start'}
+              {isListening ? (
+                <>
+                  Recording{' '}
+                  <span className="text-xs font-normal tabular-nums text-muted-foreground/75">
+                    {formatTimer(recordingSeconds)}
+                  </span>
+                </>
+              ) : (
+                'Tap mic to start'
+              )}
             </p>
           </div>
 

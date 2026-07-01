@@ -7,6 +7,7 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { StreakCounter } from '@/components/layout/StreakCounter'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
+import { NAV_SHELL_HEIGHT_CLASS } from '@/lib/theme/nav-classes'
 import { cn } from '@/lib/utils'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
@@ -129,13 +130,16 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
         </div>
 
         <header
-          className="sticky top-0 z-20 flex items-center gap-3 border-b px-4 pb-3 lg:hidden"
+          className={cn(
+            'sticky top-0 z-20 flex items-center gap-3 border-b px-4 pb-3 lg:hidden',
+            NAV_SHELL_HEIGHT_CLASS,
+          )}
           style={{
             paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0px))',
             borderColor: 'var(--card-border)',
-            background: 'color-mix(in srgb, var(--card-bg) 96%, transparent)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            background: 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
           }}
         >
           <button

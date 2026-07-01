@@ -35,7 +35,7 @@ export function CandidatePreview({
           You
         </span>
         {questionLabel ? (
-          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-(--text-secondary) sm:text-xs">
+          <span className="ie-timer-secondary shrink-0 tabular-nums sm:text-[11px]">
             {questionLabel}
           </span>
         ) : null}
@@ -52,14 +52,14 @@ export function CandidatePreview({
             aria-label="Your camera preview"
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-4 text-center">
             <div
-              className="flex h-20 w-20 items-center justify-center rounded-full border border-(--card-border) bg-(--card-bg) shadow-sm"
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-(--card-border) bg-(--card-bg) shadow-sm sm:h-20 sm:w-20"
               aria-hidden
             >
-              <User className="h-10 w-10 text-(--text-muted)" strokeWidth={1.5} />
+              <User className="h-8 w-8 text-(--text-muted) sm:h-10 sm:w-10" strokeWidth={1.5} />
             </div>
-            <p className="max-w-[14rem] text-xs leading-relaxed text-(--text-muted)">
+            <p className="max-w-[16rem] text-xs leading-relaxed text-(--text-muted)">
               {status === 'starting'
                 ? 'Starting camera…'
                 : status === 'denied'
@@ -74,8 +74,8 @@ export function CandidatePreview({
         )}
 
         {liveMic && (
-          <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1 backdrop-blur-sm">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-success)" />
+          <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 backdrop-blur-sm">
+            <span className="ie-status-pulse h-1.5 w-1.5 rounded-full bg-(--accent-success) animate-pulse" />
             <span className="text-xs font-medium text-white">Listening</span>
           </div>
         )}

@@ -2,12 +2,25 @@
 
 import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { FileUp, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import {
+  IE_FIELD_SURFACE_STYLE,
+  IE_SPINNER_LG_CLASS,
+  IE_SURFACE_CLASS,
+  IE_UPLOAD_ICON_SHELL_CLASS,
+  IE_UPLOAD_ICON_SHELL_STYLE,
+  IE_UPLOAD_ZONE_CLASS,
+  IE_UPLOAD_ZONE_DRAG_STYLE,
+  IE_UPLOAD_ZONE_IDLE_STYLE,
+} from '@/lib/theme/component-classes';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
 import { formatResumeUserFacingError } from '@/lib/resume/parse-outcome';
 import type { ParsedResume } from '@/types/app.types';
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import { cn } from '@/lib/utils';
 
 type UploadStatus = 'idle' | 'uploading' | 'extracting' | 'parsing' | 'success' | 'error';
 
@@ -120,7 +133,6 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) handleFile(file);
-    // Reset input so the same file can be re-selected after an error
     e.target.value = '';
   }
 
@@ -135,13 +147,13 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
 
   if (status === 'success') {
     return (
-      <div className="rounded-lg border p-5">
+      <div className={cn(IE_SURFACE_CLASS, 'p-5')} style={IE_FIELD_SURFACE_STYLE}>
         <div className="flex items-start justify-between gap-4">
           <div>
             {parsedSummary ? (
               <>
-                <p className="font-semibold">{parsedSummary.targetRole}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{parsedSummary.targetRole}</p>
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Experience: {parsedSummary.experienceEstimate}
                 </p>
                 {parsedSummary.skills.length > 0 && (
@@ -149,13 +161,17 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
                     {parsedSummary.skills.slice(0, 6).map((skill) => (
                       <span
                         key={skill}
-                        className="rounded-full bg-secondary px-2 py-0.5 text-xs"
+                        className="rounded-full px-2 py-0.5 text-xs"
+                        style={{
+                          background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                          color: 'var(--text-primary)',
+                        }}
                       >
                         {skill}
                       </span>
                     ))}
                     {parsedSummary.skills.length > 6 && (
-                      <span className="self-center text-xs text-muted-foreground">
+                      <span className="self-center text-xs" style={{ color: 'var(--text-muted)' }}>
                         +{parsedSummary.skills.length - 6} more
                       </span>
                     )}
@@ -164,8 +180,8 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
               </>
             ) : (
               <>
-                <p className="font-semibold">Resume uploaded</p>
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Resume uploaded</p>
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   AI analysis is temporarily unavailable. Your resume was saved and will be analyzed when you start an interview.
                 </p>
               </>
@@ -175,6 +191,7 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
             variant="outline"
             size="sm"
             type="button"
+            className="min-h-11"
             onClick={() => {
               setStatus('idle');
               setParsedSummary(null);
@@ -196,33 +213,38 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        className={`flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-12 transition-colors ${
-          dragOver ? 'border-primary bg-primary/5' : 'border-muted-foreground/25'
-        } ${isUploading ? 'opacity-60' : ''}`}
+        className={cn(
+          IE_UPLOAD_ZONE_CLASS,
+          isUploading && 'pointer-events-none opacity-70',
+        )}
+        style={dragOver ? IE_UPLOAD_ZONE_DRAG_STYLE : IE_UPLOAD_ZONE_IDLE_STYLE}
       >
         {isUploading ? (
           <div className="flex flex-col items-center gap-3">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-sm text-muted-foreground">
+            <Loader2 className={IE_SPINNER_LG_CLASS} style={{ color: 'var(--accent-primary)' }} aria-hidden />
+            <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }} role="status" aria-live="polite">
               {STATUS_LABEL[status]}
             </p>
           </div>
         ) : (
           <>
-            <p className="text-sm text-muted-foreground">
+            <div className={IE_UPLOAD_ICON_SHELL_CLASS} style={IE_UPLOAD_ICON_SHELL_STYLE}>
+              <FileUp className="size-6 sm:size-7" strokeWidth={1.5} aria-hidden />
+            </div>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               Drag & drop your resume (PDF or TXT, max 5 MB)
             </p>
             <input
               ref={inputRef}
               type="file"
               accept=".pdf,.txt"
-              className="hidden"
+              className="sr-only"
               onChange={handleFileChange}
               disabled={isUploading}
             />
             <Button
               variant="outline"
-              className="mt-4"
+              className="mt-1 min-h-11"
               disabled={isUploading}
               onClick={() => inputRef.current?.click()}
               type="button"
@@ -234,19 +256,22 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
       </div>
 
       {status === 'error' && errorMessage && (
-        <div className="mt-2 flex items-center justify-between">
-          <p className="text-sm text-destructive">{errorMessage}</p>
-          <Button
-            variant="ghost"
-            size="sm"
-            type="button"
-            onClick={() => {
-              setStatus('idle');
-              setErrorMessage(null);
-            }}
-          >
-            Try again
-          </Button>
+        <div className="mt-3 space-y-2">
+          <AuthErrorBanner message={errorMessage} />
+          <div className="flex justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              type="button"
+              className="min-h-11"
+              onClick={() => {
+                setStatus('idle');
+                setErrorMessage(null);
+              }}
+            >
+              Try again
+            </Button>
+          </div>
         </div>
       )}
     </div>

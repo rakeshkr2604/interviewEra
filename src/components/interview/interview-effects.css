@@ -19,4 +19,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .ie-thinking-bar, .ie-audio-bar { animation: none !important; }
+  .ie-status-ping, .ie-status-pulse { animation: none !important; }
+}
+
+/* Interview control bar — minimum 44px touch targets */
+.ie-control-icon-btn {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Secondary timer / elapsed labels — visually subordinate to header TimerCircle */
+.ie-timer-secondary {
+  font-size: 0.625rem;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  letter-spacing: normal;
+  text-transform: none;
 }

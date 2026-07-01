@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, Loader2, Lock, Sparkles } from 'lucide-react';
+import { ChevronDown, Lock, Sparkles } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,16 @@ import type { StarState } from './actions';
 import { STAR_RESULT_STORAGE_KEY, serializeStarPayload } from './star-result-storage';
 import { StarBuilderResultsView } from './StarBuilderResultsView';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import { AuthErrorBanner, FormWarningBanner } from '@/components/auth/AuthErrorBanner';
+import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
+import {
+  IE_FIELD_GROUP_CLASS,
+  IE_FIELD_SURFACE_STYLE,
+  IE_INPUT_TOOL_CLASS,
+  IE_LABEL_CLASS,
+  IE_SELECT_TOOL_CLASS,
+  IE_TEXTAREA_TOOL_CLASS,
+} from '@/lib/theme/component-classes';
 import { cn } from '@/lib/utils';
 
 const initialState: StarState = {};
@@ -73,8 +83,8 @@ function SelectShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-2.5">
-      <Label htmlFor={id} className="text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+    <div className={IE_FIELD_GROUP_CLASS}>
+      <Label htmlFor={id} className={IE_LABEL_CLASS}>
         {label}
       </Label>
       <div className="group relative">
@@ -89,12 +99,7 @@ function SelectShell({
   );
 }
 
-const selectClassName = cn(
-  'h-11 w-full cursor-pointer appearance-none rounded-xl border-2 bg-transparent pl-3.5 pr-10 text-sm font-medium',
-  'transition-[border-color,box-shadow] duration-200 outline-none',
-  'hover:border-[color-mix(in_srgb,var(--accent-primary)_35%,var(--card-border))]',
-  'focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)]',
-);
+const selectClassName = cn(IE_SELECT_TOOL_CLASS, 'bg-transparent');
 
 function useNativeSelectFieldStyles(theme: 'dark' | 'light') {
   const isDark = theme === 'dark';
@@ -113,15 +118,8 @@ function useNativeSelectFieldStyles(theme: 'dark' | 'light') {
   return { optionProps, selectFieldStyle };
 }
 
-const inputClass = cn(
-  'h-11 rounded-xl border-2 bg-transparent transition-[color,box-shadow]',
-  'focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-);
-
-const textareaClass = cn(
-  'min-h-[88px] resize-y rounded-xl border-2 bg-transparent text-base sm:text-sm',
-  'focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-);
+const inputClass = cn(IE_INPUT_TOOL_CLASS, 'bg-transparent');
+const textareaClass = cn(IE_TEXTAREA_TOOL_CLASS, 'bg-transparent');
 
 const MIN_LEN = 10;
 
@@ -175,8 +173,8 @@ export function StarBuilderForm() {
         }
       >
         <form action={formAction} className="space-y-6 p-5 sm:p-7 lg:p-8">
-          <div className="space-y-2.5">
-            <Label htmlFor="targetRole" className="text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+          <div className={IE_FIELD_GROUP_CLASS}>
+            <Label htmlFor="targetRole" className={IE_LABEL_CLASS}>
               Target role
             </Label>
             <Input
@@ -187,11 +185,7 @@ export function StarBuilderForm() {
               disabled={isPending}
               maxLength={100}
               className={inputClass}
-              style={{
-                borderColor: 'var(--card-border)',
-                color: 'var(--text-primary)',
-                background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-              }}
+              style={IE_FIELD_SURFACE_STYLE}
             />
           </div>
 
@@ -274,67 +268,28 @@ export function StarBuilderForm() {
                   maxLength={2500}
                   disabled={isPending}
                   className={textareaClass}
-                  style={{
-                    borderColor: 'var(--card-border)',
-                    color: 'var(--text-primary)',
-                    background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-                  }}
+                  style={IE_FIELD_SURFACE_STYLE}
                 />
               </div>
             ))}
           </div>
 
-          {state.error && (
-            <p
-              className="rounded-xl border-2 px-4 py-3 text-sm font-medium sm:text-base"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--accent-danger) 35%, var(--card-border))',
-                background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
-                color: 'var(--accent-danger)',
-              }}
-              role="alert"
-            >
-              {state.error}
-            </p>
-          )}
+          {state.error ? <AuthErrorBanner message={state.error} /> : null}
 
-          <button
-            type="submit"
-            disabled={isPending}
-            className="landing-cta-lift inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] px-8 text-base font-semibold text-white disabled:pointer-events-none disabled:opacity-60 sm:h-[3.25rem] sm:text-lg"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-              boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-            }}
+          <FormSubmitButton
+            loading={isPending}
+            loadingLabel="Building your answer…"
+            className="sm:text-lg"
+            icon={<Sparkles className="size-5" aria-hidden />}
           >
-            {isPending ? (
-              <>
-                <Loader2 className="size-5 animate-spin" aria-hidden />
-                Building your answer…
-              </>
-            ) : (
-              <>
-                <Sparkles className="size-5" aria-hidden />
-                Build my STAR answer
-              </>
-            )}
-          </button>
+            Build my STAR answer
+          </FormSubmitButton>
         </form>
       </FreeToolFormCard>
 
       {inlineFallback && state.result && (
         <div className="mt-10 space-y-4">
-          <p
-            className="rounded-xl border-2 px-4 py-3 text-center text-sm font-medium sm:text-base"
-            style={{
-              borderColor: 'var(--card-border)',
-              background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
-              color: 'var(--text-primary)',
-            }}
-          >
-            Couldn&apos;t open the results page (browser storage blocked). Your answer is shown below — try allowing site
-            data or use another browser next time.
-          </p>
+          <FormWarningBanner message="Couldn&apos;t open the results page (browser storage blocked). Your answer is shown below — try allowing site data or use another browser next time." />
           <StarBuilderResultsView
             result={state.result}
             notice={state.notice}

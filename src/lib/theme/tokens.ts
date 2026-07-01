@@ -1,6 +1,10 @@
+import { STRUCTURAL_TOKENS } from './structural-tokens'
+
 /**
  * App-wide semantic tokens (dashboard, auth, tools, marketing chrome).
  * Kept in sync with `html[data-theme=*] .ie-landing-premium` in globals.css so light/dark match everywhere.
+ *
+ * STRUCTURAL_TOKENS (radius, shadow, motion, focus) are theme-independent and merged at apply time.
  */
 export const DARK_TOKENS: Record<string, string> = {
   '--bg-primary': '#0a0f1e',
@@ -42,3 +46,11 @@ export const LIGHT_TOKENS: Record<string, string> = {
   '--page-gradient':
     'radial-gradient(ellipse 90% 60% at 50% -20%, rgba(99, 102, 241, 0.12), transparent), radial-gradient(ellipse 50% 40% at 100% 0%, rgba(139, 92, 246, 0.08), transparent), #fafafb',
 }
+
+/** All tokens applied to documentElement — color tokens follow resolved theme. */
+export function tokensForTheme(resolved: 'dark' | 'light'): Record<string, string> {
+  const color = resolved === 'dark' ? DARK_TOKENS : LIGHT_TOKENS
+  return { ...STRUCTURAL_TOKENS, ...color }
+}
+
+export { STRUCTURAL_TOKENS }

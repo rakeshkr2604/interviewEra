@@ -29,7 +29,7 @@ export function QuestionCard({ question, questionNumber, totalQuestions }: Quest
 
   return (
     <Card
-      className={`transition-opacity duration-300 ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`transition-opacity duration-300 motion-reduce:transition-none ${visible ? 'opacity-100' : 'opacity-0'}`}
     >
       <CardContent className="pt-5 pb-6">
         <div className="flex items-center justify-between mb-4">

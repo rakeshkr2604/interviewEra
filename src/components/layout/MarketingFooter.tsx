@@ -16,9 +16,10 @@ import { cn } from '@/lib/utils';
 
 const PRODUCT_LINKS = [
   { href: '/how-it-works', label: 'How It Works' },
+  { href: '/teams', label: 'For Teams' },
   { href: '/signup', label: 'Start Mock Interview' },
-  { href: '/campus', label: 'Campus Hiring' },
-  { href: '/college', label: 'College Dashboard' },
+  { href: '/campus', label: 'Campus Placements' },
+  { href: '/college', label: 'Campus Workspace' },
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 
@@ -85,7 +86,7 @@ const SOCIAL_LINKS = [
 // ── Shared styles ──────────────────────────────────────────────────────────────
 
 const LINK_CLS =
-  'text-sm transition-all duration-200 hover:opacity-100 hover:translate-x-0.5 inline-block';
+  'text-sm transition-[opacity,transform] duration-200 hover:opacity-100 hover:translate-x-0.5 inline-block motion-reduce:transform-none';
 
 const COL_HEADING_CLS = 'text-xs font-semibold uppercase tracking-widest';
 
@@ -125,7 +126,7 @@ export function MarketingFooter() {
               ctaKey={CTA_KEYS.START_MOCK_INTERVIEW}
               ctaText="Start Mock Interview"
               section="footer"
-              className="mt-5 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:opacity-90 hover:-translate-y-px"
+              className="landing-cta-lift mt-5 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
               style={{
                 background: 'var(--accent-primary)',
                 boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
@@ -143,7 +144,7 @@ export function MarketingFooter() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border transition-all duration-200 hover:scale-105 hover:border-(--accent-primary)"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border transition-[transform,border-color] duration-200 hover:scale-105 hover:border-(--accent-primary) motion-reduce:transform-none"
                   style={{
                     borderColor: 'var(--card-border)',
                     background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',

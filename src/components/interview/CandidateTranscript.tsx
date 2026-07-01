@@ -2,6 +2,11 @@
 import { useEffect, useRef } from 'react'
 import { Mic, MicOff } from 'lucide-react'
 import type { SpeechRecognitionState } from '@/hooks/useSpeechRecognition'
+import {
+  IE_ALERT_BANNER_CLASS,
+  IE_ALERT_ERROR_STYLE,
+  IE_FOCUS_VISIBLE,
+} from '@/lib/theme/component-classes'
 // Route-scoped: waveform / thinking-bar styles load only with the interview session.
 import './interview-effects.css'
 
@@ -78,9 +83,9 @@ export function CandidateTranscript({
   return (
     <div className={`w-full min-w-0 space-y-2 ${fillHeight ? 'flex min-h-0 flex-1 flex-col' : ''}`}>
       {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-(--text-secondary)">Your Answer</span>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="text-xs font-medium text-(--text-muted)">Your answer</span>
           {/* Live audio bars — only shown while mic is active + silent */}
           {showBars && (
             <div className="flex items-end gap-[2px]" style={{ height: 14 }}>
@@ -99,9 +104,10 @@ export function CandidateTranscript({
         <button
           onClick={onToggle}
           disabled={!isSupported || permissionState === 'requesting'}
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs
-                      font-semibold transition-colors duration-200
+          className={`flex min-h-[44px] items-center gap-1.5 rounded-full px-3 py-2 text-xs
+                      font-semibold transition-colors duration-200 motion-reduce:transition-none
                       disabled:opacity-50
+                      focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-(--accent-primary)/30
                       ${isListening && !userMicMuted
                         ? 'bg-(--accent-danger)/15 text-(--accent-danger)'
                         : 'bg-(--bg-tertiary) text-(--text-secondary)'
@@ -130,11 +136,15 @@ export function CandidateTranscript({
       </div>
 
       {error && (
-        <div className="flex items-center justify-between rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
-          <span>{error}</span>
+        <div
+          className={`flex items-center justify-between gap-3 ${IE_ALERT_BANNER_CLASS}`}
+          style={IE_ALERT_ERROR_STYLE}
+          role="alert"
+        >
+          <span className="text-xs">{error}</span>
           <button
             type="button"
-            className="font-semibold underline"
+            className={`shrink-0 min-h-[44px] px-2 text-xs font-semibold underline ${IE_FOCUS_VISIBLE}`}
             onClick={onRetry}
             disabled={!isSupported}
           >
@@ -145,8 +155,8 @@ export function CandidateTranscript({
 
       <div
         ref={scrollRef}
-        className={`w-full max-w-full overflow-y-auto rounded-xl
-                   border border-(--card-border) bg-(--card-bg) p-4 text-sm leading-relaxed
+        className={`mx-auto w-full max-w-prose overflow-y-auto rounded-xl
+                   border border-(--card-border) bg-(--card-bg) px-4 py-3.5 text-sm leading-relaxed
                    whitespace-pre-wrap break-words text-(--text-primary)
                    ${fillHeight ? 'min-h-0 flex-1' : 'min-h-[120px] max-h-[min(50vh,520px)]'}`}
       >
@@ -165,7 +175,7 @@ export function CandidateTranscript({
             )}
           </>
         ) : (
-          <span className="text-(--text-muted)">
+          <span className="text-(--text-muted) leading-relaxed">
             {active
               ? 'Start speaking — your words will appear here'
               : starting

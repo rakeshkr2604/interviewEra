@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { LifeBuoy, Mail } from 'lucide-react';
 import { HelpCenterSearch } from '@/components/help/HelpCenterSearch';
+import { MarketingPageHeader } from '@/components/layout/MarketingPageHeader';
 import { breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { generateMetadata, schemaIds, siteConfig } from '@/lib/seo/metadata';
 
@@ -40,27 +41,12 @@ export default function HelpCenterPage() {
     <main id="main-content" className="px-5 pb-24 pt-16 sm:pt-20" style={{ color: 'var(--text-primary)' }}>
       {/* Hero */}
       <div className="mx-auto max-w-2xl text-center">
-        <span
-          className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold"
-          style={{
-            borderColor: 'var(--card-border)',
-            background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-            color: 'var(--accent-hover)',
-          }}
-        >
-          <LifeBuoy className="size-3.5" aria-hidden />
-          Help Center
-        </span>
-        <h1
-          className="mt-5 text-balance text-3xl font-extrabold tracking-tight sm:text-[42px] sm:leading-[1.08]"
-          style={{ fontFamily: "'Bricolage Grotesque', sans-serif" }}
-        >
-          How can we help?
-        </h1>
-        <p className="mx-auto mt-4 max-w-lg text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-          Guides and answers for setting up InterviewEra, running interview sessions, understanding
-          your scores, and managing your account.
-        </p>
+        <MarketingPageHeader
+          eyebrow="Help Center"
+          eyebrowIcon={LifeBuoy}
+          title="How can we help?"
+          subtitle="Guides and answers for setting up InterviewEra, running interview sessions, understanding your scores, and managing your account."
+        />
       </div>
 
       {/* Search + categories (client-filtered, SSR-rendered) */}

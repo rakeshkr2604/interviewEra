@@ -15,7 +15,14 @@ import {
   questionsHubPath,
 } from '@/lib/seo/programmatic'
 import { isRoleIndexable } from '@/lib/seo/programmatic/indexing'
-import { LANDING_PAGE_CONTAINER, CONTENT_SECTION } from '@/lib/landing/container'
+import { LANDING_PAGE_CONTAINER, CONTENT_SECTION, LANDING_HOME_EYEBROW, LANDING_HOME_HEADING, LANDING_HOME_SUBHEAD } from '@/lib/landing/container'
+import { MarketingSectionHeader } from '@/components/layout/MarketingSectionHeader'
+import {
+  IE_MARKETING_CTA_PRIMARY_CLASS,
+  IE_MARKETING_CTA_PRIMARY_STYLE,
+  IE_MARKETING_CTA_SECONDARY_CLASS,
+  IE_MARKETING_CTA_SECONDARY_STYLE,
+} from '@/lib/theme/component-classes'
 
 export const metadata: Metadata = questionsHubMetadata()
 
@@ -52,22 +59,13 @@ export default function InterviewQuestionsHubPage() {
         style={{ borderColor: 'var(--card-border)' }}
       >
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          <p
-            className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm"
-            style={{ color: 'var(--accent-primary)' }}
-          >
+          <p className={LANDING_HOME_EYEBROW}>
             Interview Preparation · India · 2026
           </p>
-          <h1
-            className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl md:text-[2.4rem]"
-            style={{ color: 'var(--text-primary)' }}
-          >
+          <h1 className={`${LANDING_HOME_HEADING} max-w-3xl`}>
             Interview Questions for Indian Placements 2026
           </h1>
-          <p
-            className="mt-4 max-w-2xl text-base leading-relaxed sm:text-lg"
-            style={{ color: 'var(--text-secondary)' }}
-          >
+          <p className={`${LANDING_HOME_SUBHEAD} max-w-2xl text-left sm:text-lg`}>
             Browse curated interview questions by role, company, or technology. Every page covers
             technical, behavioral, and HR rounds with preparation tips — built for Indian campus
             placements.
@@ -75,15 +73,15 @@ export default function InterviewQuestionsHubPage() {
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href="/resources"
-              className="inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold transition-opacity hover:opacity-90"
-              style={{ background: 'var(--accent-primary)', color: '#fff' }}
+              className={IE_MARKETING_CTA_PRIMARY_CLASS}
+              style={IE_MARKETING_CTA_PRIMARY_STYLE}
             >
               All prep resources
             </Link>
             <Link
               href="/blog"
-              className="inline-flex items-center justify-center rounded-full border px-5 py-2 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
-              style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+              className={IE_MARKETING_CTA_SECONDARY_CLASS}
+              style={IE_MARKETING_CTA_SECONDARY_STYLE}
             >
               Read guides
             </Link>
@@ -118,10 +116,10 @@ export default function InterviewQuestionsHubPage() {
           style={{ borderColor: 'var(--card-border)' }}
         >
           <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-            <SectionHeader
+            <MarketingSectionHeader
               eyebrow="Featured"
               title="Featured Interview Guides"
-              description="Deep-dive prep hubs with hiring process, roadmaps, and expanded question banks."
+              subtitle="Deep-dive prep hubs with hiring process, roadmaps, and expanded question banks."
             />
             <ul className="mt-6 grid gap-3 p-0 list-none sm:grid-cols-2 lg:grid-cols-3" role="list">
               {featured.map((entry) => (
@@ -154,10 +152,10 @@ export default function InterviewQuestionsHubPage() {
         style={{ borderColor: 'var(--card-border)' }}
       >
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          <SectionHeader
+          <MarketingSectionHeader
             eyebrow="By role"
             title="Browse by Job Role"
-            description="Pick your target role to see curated questions covering technical depth, behavioral scenarios, and HR rounds."
+            subtitle="Pick your target role to see curated questions covering technical depth, behavioral scenarios, and HR rounds."
           />
           <ul className="mt-6 grid gap-3 p-0 list-none sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" role="list">
             {ROLES.filter(isRoleIndexable).map((role) => (
@@ -203,10 +201,10 @@ export default function InterviewQuestionsHubPage() {
         style={{ borderColor: 'var(--card-border)' }}
       >
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          <SectionHeader
+          <MarketingSectionHeader
             eyebrow="By company"
             title="Browse by Company"
-            description="Get company-specific interview questions, process overviews, and preparation tips for top Indian employers."
+            subtitle="Get company-specific interview questions, process overviews, and preparation tips for top Indian employers."
           />
 
           <CompanyGroup heading="IT Service Companies" companies={SERVICE_COMPANIES} />
@@ -218,10 +216,10 @@ export default function InterviewQuestionsHubPage() {
       {/* ── Browse by Skill ───────────────────────────────────────────────── */}
       <section className={CONTENT_SECTION}>
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
-          <SectionHeader
+          <MarketingSectionHeader
             eyebrow="By technology"
             title="Browse by Skill / Topic"
-            description="Deep-dive question sets for specific technologies and computer science subjects — essential for technical rounds."
+            subtitle="Deep-dive question sets for specific technologies and computer science subjects — essential for technical rounds."
           />
           <ul
             className="mt-6 flex flex-wrap gap-2.5 p-0 list-none"
@@ -278,36 +276,6 @@ export default function InterviewQuestionsHubPage() {
         </div>
       </section>
     </>
-  )
-}
-
-function SectionHeader({
-  eyebrow,
-  title,
-  description,
-}: {
-  eyebrow: string
-  title: string
-  description: string
-}) {
-  return (
-    <div className="max-w-2xl">
-      <p
-        className="text-xs font-bold uppercase tracking-[0.14em]"
-        style={{ color: 'var(--accent-primary)' }}
-      >
-        {eyebrow}
-      </p>
-      <h2
-        className="mt-2 text-xl font-bold tracking-tight sm:text-2xl"
-        style={{ color: 'var(--text-primary)' }}
-      >
-        {title}
-      </h2>
-      <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        {description}
-      </p>
-    </div>
   )
 }
 

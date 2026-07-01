@@ -41,17 +41,19 @@ export function BlurredSection({
 
   return (
     <div
-      className="relative overflow-hidden rounded-xl border-2 p-4"
+      className="relative min-h-[140px] overflow-hidden rounded-xl border-2 p-4 sm:p-5"
       style={{
         borderColor: 'var(--card-border)',
         background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
       }}
+      role="region"
+      aria-label={upgradeLabel}
     >
       <div aria-hidden="true" className="pointer-events-none space-y-2.5 select-none">
         {['100%', '83%', '67%', '100%', '75%', '83%'].map((width, i) => (
           <div
             key={i}
-            className="h-3 max-w-full animate-pulse rounded"
+            className="h-3 max-w-full animate-pulse motion-reduce:animate-none rounded"
             style={{
               width,
               background: 'color-mix(in srgb, var(--text-muted) 35%, transparent)',
@@ -73,7 +75,7 @@ export function BlurredSection({
         </p>
         <Link
           href="/upgrade"
-          className="landing-cta-lift mt-3 inline-flex items-center rounded-[12px] px-4 py-2 text-sm font-semibold text-white"
+          className="landing-cta-lift mt-3 inline-flex items-center rounded-[12px] px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]"
           style={{
             background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
             boxShadow: '0 12px 32px color-mix(in srgb, var(--accent-primary) 28%, transparent)',

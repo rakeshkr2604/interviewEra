@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { CheckCircle2, Loader2 } from 'lucide-react'
+import { IE_SPINNER_LG_CLASS } from '@/lib/theme/component-classes'
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers'
 import {
   QUESTION_GEN_PROGRESS_STAGES,
@@ -60,7 +61,10 @@ export function InterviewQuestionGenLoading({
             </p>
           </div>
         ) : (
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-(--accent-primary) border-t-transparent" />
+          <div
+            className={`mx-auto h-10 w-10 rounded-full border-2 border-(--accent-primary) border-t-transparent ${IE_SPINNER_LG_CLASS}`}
+            aria-hidden
+          />
         )}
 
         {role ? (
@@ -93,7 +97,7 @@ export function InterviewQuestionGenLoading({
                   {done ? (
                     <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                   ) : active ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-(--accent-primary)" />
+                    <Loader2 className={`h-4 w-4 text-(--accent-primary) ${IE_SPINNER_LG_CLASS}`} />
                   ) : (
                     <span className="block h-4 w-4 rounded-full border border-(--card-border)" />
                   )}

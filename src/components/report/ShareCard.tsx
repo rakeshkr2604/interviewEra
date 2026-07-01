@@ -87,7 +87,8 @@ export function ShareCard({ overallScore, role, reportId }: ShareCardProps) {
             render={
               <Button
                 variant="secondary"
-                className="relative mt-6 w-full border border-white/25 bg-white/15 font-semibold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
+                className="relative mt-6 w-full min-h-11 border border-white/25 bg-white/15 font-semibold text-white shadow-sm backdrop-blur-sm hover:bg-white/25"
+                aria-label="Open share dialog for your interview score"
               >
                 Share your result
               </Button>

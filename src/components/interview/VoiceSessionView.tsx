@@ -12,6 +12,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mic, Loader2, AlertTriangle, Play } from 'lucide-react'
 import { TimerCircle } from '@/components/interview/TimerCircle'
+import { IE_SPINNER_LG_CLASS } from '@/lib/theme/component-classes'
 import { useVoiceSession } from '@/hooks/useVoiceSession'
 import { readAnswerStyle } from '@/lib/settings/client-preferences'
 import {
@@ -166,15 +167,15 @@ export function VoiceSessionView(props: VoiceSessionViewProps) {
       )}
 
       {isProcessing && (
-        <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
-          <Loader2 className="animate-spin" size={18} /> Evaluating your answer…
+        <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]" role="status" aria-live="polite" aria-busy="true">
+          <Loader2 className={IE_SPINNER_LG_CLASS} size={18} aria-hidden /> Evaluating your answer…
         </div>
       )}
 
       {isListening && (
         <div className="flex flex-col items-center gap-4">
           <TimerCircle timeLeft={timeLeft} totalTime={totalSeconds} />
-          <div className="min-h-[64px] w-full rounded-xl bg-[var(--bg-secondary)] p-4 text-sm">
+          <div className="mx-auto min-h-[64px] w-full max-w-prose rounded-xl bg-[var(--bg-secondary)] p-4 text-sm leading-relaxed">
             {liveTranscript || (
               <span className="text-[var(--text-secondary)]">Start speaking your answer…</span>
             )}
@@ -182,16 +183,16 @@ export function VoiceSessionView(props: VoiceSessionViewProps) {
           <button
             type="button"
             onClick={submit}
-            className="flex items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-6 py-3 font-semibold text-white"
+            className="flex min-h-[44px] items-center gap-2 rounded-xl bg-[var(--accent-primary)] px-6 py-3 font-semibold text-white"
           >
-            <Mic size={18} /> Submit answer
+            <Mic size={18} aria-hidden /> Submit answer
           </button>
         </div>
       )}
 
       {view.state === 'completed' && (
-        <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]">
-          <Loader2 className="animate-spin" size={18} /> Finishing up…
+        <div className="flex items-center justify-center gap-2 text-[var(--text-secondary)]" role="status" aria-live="polite" aria-busy="true">
+          <Loader2 className={IE_SPINNER_LG_CLASS} size={18} aria-hidden /> Finishing up…
         </div>
       )}
     </div>
