@@ -22,6 +22,7 @@ import {
   type RecentUser,
   type SystemHealth,
 } from '@/hooks/useAdminStats';
+import { formatElevenLabsHealthReason, type ElevenLabsHealthReason } from '@/lib/voice/elevenlabs-health-labels';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -125,7 +126,8 @@ function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; l
       name:       'ElevenLabs',
       icon:       <Activity className="h-4 w-4" />,
       status:     health.services.elevenlabs.status,
-      latency_ms: undefined as number | undefined,
+      latency_ms: health.services.elevenlabs.latency_ms,
+      extra:      formatElevenLabsHealthReason(health.services.elevenlabs.reason as ElevenLabsHealthReason | undefined),
     },
   ] : [];
 

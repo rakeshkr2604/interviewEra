@@ -7,6 +7,7 @@ import {
   resolveElevenLabsModelId,
   resolveElevenLabsVoiceId,
 } from '@/lib/voice/elevenlabs-voices';
+import { resolveElevenLabsApiKey } from '@/lib/voice/elevenlabs-health-shared';
 
 // Hard ceiling: no single TTS request may exceed this regardless of plan.
 // Prevents runaway prompts from generating 10-minute audio at full cost.
@@ -121,7 +122,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.ELEVENLABS_API_KEY;
+  const apiKey = resolveElevenLabsApiKey();
   if (!apiKey) {
     console.error('[TTS proxy] ELEVENLABS_API_KEY not configured');
     return NextResponse.json(

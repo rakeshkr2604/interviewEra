@@ -143,7 +143,7 @@ export interface SystemHealth {
     database:     { status: string; latency_ms: number };
     redis:        { status: string; latency_ms: number };
     ai_providers: { status: string; routing_basis: string; total_cost_usd: number };
-    elevenlabs:   { status: string };
+    elevenlabs:   { status: string; latency_ms?: number; reason?: string; quota_remaining_pct?: number };
   };
   checked_at: string;
 }

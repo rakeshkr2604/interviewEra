@@ -14,6 +14,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { getIntelligenceSummary } from '@/lib/ai/provider-intelligence';
 import getRedis from '@/lib/redis/client';
 import { getCached, setCached } from '@/lib/admin/cache';
+import { checkElevenLabsHealth } from '@/lib/voice/elevenlabs-health';
 
 const CACHE_KEY = 'admin:system';
 const CACHE_TTL = 60_000; // 60 seconds
@@ -42,18 +43,8 @@ async function checkRedis(): Promise<{ status: ServiceStatus; latency_ms: number
   }
 }
 
-async function checkElevenLabs(): Promise<{ status: ServiceStatus }> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) return { status: 'degraded' };
-  try {
-    const res = await fetch('https://api.elevenlabs.io/v1/user', {
-      headers: { 'xi-api-key': apiKey },
-      signal: AbortSignal.timeout(5_000),
-    });
-    return { status: res.ok ? 'healthy' : 'degraded' };
-  } catch {
-    return { status: 'degraded' };
-  }
+async function checkElevenLabs() {
+  return checkElevenLabsHealth();
 }
 
 export async function GET(request: Request) {
@@ -107,7 +98,10 @@ export async function GET(request: Request) {
         },
       },
       elevenlabs: {
-        status: elevenlabs.status,
+        status:     elevenlabs.status,
+        latency_ms: elevenlabs.latency_ms,
+        reason:     elevenlabs.reason,
+        quota_remaining_pct: elevenlabs.quota_remaining_pct,
       },
     },
     checked_at: new Date().toISOString(),
