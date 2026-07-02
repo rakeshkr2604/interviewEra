@@ -204,8 +204,9 @@ const FAQS = [
 function MockDashboardHero() {
   return (
     <div
-      className="w-full overflow-hidden rounded-2xl border-2 shadow-2xl"
+      className="college-mock-dashboard w-full overflow-hidden rounded-2xl border-2 shadow-2xl"
       style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))', background: 'var(--card-bg)' }}
+      aria-hidden="true"
     >
       {/* Title bar */}
       <div
@@ -223,7 +224,7 @@ function MockDashboardHero() {
         </div>
         <span
           className="rounded-full px-2 py-0.5 text-[10px] font-bold"
-          style={{ background: 'color-mix(in srgb, #22c55e 14%, transparent)', color: '#22c55e' }}
+          style={{ background: 'color-mix(in srgb, var(--accent-success) 14%, transparent)', color: 'var(--accent-success)' }}
         >
           LIVE
         </span>
@@ -232,8 +233,8 @@ function MockDashboardHero() {
       {/* Stat cards */}
       <div className="grid grid-cols-2 divide-x divide-y" style={{ borderColor: 'var(--card-border)' }}>
         {[
-          { label: 'Students Enrolled', value: '148', color: 'var(--accent-primary)' },
-          { label: 'Placement Ready', value: '63', color: '#22c55e' },
+          { label: 'Students Enrolled', value: '148', color: 'var(--accent-link)' },
+          { label: 'Placement Ready', value: '63', color: 'var(--accent-success)' },
           { label: 'Avg. Score', value: '6.8/10', color: '#8b5cf6' },
           { label: 'Sessions This Week', value: '94', color: '#06b6d4' },
         ].map(({ label, value, color }) => (
@@ -251,7 +252,7 @@ function MockDashboardHero() {
           {[
             { tier: 'Tier 4 — Mock Panel', pct: 8, color: '#f59e0b' },
             { tier: 'Tier 3 — Company Patterns', pct: 34, color: '#8b5cf6' },
-            { tier: 'Tier 2 — Advanced', pct: 41, color: 'var(--accent-primary)' },
+            { tier: 'Tier 2 — Advanced', pct: 41, color: 'var(--accent-link)' },
             { tier: 'Tier 1 — Fundamentals', pct: 17, color: 'var(--text-muted)' },
           ].map(({ tier, pct, color }) => (
             <div key={tier} className="flex items-center gap-2">
@@ -269,7 +270,7 @@ function MockDashboardHero() {
       <div className="border-t" style={{ borderColor: 'var(--card-border)' }}>
         <div className="flex items-center justify-between px-4 py-2" style={{ background: 'var(--bg-secondary)' }}>
           <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Recent Students</span>
-          <span className="text-[10px]" style={{ color: 'var(--accent-primary)' }}>View all 148 →</span>
+          <span className="text-[10px]" style={{ color: 'var(--accent-link)' }}>View all 148 →</span>
         </div>
         {[
           { name: 'Priya Sharma', sessions: 7, score: '7.4', tier: 'T3', ready: true },
@@ -290,9 +291,9 @@ function MockDashboardHero() {
                 className="rounded-full px-1.5 py-0.5 font-bold"
                 style={{
                   background: ready
-                    ? 'color-mix(in srgb, #22c55e 12%, transparent)'
+                    ? 'color-mix(in srgb, var(--accent-success) 12%, transparent)'
                     : 'color-mix(in srgb, var(--text-muted) 12%, transparent)',
-                  color: ready ? '#22c55e' : 'var(--text-muted)',
+                  color: ready ? 'var(--accent-success)' : 'var(--text-muted)',
                 }}
               >
                 {tier}
@@ -313,7 +314,7 @@ export default async function CollegeLandingPage() {
   if (user) redirect('/college/dashboard');
 
   return (
-    <div className="min-h-screen" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
+    <main id="main-content" className="min-h-screen" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
 
       {/* ── SECTION 1: Hero ───────────────────────────────────────────────────── */}
       <section
@@ -342,7 +343,7 @@ export default async function CollegeLandingPage() {
               style={{
                 borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, transparent)',
                 background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                color: 'var(--accent-primary)',
+                color: 'var(--accent-link)',
               }}
             >
               For T&amp;P Officers &amp; Placement Cells
@@ -350,7 +351,7 @@ export default async function CollegeLandingPage() {
 
             <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl" style={{ color: 'var(--text-primary)' }}>
               Prepare Your Entire Batch{' '}
-              <span style={{ color: 'var(--accent-primary)' }}>for Placements</span>
+              <span style={{ color: 'var(--accent-link)' }}>for Placements</span>
             </h1>
 
             <p className="mt-5 text-lg leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
@@ -362,7 +363,7 @@ export default async function CollegeLandingPage() {
             <ul className="mt-7 space-y-3">
               {HERO_BULLETS.map((b) => (
                 <li key={b} className="flex items-start gap-3 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+                  <CheckCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--accent-link)' }} aria-hidden />
                   {b}
                 </li>
               ))}
@@ -409,7 +410,7 @@ export default async function CollegeLandingPage() {
               <Link
                 href="/help-center"
                 className="mt-1 inline-flex min-h-[44px] items-center text-sm font-semibold transition-opacity hover:opacity-80"
-                style={{ color: 'var(--accent-primary)' }}
+                style={{ color: 'var(--accent-link)' }}
               >
                 Student Invitation
               </Link>
@@ -433,7 +434,7 @@ export default async function CollegeLandingPage() {
       >
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-danger, #ef4444)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-danger)' }}>
               The Problem
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -447,17 +448,17 @@ export default async function CollegeLandingPage() {
                 key={tag}
                 className="rounded-2xl p-7"
                 style={{
-                  background: 'color-mix(in srgb, #ef4444 5%, var(--card-bg))',
-                  border: '1.5px solid color-mix(in srgb, #ef4444 18%, var(--card-border))',
+                  background: 'color-mix(in srgb, var(--accent-danger) 5%, var(--card-bg))',
+                  border: '1.5px solid color-mix(in srgb, var(--accent-danger) 18%, var(--card-border))',
                 }}
               >
                 <span
                   className="inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                  style={{ background: 'color-mix(in srgb, #ef4444 12%, transparent)' }}
+                  style={{ background: 'color-mix(in srgb, var(--accent-danger) 12%, transparent)' }}
                 >
-                  <Icon className="h-5 w-5" style={{ color: '#ef4444' }} aria-hidden />
+                  <Icon className="h-5 w-5" style={{ color: 'var(--accent-danger)' }} aria-hidden />
                 </span>
-                <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em]" style={{ color: '#ef4444' }}>{tag}</p>
+                <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em]" style={{ color: 'var(--accent-danger)' }}>{tag}</p>
                 <p className="mt-2 text-sm font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>{headline}</p>
                 <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>{body}</p>
               </div>
@@ -470,7 +471,7 @@ export default async function CollegeLandingPage() {
       <section className="px-4 py-20 sm:px-6" id="solution">
         <div className="mx-auto max-w-6xl">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-link)' }}>
               The Solution
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -492,7 +493,7 @@ export default async function CollegeLandingPage() {
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                     style={{ background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
                   >
-                    <Icon className="h-5 w-5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+                    <Icon className="h-5 w-5" style={{ color: 'var(--accent-link)' }} aria-hidden />
                   </span>
                   <div>
                     <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
@@ -512,7 +513,7 @@ export default async function CollegeLandingPage() {
       >
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-link)' }}>
               Simple Setup
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -525,8 +526,9 @@ export default async function CollegeLandingPage() {
               <div key={step}>
                 {/* Mock UI placeholder */}
                 <div
-                  className="mb-5 overflow-hidden rounded-xl border"
+                  className="college-mock-dashboard mb-5 overflow-hidden rounded-xl border"
                   style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+                  aria-hidden="true"
                 >
                   <div
                     className="flex items-center justify-between border-b px-3 py-2"
@@ -541,7 +543,7 @@ export default async function CollegeLandingPage() {
                       </span>
                       <span className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>{mockLabel}</span>
                     </div>
-                    <Icon className="h-3.5 w-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+                    <Icon className="h-3.5 w-3.5" style={{ color: 'var(--accent-link)' }} aria-hidden />
                   </div>
                   <div className="space-y-1.5 p-3">
                     {[70, 50, 85, 40].map((w, i) => (
@@ -574,7 +576,7 @@ export default async function CollegeLandingPage() {
                     <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h3>
                     <span
                       className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold"
-                      style={{ color: 'var(--accent-primary)' }}
+                      style={{ color: 'var(--accent-link)' }}
                     >
                       <Clock className="h-3 w-3" aria-hidden />
                       {time}
@@ -592,7 +594,7 @@ export default async function CollegeLandingPage() {
       <section className="px-4 py-20 sm:px-6">
         <div className="mx-auto max-w-5xl">
           <div className="mb-10 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-link)' }}>
               T&amp;P Dashboard
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -605,8 +607,9 @@ export default async function CollegeLandingPage() {
 
           {/* Full mock dashboard */}
           <div
-            className="overflow-hidden rounded-2xl border-2 shadow-xl"
+            className="college-mock-dashboard overflow-hidden rounded-2xl border-2 shadow-xl"
             style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, var(--card-border))', background: 'var(--card-bg)' }}
+            aria-hidden="true"
           >
             {/* Chrome bar */}
             <div
@@ -625,7 +628,7 @@ export default async function CollegeLandingPage() {
               <div className="flex items-center gap-2">
                 <span
                   className="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
-                  style={{ background: 'color-mix(in srgb, #22c55e 14%, transparent)', color: '#22c55e' }}
+                  style={{ background: 'color-mix(in srgb, var(--accent-success) 14%, transparent)', color: 'var(--accent-success)' }}
                 >
                   Live
                 </span>
@@ -642,8 +645,8 @@ export default async function CollegeLandingPage() {
             {/* Stat row */}
             <div className="grid grid-cols-2 divide-x divide-y border-b sm:grid-cols-4 sm:divide-y-0" style={{ borderColor: 'var(--card-border)' }}>
               {[
-                { label: 'Students Enrolled', value: '148', sub: 'of 200 seats', color: 'var(--accent-primary)' },
-                { label: 'Placement Ready', value: '63', sub: '42% of batch', color: '#22c55e' },
+                { label: 'Students Enrolled', value: '148', sub: 'of 200 seats', color: 'var(--accent-link)' },
+                { label: 'Placement Ready', value: '63', sub: '42% of batch', color: 'var(--accent-success)' },
                 { label: 'Avg. Score', value: '6.8', sub: 'out of 10', color: '#8b5cf6' },
                 { label: 'Sessions This Week', value: '94', sub: '↑ 31% vs last week', color: '#06b6d4' },
               ].map(({ label, value, sub, color }) => (
@@ -664,7 +667,7 @@ export default async function CollegeLandingPage() {
                   {[
                     { tier: 'Tier 4 — Mock Panel', pct: 8, color: '#f59e0b' },
                     { tier: 'Tier 3 — Company', pct: 34, color: '#8b5cf6' },
-                    { tier: 'Tier 2 — Advanced', pct: 41, color: 'var(--accent-primary)' },
+                    { tier: 'Tier 2 — Advanced', pct: 41, color: 'var(--accent-link)' },
                     { tier: 'Tier 1 — Fundamentals', pct: 17, color: 'var(--text-muted)' },
                   ].map(({ tier, pct, color }) => (
                     <div key={tier} className="flex items-center gap-2">
@@ -731,9 +734,9 @@ export default async function CollegeLandingPage() {
                             className="rounded-full px-2 py-0.5 font-semibold"
                             style={{
                               background: ok
-                                ? 'color-mix(in srgb, #22c55e 12%, transparent)'
-                                : 'color-mix(in srgb, #ef4444 12%, transparent)',
-                              color: ok ? '#22c55e' : '#ef4444',
+                                ? 'color-mix(in srgb, var(--accent-success) 12%, transparent)'
+                                : 'color-mix(in srgb, var(--accent-danger) 12%, transparent)',
+                              color: ok ? 'var(--accent-success)' : 'var(--accent-danger)',
                             }}
                           >
                             {status}
@@ -757,7 +760,7 @@ export default async function CollegeLandingPage() {
       >
         <div className="mx-auto max-w-5xl">
           <div className="mb-12 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-link)' }}>
               Pricing
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -801,7 +804,7 @@ export default async function CollegeLandingPage() {
                   <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>{plan.seats}</p>
                   <p
                     className="mt-1 text-xs font-semibold"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--accent-link)' }}
                   >
                     {plan.perStudent}
                   </p>
@@ -810,7 +813,7 @@ export default async function CollegeLandingPage() {
                 <ul className="mt-6 flex-1 space-y-2.5">
                   {plan.features.map((f) => (
                     <li key={f} className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: '#22c55e' }} aria-hidden />
+                      <CheckCircle className="mt-0.5 h-4 w-4 shrink-0" style={{ color: 'var(--accent-success)' }} aria-hidden />
                       {f}
                     </li>
                   ))}
@@ -846,7 +849,7 @@ export default async function CollegeLandingPage() {
 
           <p className="mt-8 text-center text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
             All plans include unlimited interviews for students. &nbsp;
-            <span style={{ color: 'var(--accent-primary)' }}>₹500–1,000/student</span> vs ₹5,000 for traditional coaching.
+            <span style={{ color: 'var(--accent-link)' }}>₹500–1,000/student</span> vs ₹5,000 for traditional coaching.
           </p>
         </div>
       </section>
@@ -942,7 +945,7 @@ export default async function CollegeLandingPage() {
               { val: '7.8/10', label: 'Avg score improvement' },
             ].map(({ val, label }) => (
               <div key={label}>
-                <p className="text-4xl font-bold" style={{ color: 'var(--accent-primary)' }}>{val}</p>
+                <p className="text-4xl font-bold" style={{ color: 'var(--accent-link)' }}>{val}</p>
                 <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>{label}</p>
               </div>
             ))}
@@ -967,7 +970,7 @@ export default async function CollegeLandingPage() {
       <section className="px-4 py-20 sm:px-6" id="faq">
         <div className="mx-auto max-w-3xl">
           <div className="mb-10 text-center">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-link)' }}>
               FAQ
             </p>
             <h2 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
@@ -992,7 +995,7 @@ export default async function CollegeLandingPage() {
                   {item.q}
                   <ChevronRight
                     className="h-4 w-4 shrink-0 transition-transform duration-200 group-open:rotate-90"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--accent-link)' }}
                     aria-hidden
                   />
                 </summary>
@@ -1066,23 +1069,23 @@ export default async function CollegeLandingPage() {
 
       {/* ── Footer ────────────────────────────────────────────────────────────── */}
       <footer
-        className="border-t px-4 py-8 text-center text-xs"
-        style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
+        className="college-site-footer border-t px-4 py-8 text-center text-xs"
+        style={{ borderColor: 'var(--card-border)' }}
       >
         <p>
           © {new Date().getFullYear()} InterviewEra &nbsp;·&nbsp;
-          <Link href="/privacy" className="hover:opacity-70">Privacy</Link>
+          <Link href="/privacy" className="underline-offset-2 hover:underline">Privacy</Link>
           &nbsp;·&nbsp;
-          <Link href="/terms" className="hover:opacity-70">Terms</Link>
+          <Link href="/terms" className="underline-offset-2 hover:underline">Terms</Link>
           &nbsp;·&nbsp;
-          <Link href="/pricing" className="hover:opacity-70">Pricing</Link>
+          <Link href="/pricing" className="underline-offset-2 hover:underline">Pricing</Link>
           &nbsp;·&nbsp;
-          <Link href="/" className="hover:opacity-70">Home</Link>
+          <Link href="/" className="underline-offset-2 hover:underline">Home</Link>
           &nbsp;·&nbsp;
-          <Link href="/campus" className="hover:opacity-70">Campus Info</Link>
+          <Link href="/campus" className="underline-offset-2 hover:underline">Campus Info</Link>
         </p>
       </footer>
 
-    </div>
+    </main>
   );
 }

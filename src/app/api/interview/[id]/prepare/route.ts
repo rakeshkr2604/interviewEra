@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { resolveInterviewQuestions } from '@/lib/interview/resolve-interview-questions';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import {
   logPrepareCompleted,
   logPrepareFailed,
@@ -35,9 +36,13 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rateLimit = await checkRateLimit(`prepare:${user.id}`, 60, 15);
-    if (!rateLimit.allowed) {
-      return NextResponse.json({ error: 'Too many prepare requests.' }, { status: 429 });
+    const rateLimit = await checkRateLimit(`prepare:${user.id}`, 60, 15, { failClosed: true });
+    const blocked = buildRateLimitHttpResponse(rateLimit, 'Too many prepare requests.');
+    if (blocked) {
+      return NextResponse.json(blocked.body, {
+        status: blocked.status,
+        headers: blocked.headers,
+      });
     }
 
     const serviceClient = createServiceClient();
@@ -168,6 +173,14 @@ export async function POST(
       .eq('id', interviewId);
 
     logPrepareCompleted(interviewId, prepareStartedAt, resolved.questions.length);
+
+    trackInterviewEvent('question_generated', {
+      userId: user.id,
+      interviewId,
+      count: resolved.questions.length,
+      usedFallback: resolved.usedFallback,
+      fromCache: resolved.fromCache,
+    });
 
     return NextResponse.json({
       ready: true,

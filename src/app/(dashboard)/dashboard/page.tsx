@@ -12,6 +12,12 @@ import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { DashboardCommunityCard } from '@/components/community/DashboardCommunityCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
+import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker'
+import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
+import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
+import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
+import { computeReadinessScore } from '@/lib/candidate/readiness-score'
+import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
 import type { InterviewWithReportsRow } from './dashboard-types'
 import { PAGE_SEO } from '@/lib/seo/metadata'
 import { formatDateEnIn } from '@/lib/datetime/ist'
@@ -115,8 +121,13 @@ export default async function DashboardPage() {
 
   const inProgressInterview = rows.find((row) => row.status !== 'completed') ?? null
 
+  const candidateSnapshot = await loadCandidateSnapshot(user.id)
+  const readiness = computeReadinessScore(candidateSnapshot)
+  const roadmap = generatePersonalizedRoadmap(candidateSnapshot)
+
   return (
     <>
+      <CandidatePageTracker event="dashboard_viewed" />
       <RetentionProgressRefreshListener />
       <Suspense fallback={null}>
         <PaymentSuccessBanner />
@@ -167,7 +178,11 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <QuickActionsGrid />
+      <QuickActionsGrid resumeCompletionPct={candidateSnapshot.resumeCompletionPct} />
+
+      <ReadinessOverviewCard readiness={readiness} />
+
+      <RecommendationsStrip roadmap={roadmap} />
 
       <DashboardCommunityCard />
 

@@ -281,7 +281,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
   const embedSrc = `${calendlyUrl}?embed_type=Inline&hide_gdpr_banner=1`;
 
   return (
-    <main className="relative" style={{ color: 'var(--text-primary)' }}>
+    <main id="main-content" className="relative" style={{ color: 'var(--text-primary)' }}>
       {/* Hero — two columns on lg+: copy left, mechanism mockup right */}
       <section
         className="relative overflow-hidden border-b px-4 py-16 sm:px-5 sm:py-20"

@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
 import { computeJdFingerprint } from '@/lib/redis/question-cache';
 import type { InterviewSessionContext, InterviewGenerationContext } from '@/types/app.types';
 import { getInterviewerById } from '@/lib/config/interviewers';
 import { difficultyQuestionCount } from '@/lib/interview/difficulty-question-count';
+import { getExperimentFirstInterviewQuestionCount } from '@/lib/analytics/experiments';
 import { getUserProgress } from '@/lib/retention';
 import { trackProductEvent } from '@/lib/analytics/product-events';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -22,18 +24,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const rateLimit = await checkRateLimit(`start:${user.id}`, 60, 5);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many interview starts. Please wait before trying again.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(rateLimit.resetInSeconds),
-            'X-RateLimit-Remaining': '0',
-          },
-        },
-      );
+    const rateLimit = await checkRateLimit(`start:${user.id}`, 60, 5, { failClosed: true });
+    const blocked = buildRateLimitHttpResponse(
+      rateLimit,
+      'Too many interview starts. Please wait before trying again.',
+    );
+    if (blocked) {
+      return NextResponse.json(blocked.body, {
+        status: blocked.status,
+        headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
+      });
     }
 
     let rawBody: unknown;
@@ -72,11 +72,24 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? rawJobDescription.trim().slice(0, 12000)
         : undefined;
 
+    const serviceClient = createServiceClient();
+
     let rawCount: number;
     if (domainPackId) {
       rawCount = clientQuestionCount ?? 6;
     } else {
-      rawCount = clientQuestionCount ?? difficultyQuestionCount(difficulty);
+      const { count: priorCompleted } = await serviceClient
+        .from('interviews')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('status', 'completed');
+
+      const isFirstCompletedInterview = (priorCompleted ?? 0) === 0;
+      if (isFirstCompletedInterview && clientQuestionCount === undefined) {
+        rawCount = await getExperimentFirstInterviewQuestionCount(user.id);
+      } else {
+        rawCount = clientQuestionCount ?? difficultyQuestionCount(difficulty);
+      }
     }
     const questionCount = Math.min(10, Math.max(4, rawCount));
 
@@ -87,8 +100,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!interviewer) {
       return NextResponse.json({ error: 'Invalid interviewer selection' }, { status: 400 });
     }
-
-    const serviceClient = createServiceClient();
 
     if (domainPackId) {
       const { data: profile } = await serviceClient
@@ -116,6 +127,57 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!resume || resume.status !== 'parsed') {
       return NextResponse.json(
         { error: 'Resume is not ready yet. Please wait for parsing to complete.' },
+        { status: 409 },
+      );
+    }
+
+    // ── Duplicate prevention ─────────────────────────────────────────────────
+    // 1) Reuse a just-created pending interview (double-click / retry) — no extra credit.
+    const recentCutoff = new Date(Date.now() - 90_000).toISOString();
+    const { data: recentPending } = await serviceClient
+      .from('interviews')
+      .select('id, status, created_at')
+      .eq('user_id', user.id)
+      .eq('resume_id', resumeId)
+      .eq('role', role)
+      .eq('status', 'pending')
+      .gte('created_at', recentCutoff)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentPending?.id) {
+      trackInterviewEvent('interview_created', {
+        userId: user.id,
+        interviewId: recentPending.id,
+        deduped: true,
+      });
+      return NextResponse.json({
+        interviewId: recentPending.id,
+        preparing: true,
+        phase: 'generating_questions',
+        deduped: true,
+      });
+    }
+
+    // 2) Block a second concurrent session — resume the active one instead.
+    const { data: activeInterview } = await serviceClient
+      .from('interviews')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeInterview?.id) {
+      return NextResponse.json(
+        {
+          error: 'active_interview',
+          interviewId: activeInterview.id,
+          status: activeInterview.status,
+          resumeUrl: `/interview/session/${activeInterview.id}`,
+        },
         { status: 409 },
       );
     }
@@ -208,6 +270,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error('[interview/start] DB insert error:', interviewError);
       return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
     }
+
+    trackInterviewEvent('interview_created', {
+      userId: user.id,
+      interviewId: interview.id,
+      role,
+      difficulty,
+      async: useAsyncPrepare,
+    });
 
     if (useAsyncPrepare) {
       trackProductEvent({

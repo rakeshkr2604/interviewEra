@@ -228,6 +228,44 @@ export async function updateConversationState(
   return updatedState;
 }
 
+/** Persist generated follow-up for learning/improvement (migration 020). Best-effort. */
+export async function persistFollowUpQuestion(input: {
+  conversationStateId: string;
+  originalQuestion: string;
+  originalAnswer: string;
+  followupQuestion: string;
+  followupType: string;
+}): Promise<void> {
+  const supabase = createServiceClient();
+
+  const { data: analysis } = await supabase
+    .from('answer_analyses')
+    .select('id')
+    .eq('conversation_state_id', input.conversationStateId)
+    .eq('question_text', input.originalQuestion)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!analysis?.id) {
+    console.warn('[conversation-state] followup_questions skip — no analysis row');
+    return;
+  }
+
+  const { error } = await supabase.from('followup_questions').insert({
+    answer_analysis_id: analysis.id,
+    original_question: input.originalQuestion,
+    original_answer: input.originalAnswer,
+    followup_question: input.followupQuestion,
+    followup_type: input.followupType,
+    was_used: true,
+  });
+
+  if (error) {
+    console.error('[conversation-state] Failed to persist followup_questions:', error);
+  }
+}
+
 export async function getConversationState(
   interviewId: string,
 ): Promise<ConversationState | null> {

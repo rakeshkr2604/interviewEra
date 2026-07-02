@@ -203,6 +203,7 @@ export function generateMetadata({
     },
     twitter: {
       card: 'summary_large_image',
+      site: '@InterviewEra',
       title: promoTitle,
       description: safeDescription,
       images: [image],

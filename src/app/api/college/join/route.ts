@@ -1,6 +1,7 @@
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { getEffectiveInviteStatus } from '@/lib/college/invites';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest) {
 
     const { data: invite, error: inviteError } = await serviceClient
       .from('campus_invites')
-      .select('id, org_id, email, status')
+      .select('id, org_id, email, status, expires_at')
       .eq('token', token)
       .single();
 
@@ -32,11 +33,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invitation not found' }, { status: 404 });
     }
 
-    if (invite.status === 'accepted') {
+    const effectiveStatus = getEffectiveInviteStatus(invite);
+
+    if (invite.status === 'accepted' || effectiveStatus === 'accepted') {
       return NextResponse.json({ error: 'Invitation already accepted' }, { status: 400 });
     }
 
-    if (invite.email.toLowerCase() !== inviteEmail.toLowerCase()) {
+    if (effectiveStatus === 'expired') {
+      if (invite.status === 'pending') {
+        await serviceClient.from('campus_invites').update({ status: 'expired' }).eq('id', invite.id);
+      }
+      return NextResponse.json({ error: 'Invitation has expired' }, { status: 410 });
+    }
+
+    if (effectiveStatus === 'revoked') {
+      return NextResponse.json({ error: 'Invitation has been revoked' }, { status: 410 });
+    }
+
+    const normalizedInviteEmail = invite.email.toLowerCase();
+    const sessionEmail = user.email?.toLowerCase();
+
+    if (!sessionEmail || sessionEmail !== normalizedInviteEmail) {
+      return NextResponse.json(
+        { error: 'Sign in with the email address that received this invitation.' },
+        { status: 403 },
+      );
+    }
+
+    if (inviteEmail && inviteEmail.toLowerCase() !== normalizedInviteEmail) {
       return NextResponse.json({ error: 'Email mismatch' }, { status: 400 });
     }
 

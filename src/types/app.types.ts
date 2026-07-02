@@ -46,6 +46,8 @@ export interface InterviewSessionContext {
   jobDescription?: string;
   /** Present while questions are generated in background */
   generation?: InterviewGenerationContext;
+  /** Server-persisted in-progress state for History resume / cross-device recovery */
+  resume?: import('@/lib/session/interview-resume-snapshot').InterviewResumeSnapshot;
 }
 
 export interface DomainPack {

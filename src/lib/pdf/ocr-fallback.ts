@@ -108,9 +108,12 @@ export async function extractTextWithOcr(
   if (!hasPdfJsNodeGlobalsReady()) return null;
 
   if (opts?.userId) {
-    const rl = await checkRateLimit(`ocr:${opts.userId}`, 3600, 8);
+    const rl = await checkRateLimit(`ocr:${opts.userId}`, 3600, 8, { failClosed: true });
     if (!rl.allowed) {
-      console.warn('[ocr-fallback] rate limited', { userId: opts.userId });
+      console.warn('[ocr-fallback] rate limited', {
+        userId: opts.userId,
+        redisUnavailable: rl.redisUnavailable,
+      });
       return null;
     }
   }

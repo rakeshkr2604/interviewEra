@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { evaluateAnswer } from '@/lib/openai/evaluate-answer';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { interviewAnswerSchema } from '@/lib/validations/schemas';
 import { analyzeFillerWords } from '@/lib/filler-words/analyze';
 import type { QuestionRubric } from '@/types/app.types';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -21,18 +22,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // ── Step 2: Rate limiting (5 req / 10s per user) ──────────────────────────
-    const rateLimit = await checkRateLimit(`answer:${user.id}`, 10, 5);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please wait a moment before submitting.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(rateLimit.resetInSeconds),
-            'X-RateLimit-Remaining': '0',
-          },
-        }
-      );
+    const rateLimit = await checkRateLimit(`answer:${user.id}`, 10, 5, { failClosed: true });
+    const blocked = buildRateLimitHttpResponse(
+      rateLimit,
+      'Too many requests. Please wait a moment before submitting.',
+    );
+    if (blocked) {
+      return NextResponse.json(blocked.body, {
+        status: blocked.status,
+        headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
+      });
     }
 
     let rawBody: unknown;
@@ -80,6 +79,35 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Question not found' }, { status: 404 });
     }
 
+    // ── Idempotent: duplicate submit for same question ─────────────────────
+    const { data: existingAnswer } = await serviceClient
+      .from('answers')
+      .select('id')
+      .eq('question_id', questionId)
+      .maybeSingle();
+
+    if (existingAnswer?.id) {
+      const { data: existingEval } = await serviceClient
+        .from('evaluations')
+        .select('id, overall_score, feedback_text')
+        .eq('answer_id', existingAnswer.id)
+        .maybeSingle();
+
+      trackInterviewEvent('answer_recorded', {
+        userId: user.id,
+        interviewId,
+        questionId,
+        idempotent: true,
+      });
+
+      return NextResponse.json({
+        evaluationId: existingEval?.id ?? null,
+        score: existingEval?.overall_score ?? null,
+        feedback: existingEval?.feedback_text ?? 'Answer already recorded.',
+        idempotent: true,
+      });
+    }
+
     // ── Step 4: Save answer record ────────────────────────────────────────────
     const { data: answer, error: answerError } = await serviceClient
       .from('answers')
@@ -95,6 +123,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error('[interview/answer] Answer insert error:', answerError);
       return NextResponse.json({ error: 'Failed to save answer' }, { status: 500 });
     }
+
+    trackInterviewEvent('answer_recorded', {
+      userId: user.id,
+      interviewId,
+      questionId,
+      answerMode: answerMode ?? 'text',
+      durationSeconds: durationSeconds ?? 0,
+    });
 
     // ── Step 4b: Persist speech metrics (non-fatal if column absent in prod) ──
     if (durationSeconds !== undefined) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { processAnswer } from '@/lib/interview/interview-orchestrator';
 import type { InterviewContext } from '@/lib/interview/types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
@@ -43,18 +43,16 @@ export async function POST(request: NextRequest) {
     }
 
     // 1-2 LLM calls per request — rate limit like the sibling answer route.
-    const rateLimit = await checkRateLimit(`process-answer:${user.id}`, 10, 5);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please wait a moment before submitting.' },
-        {
-          status: 429,
-          headers: {
-            'Retry-After': String(rateLimit.resetInSeconds),
-            'X-RateLimit-Remaining': '0',
-          },
-        },
-      );
+    const rateLimit = await checkRateLimit(`process-answer:${user.id}`, 10, 5, { failClosed: true });
+    const blocked = buildRateLimitHttpResponse(
+      rateLimit,
+      'Too many requests. Please wait a moment before submitting.',
+    );
+    if (blocked) {
+      return NextResponse.json(blocked.body, {
+        status: blocked.status,
+        headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
+      });
     }
 
     let body: unknown;
@@ -76,12 +74,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
+    const sanitizedQuestion = question.slice(0, 4000);
+    const sanitizedAnswer = answer.slice(0, 12000);
+
     const { owned, sessionContext } = await getOwnedInterviewContext(
       user.id,
       interview_id,
     );
     if (!owned) {
       return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
+    }
+
+    const { data: interviewRow } = await createServiceClient()
+      .from('interviews')
+      .select('status')
+      .eq('id', interview_id)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (!interviewRow || interviewRow.status !== 'in_progress') {
+      return NextResponse.json({ error: 'Interview is not in progress' }, { status: 400 });
     }
 
     // Server-authoritative locked mode (falls back to context.interview_style
@@ -98,8 +110,8 @@ export async function POST(request: NextRequest) {
 
     const response = await processAnswer(
       interview_id,
-      question,
-      answer,
+      sanitizedQuestion,
+      sanitizedAnswer,
       context,
       validInterviewerId,
       lockedMode,

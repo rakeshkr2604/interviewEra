@@ -7,6 +7,7 @@ import { SCREENSHOT_BUCKET, isOwnedScreenshotPath } from '@/lib/feedback/screens
 import { sendFeedbackEmail } from '@/lib/feedback/email-sender';
 import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
 import { autoTagFeedback } from '@/lib/feedback/auto-tag';
+import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 
 const SCREENSHOT_URL_TTL_SECONDS = 60 * 60 * 24 * 365; // 1 year — outlives the email
 
@@ -54,6 +55,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     confusionText,
     bugsText,
     wouldUseAgain,
+    npsScore,
+    feedbackCategory,
     pageUrl,
     browserInfo,
     screenshotPath,
@@ -125,6 +128,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       confusion_text: confusionText,
       bugs_text: bugsText,
       would_use_again: wouldUseAgain ?? null,
+      nps_score: npsScore ?? null,
+      feedback_category: feedbackCategory ?? 'general',
+      is_anonymous: false,
       page_url: pageUrl,
       browser_info: browserInfo,
       severity,
@@ -153,6 +159,15 @@ export async function POST(request: Request): Promise<NextResponse> {
   // We await so the status is updated before we respond; Resend is fast enough
   // that this doesn't meaningfully increase latency.
   await sendFeedbackEmail(service, insertedRow.id, payload, 0);
+
+  trackProductEventServer({
+    event_name: 'feedback_submitted',
+    user_id: user.id,
+    feedback_category: feedbackCategory ?? 'general',
+  });
+  if (npsScore !== null && npsScore !== undefined) {
+    trackProductEventServer({ event_name: 'nps_submitted', user_id: user.id, nps_score: npsScore });
+  }
 
   return NextResponse.json({ ok: true });
 }

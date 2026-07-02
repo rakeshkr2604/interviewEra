@@ -13,6 +13,10 @@ import {
   CreditCard,
   Shield,
   Award,
+  FileText,
+  Gauge,
+  Map,
+  Bell,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { createClient } from '@/lib/supabase/client'
@@ -35,13 +39,17 @@ const NAV_SECTIONS = [
   {
     label: 'PRACTICE',
     items: [
+      { href: '/resume', label: 'Resume', icon: FileText },
       { href: '/history', label: 'Interview History', icon: History },
     ],
   },
   {
     label: 'INSIGHTS',
     items: [
+      { href: '/readiness', label: 'Readiness', icon: Gauge },
+      { href: '/roadmap', label: 'Prep Roadmap', icon: Map },
       { href: '/analytics', label: 'Performance Analytics', icon: BarChart2 },
+      { href: '/notifications', label: 'Notifications', icon: Bell },
     ],
   },
   {
@@ -186,7 +194,7 @@ export function Sidebar({
           >
             <p
               className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em]"
-              style={{ color: 'color-mix(in srgb, var(--text-muted) 52%, transparent)' }}
+              style={{ color: 'var(--text-muted)' }}
             >
               {section.label}
             </p>

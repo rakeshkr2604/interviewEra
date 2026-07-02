@@ -115,20 +115,8 @@ export function VoiceAudioPanel() {
           return (
             <div
               key={iv.id}
-              role="button"
-              tabIndex={0}
-              aria-pressed={selected}
-              aria-label={`Select ${iv.name} as interviewer voice`}
-              onClick={() => persistVoice(g)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  persistVoice(g)
-                }
-              }}
               className={cn(
-                'flex cursor-pointer gap-3 rounded-2xl border-2 p-3 text-left transition-all duration-200',
-                'hover:border-[var(--accent-primary)]/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/45',
+                'relative flex gap-3 rounded-2xl border-2 p-3 text-left transition-all duration-200',
                 !selected && 'border-[var(--card-border)]',
               )}
               style={
@@ -142,31 +130,41 @@ export function VoiceAudioPanel() {
                   : { color: 'var(--text-primary)' }
               }
             >
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-secondary)]">
-                <Image
-                  src={iv.avatarImage}
-                  alt=""
-                  width={64}
-                  height={64}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold">{iv.name}</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {iv.role}
-                </p>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="mt-2 h-7 text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    void handlePreview(iv.id)
-                  }}
-                  disabled={previewing === iv.id}
-                >
+              <button
+                type="button"
+                aria-pressed={selected}
+                aria-label={`Select ${iv.name} as interviewer voice`}
+                onClick={() => persistVoice(g)}
+                className={cn(
+                  'flex min-w-0 flex-1 cursor-pointer gap-3 border-0 bg-transparent p-0 text-left',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/45',
+                )}
+              >
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[var(--bg-secondary)]">
+                  <Image
+                    src={iv.avatarImage}
+                    alt=""
+                    width={64}
+                    height={64}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold">{iv.name}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {iv.role}
+                  </p>
+                </div>
+              </button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-7 shrink-0 self-end text-xs"
+                onClick={() => void handlePreview(iv.id)}
+                disabled={previewing === iv.id}
+                aria-label={`Preview ${iv.name} voice`}
+              >
                   {previewing === iv.id ? (
                     <>
                       <Loader2 className="size-3.5 animate-spin" />
@@ -178,8 +176,7 @@ export function VoiceAudioPanel() {
                       Preview
                     </>
                   )}
-                </Button>
-              </div>
+              </Button>
             </div>
           )
         })}

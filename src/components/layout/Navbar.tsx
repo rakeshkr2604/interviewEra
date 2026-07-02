@@ -295,7 +295,7 @@ function NavbarSignInLink({
         'text-(--text-secondary) shadow-sm',
         'transition-[border-color,box-shadow,transform,color] duration-300 ease-out',
         'hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]',
-        'hover:text-[var(--accent-primary)]',
+        'hover:text-[var(--accent-link)]',
         'hover:shadow-[0_0_0_1px_color-mix(in_srgb,var(--accent-primary)_30%,transparent),0_8px_28px_color-mix(in_srgb,var(--accent-primary)_22%,transparent)]',
         IE_FOCUS_VISIBLE,
         'motion-reduce:transform-none motion-reduce:hover:translate-y-0',
@@ -466,7 +466,7 @@ function NavHoverMenu({
           className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg"
           style={{
             background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-            color: 'var(--accent-primary)',
+            color: 'var(--accent-link)',
           }}
           aria-hidden
         >
@@ -538,7 +538,7 @@ function NavHoverMenu({
         className={cn(
           NAV_DROPDOWN_TRIGGER_BASE,
           open || isActive
-            ? 'bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] font-semibold text-(--accent-primary)'
+            ? 'bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] font-semibold text-(--accent-link)'
             : 'text-(--text-secondary) hover:text-(--text-primary) hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]',
         )}
       >
@@ -726,7 +726,7 @@ function AvatarMenu({
               className="mt-1.5 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize"
               style={{
                 background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-                color: 'var(--accent-primary)',
+                color: 'var(--accent-link)',
               }}
             >
               {user.plan_tier}
@@ -763,7 +763,7 @@ function AvatarMenu({
             <DropdownMenuItem
               onClick={() => router.push('/upgrade')}
               className="flex cursor-pointer items-center gap-2 font-medium"
-              style={{ color: 'var(--accent-primary)' }}
+              style={{ color: 'var(--accent-link)' }}
             >
               <TrendingUp className="size-4" aria-hidden />
               Upgrade to Pro
@@ -1229,7 +1229,7 @@ function StudentNav({ user }: { user: NavUser }) {
                 <Link
                   href="/upgrade"
                   onClick={() => setMobileOpen(false)}
-                  className={cn(NAV_MOBILE_LINK_BASE, 'text-[var(--accent-primary)]')}
+                  className={cn(NAV_MOBILE_LINK_BASE, 'text-[var(--accent-link)]')}
                 >
                   Upgrade to Pro
                 </Link>
@@ -1294,7 +1294,7 @@ function AdminNav({ user }: { user: NavUser }) {
             className="rounded-md px-1.5 py-0.5 text-[11px] font-semibold"
             style={{
               background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-              color: 'var(--accent-primary)',
+              color: 'var(--accent-link)',
             }}
           >
             Campus

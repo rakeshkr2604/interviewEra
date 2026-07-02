@@ -72,7 +72,6 @@ export function useInterviewMicSession(
     dgListening,
     telemetryCtx,
     startListening,
-    restartListening,
     startDgListening,
   } = params
 

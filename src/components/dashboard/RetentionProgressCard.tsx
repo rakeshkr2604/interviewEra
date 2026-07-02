@@ -78,6 +78,7 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
             className="h-2 w-full overflow-hidden rounded-full"
             style={{ background: 'var(--bg-tertiary)' }}
             role="progressbar"
+            aria-label={`Progress to tier ${snap.tierProgress.targetTierNumber}: ${snap.tierProgress.progressPercent}%`}
             aria-valuenow={snap.tierProgress.progressPercent}
             aria-valuemin={0}
             aria-valuemax={100}

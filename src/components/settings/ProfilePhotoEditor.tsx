@@ -142,11 +142,16 @@ export function ProfilePhotoEditor({
             )}
           </span>
         </button>
+        <label htmlFor="profile-photo-input" className="sr-only">
+          Upload profile photo (JPG, PNG, or WEBP, max 2 MB)
+        </label>
         <input
           ref={inputRef}
+          id="profile-photo-input"
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="sr-only"
+          aria-label="Upload profile photo (JPG, PNG, or WEBP, max 2 MB)"
           disabled={busy}
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -157,7 +162,7 @@ export function ProfilePhotoEditor({
 
       <div className="min-w-0 flex-1 space-y-2">
         <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <p id="profile-photo-label" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Profile photo
           </p>
           <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>

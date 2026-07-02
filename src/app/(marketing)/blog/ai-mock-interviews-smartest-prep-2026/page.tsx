@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
+import { BlogStartFreeCta } from '@/components/analytics/BlogStartFreeCta';
 import { BRAND_ICON_192_PATH, brandArticleOgTitle, generateMetadata, siteConfig } from '@/lib/seo/metadata';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { AiMockBlogReadingProgress } from '@/components/blog/AiMockBlogReadingProgress';
@@ -383,8 +384,10 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
               Get 5 practice interviews at zero cost. No credit card. No commitment. Resume-personalized questions from
               day 1.
             </p>
-            <Link
-              href={DASHBOARD_URL}
+            <BlogStartFreeCta
+              href="/signup"
+              section="blog_ai_mock_interviews_cta"
+              ctaText="Start Free Practice"
               className={`mt-6 inline-flex min-h-[3rem] items-center justify-center rounded-[12px] px-8 text-[1.0625rem] font-semibold text-white shadow-md transition-[transform,box-shadow] hover:-translate-y-0.5 hover:shadow-lg ${CTA_FOCUS}`}
               style={{
                 background: 'linear-gradient(135deg, #6C47FF, #5b32e0)',
@@ -392,7 +395,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
               }}
             >
               Start Free Practice →
-            </Link>
+            </BlogStartFreeCta>
           </aside>
 
           <h2 id="good-feedback" className="ie-blog-ai-mock-h2-anchor">

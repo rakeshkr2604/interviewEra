@@ -19,8 +19,18 @@ const eslintConfig = defineConfig([
     // Node CJS one-off scripts (require() is intentional)
     "scripts/**",
     // Local brand toolkit / canvas (not part of the Next app)
+    "coverage/**",
+    "test-results/**",
+    "playwright-report/**",
     "InterviewEra.com Brand Icons/**",
   ]),
+  {
+    files: ["src/emails/**/*.{ts,tsx}"],
+    rules: {
+      "@next/next/no-head-element": "off",
+      "@next/next/no-img-element": "off",
+    },
+  },
   {
     files: ["**/*.{js,jsx,mjs,cjs,ts,tsx}"],
     plugins: {

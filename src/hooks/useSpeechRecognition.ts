@@ -1139,6 +1139,7 @@ export function useSpeechRecognition(
     isAnswerMicArmed,
     maybeFireWebSpeechStalled,
     releaseMicKeepAliveStream,
+    setCapturing,
   ]);
 
   useEffect(() => {
@@ -1324,13 +1325,18 @@ export function useSpeechRecognition(
         should_listen: shouldListenRef.current,
         has_live_recognition: !!recognitionRef.current,
       });
-      if (
-        document.visibilityState === 'visible' &&
-        shouldListenRef.current &&
-        mountedRef.current &&
-        !recognitionRef.current
-      ) {
-        voiceDebug('retry_triggered', { reason: 'visibility_resume' });
+      if (document.visibilityState !== 'visible') return;
+      if (!shouldListenRef.current || !mountedRef.current) return;
+
+      const stalledStarting =
+        recognitionStateRef.current === 'starting' &&
+        startingSinceRef.current > 0 &&
+        Date.now() - startingSinceRef.current > STARTING_STALL_RECOVERY_ARMED_MS;
+
+      if (!recognitionRef.current || stalledStarting) {
+        voiceDebug('retry_triggered', {
+          reason: stalledStarting ? 'visibility_stalled_starting' : 'visibility_resume',
+        });
         log('visibility_resume');
         beginRecognitionRef.current();
       }

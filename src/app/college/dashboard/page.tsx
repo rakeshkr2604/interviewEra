@@ -3,6 +3,10 @@ import Link from 'next/link';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 import { Users, BarChart2, Calendar, ArrowRight, TrendingUp, Award, Activity } from 'lucide-react';
+import { buildActivityFeed } from '@/lib/college/activity';
+import { getOrgSeatUsage } from '@/lib/college/students-query';
+import { ActivityTimeline } from '@/components/campus/ActivityTimeline';
+import { CampusPageTracker } from '@/components/campus/CampusPageTracker';
 
 export const metadata = privatePageMetadata({
   title: 'College Dashboard',
@@ -36,18 +40,22 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
 
   if (!org) return null;
 
-  const { data: students } = await serviceClient
-    .from('users')
-    .select('id, name, email')
-    .eq('campus_org_id', org.id);
+  const seatUsage = await getOrgSeatUsage(org.id);
 
-  const { count: pendingInvites } = await serviceClient
-    .from('campus_invites')
-    .select('id', { count: 'exact', head: true })
-    .eq('org_id', org.id)
-    .eq('status', 'pending');
+  const { data: enrollments } = await serviceClient
+    .from('college_enrollments')
+    .select('user_id, users!inner(id, name, email)')
+    .eq('college_id', org.id)
+    .eq('enrollment_status', 'active');
 
-  if (!students || students.length === 0) {
+  interface EnrollmentRow {
+    user_id: string;
+    users: { id: string; name: string | null; email: string };
+  }
+
+  const students = (enrollments as EnrollmentRow[] | null ?? []).map((e) => e.users);
+
+  if (students.length === 0) {
     return {
       totalStudents: 0,
       totalInterviews: 0,
@@ -58,37 +66,45 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
       avgInterviewsPerStudent: 0,
       completionRate: 0,
       topPerformers: [],
-      pendingInvites: pendingInvites ?? 0,
-      seatsUsed: pendingInvites ?? 0,
+      pendingInvites: seatUsage.pendingInvites,
+      seatsUsed: seatUsage.seatsUsed,
       seatCount: org.seat_count,
     };
   }
 
   const studentIds = students.map((s) => s.id);
 
-  const { data: interviews } = await serviceClient
-    .from('interviews')
-    .select('id, user_id, status, completed_at, started_at')
-    .in('user_id', studentIds);
+  const [{ data: interviews }, { data: progressRecords }] = await Promise.all([
+    serviceClient
+      .from('interviews')
+      .select('id, user_id, status, completed_at')
+      .in('user_id', studentIds),
+    serviceClient
+      .from('user_progress')
+      .select('user_id, overall_avg_score, current_tier')
+      .in('user_id', studentIds),
+  ]);
 
   const allInterviews = interviews ?? [];
   const completed = allInterviews.filter((i) => i.status === 'completed');
   const completedIds = completed.map((i) => i.id);
 
-  const { data: reports } = completedIds.length > 0
-    ? await serviceClient
-        .from('reports')
-        .select('interview_id, overall_score')
-        .in('interview_id', completedIds)
-    : { data: [] };
+  const { data: reports } =
+    completedIds.length > 0
+      ? await serviceClient
+          .from('reports')
+          .select('interview_id, overall_score')
+          .in('interview_id', completedIds)
+      : { data: [] };
 
   const scores = (reports ?? [])
     .map((r) => r.overall_score)
     .filter((s): s is number => s !== null);
 
-  const averageScore = scores.length > 0
-    ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
-    : null;
+  const averageScore =
+    scores.length > 0
+      ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+      : null;
 
   const weekAgo = new Date();
   weekAgo.setDate(weekAgo.getDate() - 7);
@@ -99,40 +115,36 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
   ).size;
 
   const scoresByStudent: Record<string, number[]> = {};
-  const completedByStudent: Record<string, number> = {};
   (reports ?? []).forEach((r) => {
     const interview = completed.find((i) => i.id === r.interview_id);
-    if (!interview) return;
+    if (!interview || r.overall_score === null) return;
     const uid = interview.user_id;
     if (!scoresByStudent[uid]) scoresByStudent[uid] = [];
-    if (r.overall_score !== null) scoresByStudent[uid].push(r.overall_score);
-    completedByStudent[uid] = (completedByStudent[uid] || 0) + 1;
+    scoresByStudent[uid].push(r.overall_score);
   });
 
-  const placementReadyCount = Object.entries(scoresByStudent).filter(([, s]) => {
-    const avg = s.reduce((a, b) => a + b, 0) / s.length;
-    return avg >= 7;
-  }).length;
+  const placementReadyCount = (progressRecords ?? []).filter(
+    (p) => (p.current_tier ?? 1) >= 3
+  ).length;
 
   const topPerformers = students
     .map((s) => {
+      const progress = progressRecords?.find((p) => p.user_id === s.id);
       const stScores = scoresByStudent[s.id] ?? [];
-      const avg = stScores.length > 0
-        ? stScores.reduce((a, b) => a + b, 0) / stScores.length
-        : 0;
-      return { name: s.name, email: s.email, score: Math.round(avg * 10) / 10 };
+      const avgFromReports =
+        stScores.length > 0 ? stScores.reduce((a, b) => a + b, 0) / stScores.length : 0;
+      const avg = progress?.overall_avg_score ?? avgFromReports;
+      return { name: s.name, email: s.email, score: Math.round(Number(avg) * 10) / 10 };
     })
     .filter((s) => s.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, 3);
 
-  const avgInterviewsPerStudent = students.length > 0
-    ? Math.round((completed.length / students.length) * 10) / 10
-    : 0;
+  const avgInterviewsPerStudent =
+    students.length > 0 ? Math.round((completed.length / students.length) * 10) / 10 : 0;
 
-  const completionRate = allInterviews.length > 0
-    ? Math.round((completed.length / allInterviews.length) * 100)
-    : 0;
+  const completionRate =
+    allInterviews.length > 0 ? Math.round((completed.length / allInterviews.length) * 100) : 0;
 
   return {
     totalStudents: students.length,
@@ -144,8 +156,8 @@ async function getDashboardData(adminUserId: string): Promise<DashboardStats | n
     avgInterviewsPerStudent,
     completionRate,
     topPerformers,
-    pendingInvites: pendingInvites ?? 0,
-    seatsUsed: students.length + (pendingInvites ?? 0),
+    pendingInvites: seatUsage.pendingInvites,
+    seatsUsed: seatUsage.seatsUsed,
     seatCount: org.seat_count,
   };
 }
@@ -164,11 +176,11 @@ function StatCard({
   accent?: string;
 }) {
   return (
-    <div
-      className="dashboard-premium-card p-5"
-    >
+    <div className="dashboard-premium-card p-5">
       <div className="flex items-start justify-between">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+          {label}
+        </p>
         <span
           className="flex h-8 w-8 items-center justify-center rounded-lg"
           style={{ background: accent ?? 'color-mix(in srgb, var(--accent-primary) 12%, transparent)' }}
@@ -176,8 +188,14 @@ function StatCard({
           <Icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
         </span>
       </div>
-      <p className="mt-3 text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{value}</p>
-      {sub && <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
+      <p className="mt-3 text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          {sub}
+        </p>
+      )}
     </div>
   );
 }
@@ -190,7 +208,17 @@ export default async function CollegeDashboardPage() {
 
   if (!user) redirect('/login');
 
-  const stats = await getDashboardData(user.id);
+  const serviceClient = createServiceClient();
+  const { data: org } = await serviceClient
+    .from('campus_organizations')
+    .select('id')
+    .eq('admin_user_id', user.id)
+    .single();
+
+  const [stats, activityEvents] = await Promise.all([
+    getDashboardData(user.id),
+    org ? buildActivityFeed(org.id, 10) : Promise.resolve([]),
+  ]);
 
   if (!stats) redirect('/college/signup');
 
@@ -198,6 +226,7 @@ export default async function CollegeDashboardPage() {
 
   return (
     <div className="space-y-8">
+      <CampusPageTracker event="campus_workspace_viewed" extra={{ org_id: org?.id }} />
       <div className="flex items-start justify-between">
         <div>
           <p
@@ -224,7 +253,6 @@ export default async function CollegeDashboardPage() {
 
       {hasStudents ? (
         <>
-          {/* Primary stats */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <StatCard
               label="Students Enrolled"
@@ -249,25 +277,32 @@ export default async function CollegeDashboardPage() {
             <StatCard
               label="Placement Ready"
               value={stats.placementReadyCount}
-              sub="avg score ≥ 7"
+              sub="tier 3+ readiness"
               icon={Award}
               accent="color-mix(in srgb, #a855f7 12%, transparent)"
             />
           </div>
 
-          {/* Secondary stats */}
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
             <div className="dashboard-premium-card p-5">
               <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                 <Activity className="h-4 w-4" />
                 Active This Week
               </div>
-              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.activeThisWeek}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>students completed an interview</p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                {stats.activeThisWeek}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                students completed an interview
+              </p>
             </div>
             <div className="dashboard-premium-card p-5">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Completion Rate</p>
-              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.completionRate}%</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Completion Rate
+              </p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                {stats.completionRate}%
+              </p>
               <div className="mt-2 h-1.5 rounded-full" style={{ background: 'var(--bg-tertiary)' }}>
                 <div
                   className="h-full rounded-full transition-all"
@@ -276,53 +311,86 @@ export default async function CollegeDashboardPage() {
               </div>
             </div>
             <div className="dashboard-premium-card p-5">
-              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Pending Invites</p>
-              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{stats.pendingInvites}</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>awaiting acceptance</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                Pending Invites
+              </p>
+              <p className="mt-2 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                {stats.pendingInvites}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                awaiting acceptance
+              </p>
             </div>
           </div>
 
-          {/* Top performers */}
-          {stats.topPerformers.length > 0 && (
-            <div className="dashboard-premium-card overflow-hidden">
-              <div
-                className="border-b px-5 py-4"
-                style={{ borderColor: 'var(--card-border)' }}
-              >
-                <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Top Performers</h3>
-              </div>
-              <div>
-                {stats.topPerformers.map((p, i) => (
-                  <div
-                    key={p.email}
-                    className="flex items-center justify-between px-5 py-3 transition-colors"
-                    style={{ borderBottom: i < stats.topPerformers.length - 1 ? `1px solid var(--card-border)` : undefined }}
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                        style={{ background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#d97706' }}
-                      >
-                        {i + 1}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{p.name ?? '—'}</p>
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{p.email}</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{p.score}/10</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ActivityTimeline events={activityEvents} />
 
-          {/* Quick navigation */}
+            {stats.topPerformers.length > 0 && (
+              <div className="dashboard-premium-card overflow-hidden">
+                <div className="border-b px-5 py-4" style={{ borderColor: 'var(--card-border)' }}>
+                  <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Top Performers
+                  </h3>
+                </div>
+                <div>
+                  {stats.topPerformers.map((p, i) => (
+                    <div
+                      key={p.email}
+                      className="flex items-center justify-between px-5 py-3 transition-colors"
+                      style={{
+                        borderBottom:
+                          i < stats.topPerformers.length - 1 ? `1px solid var(--card-border)` : undefined,
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
+                          style={{
+                            background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#d97706',
+                          }}
+                        >
+                          {i + 1}
+                        </span>
+                        <div>
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                            {p.name ?? '—'}
+                          </p>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {p.email}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {p.score}/10
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             {[
-              { href: '/college/dashboard/students', icon: Users, label: 'Manage Students', sub: `${stats.totalStudents} enrolled` },
-              { href: '/college/dashboard/analytics', icon: BarChart2, label: 'View Analytics', sub: 'Trends & distribution' },
-              { href: '/college/dashboard/deadlines', icon: Calendar, label: 'Set Deadlines', sub: 'Milestones & targets' },
+              {
+                href: '/college/dashboard/students',
+                icon: Users,
+                label: 'Manage Students',
+                sub: `${stats.totalStudents} enrolled`,
+              },
+              {
+                href: '/college/dashboard/analytics',
+                icon: BarChart2,
+                label: 'View Analytics',
+                sub: 'Trends & distribution',
+              },
+              {
+                href: '/college/dashboard/deadlines',
+                icon: Calendar,
+                label: 'Set Deadlines',
+                sub: 'Milestones & targets',
+              },
             ].map((item) => (
               <Link
                 key={item.href}
@@ -337,8 +405,12 @@ export default async function CollegeDashboardPage() {
                     <item.icon className="h-4 w-4" style={{ color: 'var(--accent-primary)' }} />
                   </span>
                   <div>
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{item.label}</p>
-                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{item.sub}</p>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {item.label}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {item.sub}
+                    </p>
                   </div>
                 </div>
                 <ArrowRight className="h-4 w-4" style={{ color: 'var(--text-muted)' }} />
@@ -347,11 +419,13 @@ export default async function CollegeDashboardPage() {
           </div>
         </>
       ) : (
-        /* Empty state */
         <div className="space-y-6">
           <div
             className="rounded-2xl border-2 border-dashed px-8 py-16 text-center"
-            style={{ borderColor: 'var(--card-border)', background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)' }}
+            style={{
+              borderColor: 'var(--card-border)',
+              background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
+            }}
           >
             <div
               className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
@@ -359,7 +433,9 @@ export default async function CollegeDashboardPage() {
             >
               <Users className="h-8 w-8 text-white" />
             </div>
-            <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>No students enrolled yet</h3>
+            <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+              No students enrolled yet
+            </h3>
             <p className="mx-auto mt-2 max-w-sm text-sm" style={{ color: 'var(--text-secondary)' }}>
               Invite your students by uploading a CSV or entering emails manually.
             </p>
@@ -380,11 +456,14 @@ export default async function CollegeDashboardPage() {
             </div>
           </div>
 
-          {/* Seat summary */}
+          {activityEvents.length > 0 && <ActivityTimeline events={activityEvents} />}
+
           <div className="dashboard-premium-card p-5">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Seats Available</p>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Seats Available
+                </p>
                 <p className="mt-1 text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                   {stats.seatCount - stats.seatsUsed}
                   <span className="ml-1 text-base font-normal" style={{ color: 'var(--text-muted)' }}>

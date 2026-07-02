@@ -22,7 +22,8 @@ import {
 } from './scoring';
 import { buildCompletionReinforcement } from './completion-reinforcement';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
-import { trackProductEvent } from '@/lib/analytics/product-events';
+import { trackProductEventServer } from '@/lib/analytics/product-events-server';
+import { applyReferralBonus } from '@/lib/referral/apply-referral';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -381,9 +382,9 @@ export async function processInterviewRetention(
   const streakDelta = streakResult.newStreak - streakResult.previousStreak;
 
   if (qualityMet && streakDelta > 0) {
-    trackProductEvent({ event: 'streak_extended', userId, interviewId, streak: streakResult.newStreak });
+    trackProductEventServer({ event: 'streak_extended', userId, interviewId, streak: streakResult.newStreak });
   } else if (streakResult.newStreak < streakResult.previousStreak) {
-    trackProductEvent({ event: 'streak_broken', userId, interviewId, streak: streakResult.newStreak });
+    trackProductEventServer({ event: 'streak_broken', userId, interviewId, streak: streakResult.newStreak });
   }
 
   const { data: userRow } = await supabase
@@ -406,6 +407,14 @@ export async function processInterviewRetention(
     },
     { ga4: false },
   );
+
+  void applyReferralBonus(supabase, userId).catch((err) => {
+    logger.error('referral_apply_failed', {
+      userId,
+      interviewId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+  });
 
   const { data: afterUnlockProg } = await supabase
     .from('user_progress')

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AdminTopBar } from '@/components/admin/AdminTopBar';
 import { privatePageMetadata } from '@/lib/seo/metadata';
+import { isPlatformAdminUser } from '@/lib/admin/auth';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export const metadata: Metadata = privatePageMetadata({
@@ -15,8 +16,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  // Only campus_admin plan_tier users can access /admin/*.
-  // Platform admins (founders) use /platform/* instead.
   const svc = createServiceClient();
   const { data: profile } = await svc
     .from('users')
@@ -25,6 +24,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .single();
 
   if (profile?.plan_tier !== 'campus_admin') {
+    if (await isPlatformAdminUser(user.id, user.email)) {
+      redirect('/college/dashboard');
+    }
     redirect('/dashboard');
   }
 

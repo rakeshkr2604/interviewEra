@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
@@ -179,8 +180,9 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
 
         <Reveal delay={0.15}>
           <div className="mt-10 text-center sm:mt-12">
-            <Link
+            <StartFreeCtaLink
               href={cta}
+              section="home_midfold_flow_cta"
               className="v3-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-[15px] font-semibold no-underline"
               style={{
                 color: '#fff',
@@ -188,7 +190,7 @@ function FlowSection({ isLoggedIn }: { isLoggedIn: boolean }) {
               }}
             >
               Start Free
-            </Link>
+            </StartFreeCtaLink>
             <p className="mt-3 text-[13.5px]" style={{ color: T.text2 }}>
               No credit card required · under 60 seconds to your first score
             </p>

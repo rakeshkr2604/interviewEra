@@ -6,18 +6,16 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
-import { cn } from '@/lib/utils';
+import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
+import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
+import {
+  IE_FIELD_GROUP_CLASS,
+  IE_FIELD_SURFACE_STYLE,
+  IE_INPUT_CLASS,
+  IE_LABEL_CLASS,
+} from '@/lib/theme/component-classes';
 
-const inputClass = cn(
-  'w-full rounded-xl border-2 px-4 py-2.5 text-sm shadow-none transition-[color,box-shadow]',
-  'focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-);
-
-const fieldSurface = {
-  borderColor: 'var(--card-border)',
-  background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-  color: 'var(--text-primary)',
-} as const;
+const fieldSurface = IE_FIELD_SURFACE_STYLE;
 
 export function ResetPasswordForm() {
   const [password, setPassword] = useState('');
@@ -127,8 +125,8 @@ export function ResetPasswordForm() {
       headerBadge={<ThemeToggle />}
     >
       <form onSubmit={handleSubmit} className="space-y-4 p-5 sm:p-6">
-        <div className="space-y-2">
-          <label htmlFor="new-password" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <label htmlFor="new-password" className={IE_LABEL_CLASS}>
             New password
           </label>
           <input
@@ -140,13 +138,14 @@ export function ResetPasswordForm() {
             minLength={8}
             required
             autoComplete="new-password"
-            className={inputClass}
+            className={IE_INPUT_CLASS}
             style={fieldSurface}
+            aria-invalid={error ? true : undefined}
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="confirm-password" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <label htmlFor="confirm-password" className={IE_LABEL_CLASS}>
             Confirm password
           </label>
           <input
@@ -158,36 +157,17 @@ export function ResetPasswordForm() {
             minLength={8}
             required
             autoComplete="new-password"
-            className={inputClass}
+            className={IE_INPUT_CLASS}
             style={fieldSurface}
+            aria-invalid={error ? true : undefined}
           />
         </div>
 
-        {error ? (
-          <p
-            className="rounded-xl border-2 px-4 py-3 text-sm font-medium"
-            role="alert"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--accent-danger) 35%, var(--card-border))',
-              background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
-              color: 'var(--accent-danger)',
-            }}
-          >
-            {error}
-          </p>
-        ) : null}
+        {error ? <AuthErrorBanner message={error} /> : null}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="landing-cta-lift inline-flex h-12 w-full items-center justify-center rounded-[14px] px-8 text-base font-semibold text-white disabled:pointer-events-none disabled:opacity-60 sm:h-[3.25rem]"
-          style={{
-            background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-            boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-          }}
-        >
-          {loading ? 'Updating…' : 'Update password'}
-        </button>
+        <FormSubmitButton loading={loading} loadingLabel="Updating…">
+          Update password
+        </FormSubmitButton>
       </form>
     </FreeToolFormCard>
   );

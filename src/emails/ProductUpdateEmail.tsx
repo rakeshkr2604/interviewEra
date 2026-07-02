@@ -34,7 +34,6 @@ export default function ProductUpdateEmail(props: Partial<ProductUpdateEmailProp
     name,
     creditsAdded,
     interviewUrl,
-    feedbackUrl,
     previewImageUrl,
     showPreviewImage,
     unsubscribeUrl,

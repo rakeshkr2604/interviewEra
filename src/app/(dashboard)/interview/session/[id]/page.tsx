@@ -66,9 +66,11 @@ import { trackFunnelEvent } from '@/lib/analytics/funnel'
 import { trackMockInterviewCompletedGa4 } from '@/lib/analytics/funnel-ga4-bridge'
 import type { FunnelCompleteGa4Payload } from '@/lib/analytics/funnel-ga4-bridge'
 import { trackProductEventClient } from '@/lib/analytics/product-events'
+import { trackInterviewEventClient } from '@/lib/analytics/interview-events'
 import { useInterviewTelemetry } from '@/hooks/useInterviewTelemetry'
 import { useInterviewRecovery } from '@/hooks/useInterviewRecovery'
 import { useInterviewDraft } from '@/hooks/useInterviewDraft'
+import { useInterviewCheckpoint } from '@/hooks/useInterviewCheckpoint'
 import { useVoiceInterviewRecovery } from '@/hooks/useVoiceInterviewRecovery'
 import { VoiceRecoveryBanner } from '@/components/interview/VoiceRecoveryBanner'
 import { InterviewStartupRecoveryPanel } from '@/components/interview/InterviewStartupRecoveryPanel'
@@ -80,6 +82,13 @@ import {
 } from '@/lib/telemetry/startup-reliability-policy'
 import type { StartupStage } from '@/lib/telemetry/interview-startup-telemetry'
 import type { InterviewDraft, DraftPhase } from '@/lib/session/interview-draft'
+import {
+  snapshotToDraftForRestore,
+  type SubmittedAnswerPayload,
+  type InterviewResumeSnapshot,
+  type ResumeSnapshotPhase,
+  type InterviewResumeSnapshotInput,
+} from '@/lib/session/interview-resume-snapshot'
 
 const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
@@ -187,6 +196,10 @@ interface InterviewData {
   difficulty: 'beginner' | 'intermediate' | 'advanced'
   answeredCount: number
   currentQuestionIndex: number
+  status?: string
+  isResume?: boolean
+  resumeSnapshot?: InterviewResumeSnapshot | null
+  submittedAnswers?: SubmittedAnswerPayload[]
   questions: InterviewQuestion[]
   creditsLeft?: number
   preparing?: boolean
@@ -349,7 +362,7 @@ export default function InterviewSessionPage() {
 
   // ─── Deepgram Microphone (Deepgram mode) ──────────────────
   const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
-    useMicrophone()
+    useMicrophone(interviewId)
 
   // ─── Timer ────────────────────────────────────────────────
   const { timeLeft, start: startTimer, stop: stopTimer, reset: resetTimer } =
@@ -580,10 +593,12 @@ export default function InterviewSessionPage() {
     reconcile: reconcileDraft,
     setUnloadGuard: setDraftUnloadGuard,
   } = useInterviewDraft(interviewId)
+  const { persistCheckpoint, flushCheckpoint } = useInterviewCheckpoint(interviewId)
   // Holds a reconciled draft between the load fetch and the startup→runtime
   // handoff, so a refresh restores the in-progress answer (transcript + timer)
   // instead of restarting the question from the server's answeredCount.
   const pendingRestoreRef = useRef<InterviewDraft | null>(null)
+  const isResumeSessionRef = useRef(false)
 
   // ── Stale-closure-proof mirrors (audit P1 #5: watchdog stale closures) ──
   // The mic-startup watchdog reads these via refs so its 5s deadline is measured
@@ -613,8 +628,9 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     if (voiceRecovery.isActive) return
     if (webSpeechFallbackLockedRef.current) return
+    if (inputMode === 'text') return
     if (permissionState === 'denied') {
-      if (inputMode !== 'text') setInputMode('text')
+      setInputMode('text')
       return
     }
     const preferred = resolvePreferredVoiceInputMode()
@@ -749,34 +765,89 @@ export default function InterviewSessionPage() {
           return
         }
         setInterviewData(result.data)
+        isResumeSessionRef.current = result.data.isResume === true
         const restoredIndex = Math.min(
           result.data.currentQuestionIndex ?? result.data.answeredCount ?? 0,
-          Math.max(0, result.data.questions.length - 1)
+          Math.max(0, result.data.questions.length - 1),
         )
         setCurrentIndex(restoredIndex)
+
+        if (result.data.submittedAnswers?.length) {
+          setAnswers(
+            result.data.submittedAnswers.map((a) => ({
+              questionId: a.questionId,
+              transcript: a.transcript,
+              durationSeconds: a.durationSeconds,
+              fillerAnalysis: {
+                count: 0,
+                ratePerMinute: 0,
+                severity: 'safe' as const,
+                words: [],
+              },
+              submittedAt: a.submittedAt,
+            })),
+          )
+        }
+
+        if (result.data.resumeSnapshot?.followUpForIndex !== undefined) {
+          followUpForIndexRef.current = result.data.resumeSnapshot.followUpForIndex
+        }
+
         interviewStartupLog('question_loaded', {
           interviewId,
           questionCount: result.data.questions.length,
           restoredIndex,
+          isResume: result.data.isResume,
         })
         track('INTERVIEW_FLOW', 'interview_loaded', {
           questionCount: result.data.questions.length,
           restoredIndex,
+          isResume: result.data.isResume,
         })
-        // ── Refresh recovery (audit P0) ──────────────────────────────────────
-        // If a refresh interrupted an in-progress answer for THIS question,
-        // stage the draft so the startup→runtime handoff restores the
-        // transcript + timer instead of restarting the question. Reconciliation
-        // discards drafts the server has already moved past (answer submitted
-        // before the refresh) so an answered question is never replayed.
+        if (result.data.isResume) {
+          trackInterviewEventClient('interview_resumed', {
+            interviewId,
+            questionIndex: restoredIndex,
+            source: 'session_load',
+          })
+        }
+        // ── Refresh / History resume recovery ─────────────────────────────────
         const reconciliation = reconcileDraft(restoredIndex)
+        const serverDraft: InterviewDraft | null = result.data.resumeSnapshot
+          ? {
+              ...snapshotToDraftForRestore(result.data.resumeSnapshot, interviewId),
+              version: 1,
+              updatedAt: Date.parse(result.data.resumeSnapshot.updatedAt) || Date.now(),
+              lastFeedback: result.data.resumeSnapshot.lastFeedback,
+            }
+          : null
         if (reconciliation.action === 'restore') {
-          pendingRestoreRef.current = reconciliation.draft
-          track('INTERVIEW_FLOW', 'draft_restore_staged', {
+          const preferServer =
+            Boolean(serverDraft) &&
+            result.data.isResume &&
+            serverDraft!.updatedAt >= reconciliation.draft.updatedAt
+          pendingRestoreRef.current = preferServer ? serverDraft! : reconciliation.draft
+          trackInterviewEventClient('interview_recovered', {
+            interviewId,
+            questionIndex: restoredIndex,
+            source: preferServer ? 'server_checkpoint' : 'draft_restore',
+          })
+          track('INTERVIEW_FLOW', preferServer ? 'server_resume_staged' : 'draft_restore_staged', {
             restoredIndex,
-            draftPhase: reconciliation.draft.phase,
-            transcriptLen: reconciliation.draft.transcript.length,
-            timerRemaining: reconciliation.draft.timerRemaining,
+            draftPhase: pendingRestoreRef.current.phase,
+            skipCount: pendingRestoreRef.current.skipCount,
+          })
+        } else if (result.data.isResume && serverDraft) {
+          pendingRestoreRef.current = serverDraft
+          trackInterviewEventClient('interview_recovered', {
+            interviewId,
+            questionIndex: restoredIndex,
+            source: 'server_checkpoint',
+          })
+          track('INTERVIEW_FLOW', 'server_resume_staged', {
+            restoredIndex,
+            draftPhase: serverDraft.phase,
+            skipCount: serverDraft.skipCount,
           })
         } else if (reconciliation.reason !== 'no_draft') {
           track('INTERVIEW_FLOW', 'draft_discarded', {
@@ -952,6 +1023,27 @@ export default function InterviewSessionPage() {
     const restore = pendingRestoreRef.current
     if (restore && restore.questionIndex === currentIndex) {
       pendingRestoreRef.current = null
+
+      if (restore.phase === 'feedback') {
+        setSkipCount(restore.skipCount)
+        setPendingFollowUp(
+          restore.pendingFollowUp
+            ? {
+                text: restore.pendingFollowUp.text,
+                tone: restore.pendingFollowUp.tone as InterviewerTone,
+              }
+            : null,
+        )
+        if (restore.lastFeedback) setLastFeedback(restore.lastFeedback)
+        setPhase('feedback')
+        phaseRef.current = 'feedback'
+        track('INTERVIEW_FLOW', 'feedback_restored', {
+          questionIndex: currentIndex,
+          hasFollowUp: Boolean(restore.pendingFollowUp),
+        })
+        return
+      }
+
       const budget = restore.timerBudget > 0 ? restore.timerBudget : TIME_PER_QUESTION
       const hasSavedAnswer = restore.transcript.trim().length > 0
       const remaining =
@@ -960,9 +1052,13 @@ export default function InterviewSessionPage() {
           : restore.timerRemaining > 0
             ? Math.min(restore.timerRemaining, budget)
             : budget
-      const voiceRecoveryActive = voiceRecovery.beginFromDraft(restore, currentIndex)
+      const voiceRecoveryActive =
+        restore.inputMode !== 'text' && voiceRecovery.beginFromDraft(restore, currentIndex)
       const modeForSession = resolvePreferredVoiceInputMode()
-      if (voiceRecoveryActive) {
+      if (restore.inputMode === 'text') {
+        setInputMode('text')
+        setManualAnswer(restore.transcript)
+      } else if (voiceRecoveryActive) {
         setInputMode(modeForSession)
         if (modeForSession === 'deepgram') {
           setDgTranscript(restore.transcript)
@@ -1039,6 +1135,11 @@ export default function InterviewSessionPage() {
 
       trackFunnelEvent('mock_interview_started', {
         userId,
+        interviewId,
+        role: interviewData.role,
+        source: 'live_session',
+      })
+      trackInterviewEventClient('interview_started', {
         interviewId,
         role: interviewData.role,
         source: 'live_session',
@@ -1515,6 +1616,11 @@ export default function InterviewSessionPage() {
         {
           onPartial: (chunk) => {
             if (!mountedRef.current) return
+            voiceDebug('TRANSCRIPT_UPDATED', {
+              interview_id: interviewId,
+              is_final: chunk.isFinal,
+              chars: chunk.text.length,
+            })
             if (chunk.isFinal) {
               setDgTranscript((prev) => prev + chunk.text + ' ')
               setDgInterim('')
@@ -1962,17 +2068,42 @@ export default function InterviewSessionPage() {
   // latest version of handleSubmitAnswer (avoids stale closure + forward-ref issue).
   useEffect(() => { handleSubmitAnswerRef.current = handleSubmitAnswer }, [handleSubmitAnswer])
 
-  // ─── Draft persistence (audit P0 refresh safety) ──────────
-  // Persist in-progress work while the candidate is actively answering — the
-  // only window a refresh can destroy unsaved work. `answerText` in the deps
-  // captures live transcript edits; `timeLeft` gives second-accurate timer
-  // restore. Writes are cheap (one small JSON to localStorage) and idempotent.
-  //
-  // We deliberately do NOT persist avatar_speaking / submitting / feedback: a
-  // refresh during those either re-asks the question (best UX) or — once the
-  // answer is server-persisted — is discarded by reconciliation. Restricting to
-  // candidate_answering also means clearDraft() on submit (phase → feedback) is
-  // never re-overwritten by this effect.
+  // ─── Draft + server checkpoint persistence ─────────────────
+  const buildCheckpointPayload = useCallback((): InterviewResumeSnapshotInput => {
+    const checkpointPhase: ResumeSnapshotPhase =
+      phase === 'candidate_answering'
+        ? 'candidate_answering'
+        : phase === 'submitting'
+          ? 'submitting'
+          : phase === 'feedback'
+            ? 'feedback'
+            : 'avatar_speaking'
+    return {
+      questionIndex: currentIndex,
+      phase: checkpointPhase,
+      transcript: checkpointPhase === 'feedback' ? '' : resolveSubmittedText(),
+      timerRemaining: timeLeft,
+      timerBudget: answerTimeBudget,
+      skipCount,
+      pendingFollowUp: pendingFollowUp
+        ? { text: pendingFollowUp.text, tone: pendingFollowUp.tone }
+        : null,
+      inputMode,
+      followUpForIndex: followUpForIndexRef.current,
+      ...(checkpointPhase === 'feedback' && lastFeedback ? { lastFeedback } : {}),
+    }
+  }, [
+    phase,
+    currentIndex,
+    resolveSubmittedText,
+    timeLeft,
+    answerTimeBudget,
+    skipCount,
+    pendingFollowUp,
+    inputMode,
+    lastFeedback,
+  ])
+
   useEffect(() => {
     if (!interviewData) return
     if (phase !== 'candidate_answering') return
@@ -1989,9 +2120,26 @@ export default function InterviewSessionPage() {
         : null,
       inputMode,
     })
+    persistCheckpoint(buildCheckpointPayload())
   }, [
     interviewData, phase, currentIndex, timeLeft, answerTimeBudget, skipCount,
     pendingFollowUp, inputMode, answerText, resolveSubmittedText, persistDraft, interviewId,
+    persistCheckpoint, buildCheckpointPayload,
+  ])
+
+  useEffect(() => {
+    if (!interviewData) return
+    if (phase !== 'feedback') return
+    persistCheckpoint(buildCheckpointPayload())
+  }, [
+    interviewData,
+    phase,
+    currentIndex,
+    skipCount,
+    pendingFollowUp,
+    lastFeedback,
+    persistCheckpoint,
+    buildCheckpointPayload,
   ])
 
   // beforeunload guard — only while there is genuine in-progress work, so a
@@ -2144,7 +2292,8 @@ export default function InterviewSessionPage() {
   // ─── Skip Question ────────────────────────────────────────
   const handleSkip = useCallback(() => {
     if (skipCount >= MAX_SKIPS || phase !== 'candidate_answering') return
-    setSkipCount(prev => prev + 1)
+    const nextSkip = skipCount + 1
+    setSkipCount(nextSkip)
     stopTimer()
     voiceDebug('stop_listening_triggered', { source: 'skip' })
     stopListening('phase_change')
@@ -2156,16 +2305,26 @@ export default function InterviewSessionPage() {
     setDgInterim('')
     setLastFeedback('')
     setLastFillerAnalysis(null)
-    // Skipping abandons the question — discard any queued follow-up so it
-    // doesn't leak into the next static question.
     setPendingFollowUp(null)
 
     if (!interviewData) return
     const isLast = currentIndex >= interviewData.questions.length - 1
     if (isLast) { handleCompleteInterview(); return }
-    setCurrentIndex(prev => prev + 1)
+    const nextIndex = currentIndex + 1
+    setCurrentIndex(nextIndex)
+    void flushCheckpoint({
+      questionIndex: nextIndex,
+      phase: 'avatar_speaking',
+      transcript: '',
+      timerRemaining: TIME_PER_QUESTION,
+      timerBudget: TIME_PER_QUESTION,
+      skipCount: nextSkip,
+      pendingFollowUp: null,
+      inputMode,
+      followUpForIndex: -1,
+    })
     goToInterviewerTurn()
-  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, elStop, stopDgListening, resetTranscript, handleCompleteInterview, goToInterviewerTurn])
+  }, [skipCount, phase, currentIndex, interviewData, stopTimer, stopListening, elStop, stopDgListening, resetTranscript, handleCompleteInterview, goToInterviewerTurn, flushCheckpoint, inputMode])
 
   // ─── Retry (re-speak current question) ───────────────────
   const handleRetry = useCallback(() => {
@@ -2505,6 +2664,9 @@ export default function InterviewSessionPage() {
       type="button"
       onClick={() => {
         if (window.confirm('Exit this interview? Your progress on this question will be lost.')) {
+          void fetch(`/api/interview/${interviewId}/abandon`, { method: 'POST' }).catch(() => {})
+          trackInterviewEventClient('interview_abandoned', { interviewId, source: 'exit_button' })
+          clearDraft()
           router.push('/dashboard')
         }
       }}

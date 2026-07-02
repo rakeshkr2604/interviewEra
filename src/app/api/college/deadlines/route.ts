@@ -1,30 +1,13 @@
-import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { requireCampusAuth, isAuthError } from '@/lib/college/api-auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const auth = await requireCampusAuth('deadlines:manage');
+    if (isAuthError(auth)) return auth;
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const serviceClient = createServiceClient();
-
-    const { data: org } = await serviceClient
-      .from('campus_organizations')
-      .select('id')
-      .eq('admin_user_id', user.id)
-      .single();
-
-    if (!org) {
-      return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
-    }
+    const serviceClient = await import('@/lib/supabase/server').then((m) => m.createServiceClient());
 
     const { description, type, targetValue, dueDate, mandatory } = await request.json();
 
@@ -42,7 +25,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { error: insertError } = await serviceClient.from('college_deadlines').insert({
-      college_id: org.id,
+      college_id: auth.org.id,
       deadline_type: type,
       target_value: numTarget,
       due_date: dueDate,

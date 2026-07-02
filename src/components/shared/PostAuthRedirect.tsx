@@ -18,6 +18,12 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { isSafePath } from '@/lib/auth/auth-params';
+import { isAuthV2Enabled } from '@/lib/auth/flags';
+import {
+  extractInviteTokenFromNext,
+  resolveDestinationFromTier,
+} from '@/lib/auth/resolve-destination-core';
 
 const STORAGE_KEY = 'auth_redirect';
 
@@ -39,13 +45,35 @@ export function PostAuthRedirect() {
       const supabase = createClient();
       const {
         data: { subscription },
-      } = supabase.auth.onAuthStateChange((event) => {
+      } = supabase.auth.onAuthStateChange(async (event) => {
         if (event !== 'SIGNED_IN') return;
         const pending = sessionStorage.getItem(STORAGE_KEY);
         if (!pending) return;
         sessionStorage.removeItem(STORAGE_KEY);
-        // Validate: only same-origin paths, no open redirect
-        if (pending.startsWith('/') && !pending.startsWith('//')) router.push(pending);
+
+        if (!isSafePath(pending)) return;
+
+        if (isAuthV2Enabled()) {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user) {
+            const { data: profile } = await supabase
+              .from('users')
+              .select('plan_tier')
+              .eq('id', user.id)
+              .single();
+            const inviteToken = extractInviteTokenFromNext(pending);
+            const destination = resolveDestinationFromTier(profile?.plan_tier, {
+              next: pending,
+              inviteToken,
+            });
+            router.push(destination);
+            return;
+          }
+        }
+
+        router.push(pending);
       });
       unsubscribe = () => subscription.unsubscribe();
     })();

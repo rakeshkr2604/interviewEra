@@ -22,6 +22,8 @@ export interface StarSampleAnswer {
 export interface StarTopicDefinition {
   readonly slug: string
   readonly label: string
+  /** Shorter label for SERP title segments when `label` exceeds limits. */
+  readonly shortLabel?: string
   /** The behavioral question interviewers commonly ask for this topic. */
   readonly questionPrompt: string
   /** 1–2 sentence meta description. */
@@ -319,6 +321,7 @@ export const STAR_TOPICS = [
   {
     slug: 'mentoring',
     label: 'Mentoring & Developing Others',
+    shortLabel: 'Mentoring',
     questionPrompt: 'Tell me about a time you mentored or helped develop a colleague or junior team member.',
     description: 'STAR answer for mentoring questions — structured example for engineering, management, and leadership interviews.',
     sitemapPriority: 0.78,

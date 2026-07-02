@@ -5,17 +5,8 @@
  *
  * Consolidates logic previously spread across `audio-gesture.ts`,
  * `useMicrophone.ts`, and `useVoicePlayer.ts` so that — per audit Phase 6 —
- * exactly one object touches `AudioContext`, `MediaStream`, ScriptProcessor,
- * and `AudioBufferSourceNode`. The manager above owns policy; this owns plumbing.
- *
- * Two AudioContexts are used by design: a shared playback context (native rate,
- * required by `decodeAudioData`) and a dedicated 16 kHz capture context (the
- * rate Deepgram expects). Both are disposed by `dispose()`. This is still a
- * single owner — there is no other code path that creates audio contexts.
- *
- * NOTE: ScriptProcessorNode is retained for cross-browser PCM access to match
- * existing production behaviour; migration to AudioWorklet is tracked for the
- * performance pass (audit Phase 11) and isolated to this file.
+ * exactly one object touches `AudioContext`, `MediaStream`, AudioWorklet /
+ * ScriptProcessor fallback, and `AudioBufferSourceNode`.
  */
 import {
   needsAudioGestureUnlock,
@@ -24,8 +15,11 @@ import {
   resumeSharedInterviewAudioContext,
   releaseAudioForMicCapture,
   closeSharedInterviewAudioContext,
+  registerCaptureAudioContext,
+  unregisterCaptureAudioContext,
 } from '@/lib/voice/audio-gesture'
 import { getMicAudioConstraints } from '@/lib/settings/client-preferences'
+import { createPcmCaptureGraph } from '@/lib/voice/audio/pcm-capture-graph'
 import { createVoiceLogger } from '@/lib/voice/core/observability'
 import type {
   AudioDriver,
@@ -36,18 +30,8 @@ import type {
 } from '@/lib/voice/audio/audio-driver'
 
 const CAPTURE_SAMPLE_RATE = 16_000
-const SCRIPT_PROCESSOR_BUFFER = 4_096
 
 const log = createVoiceLogger('audio-driver')
-
-function floatToInt16(input: Float32Array): ArrayBuffer {
-  const out = new Int16Array(input.length)
-  for (let i = 0; i < input.length; i++) {
-    const s = Math.max(-1, Math.min(1, input[i]))
-    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff
-  }
-  return out.buffer
-}
 
 export class BrowserAudioDriver implements AudioDriver {
   private captureStream: MediaStream | null = null
@@ -73,25 +57,27 @@ export class BrowserAudioDriver implements AudioDriver {
 
     const ctx = new AudioContext({ sampleRate: CAPTURE_SAMPLE_RATE })
     this.captureContext = ctx
-    const source = ctx.createMediaStreamSource(stream)
-    const processor = ctx.createScriptProcessor(SCRIPT_PROCESSOR_BUFFER, 1, 1)
-
-    processor.onaudioprocess = (e: AudioProcessingEvent) => {
-      const channel = e.inputBuffer.getChannelData(0)
-      onPcm(floatToInt16(channel))
+    registerCaptureAudioContext(ctx)
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume()
+      } catch {
+        log.warn('capture_context_resume_failed', null, { state: ctx.state })
+      }
+    }
+    if (ctx.state === 'running') {
+      log.info('capture_context_ready', null, { sampleRate: ctx.sampleRate, state: ctx.state })
     }
 
-    // ScriptProcessor must be wired into the graph to fire, routed through a
-    // silent gain so mic audio is never played back through the speakers.
-    const silentSink = ctx.createGain()
-    silentSink.gain.value = 0
-    source.connect(processor)
-    processor.connect(silentSink)
-    silentSink.connect(ctx.destination)
+    const captureGraph = await createPcmCaptureGraph(ctx, stream, onPcm, {
+      onModeSelected: (mode) => {
+        log.info('capture_mode_selected', null, { mode })
+      },
+    })
 
     this.installCaptureVisibilityResume(ctx)
 
-    log.info('capture_started', null, { sampleRate: ctx.sampleRate })
+    log.info('capture_started', null, { sampleRate: ctx.sampleRate, mode: captureGraph.mode })
 
     let stopped = false
     return {
@@ -99,17 +85,7 @@ export class BrowserAudioDriver implements AudioDriver {
         if (stopped) return
         stopped = true
         try {
-          processor.disconnect()
-        } catch {
-          /* */
-        }
-        try {
-          source.disconnect()
-        } catch {
-          /* */
-        }
-        try {
-          silentSink.disconnect()
+          captureGraph.disconnect()
         } catch {
           /* */
         }
@@ -118,6 +94,7 @@ export class BrowserAudioDriver implements AudioDriver {
         } catch {
           /* */
         }
+        unregisterCaptureAudioContext(ctx)
         try {
           void ctx.close()
         } catch {
@@ -247,6 +224,7 @@ export class BrowserAudioDriver implements AudioDriver {
     if (this.captureContext) {
       try {
         this.removeCaptureVisibilityResume()
+        unregisterCaptureAudioContext(this.captureContext)
         await this.captureContext.close()
       } catch {
         /* */

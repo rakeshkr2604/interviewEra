@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ensurePublicUserRow } from '@/lib/supabase/ensure-public-user';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import {
   extractText,
   normalizeFileName,
@@ -270,20 +270,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     console.log('[UPLOAD_STAGE] rate_limit_start', { reqId });
-    const rateLimit = await checkRateLimit(`upload:${user.id}`, 300, 5);
+    const rateLimit = await checkRateLimit(`upload:${user.id}`, 300, 5, { failClosed: true });
     console.log('[UPLOAD_STAGE] rate_limit_done', { reqId, allowed: rateLimit.allowed });
-    if (!rateLimit.allowed) {
+    const blocked = buildRateLimitHttpResponse(
+      rateLimit,
+      'Too many uploads. Please wait a few minutes before trying again.',
+    );
+    if (blocked) {
       return jsonWithReq(
         {
-          error: 'Too many uploads. Please wait a few minutes before trying again.',
-          code: 'UPLOAD_RATE_LIMIT',
+          ...blocked.body,
+          code: rateLimit.redisUnavailable ? 'UPLOAD_RATE_LIMIT_UNAVAILABLE' : 'UPLOAD_RATE_LIMIT',
         },
-        429,
+        blocked.status,
         reqId,
-        {
-          'Retry-After': String(rateLimit.resetInSeconds),
-          'X-RateLimit-Remaining': '0',
-        },
+        blocked.headers,
       );
     }
 

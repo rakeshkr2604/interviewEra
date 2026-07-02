@@ -17,6 +17,7 @@
  *   date_from   (ISO date string)
  *   date_to     (ISO date string)
  *   label       (one of the FeedbackLabel values, e.g. 'Mobile')
+ *   email_status ('pending' | 'sent' | 'failed' | 'retrying' | '')
  *   sort        ('newest' | 'oldest' | 'rating_asc' | 'rating_desc' | 'severity', default 'newest')
  *
  * Secured: platform admin only (ADMIN_EMAILS env var).
@@ -63,6 +64,7 @@ export interface DashboardStats {
   unread: number;
   unresolved: number;
   critical_and_high: number;
+  failed_email_count: number;
 }
 
 export interface FeedbackListResponse {
@@ -110,16 +112,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   const dateFrom      = searchParams.get('date_from') ?? '';
   const dateTo        = searchParams.get('date_to') ?? '';
   const labelFilter   = searchParams.get('label') ?? '';
+  const emailStatus   = searchParams.get('email_status') ?? '';
   const sort          = searchParams.get('sort') ?? 'newest';
 
   const service = createServiceClient();
 
   // ── Stats (global, unaffected by current filters) ─────────────────────────
-  const [totalRes, unreadRes, unresolvedRes, criticalRes] = await Promise.all([
+  const [totalRes, unreadRes, unresolvedRes, criticalRes, failedEmailRes] = await Promise.all([
     service.from('feedbacks').select('*', { count: 'exact', head: true }).eq('is_archived', false),
     service.from('feedbacks').select('*', { count: 'exact', head: true }).eq('is_archived', false).eq('is_read', false),
     service.from('feedbacks').select('*', { count: 'exact', head: true }).eq('is_archived', false).eq('is_resolved', false),
     service.from('feedbacks').select('*', { count: 'exact', head: true }).eq('is_archived', false).in('severity', ['critical', 'high']),
+    service.from('feedbacks').select('*', { count: 'exact', head: true }).eq('email_status', 'failed'),
   ]);
 
   const stats: DashboardStats = {
@@ -127,6 +131,7 @@ export async function GET(request: Request): Promise<NextResponse> {
     unread:            unreadRes.count   ?? 0,
     unresolved:        unresolvedRes.count ?? 0,
     critical_and_high: criticalRes.count ?? 0,
+    failed_email_count: failedEmailRes.count ?? 0,
   };
 
   // ── Build paginated list query ─────────────────────────────────────────────
@@ -149,6 +154,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (dateFrom)               query = query.gte('created_at', dateFrom);
   if (dateTo)                 query = query.lte('created_at', dateTo + 'T23:59:59Z');
   if (labelFilter)            query = query.contains('labels', [labelFilter]);
+  if (emailStatus)            query = query.eq('email_status', emailStatus);
 
   // Full-text search across multiple text columns
   if (q) {

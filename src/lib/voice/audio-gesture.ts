@@ -8,6 +8,46 @@ import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 
 let sharedAudioContext: AudioContext | null = null
 
+/** Dedicated 16 kHz capture contexts (production useMicrophone + v2 driver). */
+const captureAudioContexts = new Set<AudioContext>()
+
+/** @internal Test-only reset for module-scoped capture context registry. */
+export function __clearCaptureAudioContextsForTests(): void {
+  captureAudioContexts.clear()
+}
+
+export function registerCaptureAudioContext(ctx: AudioContext): void {
+  if (ctx.state !== 'closed') captureAudioContexts.add(ctx)
+}
+
+export function unregisterCaptureAudioContext(ctx: AudioContext): void {
+  captureAudioContexts.delete(ctx)
+}
+
+/** Resume every live capture context after tab/lock-screen backgrounding. */
+export async function resumeCaptureAudioContext(): Promise<boolean> {
+  let anyRunning = false
+  for (const ctx of [...captureAudioContexts]) {
+    if (ctx.state === 'closed') {
+      captureAudioContexts.delete(ctx)
+      continue
+    }
+    if (ctx.state === 'suspended') {
+      try {
+        await ctx.resume()
+      } catch {
+        interviewFlowLog('audio', 'capture_audiocontext_resume_failed', { state: ctx.state })
+        continue
+      }
+    }
+    if (ctx.state === 'running') {
+      anyRunning = true
+      interviewFlowLog('audio', 'capture_audiocontext_resumed', { state: ctx.state })
+    }
+  }
+  return anyRunning
+}
+
 /**
  * True when TTS/Web Audio needs an in-page tap before the first speak().
  * All iOS browsers (Safari, CriOS, Edge, Firefox, in-app WebViews) use WebKit

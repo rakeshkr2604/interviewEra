@@ -107,16 +107,62 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
         }
 
         const data = await parseResponseJsonSafe<{
-          parsedSummary: ParsedSummary | null;
+          parsedSummary?: ParsedSummary | null;
           parsed: boolean;
           resumeId?: string;
+          extractionWarning?: string;
         }>(res);
-        if (data.resumeId) {
-          trackResumeUploadedGa4(data.resumeId, { source: 'upload_zone' });
+        if (!data.resumeId) {
+          setStatus('error');
+          setErrorMessage('Upload succeeded but resume id is missing. Please retry.');
+          return;
         }
-        if (data.parsedSummary) {
-          setParsedSummary(data.parsedSummary);
+
+        trackResumeUploadedGa4(data.resumeId, { source: 'upload_zone' });
+
+        setStatus('parsing');
+
+        const parseController = new AbortController();
+        const parseTimeout = window.setTimeout(() => parseController.abort(), 65_000);
+        try {
+          const parseRes = await fetch('/api/resume/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ resumeId: data.resumeId }),
+            signal: parseController.signal,
+          });
+
+          if (!parseRes.ok) {
+            const perr = await parseResponseJsonSafe<UploadErrorResponse>(parseRes);
+            setStatus('error');
+            setErrorMessage(
+              formatResumeUserFacingError(perr) ||
+                'We could not analyze this resume. Try a text-based PDF or a .txt export.',
+            );
+            return;
+          }
+
+          const parsed = await parseResponseJsonSafe<{
+            parsedSummary?: ParsedSummary;
+          }>(parseRes);
+          if (parsed.parsedSummary) {
+            setParsedSummary(parsed.parsedSummary);
+          }
+        } catch (parseErr) {
+          const aborted =
+            parseErr instanceof DOMException && parseErr.name === 'AbortError';
+          setStatus('error');
+          setErrorMessage(
+            aborted
+              ? 'Resume analysis timed out. Please retry — shorter resumes parse faster.'
+              : 'Could not start resume analysis. Check your connection and retry.',
+          );
+          return;
+        } finally {
+          window.clearTimeout(parseTimeout);
         }
+
         setStatus('success');
         router.refresh();
       } catch {
@@ -231,14 +277,20 @@ export function UploadZone({ initialResume }: UploadZoneProps) {
             <div className={IE_UPLOAD_ICON_SHELL_CLASS} style={IE_UPLOAD_ICON_SHELL_STYLE}>
               <FileUp className="size-6 sm:size-7" strokeWidth={1.5} aria-hidden />
             </div>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            <label
+              htmlFor="resume-upload-input"
+              className="text-sm font-medium"
+              style={{ color: 'var(--text-primary)' }}
+            >
               Drag & drop your resume (PDF or TXT, max 5 MB)
-            </p>
+            </label>
             <input
               ref={inputRef}
+              id="resume-upload-input"
               type="file"
               accept=".pdf,.txt"
               className="sr-only"
+              aria-label="Upload resume file (PDF or TXT, max 5 MB)"
               onChange={handleFileChange}
               disabled={isUploading}
             />

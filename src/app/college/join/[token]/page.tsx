@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { authPageMetadata } from '@/lib/seo/metadata';
 import { JoinInviteForm } from './JoinInviteForm';
+import { getEffectiveInviteStatus } from '@/lib/college/invites';
 
 export const metadata = authPageMetadata({
   title: 'Join Campus Program',
@@ -18,7 +19,7 @@ async function getInviteData(token: string) {
 
   const { data: invite, error } = await serviceClient
     .from('campus_invites')
-    .select('id, org_id, email, status, invited_at, accepted_at')
+    .select('id, org_id, email, status, invited_at, accepted_at, expires_at')
     .eq('token', token)
     .single();
 
@@ -26,8 +27,18 @@ async function getInviteData(token: string) {
     return { invite: null, org: null };
   }
 
+  const effectiveStatus = getEffectiveInviteStatus(invite);
+
   if (invite.status === 'accepted') {
-    return { invite, org: null, error: 'expired' };
+    return { invite, org: null, error: 'accepted' as const };
+  }
+
+  if (effectiveStatus === 'expired') {
+    return { invite, org: null, error: 'expired' as const };
+  }
+
+  if (effectiveStatus === 'revoked') {
+    return { invite, org: null, error: 'revoked' as const };
   }
 
   const { data: org } = await serviceClient
@@ -48,7 +59,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
 
   const { invite, org, error } = await getInviteData(token);
 
-  if (error === 'expired') {
+  if (error === 'accepted') {
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
         <div
@@ -59,7 +70,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
             className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
             style={{ background: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)' }}
           >
-            <span className="text-2xl">⏰</span>
+            <span className="text-2xl">✓</span>
           </div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Invitation Already Used</h1>
           <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
@@ -73,6 +84,32 @@ export default async function JoinInvitePage({ params }: PageProps) {
           >
             Sign In
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (error === 'expired' || error === 'revoked') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+        <div
+          className="w-full max-w-md rounded-2xl p-8 text-center"
+          style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+        >
+          <div
+            className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
+            style={{ background: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)' }}
+          >
+            <span className="text-2xl">{error === 'revoked' ? '🚫' : '⏰'}</span>
+          </div>
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {error === 'revoked' ? 'Invitation Revoked' : 'Invitation Expired'}
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            {error === 'revoked'
+              ? 'This invitation has been revoked by your T&P officer. Contact them for a new invitation.'
+              : 'This invitation link has expired. Contact your T&P officer for a new invitation.'}
+          </p>
         </div>
       </div>
     );

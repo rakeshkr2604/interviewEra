@@ -1,15 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Check, ChevronDown } from 'lucide-react';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import { IE_INPUT_CLASS, IE_SELECT_CLASS, IE_FIELD_SURFACE_STYLE, IE_LABEL_CLASS, IE_LABEL_OPTIONAL_CLASS, IE_FIELD_GROUP_CLASS } from '@/lib/theme/component-classes';
+import { AuthErrorBanner, FormSuccessBanner } from '@/components/auth/AuthErrorBanner';
+import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
 import { cn } from '@/lib/utils';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { displayNameSchema } from '@/lib/validations/schemas';
+import { isAuthV2Enabled } from '@/lib/auth/flags';
+import type { AuthIntent } from '@/lib/auth/auth-intent';
+import { OAuthButton } from '@/components/auth/OAuthButton';
+import { AuthDivider } from '@/components/auth/AuthDivider';
+import { AuthInterstitial } from '@/components/auth/AuthInterstitial';
+import { useOAuthSignIn } from '@/hooks/use-oauth-sign-in';
+import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -30,21 +41,9 @@ const PASSWORD_RULES = [
   { id: 'special', label: '1 special character', test: (p: string) => /[^A-Za-z0-9\s]/.test(p) },
 ] as const;
 
-const inputClass = cn(
-  'w-full rounded-xl border-2 px-4 py-2.5 text-sm shadow-none transition-[color,box-shadow]',
-  'focus-visible:border-[color-mix(in_srgb,var(--accent-primary)_45%,var(--card-border))] focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_25%,transparent)] focus-visible:outline-none',
-);
+const selectClass = cn(IE_SELECT_CLASS);
 
-const selectClass = cn(
-  inputClass,
-  'cursor-pointer appearance-none pr-10',
-);
-
-const fieldSurface = {
-  borderColor: 'var(--card-border)',
-  background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
-  color: 'var(--text-primary)',
-} as const;
+const fieldSurface = IE_FIELD_SURFACE_STYLE;
 
 /** Visual indicator; native `required` + `aria-required` announce requirement to AT. */
 function RequiredMark() {
@@ -73,11 +72,16 @@ function SelectShell({ id, label, children }: { id: string; label: string; child
 
 interface SignupFormProps {
   next?: string;
+  email?: string;
+  intent?: AuthIntent;
 }
 
-export function SignupForm({ next }: SignupFormProps) {
+export function SignupForm({ next, email: initialEmail, intent = 'candidate' }: SignupFormProps) {
+  const router = useRouter();
+  const { trackAuthStarted, trackSignupStarted, trackVerificationSent } = useAuthAnalytics();
+  const { signInWithGoogle, loading: oauthLoading } = useOAuthSignIn({ next, intent, flow: 'signup' });
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(initialEmail ?? '');
   const [password, setPassword] = useState('');
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [submitAttempted, setSubmitAttempted] = useState(false);
@@ -89,6 +93,22 @@ export function SignupForm({ next }: SignupFormProps) {
   const passwordChecks = PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) }));
   const passwordValid = passwordChecks.every((c) => c.met);
   const showPasswordChecklist = passwordFocused || password.length > 0;
+
+  useEffect(() => {
+    trackAuthStarted({ flow: 'signup', intent, source_page: '/signup' });
+  }, [trackAuthStarted, intent]);
+
+  useEffect(() => {
+    if (initialEmail) setEmail(initialEmail);
+  }, [initialEmail]);
+
+  async function handleGoogleSignup() {
+    try {
+      await signInWithGoogle();
+    } catch {
+      setFeedback({ kind: 'error', text: 'Failed to initiate Google sign-up. Please try again.' });
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -102,6 +122,7 @@ export function SignupForm({ next }: SignupFormProps) {
 
     setFeedback(null);
     setLoading(true);
+    trackSignupStarted({ flow: 'signup', intent, method: 'email' });
 
     try {
       const nameCheck = displayNameSchema.safeParse(name);
@@ -157,6 +178,16 @@ export function SignupForm({ next }: SignupFormProps) {
         });
       }
 
+      const emailDomain = email.includes('@') ? email.split('@')[1] : undefined;
+      trackVerificationSent({ intent, email_domain: emailDomain });
+
+      if (isAuthV2Enabled()) {
+        router.push(
+          `/auth/verify-pending?email=${encodeURIComponent(email)}&intent=${intent}`,
+        );
+        return;
+      }
+
       setFeedback({
         kind: 'success',
         text: signupBody.message ?? 'Account created! Check your email to confirm before signing in.',
@@ -169,7 +200,9 @@ export function SignupForm({ next }: SignupFormProps) {
   }
 
   return (
-    <FreeToolFormCard
+    <>
+      <AuthInterstitial visible={oauthLoading} />
+      <FreeToolFormCard
       headerEyebrow="Get started"
       headerTitle="Create your account"
       headerSubtitle="Start AI mock interviews tailored to your resume — free to begin."
@@ -187,8 +220,15 @@ export function SignupForm({ next }: SignupFormProps) {
           Required fields must be filled before you can create an account.
         </p>
 
-        <div className="space-y-2">
-          <label htmlFor="name" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <OAuthButton
+          loading={oauthLoading}
+          disabled={loading}
+          onClick={() => void handleGoogleSignup()}
+        />
+        <AuthDivider />
+
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <label htmlFor="name" className={IE_LABEL_CLASS}>
             Full name
             <RequiredMark />
           </label>
@@ -200,13 +240,13 @@ export function SignupForm({ next }: SignupFormProps) {
             required
             aria-required="true"
             autoComplete="name"
-            className={inputClass}
+            className={IE_INPUT_CLASS}
             style={fieldSurface}
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="email" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <label htmlFor="email" className={IE_LABEL_CLASS}>
             Email
             <RequiredMark />
           </label>
@@ -219,13 +259,13 @@ export function SignupForm({ next }: SignupFormProps) {
             required
             aria-required="true"
             autoComplete="email"
-            className={inputClass}
+            className={IE_INPUT_CLASS}
             style={fieldSurface}
           />
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="password" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <label htmlFor="password" className={IE_LABEL_CLASS}>
             Password
             <RequiredMark />
           </label>
@@ -246,7 +286,7 @@ export function SignupForm({ next }: SignupFormProps) {
             aria-describedby="password-requirements"
             aria-invalid={submitAttempted && !passwordValid}
             autoComplete="new-password"
-            className={inputClass}
+            className={IE_INPUT_CLASS}
             style={fieldSurface}
           />
 
@@ -299,10 +339,10 @@ export function SignupForm({ next }: SignupFormProps) {
           ) : null}
         </div>
 
-        <div className="space-y-2" role="group" aria-label="Expected placement date, optional">
-          <p className="text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+        <div className={IE_FIELD_GROUP_CLASS} role="group" aria-label="Expected placement date, optional">
+          <p className={IE_LABEL_CLASS}>
             Expected placement date{' '}
-            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+            <span className={IE_LABEL_OPTIONAL_CLASS}>
               (optional)
             </span>
           </p>
@@ -343,38 +383,16 @@ export function SignupForm({ next }: SignupFormProps) {
         </div>
 
         {feedback ? (
-          <p
-            className="rounded-xl border-2 px-4 py-3 text-sm font-medium"
-            role={feedback.kind === 'error' ? 'alert' : 'status'}
-            style={
-              feedback.kind === 'error'
-                ? {
-                    borderColor: 'color-mix(in srgb, var(--accent-danger) 35%, var(--card-border))',
-                    background: 'color-mix(in srgb, var(--accent-danger) 8%, transparent)',
-                    color: 'var(--accent-danger)',
-                  }
-                : {
-                    borderColor: 'color-mix(in srgb, var(--accent-success) 35%, var(--card-border))',
-                    background: 'color-mix(in srgb, var(--accent-success) 10%, transparent)',
-                    color: 'var(--text-primary)',
-                  }
-            }
-          >
-            {feedback.text}
-          </p>
+          feedback.kind === 'error' ? (
+            <AuthErrorBanner message={feedback.text} />
+          ) : (
+            <FormSuccessBanner message={feedback.text} />
+          )
         ) : null}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="landing-cta-lift mt-2 inline-flex h-12 w-full items-center justify-center rounded-[14px] px-8 text-base font-semibold text-white disabled:pointer-events-none disabled:opacity-60 sm:h-[3.25rem]"
-          style={{
-            background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-            boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-          }}
-        >
-          {loading ? 'Creating account…' : 'Create account'}
-        </button>
+        <FormSubmitButton loading={loading} loadingLabel="Creating account…">
+          Create account
+        </FormSubmitButton>
 
         <p className="pt-1 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
           Already have an account?{' '}
@@ -388,5 +406,6 @@ export function SignupForm({ next }: SignupFormProps) {
         </p>
       </form>
     </FreeToolFormCard>
+    </>
   );
 }

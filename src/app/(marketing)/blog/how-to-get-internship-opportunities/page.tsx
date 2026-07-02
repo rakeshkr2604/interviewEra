@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
+import { BlogStartFreeCta } from '@/components/analytics/BlogStartFreeCta';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import {
   BlogEditorialFaq,
@@ -523,8 +524,10 @@ export default function HowToGetInternshipOpportunitiesPage() {
                 Practice explaining projects, answering behavioral questions, and communicating with confidence before
                 your next internship interview.
               </p>
-              <Link
+              <BlogStartFreeCta
                 href="/signup"
+                section="blog_internship_cta"
+                ctaText="Start Free Mock Interview"
                 className="landing-cta-lift mt-5 inline-flex h-11 items-center justify-center gap-2 rounded-[12px] px-6 text-sm font-semibold text-white sm:h-12 sm:px-8 sm:text-base"
                 style={{
                   background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
@@ -533,7 +536,7 @@ export default function HowToGetInternshipOpportunitiesPage() {
               >
                 Start Free Mock Interview
                 <ArrowRight className="size-4" aria-hidden />
-              </Link>
+              </BlogStartFreeCta>
               <p className="ie-blog-anxiety-cta__note">Three free sessions. No card required.</p>
             </aside>
 

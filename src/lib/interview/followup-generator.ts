@@ -10,6 +10,7 @@
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { getTokenBudget } from '@/lib/ai/token-budget';
 import { clampHistoryForOperation } from '@/lib/ai/context-hygiene';
+import { questionSimilarity } from '@/lib/interview/deduplicate-questions';
 import type {
   AnswerAnalysis,
   DialogueEntry,
@@ -171,6 +172,13 @@ export async function generateFollowUp(
   // acknowledge_move_on → no follow-up; orchestrator advances to next question.
   if (followupType === 'acknowledge_move_on') return '';
 
+  // Avoid repeating a follow-up the interviewer already asked in this thread.
+  const priorInterviewerTurns = dialogueHistory
+    .filter((e) => e.speaker === 'interviewer')
+    .map((e) => e.text);
+  const isRepeatedFollowUp = (candidate: string): boolean =>
+    priorInterviewerTurns.some((q) => questionSimilarity(candidate, q) >= 0.72);
+
   // Pick a deterministic template as the offline safety net for this gap type,
   // then try the context-aware LLM first (references prior dialogue).
   let staticFallback: string;
@@ -201,7 +209,7 @@ export async function generateFollowUp(
     staticFallback,
     interviewerId,
     mode,
-  );
+  ).then((generated) => (isRepeatedFollowUp(generated) ? staticFallback : generated));
 }
 
 async function generateProbeDepthFollowUp(

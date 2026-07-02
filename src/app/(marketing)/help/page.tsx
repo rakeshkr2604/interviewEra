@@ -1,15 +1,22 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { generateMetadata } from '@/lib/seo/metadata';
+import { canonicalUrl } from '@/lib/seo/site-url';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 
-export const metadata: Metadata = generateMetadata({
-  title: 'Frequently Asked Questions',
-  description:
-    'Answers to common questions about InterviewEra — credits, interview sessions, scoring, plans, and your account.',
-  path: '/help',
-  keywords: ['InterviewEra FAQ', 'mock interview FAQ', 'interview credits', 'how it works'],
-});
+/** FAQ anchor page — canonical hub is /help-center (no duplicate indexing). */
+export const metadata: Metadata = {
+  ...generateMetadata({
+    title: 'Frequently Asked Questions',
+    description:
+      'Answers to common questions about InterviewEra — credits, interview sessions, scoring, plans, and your account.',
+    path: '/help',
+    noIndex: true,
+    noIndexFollow: true,
+    keywords: ['InterviewEra FAQ', 'mock interview FAQ', 'interview credits', 'how it works'],
+  }),
+  alternates: { canonical: canonicalUrl('/help-center') },
+};
 
 // ─── FAQ data ──────────────────────────────────────────────────────────────────
 

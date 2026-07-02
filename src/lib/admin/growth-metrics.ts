@@ -1,0 +1,215 @@
+/**
+ * Founder growth metrics — acquisition, retention, revenue, referrals.
+ */
+
+import type { SupabaseClient } from '@supabase/supabase-js';
+
+export interface RetentionCohort {
+  label: string;
+  rate_pct: number;
+  cohort_size: number;
+  retained: number;
+}
+
+export interface GrowthMetricsResult {
+  range_days: number;
+  wau: number;
+  mau: number;
+  retention: RetentionCohort[];
+  referrals: {
+    total_credited: number;
+    pending: number;
+    credits_issued: number;
+  };
+  revenue: {
+    pricing_page_views: number;
+    checkout_started: number;
+    payments_captured: number;
+    conversion_rate_pct: number | null;
+    revenue_inr: number;
+  };
+  feedback: {
+    submissions: number;
+    avg_rating: number | null;
+    avg_nps: number | null;
+    failed_emails: number;
+  };
+  generated_at: string;
+}
+
+function pct(n: number, d: number): number | null {
+  if (d <= 0) return null;
+  return Math.round((n / d) * 1000) / 10;
+}
+
+async function countActiveSince(svc: SupabaseClient, sinceIso: string): Promise<number> {
+  const { count } = await svc
+    .from('user_activity')
+    .select('user_id', { count: 'exact', head: true })
+    .gte('last_seen_at', sinceIso);
+  return count ?? 0;
+}
+
+async function computeRetention(
+  svc: SupabaseClient,
+  days: number,
+): Promise<RetentionCohort> {
+  const cohortStart = new Date(Date.now() - (days + 7) * 24 * 60 * 60 * 1000);
+  const cohortEnd = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+
+  const { data: cohort } = await svc
+    .from('users')
+    .select('id, created_at')
+    .gte('created_at', cohortStart.toISOString())
+    .lt('created_at', cohortEnd.toISOString());
+
+  const users = cohort ?? [];
+  if (users.length === 0) {
+    return { label: `D${days}`, rate_pct: 0, cohort_size: 0, retained: 0 };
+  }
+
+  let retained = 0;
+  for (const u of users) {
+    const created = new Date(u.created_at as string).getTime();
+    const windowEnd = created + days * 24 * 60 * 60 * 1000;
+
+    const { data: activity } = await svc
+      .from('user_activity')
+      .select('last_seen_at')
+      .eq('user_id', u.id as string)
+      .maybeSingle();
+
+    if (activity?.last_seen_at) {
+      const lastSeen = new Date(activity.last_seen_at as string).getTime();
+      if (lastSeen <= windowEnd && lastSeen > created) {
+        retained += 1;
+        continue;
+      }
+    }
+
+    const { count } = await svc
+      .from('interviews')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', u.id as string)
+      .gte('started_at', new Date(created).toISOString())
+      .lte('started_at', new Date(windowEnd).toISOString());
+
+    if ((count ?? 0) > 0) retained += 1;
+  }
+
+  return {
+    label: `D${days}`,
+    rate_pct: pct(retained, users.length) ?? 0,
+    cohort_size: users.length,
+    retained,
+  };
+}
+
+export async function computeGrowthMetrics(
+  svc: SupabaseClient,
+  rangeDays: number,
+): Promise<GrowthMetricsResult> {
+  const sinceIso = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const [
+    wau,
+    mau,
+    d1,
+    d7,
+    d30,
+    creditedReferrals,
+    pendingReferrals,
+    pricingViews,
+    checkoutStarted,
+    paymentsCaptured,
+    revenueRows,
+    feedbackRows,
+    failedEmails,
+  ] = await Promise.all([
+    countActiveSince(svc, weekAgo),
+    countActiveSince(svc, monthAgo),
+    computeRetention(svc, 1),
+    computeRetention(svc, 7),
+    computeRetention(svc, 30),
+    svc.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'credited'),
+    svc.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    svc
+      .from('product_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_name', 'pricing_page_viewed')
+      .gte('created_at', sinceIso),
+    svc
+      .from('product_events')
+      .select('id', { count: 'exact', head: true })
+      .eq('event_name', 'payment_started')
+      .gte('created_at', sinceIso),
+    svc
+      .from('payments')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'paid')
+      .gte('created_at', sinceIso),
+    svc
+      .from('payments')
+      .select('amount')
+      .eq('status', 'paid')
+      .gte('created_at', sinceIso),
+    svc
+      .from('feedbacks')
+      .select('rating, nps_score')
+      .gte('created_at', sinceIso),
+    svc
+      .from('feedbacks')
+      .select('id', { count: 'exact', head: true })
+      .eq('email_status', 'failed'),
+  ]);
+
+  const payments = paymentsCaptured.count ?? 0;
+  const pricing = pricingViews.count ?? 0;
+
+  const feedbackList = feedbackRows.data ?? [];
+  const ratings = feedbackList.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n));
+  const npsScores = feedbackList
+    .map((r) => (r.nps_score === null ? null : Number(r.nps_score)))
+    .filter((n): n is number => n !== null && Number.isFinite(n));
+
+  const revenueInr = ((revenueRows.data ?? []) as { amount: number | null }[]).reduce(
+    (s, r) => s + (r.amount ?? 0),
+    0,
+  ) / 100;
+
+  const credited = creditedReferrals.count ?? 0;
+
+  return {
+    range_days: rangeDays,
+    wau,
+    mau,
+    retention: [d1, d7, d30],
+    referrals: {
+      total_credited: credited,
+      pending: pendingReferrals.count ?? 0,
+      credits_issued: credited * 2,
+    },
+    revenue: {
+      pricing_page_views: pricing,
+      checkout_started: checkoutStarted.count ?? 0,
+      payments_captured: payments,
+      conversion_rate_pct: pct(payments, pricing),
+      revenue_inr: revenueInr,
+    },
+    feedback: {
+      submissions: feedbackList.length,
+      avg_rating:
+        ratings.length > 0
+          ? Math.round((ratings.reduce((a, b) => a + b, 0) / ratings.length) * 10) / 10
+          : null,
+      avg_nps:
+        npsScores.length > 0
+          ? Math.round((npsScores.reduce((a, b) => a + b, 0) / npsScores.length) * 10) / 10
+          : null,
+      failed_emails: failedEmails.count ?? 0,
+    },
+    generated_at: new Date().toISOString(),
+  };
+}

@@ -5,7 +5,7 @@ import { Navbar } from '@/components/layout/Navbar';
 
 /**
  * Thin wrapper that renders <Navbar /> only on marketing-side routes.
- * Dashboard, admin, campus, and auth pages have their own chrome
+ * Dashboard, admin, campus, platform, and auth pages have their own chrome
  * (DashboardChrome, AdminTopBar, CampusDashboardChrome) — rendering
  * the Navbar there would produce a double header.
  *
@@ -25,8 +25,13 @@ const SUPPRESS_PREFIXES = [
   '/feedback',
   '/profile',
   '/admin',
+  '/platform',
   '/college/dashboard',
   '/college/signup',
+  '/notifications',
+  '/readiness',
+  '/roadmap',
+  '/resume',
   '/login',
   '/signup',
   '/forgot-password',

@@ -93,6 +93,8 @@ export function formatResumeUserFacingError(body: {
   if (msg && hint) return `${msg} ${hint}`;
   return msg || 'Upload failed. Please try again.';
 }
+
+export const PARSE_DEGRADED_WARNING =
   'We extracted most of your resume, but some sections may be incomplete.';
 
 export const PARSE_MINIMAL_WARNING =

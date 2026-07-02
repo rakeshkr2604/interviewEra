@@ -561,10 +561,9 @@ export default function LandingHeroSimulator() {
     <div
       className="sim-host"
       ref={rootRef}
-      role="img"
-      aria-label="Animated preview of a live InterviewEra mock interview: the AI interviewer Priya asks a resume-based question, the candidate answers, an adaptive follow-up is generated, and the answer is scored across five dimensions."
+      aria-hidden="true"
     >
-      <div className="sim" aria-hidden="true">
+      <div className="sim">
         {/* animated cursor */}
         <svg className="sim-cursor" viewBox="0 0 24 24" fill="none">
           <path
@@ -608,12 +607,12 @@ export default function LandingHeroSimulator() {
                 01:30
               </div>
             </div>
-            <button className="sim-exit-btn" tabIndex={-1} type="button">
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <span className="sim-exit-btn" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <path d="M3 3l6 6M3 9l6-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
               Exit
-            </button>
+            </span>
           </div>
         </div>
 
@@ -842,16 +841,16 @@ export default function LandingHeroSimulator() {
             </span>
           </div>
           <div className="sim-foot-right">
-            <button className="sim-prev-btn" tabIndex={-1} type="button" disabled>
-              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+            <span className="sim-prev-btn disabled" aria-hidden="true">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true">
                 <path d="M7 9L3 6l4-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               Previous
-            </button>
-            <button className="sim-next-btn primary disabled" tabIndex={-1} type="button">
+            </span>
+            <span className="sim-next-btn primary disabled" aria-hidden="true">
               <span data-sim="nextLabel">Next question</span>
               <span className="arrow">→</span>
-            </button>
+            </span>
           </div>
         </div>
       </div>

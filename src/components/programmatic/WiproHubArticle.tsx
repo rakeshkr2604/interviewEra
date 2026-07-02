@@ -123,7 +123,7 @@ function RoadmapSection({
 
 export function WiproHubArticle({
   company,
-  questions,
+  questions: _questions,
 }: {
   company: Company
   questions: readonly SeoQuestion[]

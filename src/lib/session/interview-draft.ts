@@ -48,6 +48,8 @@ export interface InterviewDraft {
   inputMode: 'voice' | 'text' | 'deepgram';
   /** epoch ms of last write — drives TTL + staleness. */
   updatedAt: number;
+  /** Present when restoring feedback phase after server resume. */
+  lastFeedback?: string;
 }
 
 export type InterviewDraftInput = Omit<InterviewDraft, 'version' | 'updatedAt'>;

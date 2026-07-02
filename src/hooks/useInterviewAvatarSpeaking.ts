@@ -313,7 +313,6 @@ export function useInterviewAvatarSpeaking(
       const t = window.setTimeout(() => finishAuthorizedRef.current('voice_disabled'), 0)
       return () => {
         window.clearTimeout(t)
-        if (generation !== speakGenerationRef.current) return
         try { stopSpeakingRef.current() } catch { /* */ }
         try { elStopRef.current() } catch { /* */ }
       }
@@ -335,13 +334,13 @@ export function useInterviewAvatarSpeaking(
     return () => {
       window.clearTimeout(speakTimer)
       clearTimeout(stuckTimer)
-      if (generation !== speakGenerationRef.current) return
       setPlaybackFailed(false)
       try { stopSpeakingRef.current() } catch { /* */ }
       try { elStopRef.current() } catch { /* */ }
     }
   }, [
     phase,
+    phaseRef,
     currentIndex,
     pendingFollowUpKey,
     audioUnlocked,

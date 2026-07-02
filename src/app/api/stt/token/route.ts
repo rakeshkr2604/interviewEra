@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient as createSupabase, createServiceClient } from '@/lib/supabase/server';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { abuseGate, recordSTTTokenRequest } from '@/lib/abuse/risk-scorer';
 import { checkSTTQuota } from '@/lib/quota/voice-quota';
 import {
@@ -56,21 +56,28 @@ export async function POST(request: NextRequest) {
   }
 
   // ── 4. IP rate limit — 20 tokens per IP per hour ─────────────────────────
-  const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20);
-  if (!ipRL.allowed) {
-    return NextResponse.json(
-      { error: 'Too many requests from this IP. Try again later.' },
-      { status: 429, headers: { 'Retry-After': String(ipRL.resetInSeconds) } },
-    );
+  const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20, { failClosed: true });
+  const ipBlocked = buildRateLimitHttpResponse(
+    ipRL,
+    'Too many requests from this IP. Try again later.',
+  );
+  if (ipBlocked) {
+    return NextResponse.json(ipBlocked.body, {
+      status: ipBlocked.status,
+      headers: ipBlocked.headers,
+    });
   }
 
-  // ── 5. User rate limit — 10 tokens per user per hour ─────────────────────
-  const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10);
-  if (!userRL.allowed) {
-    return NextResponse.json(
-      { error: 'Too many recording sessions. Please wait and try again.' },
-      { status: 429, headers: { 'Retry-After': String(userRL.resetInSeconds) } },
-    );
+  const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10, { failClosed: true });
+  const userBlocked = buildRateLimitHttpResponse(
+    userRL,
+    'Too many recording sessions. Please wait and try again.',
+  );
+  if (userBlocked) {
+    return NextResponse.json(userBlocked.body, {
+      status: userBlocked.status,
+      headers: userBlocked.headers,
+    });
   }
 
   // ── 6. Resolve plan tier + session validation (parallel) ─────────────────

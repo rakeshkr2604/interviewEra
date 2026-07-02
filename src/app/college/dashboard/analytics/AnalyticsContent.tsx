@@ -25,37 +25,18 @@ const PlacementReadyChart = dynamic(
   { loading: ChartSkeleton, ssr: false }
 );
 
-interface TierDistribution {
-  tier: number;
-  count: number;
-}
+import type { AnalyticsPayload } from '@/lib/college/types';
 
-interface ScoreTrendPoint {
-  date: string;
-  score: number;
-}
-
-interface SessionDay {
-  date: string;
-  count: number;
-}
-
-interface PlacementReady {
-  ready: number;
-  almostReady: number;
-  needsWork: number;
-}
-
-interface AnalyticsData {
-  tierDistribution: TierDistribution[];
-  scoreTrend: ScoreTrendPoint[];
-  sessionActivity: SessionDay[];
-  placementReady: PlacementReady;
-  totalStudents: number;
-  generatedAt: string;
-}
+type AnalyticsData = AnalyticsPayload;
 
 type DateRange = '7' | '30' | '90' | 'all';
+
+const RANGE_LABELS: Record<DateRange, string> = {
+  '7': 'Last 7 days',
+  '30': 'Last 30 days',
+  '90': 'Last 90 days',
+  all: 'All time',
+};
 
 interface AnalyticsContentProps {
   initialData: AnalyticsData | null;
@@ -114,11 +95,21 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
     });
     csv.push('');
 
-    csv.push('Score Trend (Last 30 Days)');
+    csv.push('Score Trend');
     csv.push('Date,Average Score');
     data.scoreTrend.forEach((item) => {
       csv.push(`${item.date},${item.score}`);
     });
+    csv.push('');
+
+    csv.push('Department Analytics');
+    csv.push('Branch,Students,Avg Score,Placement Ready');
+    data.branchBreakdown.forEach((item) => {
+      csv.push(`${item.branch},${item.studentCount},${item.avgScore ?? ''},${item.placementReady}`);
+    });
+    csv.push('');
+
+    csv.push(`Completion Rate,${data.completionRate}%`);
     csv.push('');
 
     csv.push('Placement Ready Breakdown');
@@ -226,7 +217,41 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
             {data.totalStudents > 0 ? Math.round((data.placementReady.needsWork / data.totalStudents) * 100) : 0}%
           </p>
         </div>
+        <div className="dashboard-premium-card p-5">
+          <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Completion Rate</p>
+          <p className="mt-1 text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>{data.completionRate}%</p>
+        </div>
       </div>
+
+      {data.branchBreakdown.length > 0 && (
+        <div className="dashboard-premium-card overflow-hidden" style={{ padding: 0 }}>
+          <div className="border-b px-5 py-4" style={{ borderColor: 'var(--card-border)' }}>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>Department Analytics</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}>
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-medium uppercase">Branch</th>
+                  <th className="px-5 py-3 text-center text-xs font-medium uppercase">Students</th>
+                  <th className="px-5 py-3 text-center text-xs font-medium uppercase">Avg Score</th>
+                  <th className="px-5 py-3 text-center text-xs font-medium uppercase">Placement Ready</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.branchBreakdown.map((row) => (
+                  <tr key={row.branch} className="border-t" style={{ borderColor: 'var(--card-border)' }}>
+                    <td className="px-5 py-3" style={{ color: 'var(--text-primary)' }}>{row.branch}</td>
+                    <td className="px-5 py-3 text-center">{row.studentCount}</td>
+                    <td className="px-5 py-3 text-center">{row.avgScore ?? '—'}</td>
+                    <td className="px-5 py-3 text-center">{row.placementReady}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -250,7 +275,9 @@ export function AnalyticsContent({ initialData, collegeId }: AnalyticsContentPro
 
         {/* Score Trend */}
         <div className="dashboard-premium-card p-5 lg:col-span-2">
-          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Score Trend (Last 30 Days)</h2>
+          <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>
+            Score Trend ({RANGE_LABELS[dateRange]})
+          </h2>
           {data.scoreTrend.some((t) => t.score > 0) ? (
             <ScoreTrendChart data={data.scoreTrend} />
           ) : (

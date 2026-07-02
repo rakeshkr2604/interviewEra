@@ -1,14 +1,17 @@
 import Link from 'next/link';
-import { ArrowLeft, CalendarPlus, Rocket, Target } from 'lucide-react';
+import { ArrowLeft, Building2, CalendarPlus, GraduationCap, Rocket, Target } from 'lucide-react';
 import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
+import { IntentBadge } from '@/components/auth/IntentBadge';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
-import { SignupForm } from './SignupForm';
+import { SignupPageClient } from './SignupPageClient';
 import { generateMetadata } from '@/lib/seo/metadata';
+import { isSafePath } from '@/lib/auth/auth-params';
+import { parseAuthIntent, type AuthIntent } from '@/lib/auth/auth-intent';
 
 interface SignupPageProps {
-  searchParams: Promise<{ next?: string; email?: string }>;
+  searchParams: Promise<{ next?: string; email?: string; intent?: string }>;
 }
 
 export const metadata = generateMetadata({
@@ -19,15 +22,47 @@ export const metadata = generateMetadata({
   keywords: ['InterviewEra sign up', 'AI mock interview account', 'placement interview practice'],
 });
 
-const BULLETS = [
-  { icon: Rocket, text: 'Resume-aware questions — not one-size-fits-all banks' },
-  { icon: Target, text: 'Scores and fixes you can use before the next mock' },
-  { icon: CalendarPlus, text: 'Optional placement month helps us tune your prep rhythm' },
-] as const;
+const COPY: Record<
+  AuthIntent,
+  { h1: string; subtitle: string; bullets: { icon: typeof Rocket; text: string }[] }
+> = {
+  candidate: {
+    h1: 'Start your first mock interview',
+    subtitle:
+      'AI mock interviews tailored to your resume, with rubric-scored feedback built for placement season.',
+    bullets: [
+      { icon: Rocket, text: 'Resume-aware questions — not one-size-fits-all banks' },
+      { icon: Target, text: 'Scores and fixes you can use before the next mock' },
+      { icon: CalendarPlus, text: 'Optional placement month helps us tune your prep rhythm' },
+    ],
+  },
+  college: {
+    h1: 'Set up your campus workspace',
+    subtitle: 'Bulk student onboarding, deadlines, and a T&P dashboard for your placement batch.',
+    bullets: [
+      { icon: GraduationCap, text: 'CSV bulk invite for your entire batch' },
+      { icon: Target, text: 'Live progress tracking per student' },
+      { icon: Rocket, text: 'Pilot-friendly pricing for Indian campuses' },
+    ],
+  },
+  business: {
+    h1: 'Create your hiring workspace',
+    subtitle: 'Evaluate candidates with structured AI interviews and scoring.',
+    bullets: [
+      { icon: Building2, text: 'Work-email signup for your organization' },
+      { icon: Target, text: 'Structured candidate evaluation' },
+      { icon: Rocket, text: 'Scale hiring without losing signal' },
+    ],
+  },
+};
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
-  const { next: rawNext } = await searchParams;
-  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : undefined;
+  const params = await searchParams;
+  const intent = parseAuthIntent(params.intent);
+  const next = isSafePath(params.next) ? params.next : undefined;
+  const email = params.email?.trim() || undefined;
+  const copy = COPY[intent];
+
   return (
     <div
       className="ie-landing-premium min-h-screen"
@@ -48,30 +83,32 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
         <AuthSplitLayout
           left={
             <>
-              <div
-                className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide lg:mx-0"
-                style={{
-                  borderColor: 'var(--card-border)',
-                  background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <AuthBrandChipIcon />
-                <BrandWordmarkSplit interviewClassName="font-medium" eraClassName="font-semibold" />
+              <div className="flex flex-wrap items-center gap-2">
+                <div
+                  className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide"
+                  style={{
+                    borderColor: 'var(--card-border)',
+                    background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                    color: 'var(--text-primary)',
+                  }}
+                >
+                  <AuthBrandChipIcon />
+                  <BrandWordmarkSplit interviewClassName="font-medium" eraClassName="font-semibold" />
+                </div>
+                {intent !== 'candidate' ? <IntentBadge intent={intent} /> : null}
               </div>
 
               <div className="space-y-4">
                 <h1 className="text-[2rem] font-bold leading-[1.08] tracking-tight text-balance sm:text-4xl md:text-5xl md:leading-[1.05]">
-                  Create your account
+                  {copy.h1}
                 </h1>
                 <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-                  AI mock interviews tailored to your resume, with rubric-scored feedback built for placement season
-                  and early-career interviews.
+                  {copy.subtitle}
                 </p>
               </div>
 
               <ul className="mx-auto max-w-md space-y-3.5 text-left sm:max-w-lg lg:mx-0 lg:max-w-none">
-                {BULLETS.map(({ icon: Icon, text }) => (
+                {copy.bullets.map(({ icon: Icon, text }) => (
                   <li key={text} className="flex gap-3 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
                     <span
                       className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl"
@@ -88,7 +125,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
               </ul>
             </>
           }
-          right={<SignupForm next={next} />}
+          right={<SignupPageClient intent={intent} next={next} email={email} />}
         />
       </AuthPremiumShell>
     </div>

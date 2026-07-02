@@ -38,6 +38,49 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Unit tests
+        run: npm test
+
+  # ── Job 1b: E2E auth (Playwright) ───────────────────────────────────────────
+  e2e_auth:
+    name: E2E Auth
+    runs-on: ubuntu-latest
+    needs: [quality]
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_anon_key
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role
+      OPENAI_API_KEY: sk-placeholder
+      RESEND_API_KEY: re_placeholder
+      UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: placeholder_token
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Build
+        run: npm run build
+
+      - name: E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+
   # ── Pdf extract regression (pdfjs-dist + fallback) ───────────────────────────
   pdf_extract:
     name: PDF extract regression
@@ -66,7 +109,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [quality, pdf_extract]
+    needs: [quality, pdf_extract, e2e_auth]
 
     env:
       # Public vars

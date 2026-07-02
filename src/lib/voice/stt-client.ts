@@ -7,6 +7,7 @@ import {
   type ListenV1Model,
 } from '@deepgram/sdk';
 import { resolveSttLocale, type SttLocale } from '@/lib/voice/speech-locale';
+import { PcmSendBuffer } from '@/lib/voice/stt/pcm-send-buffer';
 import { lifecycleLog, lifecycleWarn, voiceDebug } from './lifecycle-log';
 
 export interface TranscriptChunk {
@@ -58,6 +59,8 @@ export class StreamingSTT {
   private socket: any = null;
   private fullTranscript = '';
   private lastFinal = '';
+  private chunksSent = 0;
+  private readonly pcmBuffer = new PcmSendBuffer();
   // Monotonic id of the current session. Bumped on every start() and stop().
   private gen = 0;
   // Set true after stop() — any in-flight connect() resolution must close.
@@ -71,6 +74,8 @@ export class StreamingSTT {
   async start(callbacks: STTCallbacks, options?: STTStartOptions): Promise<void> {
     this.fullTranscript = '';
     this.lastFinal = '';
+    this.chunksSent = 0;
+    this.pcmBuffer.clear();
     this.aborted = false;
     const mySession = ++this.gen;
 
@@ -125,7 +130,13 @@ export class StreamingSTT {
         return;
       }
       voiceDebug('dg_ws_opened', { session: mySession });
+      voiceDebug('STT_CONNECTED', { session: mySession });
+      voiceDebug('VAD_STARTED', { session: mySession });
       lifecycleLog('stt', 'ws_open', { session: mySession });
+      const flushed = this.pcmBuffer.flush((chunk) => this.sendMediaNow(chunk));
+      if (flushed > 0) {
+        voiceDebug('CHUNK_FLUSHED', { session: mySession, chunks: flushed, queued_bytes: 0 });
+      }
       try { callbacks.onOpen?.(); } catch { /* */ }
     });
 
@@ -160,6 +171,7 @@ export class StreamingSTT {
               is_final: true,
               chars: clean.length,
             });
+            voiceDebug('STT_FINAL', { session: mySession, chars: clean.length });
             try { callbacks.onPartial({ text: clean, isFinal: true, confidence }); } catch { /* */ }
           }
         } else {
@@ -168,12 +180,14 @@ export class StreamingSTT {
             is_final: false,
             chars: transcript.length,
           });
+          voiceDebug('STT_PARTIAL', { session: mySession, chars: transcript.length });
           try { callbacks.onPartial({ text: transcript, isFinal: false, confidence }); } catch { /* */ }
         }
       } else if (msg?.type === 'UtteranceEnd') {
         const text = this.fullTranscript.trim();
         if (text) {
           voiceDebug('dg_utterance_end', { session: mySession, chars: text.length });
+          voiceDebug('VAD_SPEECH_END', { session: mySession, chars: text.length });
           try { callbacks.onFinal(text); } catch { /* */ }
           this.fullTranscript = '';
           this.lastFinal = '';
@@ -208,11 +222,28 @@ export class StreamingSTT {
     });
   }
 
+  private sendMediaNow(audioData: ArrayBuffer): void {
+    if (this.aborted || !this.socket || this.socket.readyState !== 1) return;
+    this.socket.sendMedia(audioData);
+    this.chunksSent += 1;
+    if (this.chunksSent === 1 || this.chunksSent % 50 === 0) {
+      voiceDebug('CHUNK_SENT', { chunk: this.chunksSent, bytes: audioData.byteLength });
+    }
+  }
+
   sendAudio(audioData: ArrayBuffer): void {
     if (this.aborted) return;
-    // readyState 1 = WebSocket OPEN
     if (this.socket?.readyState === 1) {
-      this.socket.sendMedia(audioData);
+      this.sendMediaNow(audioData);
+      return;
+    }
+    // Queue while CONNECTING — flushed on 'open'.
+    this.pcmBuffer.enqueue(audioData);
+    if (this.pcmBuffer.queuedChunks === 1 || this.pcmBuffer.queuedChunks % 25 === 0) {
+      voiceDebug('CHUNK_QUEUED', {
+        queued_chunks: this.pcmBuffer.queuedChunks,
+        queued_bytes: this.pcmBuffer.queuedBytes,
+      });
     }
   }
 
@@ -221,6 +252,7 @@ export class StreamingSTT {
   stop(): void {
     if (this.aborted && !this.socket) return;
     this.aborted = true;
+    this.pcmBuffer.clear();
     // Bump the generation BEFORE closing so any callbacks dispatched between
     // close() and the close-event landing are dropped by the stale-gate.
     this.gen += 1;

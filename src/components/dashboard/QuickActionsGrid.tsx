@@ -4,6 +4,9 @@ import {
   BarChart2,
   CalendarPlus,
   FileSearch,
+  FileText,
+  Gauge,
+  Map,
   MessageSquare,
   Zap,
 } from 'lucide-react';
@@ -15,34 +18,59 @@ interface QuickAction {
   icon: LucideIcon;
 }
 
-const QUICK_ACTIONS: QuickAction[] = [
-  {
-    label: 'Resume analysis',
-    description: 'Check ATS compatibility',
-    href: '/tools/ats-checker',
-    icon: FileSearch,
-  },
-  {
-    label: 'Mock interview',
-    description: 'Start a new session',
-    href: '/onboarding',
-    icon: CalendarPlus,
-  },
-  {
-    label: 'Analytics',
-    description: 'See your progress',
-    href: '/analytics',
-    icon: BarChart2,
-  },
-  {
-    label: 'Feedback',
-    description: 'Share your thoughts',
-    href: '/feedback',
-    icon: MessageSquare,
-  },
-];
+function buildQuickActions(resumeCompletionPct: number): QuickAction[] {
+  return [
+    {
+      label: 'Resume workspace',
+      description:
+        resumeCompletionPct >= 100
+          ? 'Resume ready — review or replace'
+          : `${resumeCompletionPct}% complete — upload to improve`,
+      href: '/resume',
+      icon: FileText,
+    },
+    {
+      label: 'Readiness score',
+      description: 'See placement readiness breakdown',
+      href: '/readiness',
+      icon: Gauge,
+    },
+    {
+      label: 'Prep roadmap',
+      description: 'Personalized topics and mocks',
+      href: '/roadmap',
+      icon: Map,
+    },
+    {
+      label: 'Mock interview',
+      description: 'Start a new session',
+      href: '/onboarding',
+      icon: CalendarPlus,
+    },
+    {
+      label: 'ATS checker',
+      description: 'Check resume compatibility',
+      href: '/tools/ats-checker',
+      icon: FileSearch,
+    },
+    {
+      label: 'Analytics',
+      description: 'See your progress',
+      href: '/analytics',
+      icon: BarChart2,
+    },
+    {
+      label: 'Feedback',
+      description: 'Share your thoughts',
+      href: '/feedback',
+      icon: MessageSquare,
+    },
+  ];
+}
 
-export function QuickActionsGrid() {
+export function QuickActionsGrid({ resumeCompletionPct = 0 }: { resumeCompletionPct?: number }) {
+  const actions = buildQuickActions(resumeCompletionPct);
+
   return (
     <section className="dashboard-section" aria-labelledby="quick-actions-heading">
       <div className="mb-3 flex items-baseline gap-2 px-0.5 lg:mb-4">
@@ -63,7 +91,7 @@ export function QuickActionsGrid() {
       </div>
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4 lg:gap-4">
-        {QUICK_ACTIONS.map((action) => {
+        {actions.map((action) => {
           const Icon = action.icon;
           return (
             <Link

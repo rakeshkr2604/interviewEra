@@ -1,5 +1,12 @@
 import { updateSession } from '@/lib/supabase/middleware';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { isAuthV2Enabled } from '@/lib/auth/flags';
+import { isSafePath } from '@/lib/auth/auth-params';
+import { normalizeAuthErrorCode } from '@/lib/auth/auth-errors';
+import {
+  extractInviteTokenFromNext,
+  resolvePostAuthDestination,
+} from '@/lib/auth/resolve-destination';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_ROUTES = new Set([
@@ -21,9 +28,11 @@ const PUBLIC_ROUTES = new Set([
   '/refund',
   '/auth/callback',
   '/auth/confirm',
+  '/auth/error',
+  '/auth/verify-pending',
   '/teams',
 ]);
-const AUTH_ROUTES = new Set(['/login', '/signup']);
+const AUTH_ROUTES = new Set(['/login', '/signup', '/auth/verify-pending']);
 
 // ─── Rate Limiting ────────────────────────────────────────────────────────────
 // Redis-backed rate limiter (Upstash) — works correctly across all edge instances
@@ -90,6 +99,26 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isApi = pathname.startsWith('/api/');
 
+  if (isAuthV2Enabled() && pathname === '/college/signup') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/signup';
+    url.searchParams.set('intent', 'college');
+    return NextResponse.redirect(url, 301);
+  }
+
+  if (isAuthV2Enabled() && pathname === '/login') {
+    const legacyError = request.nextUrl.searchParams.get('error');
+    if (legacyError) {
+      const errorUrl = new URL('/auth/error', request.url);
+      errorUrl.searchParams.set('code', normalizeAuthErrorCode(legacyError));
+      const email = request.nextUrl.searchParams.get('email');
+      const next = request.nextUrl.searchParams.get('next');
+      if (email) errorUrl.searchParams.set('email', email);
+      if (isSafePath(next)) errorUrl.searchParams.set('next', next!);
+      return NextResponse.redirect(errorUrl);
+    }
+  }
+
   /** Refresh session on multipart / heavy POSTs that must see a fresh cookie (avoid 401 + HTML edge). */
   const resumeApiNeedsSession =
     isApi &&
@@ -140,6 +169,7 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/tools/') ||
     pathname.startsWith('/blog') ||
     pathname.startsWith('/interview-questions') ||
+    pathname.startsWith('/college/join/') ||
     pathname === '/help' ||
     pathname === '/help-center' ||
     pathname.startsWith('/open/badges') ||
@@ -184,18 +214,23 @@ export async function middleware(request: NextRequest) {
   if (!user && !isPublic && !isApi) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('next', pathname);
+    if (isAuthV2Enabled()) {
+      loginUrl.searchParams.set('reason', 'session_required');
+    }
     return NextResponse.redirect(loginUrl);
   }
 
-  // Authenticated user on a pure auth route → honour ?next if valid, else dashboard.
-  // Preserving ?next is required so router.refresh() on the login page (after email
-  // sign-in) doesn't lose the intended post-login destination.
   if (user && AUTH_ROUTES.has(pathname)) {
     const rawNext = request.nextUrl.searchParams.get('next');
-    const dest =
-      rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//')
-        ? rawNext
-        : '/dashboard';
+    if (isAuthV2Enabled()) {
+      const inviteToken = extractInviteTokenFromNext(rawNext);
+      const dest = await resolvePostAuthDestination(user.id, {
+        next: rawNext,
+        inviteToken,
+      });
+      return NextResponse.redirect(new URL(dest, request.url));
+    }
+    const dest = isSafePath(rawNext) ? rawNext : '/dashboard';
     return NextResponse.redirect(new URL(dest, request.url));
   }
 

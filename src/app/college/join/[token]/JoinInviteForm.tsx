@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { WrongAccountCard } from '@/components/auth/WrongAccountCard';
 
 interface JoinInviteFormProps {
   token: string;
@@ -65,37 +66,13 @@ export function JoinInviteForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (emailMismatch) {
+  if (emailMismatch && userEmail) {
     return (
-      <div className="space-y-5">
-        <div
-          className="rounded-xl p-4"
-          style={{
-            background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
-            border: '1px solid color-mix(in srgb, var(--accent-warning) 30%, transparent)',
-          }}
-        >
-          <div className="flex gap-3">
-            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" style={{ color: 'var(--accent-warning)' }} />
-            <div>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Wrong account</p>
-              <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                This invitation is for <strong>{inviteEmail}</strong> but you're signed in as{' '}
-                <strong>{userEmail}</strong>. Please sign out and sign in with the correct account,
-                or create a new account using your college email.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <a
-          href={`/login?email=${encodeURIComponent(inviteEmail)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
-          className="block w-full rounded-xl px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:opacity-90"
-          style={{ background: 'var(--accent-primary)' }}
-        >
-          Sign in with {inviteEmail}
-        </a>
-      </div>
+      <WrongAccountCard
+        inviteEmail={inviteEmail}
+        userEmail={userEmail}
+        loginHref={`/login?email=${encodeURIComponent(inviteEmail)}&next=${encodeURIComponent(`/college/join/${token}`)}`}
+      />
     );
   }
 

@@ -118,9 +118,17 @@ export function StartInterviewForm({
             interviewId?: string;
             error?: string;
             preparing?: boolean;
+            resumeUrl?: string;
           };
 
           if (!res.ok) {
+            if (res.status === 409 && data.error === 'active_interview' && data.interviewId) {
+              return {
+                ok: true,
+                interviewId: data.interviewId,
+                preparing: data.resumeUrl?.includes('preparing') ?? false,
+              };
+            }
             if (res.status === 402) {
               return { ok: false, error: 'No credits remaining. Please upgrade your plan.' };
             }

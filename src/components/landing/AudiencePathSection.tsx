@@ -106,7 +106,7 @@ export function AudiencePathSection() {
                   </p>
                   <span
                     className="mt-4 text-sm font-semibold"
-                    style={{ color: 'var(--accent-primary)' }}
+                    style={{ color: 'var(--accent-link)' }}
                   >
                     {path.cta} →
                   </span>

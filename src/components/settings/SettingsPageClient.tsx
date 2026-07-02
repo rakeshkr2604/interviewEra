@@ -20,6 +20,9 @@ import {
 import { PrivacySecurityPanel } from '@/components/settings/PrivacySecurityPanel'
 import { AccountManagementPanel } from '@/components/settings/AccountManagementPanel'
 import { DangerZoneCard } from '@/components/settings/DangerZoneCard'
+import { ReferralShareCard } from '@/components/settings/ReferralShareCard'
+import { CandidateProfilePanel } from '@/components/candidate/CandidateProfilePanel'
+import type { CandidateProfileFields } from '@/lib/candidate/types'
 import type { NotificationPreferences } from '@/lib/settings/notification-preferences'
 import type { PlanTier } from '@/types/app.types'
 import type { User } from '@supabase/supabase-js'
@@ -41,6 +44,8 @@ export function SettingsPageClient({
   recentTransactions,
   notificationPrefs,
   weeklyImprovementSummaryOn,
+  candidateProfile,
+  referralCode,
 }: {
   authUser: User
   profileName: string | null
@@ -55,6 +60,8 @@ export function SettingsPageClient({
   recentTransactions: BillingTx[]
   notificationPrefs: NotificationPreferences
   weeklyImprovementSummaryOn: boolean
+  candidateProfile: CandidateProfileFields
+  referralCode: string | null
 }) {
   const lastSignIn = authUser.last_sign_in_at ?? null
   const hasGoogle = Boolean(authUser.identities?.some((i) => i.provider === 'google'))
@@ -135,6 +142,20 @@ export function SettingsPageClient({
             </div>
           </SettingsSection>
 
+          {referralCode ? (
+            <SettingsSection
+              id="settings-referral"
+              eyebrow="Growth"
+              title="Refer a friend"
+              description="Earn bonus credits when friends complete their first mock interview."
+              density="compact"
+            >
+              <div className={SETTINGS_CARD_SHELL}>
+                <ReferralShareCard referralCode={referralCode} />
+              </div>
+            </SettingsSection>
+          ) : null}
+
           <SettingsSection
             id="settings-privacy"
             eyebrow="Trust"
@@ -148,6 +169,19 @@ export function SettingsPageClient({
                 hasGoogle={hasGoogle}
                 userEmail={profileEmail}
               />
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            id="settings-candidate-profile"
+            className="lg:col-span-2"
+            eyebrow="Placement"
+            title="Candidate profile"
+            description="Preferred role, graduation year, college, and experience level for personalized prep."
+            density="compact"
+          >
+            <div className={SETTINGS_CARD_SHELL}>
+              <CandidateProfilePanel initial={candidateProfile} />
             </div>
           </SettingsSection>
 

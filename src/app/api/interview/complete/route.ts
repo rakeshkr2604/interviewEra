@@ -14,6 +14,8 @@ import { processInterviewRetentionSafely } from '@/lib/retention/process-intervi
 import type { UserProgressRow } from '@/lib/retention/types';
 import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity';
 import { sendInterviewCompletedEmail } from '@/lib/email/lifecycle/send-interview-completed';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
+import type { InterviewSessionContext } from '@/types/app.types';
 
 type RetentionResponsePayload = InterviewCompleteRetentionPayload;
 
@@ -142,7 +144,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const { data: interview } = await serviceClient
       .from('interviews')
-      .select('id, user_id, status, started_at')
+      .select('id, user_id, status, started_at, session_context')
       .eq('id', interviewId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -191,11 +193,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const completedAt = new Date().toISOString();
+    const sessionCtx = { ...((interview.session_context ?? {}) as InterviewSessionContext) };
+    delete sessionCtx.resume;
     await serviceClient
       .from('interviews')
       .update({
         status: 'completed',
         completed_at: completedAt,
+        session_context: sessionCtx,
         ...(interview.started_at ? {} : { started_at: completedAt }),
       })
       .eq('id', interviewId);
@@ -308,6 +313,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     const { reportId, overallScore, radarData } = await aggregateReport(interviewId, user.id);
+
+    trackInterviewEvent('report_generated', {
+      userId: user.id,
+      interviewId,
+      reportId,
+      overallScore,
+    });
 
     if (user.email) {
       void sendInterviewCompletedEmail({

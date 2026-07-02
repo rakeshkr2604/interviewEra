@@ -9,6 +9,8 @@ import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
 import { LoginForm } from './LoginForm';
 
 import { authPageMetadata } from '@/lib/seo/metadata';
+import { isSafePath } from '@/lib/auth/auth-params';
+import type { SessionRedirectReason } from '@/lib/auth/auth-params';
 
 export const metadata = authPageMetadata({
   title: 'Login',
@@ -17,7 +19,7 @@ export const metadata = authPageMetadata({
 });
 
 interface LoginPageProps {
-  searchParams: Promise<{ next?: string; email?: string }>;
+  searchParams: Promise<{ next?: string; email?: string; reason?: string }>;
 }
 
 type Bullet =
@@ -31,9 +33,13 @@ const BULLETS: Bullet[] = [
 ];
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
-  const { next: rawNext } = await searchParams;
-  // Validate: only allow same-origin paths to prevent open-redirect
-  const next = rawNext && rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : undefined;
+  const params = await searchParams;
+  const next = isSafePath(params.next) ? params.next : undefined;
+  const email = params.email?.trim() || undefined;
+  const reason =
+    params.reason === 'session_expired' || params.reason === 'session_required'
+      ? (params.reason as SessionRedirectReason)
+      : undefined;
   return (
     <div
       className="ie-landing-premium min-h-screen"
@@ -110,7 +116,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               </ul>
             </>
           }
-          right={<LoginForm next={next} />}
+          right={<LoginForm next={next} email={email} reason={reason} />}
         />
       </AuthPremiumShell>
     </div>

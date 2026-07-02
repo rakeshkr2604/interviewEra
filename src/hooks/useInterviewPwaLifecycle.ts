@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import type { RuntimePhase } from '@/lib/interview/runtime-phase'
-import { resumeSharedInterviewAudioContext } from '@/lib/voice/audio-gesture'
+import { resumeSharedInterviewAudioContext, resumeCaptureAudioContext } from '@/lib/voice/audio-gesture'
 
 export interface UseInterviewPwaLifecycleOptions {
   phase: RuntimePhase
@@ -35,6 +35,7 @@ export function useInterviewPwaLifecycle({
         persisted: persisted ?? false,
       })
       void resumeSharedInterviewAudioContext()
+      void resumeCaptureAudioContext()
       onVisibleResumeRef.current?.()
       if (
         phaseRef.current === 'avatar_speaking' ||
@@ -67,6 +68,7 @@ export function useInterviewPwaLifecycle({
         persisted: false,
       })
       void resumeSharedInterviewAudioContext()
+      void resumeCaptureAudioContext()
       // Do not retry avatar TTS on focus — native confirm() and minor focus churn
       // would cancel in-progress browser speech and cause restart loops.
     }

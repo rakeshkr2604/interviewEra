@@ -92,6 +92,10 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   const [confusion, setConfusion] = useState('')
   const [bugs, setBugs] = useState('')
   const [wouldUse, setWouldUse] = useState<WouldUse>(null)
+  const [npsScore, setNpsScore] = useState<number | null>(null)
+  const [feedbackCategory, setFeedbackCategory] = useState<
+    'general' | 'bug' | 'feature' | 'interview' | 'report' | 'ai_quality'
+  >('general')
   const [screenshotPath, setScreenshotPath] = useState<string | null>(null)
   const [screenshotUploading, setScreenshotUploading] = useState(false)
   // Bumping this key remounts the uploader, clearing its internal state on reset.
@@ -114,6 +118,8 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     setConfusion('')
     setBugs('')
     setWouldUse(null)
+    setNpsScore(null)
+    setFeedbackCategory('general')
     setScreenshotPath(null)
     setScreenshotUploading(false)
     setUploaderKey((k) => k + 1)
@@ -148,6 +154,8 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
           confusionText: confusion,
           bugsText: bugs,
           wouldUseAgain: wouldUse,
+          npsScore,
+          feedbackCategory,
           pageUrl: typeof window !== 'undefined' ? window.location.href : '',
           browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           ...(screenshotPath ? { screenshotPath } : {}),
@@ -291,6 +299,46 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
                   )
                 })}
               </div>
+            </div>
+
+            <div className={IE_FIELD_GROUP_CLASS}>
+              <FieldLabel htmlFor="fb-category">Feedback type</FieldLabel>
+              <select
+                id="fb-category"
+                value={feedbackCategory}
+                disabled={submitting}
+                onChange={(e) =>
+                  setFeedbackCategory(
+                    e.target.value as typeof feedbackCategory,
+                  )
+                }
+                className={IE_INPUT_TOOL_CLASS}
+                style={IE_FIELD_SURFACE_STYLE}
+              >
+                <option value="general">General</option>
+                <option value="feature">Feature request</option>
+                <option value="bug">Bug report</option>
+                <option value="interview">Interview experience</option>
+                <option value="report">Report usefulness</option>
+                <option value="ai_quality">AI answer quality</option>
+              </select>
+            </div>
+
+            <div className={IE_FIELD_GROUP_CLASS}>
+              <FieldLabel htmlFor="fb-nps">NPS (0–10, optional)</FieldLabel>
+              <input
+                id="fb-nps"
+                type="range"
+                min={0}
+                max={10}
+                value={npsScore ?? 5}
+                disabled={submitting}
+                onChange={(e) => setNpsScore(parseInt(e.target.value, 10))}
+                className="w-full"
+              />
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {npsScore === null ? 'Slide to set a score' : `Score: ${npsScore}`}
+              </p>
             </div>
 
             {/* Screenshot */}

@@ -2,6 +2,8 @@
 
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
+import { isPlatformAdminUser } from '@/lib/admin/auth';
+import { canAccessCampusDashboard } from '@/lib/college/rbac';
 
 export async function updateOrgProfile(formData: FormData) {
   const supabase = await createClient();
@@ -11,17 +13,38 @@ export async function updateOrgProfile(formData: FormData) {
 
   if (!user) return { error: 'Not authenticated.' };
 
+  const serviceClient = createServiceClient();
+
+  const { data: profile } = await serviceClient
+    .from('users')
+    .select('plan_tier')
+    .eq('id', user.id)
+    .single();
+
+  const platformAdmin = await isPlatformAdminUser(user.id, user.email);
+  if (!canAccessCampusDashboard(profile?.plan_tier) && !platformAdmin) {
+    return { error: 'Forbidden.' };
+  }
+
   const name = (formData.get('name') as string | null)?.trim();
+  const coordinatorName = (formData.get('coordinator_name') as string | null)?.trim() || null;
+  const contactEmail = (formData.get('contact_email') as string | null)?.trim() || null;
 
   if (!name || name.length < 2) {
     return { error: 'Organization name must be at least 2 characters.' };
   }
 
-  const serviceClient = createServiceClient();
+  if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
+    return { error: 'Contact email is invalid.' };
+  }
 
   const { error } = await serviceClient
     .from('campus_organizations')
-    .update({ name })
+    .update({
+      name,
+      coordinator_name: coordinatorName,
+      contact_email: contactEmail,
+    })
     .eq('admin_user_id', user.id);
 
   if (error) {

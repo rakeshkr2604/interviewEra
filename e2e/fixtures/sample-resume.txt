@@ -1,0 +1,9 @@
+Jane Doe
+Software Engineer
+Email: jane@example.com
+
+Experience:
+- Built web applications with React and TypeScript.
+- Led a team of 3 engineers on an interview practice platform.
+
+Skills: JavaScript, TypeScript, React, Node.js

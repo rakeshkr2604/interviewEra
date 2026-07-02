@@ -9,7 +9,7 @@ export function SidebarCommunityLinks({ onNavigate }: { onNavigate?: () => void 
     <div className="mt-2 border-t border-[var(--card-border)]/55 pt-3">
       <p
         className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-[0.16em]"
-        style={{ color: 'color-mix(in srgb, var(--text-muted) 52%, transparent)' }}
+        style={{ color: 'var(--text-muted)' }}
       >
         Community
       </p>

@@ -163,6 +163,11 @@ export const feedbackSubmitSchema = z.object({
   confusionText: feedbackText(2000),
   bugsText: feedbackText(2000),
   wouldUseAgain: z.boolean().nullable().optional().default(null),
+  npsScore: z.coerce.number().int().min(0).max(10).nullable().optional().default(null),
+  feedbackCategory: z
+    .enum(['general', 'bug', 'feature', 'interview', 'report', 'ai_quality'])
+    .optional()
+    .default('general'),
   pageUrl: z
     .preprocess((v) => (typeof v === 'string' ? v : ''), z.string().max(2048))
     .transform((s) => safeText(s, 2048)),

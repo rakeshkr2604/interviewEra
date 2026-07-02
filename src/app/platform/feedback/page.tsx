@@ -16,8 +16,9 @@
  * trusts the layout's guard and focuses entirely on UX.
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import Image from 'next/image';
+import { toast } from 'sonner';
 import {
   Search, RefreshCw, ChevronLeft, ChevronRight,
   CheckCircle2, Pin, Archive, Eye, EyeOff,
@@ -159,7 +160,155 @@ function DeviceIcon({ type }: { type: string | undefined }) {
   return <Monitor className="h-3 w-3" />;
 }
 
-// ─── Stats bar ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildFeedbackReplyCompose(row: FeedbackRow) {
+  const to = row.email.trim();
+  if (!to || !to.includes('@')) return null;
+
+  const subject = 'Re: Your InterviewEra feedback';
+  const preview =
+    row.liked_text?.trim() ||
+    row.bugs_text?.trim() ||
+    row.confusion_text?.trim() ||
+    '';
+  const firstName = row.name.trim().split(/\s+/)[0] || row.name.trim() || 'there';
+  const body = [
+    `Hi ${firstName},`,
+    '',
+    'Thanks for your feedback on InterviewEra.',
+    '',
+    preview ? `---\nTheir note:\n"${preview.slice(0, 800)}"` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const q = (key: string, value: string) =>
+    `${encodeURIComponent(key)}=${encodeURIComponent(value)}`;
+
+  return {
+    to,
+    subject,
+    body,
+    gmail: `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+    outlook: `https://outlook.live.com/mail/0/deeplink/compose?to=${encodeURIComponent(to)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`,
+    mailto: `mailto:${to}?${q('subject', subject)}&${q('body', body)}`,
+  };
+}
+
+function FeedbackReplyButton({ row }: { row: FeedbackRow }) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const compose = useMemo(() => buildFeedbackReplyCompose(row), [row]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const openUrl = useCallback((url: string) => {
+    setOpen(false);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
+  const openMailApp = useCallback(() => {
+    if (!compose) return;
+    setOpen(false);
+    window.location.assign(compose.mailto);
+  }, [compose]);
+
+  const copyEmail = useCallback(async () => {
+    if (!compose) return;
+    setOpen(false);
+    try {
+      await navigator.clipboard.writeText(compose.to);
+      toast.success('Email copied to clipboard');
+    } catch {
+      toast.error('Could not copy email');
+    }
+  }, [compose]);
+
+  if (!compose) {
+    return (
+      <span
+        className="ml-auto inline-flex cursor-not-allowed items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold opacity-50"
+        style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
+        title="No email on file"
+      >
+        <Mail className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Reply</span>
+      </span>
+    );
+  }
+
+  return (
+    <div ref={rootRef} className="relative ml-auto flex items-center" onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 rounded-l-lg border border-r-0 px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[color:var(--card-bg)]"
+        style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+        onClick={(e) => {
+          e.stopPropagation();
+          openUrl(compose.gmail);
+        }}
+      >
+        <Mail className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Reply</span>
+      </button>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label="More reply options"
+        className="inline-flex items-center rounded-r-lg border px-1.5 py-1.5 transition-colors hover:bg-[color:var(--card-bg)]"
+        style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen((v) => !v);
+        }}
+      >
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open ? (
+        <div
+          role="menu"
+          className="absolute bottom-full right-0 z-50 mb-1 min-w-[11rem] overflow-hidden rounded-xl border py-1 shadow-lg"
+          style={{
+            borderColor: 'var(--card-border)',
+            background: 'var(--card-bg)',
+            boxShadow: 'var(--card-shadow)',
+          }}
+        >
+          {[
+            { label: 'Gmail', action: () => openUrl(compose.gmail) },
+            { label: 'Outlook', action: () => openUrl(compose.outlook) },
+            { label: 'Mail app', action: openMailApp },
+            { label: 'Copy email', action: () => void copyEmail() },
+          ].map(({ label, action }) => (
+            <button
+              key={label}
+              type="button"
+              role="menuitem"
+              className="flex w-full px-3 py-2 text-left text-xs font-medium transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)]"
+              style={{ color: 'var(--text-primary)' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                action();
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
 
 function StatsBar({
   stats,
@@ -514,17 +663,7 @@ function FeedbackCard({
           loading={mutating}
           onClick={(e) => { e.stopPropagation(); void onPatch({ is_archived: !row.is_archived }); }}
         />
-        <a
-          href={`mailto:${row.email}?subject=Re: Your InterviewEra feedback`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ml-auto inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-colors hover:bg-[color:var(--card-bg)]"
-          style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Mail className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Reply</span>
-        </a>
+        <FeedbackReplyButton row={row} />
       </div>
 
       {/* ── Expanded detail ── */}
@@ -693,7 +832,13 @@ function FeedbackCard({
 
 // ─── Retry emails button (ported from old page) ───────────────────────────────
 
-function RetryEmailsButton({ failedCount }: { failedCount: number }) {
+function RetryEmailsButton({
+  failedCount,
+  onRetried,
+}: {
+  failedCount: number;
+  onRetried?: () => void;
+}) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ retried: number; sent: number; failed: number; rows: RetryResultRow[] } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -704,7 +849,7 @@ function RetryEmailsButton({ failedCount }: { failedCount: number }) {
       const res  = await fetch('/api/admin/feedback-retry', { method: 'POST' });
       const data = await res.json() as typeof result & { error?: string };
       if (!res.ok) { setErr(data?.error ?? 'Something went wrong.'); }
-      else          { setResult(data); }
+      else          { setResult(data); onRetried?.(); }
     } catch { setErr('Network error — please try again.'); }
     finally   { setLoading(false); }
   }
@@ -785,7 +930,6 @@ export default function PlatformFeedbackPage() {
   const [total, setTotal]   = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [stats, setStats]   = useState<DashboardStats | null>(null);
-  const [failedEmailCount, _setFailedEmailCount] = useState(0);
   const [loading,  setLoading]  = useState(true);
   const [error,    setError]    = useState<string | null>(null);
 
@@ -837,13 +981,6 @@ export default function PlatformFeedbackPage() {
       setTotal(data.total);
       setTotalPages(data.total_pages);
       setStats(data.stats);
-
-      // Also fetch failed email count for the retry button
-      const failRes = await fetch('/api/admin/feedback?limit=1&is_archived=&email_status=failed').catch(() => null);
-      if (failRes?.ok) {
-        // We don't have a dedicated failed-count endpoint; use the stats field via a quick count
-        // For now approximate from stats — this is only for the retry button label
-      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load feedback.');
     } finally {
@@ -853,21 +990,7 @@ export default function PlatformFeedbackPage() {
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
-  // Also load failed email count once on mount
-  useEffect(() => {
-    fetch('/api/admin/feedback?limit=1&show_archived=false')
-      .then(r => r.ok ? r.json() as Promise<FeedbackListResponse> : null)
-      .then(d => {
-        if (!d) return;
-        // Use platform/feedback API to get failed email count separately
-        // For now we load it from a dedicated query
-      })
-      .catch(() => null);
-
-    // Fetch email failure count via retry endpoint (HEAD trick is not available, so just call stats)
-    fetch('/api/admin/recent-users?page=1&limit=1')
-      .catch(() => null); // fire and forget warm-up
-  }, []);
+  const failedEmailCount = stats?.failed_email_count ?? 0;
 
   // ── Mutation ───────────────────────────────────────────────────────────────
   async function patchItem(id: string, patch: Partial<FeedbackRow>) {
@@ -932,7 +1055,7 @@ export default function PlatformFeedbackPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <RetryEmailsButton failedCount={failedEmailCount} />
+          <RetryEmailsButton failedCount={failedEmailCount} onRetried={() => void fetchData()} />
           <button
             onClick={() => void fetchData()}
             disabled={loading}

@@ -273,6 +273,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
         overallScore={report.overall_score as number}
         userPlan={planTier}
         interviewId={interview.id as string}
+        reportId={id}
       />
 
       {sessionQualityFeedback ? (

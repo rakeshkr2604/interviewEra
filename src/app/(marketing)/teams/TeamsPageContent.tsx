@@ -127,7 +127,7 @@ function CardBody({
       ) : null}
       <span
         className="mt-4 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold"
-        style={{ color: 'var(--accent-primary)' }}
+        style={{ color: 'var(--accent-link)' }}
       >
         {card.cta}
         <ArrowRight

@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { isPlatformAdminUser } from '@/lib/admin/auth';
+import { canAccessCampusDashboard } from '@/lib/college/rbac';
 import { Resend } from 'resend';
 import { z } from 'zod';
 import type { NextRequest } from 'next/server';
 import { getBaseUrl } from '@/lib/server/get-base-url';
+import { trackCampusEvent } from '@/lib/analytics/campus-events';
 
 const bodySchema = z.object({
   emails: z.array(z.string().email()).min(1).max(500),
+  source: z.enum(['manual', 'csv']).optional(),
 });
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
@@ -29,7 +33,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       .eq('id', user.id)
       .single();
 
-    if (profile?.plan_tier !== 'campus_admin') {
+    const platformAdmin = await isPlatformAdminUser(user.id, user.email);
+    if (!canAccessCampusDashboard(profile?.plan_tier) && !platformAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         { status: 400 }
       );
     }
-    const { emails } = validation.data;
+    const { emails, source } = validation.data;
 
     const { count: currentStudents } = await serviceClient
       .from('users')
@@ -108,9 +113,18 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       });
     }
 
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 7);
+
     const { data: insertedInvites, error: insertError } = await serviceClient
       .from('campus_invites')
-      .insert(toInvite.map((email) => ({ org_id: org.id, email })))
+      .insert(
+        toInvite.map((email) => ({
+          org_id: org.id,
+          email,
+          expires_at: expiresAt.toISOString(),
+        }))
+      )
       .select('email, token');
 
     if (insertError || !insertedInvites) {
@@ -311,6 +325,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
           console.error('[college/bulk-invite] Email send failed:', result.reason);
         }
       }
+    }
+
+    trackCampusEvent('campus_student_invite_sent', {
+      userId: user.id,
+      org_id: org.id,
+      invite_count: insertedInvites.length,
+      skipped,
+      source: source ?? 'manual',
+    });
+
+    if (source === 'csv') {
+      trackCampusEvent('campus_csv_import_completed', {
+        userId: user.id,
+        org_id: org.id,
+        row_count: emails.length,
+        invited: insertedInvites.length,
+        skipped,
+      });
     }
 
     return NextResponse.json({

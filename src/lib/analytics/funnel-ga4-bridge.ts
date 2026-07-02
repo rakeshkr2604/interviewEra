@@ -8,9 +8,9 @@ import {
   type FunnelEventName,
   type FunnelEventPayload,
 } from '@/lib/analytics/funnel';
+import { markAnalyticsDedupeKey } from '@/lib/analytics/dedupe';
 
 const STORAGE_PREFIX = 'ie_funnel_ga4:';
-const memoryDedupe = new Set<string>();
 
 /** Payload returned by POST /api/interview/complete for client GA4 emission. */
 export type FunnelCompleteGa4Payload = {
@@ -22,18 +22,7 @@ export type FunnelCompleteGa4Payload = {
 };
 
 function markDedupeKey(dedupeKey: string): boolean {
-  if (memoryDedupe.has(dedupeKey)) return false;
-
-  const storageKey = `${STORAGE_PREFIX}${dedupeKey}`;
-  try {
-    if (sessionStorage.getItem(storageKey)) return false;
-    sessionStorage.setItem(storageKey, '1');
-  } catch {
-    /* private mode — fall back to in-memory only */
-  }
-
-  memoryDedupe.add(dedupeKey);
-  return true;
+  return markAnalyticsDedupeKey(STORAGE_PREFIX, dedupeKey);
 }
 
 /** Fire a funnel event to GA4 once per dedupe key (no product-events). */

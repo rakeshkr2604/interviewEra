@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server';
-import type { DimensionScores, DetailedAnalysis, RadarDataPoint } from '@/types/app.types';
+import type { DetailedAnalysis, RadarDataPoint } from '@/types/app.types';
 import { getBaseUrl } from '@/lib/server/get-base-url';
 import type { InterviewCompletedEmailProps } from '@/emails/InterviewCompletedEmail';
 

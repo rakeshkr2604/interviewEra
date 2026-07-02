@@ -47,7 +47,7 @@ export function usePersistOnboardingDraft(input: PersistInput) {
 
   useEffect(() => {
     const scheduler = schedulerRef.current!
-    scheduler.schedule(input)
+    scheduler.schedule(inputRef.current)
 
     return () => {
       void scheduler.flushPending()

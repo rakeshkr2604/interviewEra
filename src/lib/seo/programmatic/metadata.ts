@@ -221,7 +221,7 @@ export function skillPageMetadata(skill: Skill): Metadata {
 
 function buildSkillDescription(skill: Skill): string {
   const fresherClause = skill.fresherRelevant
-    ? 'for freshers and campus placements at Indian tech companies'
+    ? 'for freshers at Indian tech companies'
     : 'asked at top Indian tech companies'
   return `Top ${skill.label} interview questions ${fresherClause} in ${PLACEMENT_YEAR}. ${skill.description}`
 }
@@ -309,9 +309,10 @@ export function toolAtsRoleMetadata(role: Role): Metadata {
  */
 export function toolStarTopicMetadata(topic: StarTopic): Metadata {
   const path = toolStarTopicPath(topic.slug)
+  const titleLabel = 'shortLabel' in topic && topic.shortLabel ? topic.shortLabel : topic.label
 
   return generateMetadata({
-    title: `STAR: ${topic.label} Example`,
+    title: `STAR: ${titleLabel} Example`,
     description: `${topic.description} Free STAR builder with a worked example, scoring rubric, and prep tips.`,
     path,
     keywords: [

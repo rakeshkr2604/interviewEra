@@ -6,7 +6,7 @@ export const WHAT_IS_AGENTIC_AI_PATH = '/blog/what-is-agentic-ai'
 export const WHAT_IS_AGENTIC_AI_CONFIG: AgenticSpokeConfig = {
   category: 'Agentic AI',
   singleTitle: 'What Is Agentic AI? Definition, Examples & Interview Context',
-  metaTitle: 'What Is Agentic AI? Definition & Guide 2026',
+  metaTitle: 'What Is Agentic AI? 2026 Guide',
   description:
     'Agentic AI explained for engineers — definition, how it differs from autocomplete and chatbots, real interview examples, and why companies test human-AI collaboration in 2026 hiring.',
   canonicalPath: WHAT_IS_AGENTIC_AI_PATH,

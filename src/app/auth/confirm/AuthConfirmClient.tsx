@@ -5,6 +5,12 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import type { EmailOtpType } from '@supabase/supabase-js';
+import { isAuthV2Enabled } from '@/lib/auth/flags';
+import { isSafePath } from '@/lib/auth/auth-params';
+import {
+  extractInviteTokenFromNext,
+  resolveDestinationFromTier,
+} from '@/lib/auth/resolve-destination-core';
 
 type ConfirmPhase = 'loading' | 'success' | 'error';
 
@@ -17,8 +23,8 @@ const ALLOWED_OTP_TYPES = new Set<EmailOtpType>([
   'email',
 ]);
 
-function resolveNext(raw: string | null): string {
-  if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
+function resolveNextLegacy(raw: string | null): string {
+  if (isSafePath(raw)) {
     return raw;
   }
   return '/dashboard';
@@ -36,7 +42,7 @@ export function AuthConfirmClient() {
     void (async () => {
       const tokenHash = searchParams.get('token_hash')?.trim();
       const rawType = searchParams.get('type')?.trim() ?? 'recovery';
-      const next = resolveNext(searchParams.get('next'));
+      const rawNext = searchParams.get('next');
 
       if (!tokenHash) {
         if (!cancelled) {
@@ -55,7 +61,7 @@ export function AuthConfirmClient() {
       }
 
       const supabase = createClient();
-      const { error } = await supabase.auth.verifyOtp({
+      const { data: verifyData, error } = await supabase.auth.verifyOtp({
         token_hash: tokenHash,
         type: rawType as EmailOtpType,
       });
@@ -91,8 +97,24 @@ export function AuthConfirmClient() {
         }
       }
 
+      let destination = resolveNextLegacy(rawNext);
+
+      if (isAuthV2Enabled() && verifyData.user) {
+        const { data: profile } = await supabase
+          .from('users')
+          .select('plan_tier')
+          .eq('id', verifyData.user.id)
+          .single();
+
+        const inviteToken = extractInviteTokenFromNext(isSafePath(rawNext) ? rawNext : undefined);
+        destination = resolveDestinationFromTier(profile?.plan_tier, {
+          next: isSafePath(rawNext) ? rawNext : undefined,
+          inviteToken,
+        });
+      }
+
       setPhase('success');
-      router.replace(next);
+      router.replace(destination);
       router.refresh();
     })();
 
@@ -111,6 +133,14 @@ export function AuthConfirmClient() {
     );
   }
 
+  const isSignupFlow =
+    searchParams.get('type') === 'signup' || searchParams.get('type') === 'magiclink';
+  const errorHref = isAuthV2Enabled()
+    ? `/auth/error?code=verification_expired`
+    : isSignupFlow
+      ? '/signup'
+      : '/forgot-password';
+
   return (
     <div className="mx-auto max-w-md space-y-4 px-4 py-24 text-center">
       <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
@@ -120,11 +150,11 @@ export function AuthConfirmClient() {
         {message}
       </p>
       <Link
-        href="/forgot-password"
+        href={errorHref}
         className="inline-flex text-sm font-semibold"
         style={{ color: 'var(--accent-primary)' }}
       >
-        Request a new reset link →
+        {isSignupFlow ? 'Get help verifying your email →' : 'Request a new reset link →'}
       </Link>
     </div>
   );

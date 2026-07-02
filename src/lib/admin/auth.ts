@@ -1,18 +1,9 @@
 /**
  * Platform-admin authorization helpers.
- *
- * "Platform admin" = a user whose email is listed in the ADMIN_EMAILS env var.
- * This is separate from "campus admin" (plan_tier = 'campus_admin'), which is
- * the B2B role for T&P officers.
- *
- * Usage in API routes:
- *   const { admin, error } = await requirePlatformAdmin();
- *   if (error) return error;           // 401 or 403 NextResponse
- *   // admin.id / admin.email available
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 export interface PlatformAdmin {
   id: string;
@@ -34,6 +25,29 @@ export function isPlatformAdmin(email: string): boolean {
   return getPlatformAdminEmails().has(email.toLowerCase());
 }
 
+async function isPlatformRoleAdmin(userId: string): Promise<boolean> {
+  try {
+    const svc = createServiceClient();
+    const { data: profile } = await svc
+      .from('users')
+      .select('platform_role')
+      .eq('id', userId)
+      .single();
+    return profile?.platform_role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+/** True when user is in ADMIN_EMAILS or has platform_role = admin. */
+export async function isPlatformAdminUser(
+  userId: string,
+  email: string | null | undefined,
+): Promise<boolean> {
+  if (email && isPlatformAdmin(email)) return true;
+  return isPlatformRoleAdmin(userId);
+}
+
 export async function requirePlatformAdmin(): Promise<AdminResult> {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -42,7 +56,9 @@ export async function requirePlatformAdmin(): Promise<AdminResult> {
     return { admin: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 
-  if (!isPlatformAdmin(user.email)) {
+  const allowed = await isPlatformAdminUser(user.id, user.email);
+
+  if (!allowed) {
     return { admin: null, error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) };
   }
 

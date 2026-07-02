@@ -30,7 +30,7 @@ const T = {
   text2:  'var(--text-secondary)',
   text3:  'var(--text-muted)',
   acc:    'var(--accent-primary)',
-  acc2:   'var(--accent-hover)',
+  acc2:   'var(--accent-link)',
   accdim: 'var(--v3-accdim)',
   accbrd: 'var(--v3-accbrd)',
   ok:     'var(--accent-success)',
@@ -91,7 +91,7 @@ export function PricingPageClient() {
   const proPerDay    = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
 
   return (
-    <div style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
+    <main id="main-content" style={{ color: 'var(--text-primary)', background: 'var(--bg-primary)' }}>
       <PricingPageViewTracker sourcePage="/pricing" />
       {/* ─── Responsive + cross-browser styles ─── */}
       <style>{`
@@ -273,7 +273,7 @@ export function PricingPageClient() {
             {/* Free */}
             <div className="pr-card">
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Free</h3>
+                <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Free</h2>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.text, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
                   ₹0<span style={{ fontSize: 13, fontWeight: 400, color: T.text3, marginLeft: 4 }}>Forever</span>
                 </p>
@@ -291,7 +291,7 @@ export function PricingPageClient() {
             {/* Starter */}
             <div className="pr-card">
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Starter</h3>
+                <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Starter</h2>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.text, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
                   {planPriceLine('starter')}
                 </p>
@@ -315,7 +315,7 @@ export function PricingPageClient() {
             <div className="pr-card pr-card--pop">
               <span className="pr-card-badge">Popular for heavy practice</span>
               <div style={{ marginBottom: 16 }}>
-                <h3 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Pro</h3>
+                <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Pro</h2>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.acc2, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
                   {planPriceLine('pro')}
                 </p>
@@ -364,7 +364,7 @@ export function PricingPageClient() {
       </section>
 
       {/* ── BOTTOM CTA ── */}
-      <div className="pr-cta-sec">
+      <section className="pr-cta-sec" aria-label="Get started">
         <div className="pr-wrap">
           <div className="pr-cta-pill">Free to start — no card required</div>
           <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(26px, 5vw, 46px)', fontWeight: 800, marginBottom: 16, color: T.text, letterSpacing: '-0.028em' }}>
@@ -385,7 +385,7 @@ export function PricingPageClient() {
             </TrackedCtaLink>
           </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }

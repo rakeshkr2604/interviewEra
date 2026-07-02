@@ -1,9 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server';
+import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/server';
 import { displayNameSchema } from '@/lib/validations/schemas';
 import { sendSignupVerificationEmail } from '@/lib/email/lifecycle/send-verification';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { sanitizeNext } from '@/lib/auth/auth-params';
+import { captureReferralFromCode } from '@/lib/referral/capture-referral';
 
 const bodySchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
@@ -67,8 +70,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const { email, password, name, next, metadata, placementDate } = parsed.data;
   const normalizedEmail = email.trim().toLowerCase();
-  const safeNext =
-    next && next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+  const safeNext = sanitizeNext(next);
 
   const service = createServiceClient();
 
@@ -98,6 +100,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   if (placementDate) {
     await service.from('users').update({ placement_date: placementDate }).eq('id', userId);
+  }
+
+  const cookieStore = await cookies();
+  const referralCode = cookieStore.get('referral_code')?.value;
+  if (referralCode) {
+    void captureReferralFromCode(service, userId, referralCode).catch((err) => {
+      console.warn('[auth/signup] referral capture failed:', err);
+    });
   }
 
   const verification = await sendSignupVerificationEmail(normalizedEmail, {

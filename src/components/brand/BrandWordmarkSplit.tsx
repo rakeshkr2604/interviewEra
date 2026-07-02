@@ -17,7 +17,7 @@ export function BrandWordmarkSplit({
       <span className={interviewClassName} style={{ color: 'var(--text-primary)' }}>
         Interview
       </span>
-      <span className={eraClassName} style={{ color: 'var(--accent-primary)' }}>
+      <span className={eraClassName} style={{ color: 'var(--accent-link)' }}>
         Era
       </span>
     </span>

@@ -112,7 +112,7 @@ function createPaymentStore(initial: { user: UserRow; payments: PaymentRow[] }) 
             };
 
             return {
-              eq: (col: string, id: string) => {
+              eq: (col: string, _id: string) => {
                 if (col === 'id') {
                   return {
                     is: (lockCol: string, lockVal: null) => ({

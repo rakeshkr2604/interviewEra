@@ -8,7 +8,7 @@ import {
   maskRazorpayKeyId,
 } from '@/lib/razorpay/client';
 import { getPaidPlan, isPaidPlanId } from '@/lib/pricing/plans';
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { paymentCreateOrderSchema } from '@/lib/validations/schemas';
 import type { PlanTier } from '@/types/app.types';
 import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
@@ -48,18 +48,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const rateLimit = await checkRateLimit(`payment:${user.id}`, 60, 5);
-  if (!rateLimit.allowed) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait before trying again.' },
-      {
-        status: 429,
-        headers: {
-          'Retry-After': String(rateLimit.resetInSeconds),
-          'X-RateLimit-Remaining': '0',
-        },
-      },
-    );
+  const rateLimit = await checkRateLimit(`payment:${user.id}`, 60, 5, { failClosed: true });
+  const blocked = buildRateLimitHttpResponse(
+    rateLimit,
+    'Too many requests. Please wait before trying again.',
+  );
+  if (blocked) {
+    return NextResponse.json(blocked.body, {
+      status: blocked.status,
+      headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
+    });
   }
 
   let body: unknown;

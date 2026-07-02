@@ -5,6 +5,7 @@ import { creditsMonthStartIsoIst } from '@/lib/settings/ist-month'
 import {
   parseNotificationPreferencesJson,
 } from '@/lib/settings/notification-preferences'
+import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
 import { privatePageMetadata } from '@/lib/seo/metadata'
 import type { PlanTier } from '@/types/app.types'
 import type { BillingPlanInfo, BillingPayment, BillingTx } from '@/components/settings/BillingUsageCard'
@@ -23,9 +24,9 @@ export default async function SettingsPage() {
   if (!user) redirect('/login')
 
   const profileSelectFull =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path, referral_code' as const
   const profileSelectBase =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, plan_status, plan_expires_at, plan_started_at' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, plan_status, plan_expires_at, plan_started_at, referral_code' as const
 
   let profile: {
     name: string | null
@@ -39,6 +40,7 @@ export default async function SettingsPage() {
     plan_expires_at?: string | null
     plan_started_at?: string | null
     avatar_path?: string | null
+    referral_code?: string | null
   } | null = null
 
   const full = await supabase
@@ -138,6 +140,8 @@ export default async function SettingsPage() {
   const profileAvatarPath =
     typeof profile.avatar_path === 'string' ? profile.avatar_path : null
 
+  const candidateSnapshot = await loadCandidateSnapshot(user.id)
+
   return (
     <SettingsPageClient
       authUser={user}
@@ -153,6 +157,8 @@ export default async function SettingsPage() {
       recentTransactions={recentTransactions}
       notificationPrefs={notificationPrefs}
       weeklyImprovementSummaryOn={!digestUnsub}
+      candidateProfile={candidateSnapshot.profile}
+      referralCode={profile.referral_code ?? null}
     />
   )
 }

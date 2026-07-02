@@ -12,7 +12,9 @@ import {
   updateConversationState,
   getConversationState,
   initializeConversationState,
+  persistFollowUpQuestion,
 } from '@/lib/interview/conversation-state';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { selectTone } from '@/lib/interview/tone-selector';
 import type {
   ConversationState,
@@ -128,6 +130,20 @@ export async function processAnswer(
       // generateFollowUp returns '' for acknowledge_move_on / no-signal — fall through
       // to acknowledgment rather than emitting an empty interviewer turn.
       if (followUpQuestion.trim()) {
+        if (updatedState?.id) {
+          void persistFollowUpQuestion({
+            conversationStateId: updatedState.id,
+            originalQuestion: question,
+            originalAnswer: answer,
+            followupQuestion: followUpQuestion,
+            followupType: analysis.recommended_followup_type,
+          });
+        }
+        trackInterviewEvent('followup_generated', {
+          interviewId,
+          followupType: analysis.recommended_followup_type,
+        });
+
         return {
           type: 'followup',
           text: followUpQuestion,

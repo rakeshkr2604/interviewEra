@@ -16,6 +16,7 @@ import {
 } from '@/lib/interview/interview-mode';
 import { getTierConfig, getUserProgress } from '@/lib/retention';
 import type { TierPromptModifiers, UserTierId } from '@/lib/retention';
+import { deduplicateQuestions } from '@/lib/interview/deduplicate-questions';
 
 export class QuestionGenerationError extends Error {
   constructor(message: string) {
@@ -325,7 +326,14 @@ export async function generateQuestions({
             pool = coerced;
           }
 
-          const enforced = pool
+          const deduped = deduplicateQuestions(pool);
+          if (deduped.length < pool.length) {
+            console.warn(
+              `[generate-questions] Removed ${pool.length - deduped.length} duplicate/near-duplicate questions`,
+            );
+          }
+
+          const enforced = deduped
             .slice(0, questionCount)
             .map((q, idx) => ({ ...q, order: idx }));
 

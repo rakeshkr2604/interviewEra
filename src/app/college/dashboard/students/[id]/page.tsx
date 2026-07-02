@@ -61,6 +61,14 @@ async function getStudentDetails(adminUserId: string, studentId: string) {
     .eq('user_id', studentId)
     .single();
 
+  const { data: resume } = await serviceClient
+    .from('resumes')
+    .select('status')
+    .eq('user_id', studentId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
   const { data: interviews } = await serviceClient
     .from('interviews')
     .select('id, role, difficulty, status, started_at, completed_at, question_count')
@@ -84,7 +92,7 @@ async function getStudentDetails(adminUserId: string, studentId: string) {
     score: reportsByInterview.get(i.id) ?? null,
   }));
 
-  return { org, enrollment, progress, interviews: interviewsWithScores };
+  return { org, enrollment, progress, resume, interviews: interviewsWithScores };
 }
 
 const tierStyleMap: Record<number, { bg: string; color: string; label: string }> = {
@@ -144,7 +152,7 @@ export default async function StudentDetailPage({ params }: PageProps) {
     notFound();
   }
 
-  const { enrollment, progress, interviews } = data;
+  const { enrollment, progress, resume, interviews } = data;
   const completedInterviews = interviews.filter((i) => i.status === 'completed');
 
   return (
@@ -163,19 +171,20 @@ export default async function StudentDetailPage({ params }: PageProps) {
           <h1 className="text-3xl font-semibold" style={{ color: 'var(--text-primary)' }}>{enrollment.users.name ?? 'Student'}</h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>{enrollment.users.email}</p>
         </div>
-        <button
+        <a
+          href={`/api/college/students/export`}
           className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-all hover:-translate-y-0.5"
           style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-secondary)' }}
         >
           <Download className="h-4 w-4" />
-          Export Report
-        </button>
+          Export Cohort CSV
+        </a>
       </div>
 
       {/* Profile Info Card */}
       <div className="dashboard-premium-card p-5">
         <h2 className="text-lg font-semibold mb-4" style={{ color: 'var(--text-primary)' }}>Profile Information</h2>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-5">
           <div>
             <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Branch</p>
             <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
@@ -192,6 +201,12 @@ export default async function StudentDetailPage({ params }: PageProps) {
             <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Year</p>
             <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
               {enrollment.year ? `Year ${enrollment.year}` : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>Resume</p>
+            <p className="mt-1 text-base font-semibold capitalize" style={{ color: 'var(--text-primary)' }}>
+              {resume?.status?.replace(/_/g, ' ') ?? 'Not uploaded'}
             </p>
           </div>
           <div>

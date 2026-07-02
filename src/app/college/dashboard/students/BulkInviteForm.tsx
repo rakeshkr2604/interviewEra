@@ -27,6 +27,7 @@ export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<InviteResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importSource, setImportSource] = useState<'manual' | 'csv'>('manual');
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -38,6 +39,7 @@ export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
       const parsed = parseCSV(text);
       setEmails(parsed);
       setRawInput(parsed.join('\n'));
+      setImportSource('csv');
       setResult(null);
       setError(null);
     };
@@ -48,6 +50,7 @@ export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
     const text = e.target.value;
     setRawInput(text);
     setEmails(parseCSV(text));
+    setImportSource('manual');
     setResult(null);
     setError(null);
   }
@@ -69,7 +72,7 @@ export function BulkInviteForm({ seatsAvailable }: BulkInviteFormProps) {
       const res = await fetch('/api/college/bulk-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emails }),
+        body: JSON.stringify({ emails, source: importSource }),
       });
       const data = (await res.json()) as InviteResult & { error?: string };
       if (!res.ok) {

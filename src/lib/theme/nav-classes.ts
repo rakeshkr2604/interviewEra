@@ -12,7 +12,7 @@ export const NAV_DESKTOP_LINK_BASE = cn(
 );
 
 export const NAV_DESKTOP_LINK_ACTIVE = cn(
-  'bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] font-semibold text-(--accent-primary)',
+  'bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)] font-semibold text-(--accent-link)',
 );
 
 export const NAV_DROPDOWN_TRIGGER_BASE = cn(
@@ -38,7 +38,7 @@ export const NAV_MOBILE_LINK_BASE = cn(
 );
 
 export const NAV_MOBILE_LINK_ACTIVE = cn(
-  'bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] font-semibold text-(--accent-primary)',
+  'bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] font-semibold text-(--accent-link)',
 );
 
 export const NAV_MOBILE_SECTION_LABEL = cn(

@@ -88,17 +88,25 @@ export function CollegeSignupForm() {
         }),
       });
 
+      const orgBody = (await response.json()) as {
+        error?: string;
+        status?: string;
+        message?: string;
+      };
+
       if (!response.ok) {
-        const err = await response.json();
-        setFeedback({ kind: 'error', text: err.error || 'Failed to create organization.' });
+        setFeedback({ kind: 'error', text: orgBody.error || 'Failed to create organization.' });
         return;
       }
 
       setFeedback({
         kind: 'success',
         text:
-          signupBody.message ??
-          'Account created! Check your email to verify before signing in.',
+          orgBody.status === 'pending_verification'
+            ? (orgBody.message ??
+              'Application received. Our team will verify your campus workspace within 1–2 business days.')
+            : (signupBody.message ??
+              'Account created! Check your email to verify before signing in.'),
       });
     } catch (err) {
       setFeedback({

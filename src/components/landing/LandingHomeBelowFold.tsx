@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
 import Link from 'next/link';
+import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
 import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/container';
 
@@ -128,13 +128,14 @@ function CTASection({ isLoggedIn }: { isLoggedIn: boolean }) {
             Run a scored mock from your actual resume and leave with measurable feedback — not a vague “you did fine.”
           </p>
           <div className="flex flex-wrap justify-center gap-3">
-            <Link
+            <StartFreeCtaLink
               href={cta}
+              section="home_below_fold_cta"
               className="v3-btn-primary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-8 py-3.5 text-[15px] font-semibold no-underline"
               style={{ color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
             >
               Start Free
-            </Link>
+            </StartFreeCtaLink>
             <Link
               href="/pricing"
               className="v3-btn-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-7 py-3.5 text-[15px] font-semibold no-underline"

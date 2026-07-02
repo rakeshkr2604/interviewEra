@@ -1,13 +1,15 @@
 import { redirect } from 'next/navigation';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { CampusDashboardChrome } from '@/components/layout/CampusDashboardChrome';
+import { isPlatformAdminUser } from '@/lib/admin/auth';
+import { canAccessCampusDashboard } from '@/lib/college/rbac';
 
 async function getCampusOrgWithSeats(adminUserId: string) {
   const serviceClient = createServiceClient();
 
   const { data: org } = await serviceClient
     .from('campus_organizations')
-    .select('id, name, seat_count')
+    .select('id, name, seat_count, verification_status')
     .eq('admin_user_id', adminUserId)
     .single();
 
@@ -29,6 +31,7 @@ async function getCampusOrgWithSeats(adminUserId: string) {
     name: org.name,
     seatCount: org.seat_count,
     seatsUsed: (enrolledCount ?? 0) + (pendingCount ?? 0),
+    verificationStatus: org.verification_status as 'pending' | 'approved',
   };
 }
 
@@ -50,7 +53,11 @@ export default async function CollegeDashboardLayout({
     .eq('id', user.id)
     .single();
 
-  if (profile?.plan_tier !== 'campus_admin') {
+  const platformAdmin = await isPlatformAdminUser(user.id, user.email);
+  const hasCampusAccess =
+    canAccessCampusDashboard(profile?.plan_tier) || platformAdmin;
+
+  if (!hasCampusAccess) {
     redirect('/dashboard');
   }
 
@@ -58,6 +65,14 @@ export default async function CollegeDashboardLayout({
 
   if (!org) {
     redirect('/college/signup');
+  }
+
+  if (
+    org.verificationStatus === 'pending' &&
+    profile?.plan_tier !== 'campus_admin' &&
+    !platformAdmin
+  ) {
+    redirect('/college/signup?status=pending');
   }
 
   return (

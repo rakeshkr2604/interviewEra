@@ -198,11 +198,11 @@ export default function RootLayout({
                 `,
               }}
             />
-            <Suspense fallback={null}>
-              <GoogleAnalyticsPageView />
-            </Suspense>
           </>
         ) : null}
+        <Suspense fallback={null}>
+          <GoogleAnalyticsPageView />
+        </Suspense>
         <Clarity />
       </body>
     </html>

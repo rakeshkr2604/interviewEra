@@ -12,8 +12,7 @@ import { cn } from '@/lib/utils'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
 export function DashboardChrome({ children }: { children: React.ReactNode }) {
-  // TODO: re-enable once heartbeat endpoint auth is fixed (currently returns 401)
-  useHeartbeat(false);
+  useHeartbeat(true);
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')

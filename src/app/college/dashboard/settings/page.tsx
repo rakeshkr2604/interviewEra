@@ -21,7 +21,7 @@ export default async function CampusSettingsPage() {
 
   const { data: org } = await serviceClient
     .from('campus_organizations')
-    .select('id, name, seat_count, plan_start')
+    .select('id, name, seat_count, plan_start, contact_email, coordinator_name')
     .eq('admin_user_id', user.id)
     .single();
 
@@ -92,8 +92,8 @@ export default async function CampusSettingsPage() {
           seatsUsed,
           pendingInvites: pendingCount ?? 0,
           planStart: (org.plan_start as string | null) ?? null,
-          contactEmail: null,
-          coordinatorName: null,
+          contactEmail: org.contact_email,
+          coordinatorName: org.coordinator_name,
         }}
       />
     </div>
