@@ -75,7 +75,7 @@
   "devDependencies": {
     "@playwright/test": "^1.56.1",
     "@react-email/ui": "^6.6.3",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.0.1",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
