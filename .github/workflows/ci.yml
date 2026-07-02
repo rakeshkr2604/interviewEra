@@ -47,10 +47,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [quality]
     env:
+      # JWT-shaped placeholders pass createServiceClient() format checks at runtime;
+      # real auth stays skipped (global-setup fails against fake host).
       NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_anon_key
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
       NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
-      SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
       OPENAI_API_KEY: sk-placeholder
       RESEND_API_KEY: re_placeholder
       UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io

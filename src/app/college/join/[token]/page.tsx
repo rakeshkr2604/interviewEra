@@ -15,39 +15,43 @@ interface PageProps {
 }
 
 async function getInviteData(token: string) {
-  const serviceClient = createServiceClient();
+  try {
+    const serviceClient = createServiceClient();
 
-  const { data: invite, error } = await serviceClient
-    .from('campus_invites')
-    .select('id, org_id, email, status, invited_at, accepted_at, expires_at')
-    .eq('token', token)
-    .single();
+    const { data: invite, error } = await serviceClient
+      .from('campus_invites')
+      .select('id, org_id, email, status, invited_at, accepted_at, expires_at')
+      .eq('token', token)
+      .single();
 
-  if (error || !invite) {
+    if (error || !invite) {
+      return { invite: null, org: null };
+    }
+
+    const effectiveStatus = getEffectiveInviteStatus(invite);
+
+    if (invite.status === 'accepted') {
+      return { invite, org: null, error: 'accepted' as const };
+    }
+
+    if (effectiveStatus === 'expired') {
+      return { invite, org: null, error: 'expired' as const };
+    }
+
+    if (effectiveStatus === 'revoked') {
+      return { invite, org: null, error: 'revoked' as const };
+    }
+
+    const { data: org } = await serviceClient
+      .from('campus_organizations')
+      .select('id, name')
+      .eq('id', invite.org_id)
+      .single();
+
+    return { invite, org };
+  } catch {
     return { invite: null, org: null };
   }
-
-  const effectiveStatus = getEffectiveInviteStatus(invite);
-
-  if (invite.status === 'accepted') {
-    return { invite, org: null, error: 'accepted' as const };
-  }
-
-  if (effectiveStatus === 'expired') {
-    return { invite, org: null, error: 'expired' as const };
-  }
-
-  if (effectiveStatus === 'revoked') {
-    return { invite, org: null, error: 'revoked' as const };
-  }
-
-  const { data: org } = await serviceClient
-    .from('campus_organizations')
-    .select('id, name')
-    .eq('id', invite.org_id)
-    .single();
-
-  return { invite, org };
 }
 
 export default async function JoinInvitePage({ params }: PageProps) {
