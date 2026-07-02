@@ -55,6 +55,10 @@ jobs:
       RESEND_API_KEY: re_placeholder
       UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
       UPSTASH_REDIS_REST_TOKEN: placeholder_token
+      RAZORPAY_KEY_ID: rzp_test_placeholder
+      RAZORPAY_KEY_SECRET: placeholder_secret
+      RAZORPAY_WEBHOOK_SECRET: placeholder_webhook
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_placeholder
 
     steps:
       - name: Checkout

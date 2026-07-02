@@ -12,10 +12,22 @@ import { verifyOrderPaymentSignature } from '@/lib/razorpay/payment-signature';
 
 export { auditRazorpayConfig, detectRazorpayMode, maskRazorpayKeyId };
 
-export const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-});
+let razorpayClient: Razorpay | null = null;
+
+/** Lazy singleton — avoids Razorpay SDK init during Next.js build (CI has no keys). */
+function getRazorpayClient(): Razorpay {
+  if (razorpayClient) return razorpayClient;
+  const keyId = process.env.RAZORPAY_KEY_ID?.trim();
+  const keySecret = process.env.RAZORPAY_KEY_SECRET?.trim();
+  if (!keyId) {
+    throw new Error('RAZORPAY_KEY_ID is not configured');
+  }
+  razorpayClient = new Razorpay({
+    key_id: keyId,
+    key_secret: keySecret ?? '',
+  });
+  return razorpayClient;
+}
 
 export const MIN_ORDER_PAISE = 100;
 
@@ -52,7 +64,7 @@ export async function createPlanOrder(params: {
 
   let order: { id: string; amount: number | string; currency: string };
   try {
-    order = await razorpay.orders.create({
+    order = await getRazorpayClient().orders.create({
       amount: planConfig.amountPaise,
       currency: 'INR',
       receipt: receiptId,
@@ -90,7 +102,7 @@ export async function fetchRazorpayOrder(orderId: string): Promise<{
   status: string;
   notes: Record<string, string>;
 }> {
-  const order = await razorpay.orders.fetch(orderId);
+  const order = await getRazorpayClient().orders.fetch(orderId);
   return {
     id: order.id as string,
     amount: typeof order.amount === 'number' ? order.amount : Number(order.amount),
