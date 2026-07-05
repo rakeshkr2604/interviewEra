@@ -73,6 +73,7 @@ drafts/
 manual-test*
 test-output*
 logs/
+.voice-verify-out/
 *.log
 failed-emails.csv
 /screenshots/
@@ -98,3 +99,17 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Exceptions to the "Production hardening additions" internal-docs patterns above
+# (CLAUDE*.md / *_REPORT.md / *_PLAN.md / *_STRATEGY.md) — those patterns are broad
+# by design, but they were silently blocking `git add` on core engineering-program
+# documents that must be trackable: CLAUDE.md (the operating manual every session
+# reads first — previously untracked with no exception, meaning a fresh clone or CI
+# checkout would be missing it entirely) and three planning docs from the 2026-07
+# engineering program. Discovered and fixed 2026-07-05 (Task 1A.5) — if a new
+# internal-only scratch doc happens to match one of these suffixes, it stays
+# ignored by default; only the files named below are explicitly re-included.
+!CLAUDE.md
+!DEAD_CODE_REPORT.md
+!docs/RELEASE_STRATEGY.md
+!docs/OBSERVABILITY_EXECUTION_PLAN.md

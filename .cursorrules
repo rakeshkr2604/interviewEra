@@ -1,0 +1,12 @@
+# Cursor rules — InterviewEra
+
+This file is a pointer, not a policy document. The actual rules live in CLAUDE.md — read it before your first edit, every session. Do not treat this file as a substitute or a second source of truth; if this file and CLAUDE.md ever disagree, CLAUDE.md wins.
+
+1. **Read `CLAUDE.md` first.** It has the tech stack, Critical Invariants, High Risk Systems table, and Working Rules. Then read `docs/AI_BOUNDARIES.md` for the repository zone map (do-not-edit / caution / safe-to-edit).
+2. **Respect `MASTER_ENGINEERING_ROADMAP.md`.** It is the single source of truth for what engineering work is planned and in what order. If asked to do something that belongs to a different phase than the one you're working on, say so — don't silently expand scope.
+3. **Never modify a High Risk System** (CLAUDE.md's table: Payments, Speech/voice, Resume/PDF parsing, Auth V2, Database/RLS, SEO/indexing, Analytics/funnel integrity) **without reading its `docs/*.md` file first.**
+4. **Never bypass a Critical Invariant** (CLAUDE.md, numbered 1–10) to make something "work." If a fix seems to require bypassing one, stop and say so instead.
+5. **Always run verification before calling anything done** — at minimum `npm run lint` and `npm run typecheck`; add `npm test` / `npm run build` / the relevant domain check (`npx vitest run src/lib/razorpay/`, `npm run verify:pdf`, `npm run verify:voice`) when the change touches that area.
+6. **Never claim a verification step ran if it didn't.** If something needs a manual browser test or real device, say that explicitly instead of asserting it passed.
+7. **Prefer minimal diffs.** No incidental refactors on production-critical paths; no unrelated cleanup bundled into a feature or fix.
+8. **Preserve behavior.** This codebase's house style is degrade-don't-fail — don't introduce a hard failure where the existing pattern is a logged fallback, and don't change runtime behavior unless the task explicitly asks for it.

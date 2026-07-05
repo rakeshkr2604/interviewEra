@@ -1,11 +1,20 @@
 name: CI
 
-# Solo workflow: validate on every push to any branch — no PR required.
-# Dependabot still gets CI when it pushes to dependabot/* branches.
+# Validates on every push to any branch (direct-branch iteration, Dependabot
+# pushes) AND on pull requests targeting main (so required-status-check
+# branch protection has something to bind to once enabled — see
+# docs/BRANCH_PROTECTION_SETUP.md). A branch with an open PR will trigger
+# both events on the same commit; this is accepted duplication for now
+# (see docs/ENGINEERING_PLATFORM.md Phase 9) — path filtering to reduce it
+# is a later phase, not part of this change.
 on:
   push:
     branches:
       - '**'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
   workflow_dispatch:
 
 # Cancel any in-progress run on the same branch when a new commit is pushed
@@ -186,3 +195,94 @@ jobs:
 
       - name: Audit
         run: npm audit --audit-level=critical
+
+  # ── Job 4: Secret Scan ────────────────────────────────────────────────────────
+  # Gitleaks — scans every push and PR for accidentally committed secrets.
+  # Independent of the other jobs (like `audit`) so it doesn't slow down the
+  # build; still contributes its own pass/fail status to the overall run.
+  # Free for this repo (personal-account private repo — GITLEAKS_LICENSE is
+  # only required for GitHub Organization-owned repos, not User-owned ones).
+  # Config: .gitleaks.toml allowlists the two known-fake JWT-shaped placeholder
+  # values already in this file's e2e_auth job (not real secrets).
+  secrets_scan:
+    name: Secret Scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Job 5: Merge Readiness Summary ───────────────────────────────────────────
+  # GitHub Free has no required-status-checks UI to show "all checks must pass"
+  # in one place — this job builds that visibility by hand (Task 1A.1; see
+  # MASTER_ENGINEERING_ROADMAP.md "Founder Decision — GitHub Free, Permanently").
+  # Posts (or updates, on re-push) one PR comment summarizing every job's result.
+  # `if: always()` so it still runs and reports even when an upstream job failed.
+  merge_readiness:
+    name: Merge Readiness Summary
+    runs-on: ubuntu-latest
+    if: always() && github.event_name == 'pull_request'
+    needs: [quality, e2e_auth, pdf_extract, build, audit, secrets_scan]
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Post merge-readiness comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const results = {
+              'Lint & Type Check': '${{ needs.quality.result }}',
+              'E2E Auth': '${{ needs.e2e_auth.result }}',
+              'PDF extract regression': '${{ needs.pdf_extract.result }}',
+              'Build': '${{ needs.build.result }}',
+              'Security Audit': '${{ needs.audit.result }}',
+              'Secret Scan': '${{ needs.secrets_scan.result }}',
+            };
+            const icon = (r) => (r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌');
+            const allGood = Object.values(results).every((r) => r === 'success' || r === 'skipped');
+            const lines = Object.entries(results).map(([name, r]) => `${icon(r)} **${name}** — ${r}`);
+            const marker = '<!-- ci-merge-readiness -->';
+            const body = [
+              marker,
+              allGood
+                ? '### ✅ Merge Readiness: all checks passed'
+                : '### ❌ Merge Readiness: one or more checks failed',
+              '',
+              ...lines,
+              '',
+              '_GitHub Free has no required-status-checks gate — this comment is the visibility layer. Do not merge if anything above is red._',
+            ].join('\n');
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }

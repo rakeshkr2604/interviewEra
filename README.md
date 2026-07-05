@@ -3,15 +3,15 @@
 AI-powered mock interview practice SaaS for Indian students.
 
 ## Tech Stack
-- **Frontend:** Next.js 15 (App Router) + TypeScript + Tailwind CSS v4
+- **Frontend:** Next.js 16 (App Router) + TypeScript (strict) + Tailwind CSS v4
 - **UI:** shadcn/ui + motion/react animations
 - **Backend:** Next.js API Routes + Server Actions
 - **Database:** Supabase (PostgreSQL + RLS)
 - **Auth:** Supabase Auth (email + Google OAuth)
-- **AI:** GPT-4o-mini (OpenAI) + Mistral fallback
+- **AI:** OpenRouter-routed multi-model (no Mistral fallback — removed as dead code, see CLAUDE.md Critical Invariant #9)
 - **Payments:** Razorpay (UPI + card + netbanking)
 - **Email:** Resend
-- **Analytics:** Vercel Analytics
+- **Analytics:** GA4 + Microsoft Clarity + Vercel Analytics
 - **Caching:** Upstash Redis
 
 ## Interview Flow
@@ -30,14 +30,7 @@ npm run dev
 ```
 
 ## Supabase Migrations
-Run in order in Supabase SQL Editor:
-1. supabase/migrations/001_initial_schema.sql
-2. supabase/migrations/002_rpc_functions.sql
-3. supabase/migrations/003_email_preferences.sql
-4. supabase/migrations/004_domain_packs.sql
-5. supabase/migrations/005_campus.sql
-6. supabase/migrations/006_indexes.sql
-7. supabase/migrations/007_referral_code.sql
+Run every file in `supabase/migrations/` in ascending numeric order (45+ sequential files as of this writing — don't hardcode a count or file list here, it will go stale; check the directory).
 
 ## Key Files
 - `CLAUDE.md` — Project rules and context (read before every session)

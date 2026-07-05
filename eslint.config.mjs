@@ -18,6 +18,7 @@ const eslintConfig = defineConfig([
     "load-tests/**",
     // Node CJS one-off scripts (require() is intentional)
     "scripts/**",
+    "scripts-archive/**",
     // Local brand toolkit / canvas (not part of the Next app)
     "coverage/**",
     "test-results/**",

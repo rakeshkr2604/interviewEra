@@ -1,0 +1,38 @@
+#!/usr/bin/env sh
+# Pre-push safety net (Task 1A.1 — MASTER_ENGINEERING_ROADMAP.md "GitHub-Free
+# workflow safety net"). This is friction, not a server-side gate: GitHub Free
+# cannot enforce branch protection (verified 403 on this plan), so this local
+# hook is the closest available substitute. Bypassable with
+# `git push --no-verify` — that is an accepted, known escape hatch for a real
+# emergency, not a bug to close.
+#
+# 1. Blocks direct pushes to `main` on any remote — the workflow is
+#    branch -> PR -> squash-merge (CLAUDE.md).
+# 2. Runs lint + typecheck before any push, to any branch.
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "$remote_ref" = "refs/heads/main" ]; then
+    echo ""
+    echo "Direct push to 'main' blocked by the pre-push hook."
+    echo "Workflow: branch -> PR -> squash-merge (see CLAUDE.md)."
+    echo "Bypass only if you know why: git push --no-verify"
+    echo ""
+    exit 1
+  fi
+done
+
+echo "pre-push: running lint + typecheck..."
+
+npm run lint
+if [ $? -ne 0 ]; then
+  echo "Lint failed — push aborted. Fix it, or: git push --no-verify"
+  exit 1
+fi
+
+npm run typecheck
+if [ $? -ne 0 ]; then
+  echo "Typecheck failed — push aborted. Fix it, or: git push --no-verify"
+  exit 1
+fi
+
+exit 0

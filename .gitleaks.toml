@@ -1,0 +1,19 @@
+title = "InterviewEra gitleaks config"
+
+# Extends gitleaks' full default ruleset (AWS keys, private keys, generic
+# high-entropy secrets, JWTs, etc.) — this file only adds a narrow allowlist,
+# it does not redefine or weaken any detection rule.
+[extend]
+useDefault = true
+
+# Known-fake CI placeholder values are NOT real secrets — they are JWT-shaped
+# strings deliberately used in .github/workflows/ci.yml's e2e_auth job so
+# createServiceClient() format checks pass at runtime while real auth stays
+# skipped (see that job's own comment). Allowlisted by exact value, not by
+# file path, so a real secret pasted into ci.yml in the future is still caught.
+[allowlist]
+description = "Known-fake JWT-shaped CI placeholders (ci.yml e2e_auth job)"
+regexes = [
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9\.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0\.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU',
+]

@@ -28,7 +28,6 @@ src/components/seo/
   SeoCrossLinksSection.tsx       # Generic server-rendered link strip
   HomeMoneyPageLinks.tsx         # Homepage hub
   ToolsRelatedBlogStrip.tsx      # Appended under all /tools/* pages
-  BlogRelatedToolsStrip.tsx      # Appended under all /blog/* pages
 ```
 
 ## What was deleted

@@ -36,6 +36,7 @@
     "node_modules",
     "vitest.config.ts",
     "scripts",
+    "scripts-archive",
     "**/*.test.ts",
     "**/*.test.tsx"
   ]
