@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect, type RefObject } from 'react';
-import { getMicAudioConstraints } from '@/lib/settings/client-preferences';
 import { getWebSpeechUnsupportedMessage } from '@/lib/voice/browser-capabilities';
 import { resolveSttLocale } from '@/lib/voice/speech-locale';
-import { releaseAudioForMicCaptureSync } from '@/lib/voice/audio-gesture';
+import { releaseAudioForMicCapture, releaseAudioForMicCaptureSync } from '@/lib/voice/audio-gesture';
 import {
   mergeFinalTranscript,
   shouldPromoteInterimOnEnd,
+  shouldSuppressInterimAsDuplicate,
   sttResultEventHash,
 } from '@/lib/voice/stt-transcript';
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry';
@@ -17,8 +17,16 @@ import {
   lifecycleWarn as scopedLifecycleWarn,
   voiceDebug,
   voiceLog,
-  getPlatformContext,
+  micFlowLog,
+  buildMicErrorContext,
 } from '@/lib/voice/lifecycle-log';
+import {
+  micCaptureCoordinator,
+} from '@/lib/voice/mic-capture-coordinator';
+import { micPermissionMonitor } from '@/lib/voice/mic-permission-monitor';
+import { emitMicPipelineTelemetry } from '@/lib/voice/mic-pipeline-telemetry';
+import { voicePipelineDiagnostics } from '@/lib/voice/voice-pipeline-diagnostics';
+import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-telemetry';
 import {
   isSttInputDebugEnabled,
   logMicTracksBeforeRecognitionStart,
@@ -27,10 +35,6 @@ import {
   sttInputTrace,
   stopSttInputLevelMeter,
 } from '@/lib/voice/stt-input-debug';
-
-function micFlowLog(event: string, data?: Record<string, unknown>): void {
-  console.log(`[mic-flow] ${event}`, { ...getPlatformContext(), ...(data ?? {}) });
-}
 
 // Minimal Web Speech API typings (not present in all TS DOM lib versions)
 interface SpeechRecognitionResult {
@@ -119,6 +123,8 @@ export interface UseSpeechRecognitionOptions {
   prepareForMicCapture?: () => void | Promise<void>;
   /** Fired when Web Speech repeatedly returns no-speech with zero transcript. */
   onWebSpeechStalled?: (payload: WebSpeechStalledPayload) => void;
+  /** Structured pipeline telemetry context (session page). */
+  telemetryCtx?: InterviewTelemetryContext;
 }
 
 export interface UseSpeechRecognitionReturn {
@@ -219,6 +225,9 @@ const STUCK_WATCHDOG_POLL_MS = 2_000;
 const MIN_RECOVERY_GAP_MS = 15_000;
 const MAX_RECOVERIES_PER_WINDOW = 3;
 const RECOVERY_WINDOW_MS = 60_000;
+/** Armed answer — detect orphaned shouldListen with no recognition instance. */
+const ORPHAN_INSTANCE_POLL_MS = 1_000;
+const ORPHAN_INSTANCE_MIN_GAP_MS = 500;
 
 function log(event: string, data?: Record<string, unknown>): void {
   if (data) {
@@ -231,7 +240,9 @@ function log(event: string, data?: Record<string, unknown>): void {
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {},
 ): UseSpeechRecognitionReturn {
-  const { keepArmedDuringAnswerRef, onSttTelemetry, prepareForMicCapture, onWebSpeechStalled } = options;
+  const { keepArmedDuringAnswerRef, onSttTelemetry, prepareForMicCapture, onWebSpeechStalled, telemetryCtx } = options;
+  const telemetryCtxRef = useRef(telemetryCtx);
+  telemetryCtxRef.current = telemetryCtx;
   const onWebSpeechStalledRef = useRef(onWebSpeechStalled);
   onWebSpeechStalledRef.current = onWebSpeechStalled;
   const isAnswerMicArmed = useCallback((): boolean => {
@@ -331,13 +342,12 @@ export function useSpeechRecognition(
   const armedNoSpeechStreakRef = useRef<number>(0);
   const webSpeechStalledFiredRef = useRef<boolean>(false);
   const micKeepAliveStreamRef = useRef<MediaStream | null>(null);
+  const lastOrphanRecoveryAtRef = useRef<number>(0);
   const recognitionStateRef = useRef<SpeechRecognitionState>('idle');
   recognitionStateRef.current = recognitionState;
 
   const releaseMicKeepAliveStream = useCallback((): void => {
-    const stream = micKeepAliveStreamRef.current;
-    if (!stream) return;
-    stream.getTracks().forEach((track) => track.stop());
+    micCaptureCoordinator.release('keep_alive');
     micKeepAliveStreamRef.current = null;
   }, []);
 
@@ -383,41 +393,53 @@ export function useSpeechRecognition(
     return Date.now() - lastSpeechAtRef.current < windowMs;
   }, []);
 
-  const ensureMicKeepAliveStream = useCallback(async (): Promise<boolean> => {
+  /**
+   * Prime mic permission via a short getUserMedia, then release immediately.
+   * Chrome treats concurrent getUserMedia + Web Speech as silent input — Web
+   * Speech must own the sole live capture when recognition.start() runs.
+   */
+  const primeMicPermission = useCallback(async (): Promise<boolean> => {
     if (!navigator?.mediaDevices?.getUserMedia) {
       setPermissionState('denied');
       setError('Microphone is not available in this browser.');
       return false;
     }
 
-    const existing = micKeepAliveStreamRef.current;
-    if (existing?.getTracks().some((track) => track.readyState === 'live')) {
-      return true;
-    }
-    if (existing) {
-      releaseMicKeepAliveStream();
-    }
+    releaseMicKeepAliveStream();
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints());
+      const stream = await micCaptureCoordinator.acquire({
+        owner: 'keep_alive',
+        telemetryCtx: telemetryCtxRef.current ?? undefined,
+      });
       const tracks = stream.getTracks();
-      micKeepAliveStreamRef.current = stream;
       voiceDebug('mic_stream_acquired', {
         track_count: tracks.length,
         labels: tracks.map((t) => t.label || '<unknown>'),
         readyStates: tracks.map((t) => t.readyState),
         muted_flags: tracks.map((t) => t.muted),
         keep_alive: true,
+        primed: true,
       });
-      micFlowLog('stream_created', { track_count: tracks.length, keep_alive: true });
+      micFlowLog('stream_created', { track_count: tracks.length, keep_alive: true, primed: true });
+      // Release before Web Speech — never hold a parallel capture.
+      releaseMicKeepAliveStream();
       setPermissionState('granted');
-      voiceDebug('mic_permission_granted', {});
-      voiceLog('mic_permission_granted', {});
-      micFlowLog('permission_granted', {});
+      voiceDebug('mic_permission_granted', { primed: true });
+      voiceLog('mic_permission_granted', { primed: true });
+      micFlowLog('permission_granted', { primed: true });
+      if (telemetryCtxRef.current) {
+        emitMicPipelineTelemetry('mic_permission_granted', telemetryCtxRef.current, {
+          primed: true,
+          track_count: tracks.length,
+          released: true,
+        });
+      }
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? `${err.name}: ${err.message}` : 'Unknown error';
       console.error('[speech] getUserMedia failed:', message);
+      micFlowLog('mic_acquire_failed', buildMicErrorContext(err, { keep_alive: true }));
 
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
         setPermissionState('denied');
@@ -448,8 +470,13 @@ export function useSpeechRecognition(
     hasRequestedMicRef.current = true;
     voiceDebug('mic_permission_requested', { source: 'useSpeechRecognition' });
     micFlowLog('permission_requested', { source: 'useSpeechRecognition' });
-    return ensureMicKeepAliveStream();
-  }, [ensureMicKeepAliveStream]);
+    if (telemetryCtxRef.current) {
+      emitMicPipelineTelemetry('mic_permission_requested', telemetryCtxRef.current, {
+        source: 'useSpeechRecognition',
+      });
+    }
+    return primeMicPermission();
+  }, [primeMicPermission]);
 
   const getPermissionState = useCallback(async (): Promise<'granted' | 'prompt' | 'denied' | 'unknown'> => {
     if (!navigator?.permissions?.query) return 'unknown';
@@ -550,6 +577,9 @@ export function useSpeechRecognition(
       hasInterim: interimRef.current.length > 0,
     });
     emitStt('stt_session_stopped', { reason, sessionId: generationRef.current });
+    if (telemetryCtxRef.current) {
+      emitMicPipelineTelemetry('speech_stopped', telemetryCtxRef.current, { reason });
+    }
   }, [detachRecognition, emitStt, releaseMicKeepAliveStream, setCapturing]);
 
   const markRestartBudgetExhausted = useCallback((source: string, gen: number) => {
@@ -582,6 +612,41 @@ export function useSpeechRecognition(
   }, [emitStt, keepArmedDuringAnswerRef, setCapturing]);
 
   type RestartKind = 'silence' | 'error';
+
+  const runScheduledRestart = useCallback(
+    async (source: string, scheduledGen: number, prepAudio: boolean): Promise<void> => {
+      if (!shouldListenRef.current || !mountedRef.current) return;
+      if (recognitionRef.current) return;
+
+      if (scheduledGen !== generationRef.current) {
+        emitStt('stt_restart_gen_mismatch', {
+          source,
+          scheduledGen,
+          currentGen: generationRef.current,
+          recognitionRefNull: recognitionRef.current === null,
+        });
+        voiceDebug('restart_gen_mismatch', {
+          source,
+          scheduledGen,
+          currentGen: generationRef.current,
+        });
+      }
+
+      if (!shouldListenRef.current || !mountedRef.current || recognitionRef.current) return;
+
+      if (prepAudio) {
+        try {
+          await releaseAudioForMicCapture();
+        } catch {
+          /* best-effort */
+        }
+      }
+
+      if (!shouldListenRef.current || !mountedRef.current || recognitionRef.current) return;
+      beginRecognitionRef.current();
+    },
+    [emitStt],
+  );
 
   const tryScheduleAutoRestart = useCallback((
     source: string,
@@ -620,8 +685,15 @@ export function useSpeechRecognition(
       if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
       restartTimerRef.current = setTimeout(() => {
         pendingRestartRef.current = false;
-        if (shouldListenRef.current && mountedRef.current && gen === generationRef.current) {
-          tryScheduleAutoRestart(`${source}_after_cooldown`, gen, kind);
+        if (shouldListenRef.current && mountedRef.current && !recognitionRef.current) {
+          void runScheduledRestart(`${source}_after_cooldown`, gen, false);
+        } else if (shouldListenRef.current && mountedRef.current && gen !== generationRef.current) {
+          emitStt('stt_restart_skipped_gen_mismatch', {
+            source: `${source}_after_cooldown`,
+            scheduledGen: gen,
+            currentGen: generationRef.current,
+            recognitionRefNull: recognitionRef.current === null,
+          });
         }
       }, waitMs);
       return false;
@@ -643,17 +715,17 @@ export function useSpeechRecognition(
       sessionId: gen,
       errorRestartCount: errorRestartCountThisQuestionRef.current,
       maxErrorRestarts: MAX_ERROR_RESTARTS_PER_QUESTION,
+      recognitionRefNull: recognitionRef.current === null,
     });
 
     if (restartTimerRef.current) clearTimeout(restartTimerRef.current);
+    const prepAudio = armed && source === 'armed_continuous_onend';
     restartTimerRef.current = setTimeout(() => {
       pendingRestartRef.current = false;
-      if (shouldListenRef.current && mountedRef.current && gen === generationRef.current) {
-        beginRecognitionRef.current();
-      }
+      void runScheduledRestart(source, gen, prepAudio);
     }, delayMs);
     return true;
-  }, [emitStt, isAnswerMicArmed, markRestartBudgetExhausted]);
+  }, [emitStt, isAnswerMicArmed, markRestartBudgetExhausted, runScheduledRestart]);
 
   // Legacy alias — visibility resume paths call beginRecognition directly.
 
@@ -730,14 +802,26 @@ export function useSpeechRecognition(
       }
       // Mic session is open; transcript events promote to 'active'.
       setCapturing(true);
-      setRecognitionState('starting');
-      startingSinceRef.current = Date.now();
-      emitStt('stt_onstart', { sessionId: myGen });
+      if (isAnswerMicArmed() && hasTranscriptContent()) {
+        setRecognitionState('active');
+        startingSinceRef.current = 0;
+      } else {
+        setRecognitionState('starting');
+        startingSinceRef.current = Date.now();
+      }
+      emitStt('stt_onstart', {
+        sessionId: myGen,
+        has_prior_transcript: hasTranscriptContent(),
+        recognitionRefNull: recognitionRef.current === null,
+      });
       emitStt('stt_start_success', { sessionId: myGen, phase: 'onstart' });
       sttInputTrace('onstart', { sessionId: myGen });
       voiceDebug('recognition_started', { gen: myGen });
       voiceLog('speech_started', { gen: myGen });
       micFlowLog('recognition_started', { gen: myGen });
+      if (telemetryCtxRef.current) {
+        emitMicPipelineTelemetry('speech_started', telemetryCtxRef.current, { gen: myGen });
+      }
       log('started');
     };
 
@@ -773,10 +857,9 @@ export function useSpeechRecognition(
       markSttInputDebugFlag('onspeechstart', myGen);
       armedNoSpeechStreakRef.current = 0;
       setCapturing(true);
-      setRecognitionState('active');
-      // Do not bump lastSpeechAt here — only real transcript events count for
-      // "recent speech" and stuck recovery. onspeechstart alone can fire while
-      // the audio pipeline delivers zero onresult events (Chrome/Edge silent STT).
+      // Stay on 'starting' until onresult — onspeechstart alone can fire while
+      // the audio pipeline delivers zero onresult (Chrome silent STT / no-speech).
+      voicePipelineDiagnostics.recordSpeechEvent('onspeechstart');
     };
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
@@ -865,10 +948,10 @@ export function useSpeechRecognition(
       if (interimChunk) {
         const cleaned = interimChunk.trim();
         if (cleaned && cleaned !== interimRef.current) {
-          const nFinal = finalTranscriptRef.current.trim().replace(/\s+/g, ' ').toLowerCase();
-          const nInterim = cleaned.replace(/\s+/g, ' ').toLowerCase();
-          const isDuplicateOfFinal =
-            nFinal.length > 0 && (nFinal === nInterim || nFinal.includes(nInterim));
+          const isDuplicateOfFinal = shouldSuppressInterimAsDuplicate(
+            finalTranscriptRef.current,
+            cleaned,
+          );
           if (!isDuplicateOfFinal) {
             interimRef.current = cleaned;
             lastSpeechAtRef.current = now;
@@ -908,6 +991,10 @@ export function useSpeechRecognition(
           has_interim: Boolean(interimChunk),
           total_chars: finalTranscriptRef.current.length + interimRef.current.length,
         });
+        voicePipelineDiagnostics.recordSpeechEvent('onresult');
+        voicePipelineDiagnostics.recordTranscriptUpdate(
+          finalTranscriptRef.current.length + interimRef.current.length,
+        );
         syncRender();
       }
     };
@@ -937,6 +1024,7 @@ export function useSpeechRecognition(
       // handle recovery, don't surface them as red errors to the user.
       if (event.error === 'no-speech') {
         log('benign_error', { error: 'no-speech' });
+        voicePipelineDiagnostics.recordSpeechEvent('no-speech');
         const hasLiveText =
           finalTranscriptRef.current.length > 0 ||
           interimRef.current.trim().length > 0;
@@ -1023,6 +1111,7 @@ export function useSpeechRecognition(
         sessionId: myGen,
         should_listen: shouldListenRef.current,
         final_chars: finalTranscriptRef.current.length,
+        recognition_ref_null: recognitionRef.current === null,
       });
       sttInputTrace('onend', {
         sessionId: myGen,
@@ -1096,6 +1185,7 @@ export function useSpeechRecognition(
     recognitionRef.current = recognition;
     // Web Speech opens its own mic capture on Chrome — holding getUserMedia
     // concurrently causes silent input and immediate no-speech errors.
+    releaseAudioForMicCaptureSync();
     if (isSttInputDebugEnabled()) {
       logMicTracksBeforeRecognitionStart(micKeepAliveStreamRef.current, myGen);
     }
@@ -1140,6 +1230,7 @@ export function useSpeechRecognition(
     maybeFireWebSpeechStalled,
     releaseMicKeepAliveStream,
     setCapturing,
+    hasTranscriptContent,
   ]);
 
   useEffect(() => {
@@ -1185,12 +1276,6 @@ export function useSpeechRecognition(
     if (hasRequestedMicRef.current && permissionStateRef.current === 'granted') {
       void (async () => {
         try {
-          const streamOk = await ensureMicKeepAliveStream();
-          if (!streamOk || !mountedRef.current) {
-            emitStt('stt_start_failed', { reason: 'keep_alive_stream_failed' });
-            if (mountedRef.current) setError('Unable to open microphone. Try Retry or Type answer.');
-            return;
-          }
           armRecognitionSync();
         } finally {
           startInFlightRef.current = false;
@@ -1218,7 +1303,7 @@ export function useSpeechRecognition(
       }
     })();
     return true;
-  }, [isSupported, emitStt, resetForNewListenSession, armRecognitionSync, requestMicPermission, ensureMicKeepAliveStream]);
+  }, [isSupported, emitStt, resetForNewListenSession, armRecognitionSync, requestMicPermission]);
 
   const startListening = useCallback(async (): Promise<boolean> => {
     if (!isSupported) return false;
@@ -1255,14 +1340,9 @@ export function useSpeechRecognition(
           setError('Microphone still blocked');
           return false;
         }
-      } else {
-        const streamOk = await ensureMicKeepAliveStream();
-        if (!streamOk) {
-          emitStt('stt_start_failed', { reason: 'keep_alive_stream_failed' });
-          setError('Unable to open microphone. Try Retry or Type answer.');
-          return false;
-        }
       }
+      // Permission already granted: Web Speech owns getUserMedia exclusively.
+      // Do NOT acquire a coordinator stream here — Chrome silent-input bug.
 
       shouldListenRef.current = true;
       micFlowLog('listening_started', {});
@@ -1275,7 +1355,7 @@ export function useSpeechRecognition(
     } finally {
       startInFlightRef.current = false;
     }
-  }, [isSupported, getPermissionState, requestMicPermission, ensureMicKeepAliveStream, beginRecognition, resetForNewListenSession, emitStt, prepareForMicCapture]);
+  }, [isSupported, getPermissionState, requestMicPermission, beginRecognition, resetForNewListenSession, emitStt, prepareForMicCapture]);
 
   const retryPermission = useCallback(async (): Promise<boolean> => {
     setError(null);
@@ -1489,6 +1569,30 @@ export function useSpeechRecognition(
     return () => clearInterval(iv);
   }, [recognitionState, emitStt, tryScheduleAutoRestart, isAnswerMicArmed, hasTranscriptContent]);
 
+  // Armed answer window: shouldListen is true but recognition instance is gone
+  // (generation-gated restart dropped, or onend race). Rebuild silently.
+  useEffect(() => {
+    const iv = setInterval(() => {
+      if (!shouldListenRef.current || !mountedRef.current) return;
+      if (!isAnswerMicArmed()) return;
+      if (recognitionRef.current) return;
+      if (pendingRestartRef.current) return;
+
+      const now = Date.now();
+      if (now - lastOrphanRecoveryAtRef.current < ORPHAN_INSTANCE_MIN_GAP_MS) return;
+
+      lastOrphanRecoveryAtRef.current = now;
+      voiceDebug('orphan_instance_recovery', { gen: generationRef.current });
+      emitStt('stt_orphan_instance_recovery', {
+        sessionId: generationRef.current,
+        final_chars: finalTranscriptRef.current.length,
+      });
+      void runScheduledRestart('orphan_instance_watchdog', generationRef.current, true);
+    }, ORPHAN_INSTANCE_POLL_MS);
+
+    return () => clearInterval(iv);
+  }, [isAnswerMicArmed, emitStt, runScheduledRestart]);
+
   // ── StrictMode remount fix ───────────────────────────────────────────────
   // React StrictMode (dev) performs a mount → unmount → remount cycle. The
   // unmount cleanup sets mountedRef.current = false, but useRef preserves the
@@ -1499,6 +1603,28 @@ export function useSpeechRecognition(
     mountedRef.current = true;
     voiceDebug('mount_flag_reset', { source: 'useSpeechRecognition_mount' });
   }, []);
+
+  // Permission lifecycle — detect revoke/restore without page refresh.
+  useEffect(() => {
+    return micPermissionMonitor.subscribe((state, transition) => {
+      if (state === 'denied') {
+        setPermissionState('denied');
+        if (transition === 'revoked' || transition === 'denied') {
+          setError('Microphone access was revoked. Allow the mic in browser settings or use Type mode.');
+          stopListening('permission_revoked');
+        }
+        return;
+      }
+      if (state === 'granted') {
+        setPermissionState('granted');
+        if (transition === 'restored' && telemetryCtxRef.current) {
+          emitMicPipelineTelemetry('mic_recovered', telemetryCtxRef.current, { source: 'permission' });
+        }
+      } else if (state === 'prompt') {
+        setPermissionState('prompt');
+      }
+    }, telemetryCtxRef.current ?? undefined);
+  }, [stopListening]);
 
   // Deterministic unmount teardown. Ordering matters:
   //   1. mark unmounted (gates every async callback) and disable auto-restart

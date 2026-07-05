@@ -95,6 +95,20 @@ export function mergeFinalTranscript(
   return { text: merged, action: 'append', reason: 'append_distinct' }
 }
 
+/**
+ * True when an interim chunk adds no new information beyond accumulated final.
+ * Allows cumulative interims that extend the final (e.g. "hello hello" → "hello hello world").
+ */
+export function shouldSuppressInterimAsDuplicate(finalText: string, interim: string): boolean {
+  const nFinal = normalizeTranscriptToken(finalText)
+  const nInterim = normalizeTranscriptToken(interim)
+  if (!nFinal || !nInterim) return false
+  if (nFinal === nInterim) return true
+  if (nInterim.startsWith(nFinal) && nInterim.length > nFinal.length) return false
+  if (nFinal.includes(nInterim) && nInterim.length < nFinal.length) return true
+  return false
+}
+
 /** Hash for deduplicating identical consecutive STT result events. */
 export function sttResultEventHash(finalPart: string, interimPart: string): string {
   return normalizeTranscriptToken(`${finalPart}\x1f${interimPart}`)

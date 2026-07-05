@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 
 interface Interview {
   id: string
@@ -39,6 +40,9 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
     <div className="space-y-2.5">
       {interviews.map((interview) => {
         const isCompleted = interview.status === 'completed'
+        // Server only accepts answers/checkpoints for pending/in_progress —
+        // abandoned sessions are terminal and must not offer "Continue".
+        const isResumable = isResumableInterviewStatus(interview.status)
         const date = formatInterviewDateEnIn(interview.started_at, interview.completed_at)
         const reportHref =
           isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
@@ -73,11 +77,11 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
                     color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
                   }}
                 >
-                  {isCompleted ? 'Completed' : 'Incomplete'}
+                  {isCompleted ? 'Completed' : interview.status === 'abandoned' ? 'Ended' : 'Incomplete'}
                 </span>
               </div>
 
-              {!isCompleted ? (
+              {isResumable ? (
                 <Link
                   href={`/interview/session/${interview.id}`}
                   className={actionBtnClass}

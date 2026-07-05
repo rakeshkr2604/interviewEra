@@ -161,3 +161,24 @@ export function interviewLog(event: string, data?: LogData): void {
   const payload = { ...getPlatformContext(), ...(data ?? {}) };
   console.log(`[INTERVIEW] ${event}`, payload);
 }
+
+/** Always-on mic pipeline transitions (permission, acquire, release, track state). */
+export function micFlowLog(event: string, data?: LogData): void {
+  const payload = { ...getPlatformContext(), ts: Date.now(), ...(data ?? {}) };
+  console.log(`[mic-flow] ${event}`, payload);
+}
+
+/** Structured mic error context for production diagnostics. */
+export function buildMicErrorContext(
+  err: unknown,
+  extra?: LogData,
+): LogData {
+  const base: LogData = { ...getPlatformContext(), ...(extra ?? {}) };
+  if (err instanceof DOMException) {
+    return { ...base, error_name: err.name, error_message: err.message };
+  }
+  if (err instanceof Error) {
+    return { ...base, error_name: err.name, error_message: err.message };
+  }
+  return { ...base, error_message: String(err) };
+}

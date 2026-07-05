@@ -14,13 +14,13 @@ import {
 import { resolveVoiceForInterviewer } from '@/lib/interviewer/voice'
 import {
   STORAGE_KEYS,
-  getMicAudioConstraints,
   readVoiceGender,
   readAiVoiceEnabled,
   readNoiseCancellationPreferred,
   readTtsRate,
   type VoiceGenderPreference,
 } from '@/lib/settings/client-preferences'
+import { micCaptureCoordinator } from '@/lib/voice/mic-capture-coordinator'
 import { cn } from '@/lib/utils'
 
 async function getVoicesWithRetry(): Promise<SpeechSynthesisVoice[]> {
@@ -93,11 +93,12 @@ export function VoiceAudioPanel() {
     }
     setMicState('testing')
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints())
-      stream.getTracks().forEach((t) => t.stop())
+      await micCaptureCoordinator.acquire({ owner: 'settings_test' })
+      micCaptureCoordinator.release('settings_test')
       setMicState('ok')
       window.setTimeout(() => setMicState('idle'), 2500)
     } catch {
+      micCaptureCoordinator.release('settings_test')
       setMicState('error')
     }
   }

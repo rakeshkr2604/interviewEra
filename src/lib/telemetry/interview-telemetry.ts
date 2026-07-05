@@ -68,8 +68,6 @@ export interface InterviewTelemetryOptions {
 
 type TelemetryData = Record<string, unknown>;
 
-// Per-page-load id. Distinguishes telemetry from separate attempts/refreshes of
-// the same interview. Cheap, collision-resistant enough for log correlation.
 const RUN_ID = makeRunId();
 
 const TELEMETRY_EPOCH =
@@ -189,4 +187,9 @@ export function interviewTelemetry(
   else console.log(tag, payload);
 
   if (options?.critical) beacon(payload);
+}
+
+/** Per-page-load session id included in every telemetry event. */
+export function getInterviewTelemetryRunId(): string {
+  return RUN_ID;
 }

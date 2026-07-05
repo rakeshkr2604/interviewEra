@@ -6,7 +6,7 @@
  * Dev builds: always on.
  */
 
-import { getMicAudioConstraints } from '@/lib/settings/client-preferences'
+import { micCaptureCoordinator } from '@/lib/voice/mic-capture-coordinator'
 
 const DEV_ALWAYS_ON = process.env.NODE_ENV !== 'production'
 
@@ -302,7 +302,7 @@ export async function startSttInputLevelMeter(): Promise<void> {
   if (!navigator?.mediaDevices?.getUserMedia) return
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints())
+    const stream = await micCaptureCoordinator.acquire({ owner: 'debug_meter' })
     meterStream = stream
     meterContext = new AudioContext()
     if (meterContext.state === 'suspended') {
@@ -334,7 +334,7 @@ export async function stopSttInputLevelMeter(): Promise<void> {
   }
   meterAnalyser = null
   if (meterStream) {
-    meterStream.getTracks().forEach((t) => t.stop())
+    micCaptureCoordinator.release('debug_meter')
     meterStream = null
   }
   if (meterContext) {

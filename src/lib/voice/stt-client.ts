@@ -9,6 +9,7 @@ import {
 import { resolveSttLocale, type SttLocale } from '@/lib/voice/speech-locale';
 import { PcmSendBuffer } from '@/lib/voice/stt/pcm-send-buffer';
 import { lifecycleLog, lifecycleWarn, voiceDebug } from './lifecycle-log';
+import { voicePipelineDiagnostics } from './voice-pipeline-diagnostics';
 
 export interface TranscriptChunk {
   text: string;
@@ -135,6 +136,7 @@ export class StreamingSTT {
       lifecycleLog('stt', 'ws_open', { session: mySession });
       const flushed = this.pcmBuffer.flush((chunk) => this.sendMediaNow(chunk));
       if (flushed > 0) {
+        voicePipelineDiagnostics.recordBufferFlush(flushed);
         voiceDebug('CHUNK_FLUSHED', { session: mySession, chunks: flushed, queued_bytes: 0 });
       }
       try { callbacks.onOpen?.(); } catch { /* */ }
@@ -166,6 +168,7 @@ export class StreamingSTT {
           if (clean && clean !== this.lastFinal) {
             this.fullTranscript += clean + ' ';
             this.lastFinal = clean;
+            voicePipelineDiagnostics.recordDeepgramFinal(clean.length);
             voiceDebug('dg_transcript_received', {
               session: mySession,
               is_final: true,
@@ -175,6 +178,7 @@ export class StreamingSTT {
             try { callbacks.onPartial({ text: clean, isFinal: true, confidence }); } catch { /* */ }
           }
         } else {
+          voicePipelineDiagnostics.recordDeepgramPartial(transcript.length);
           voiceDebug('dg_transcript_received', {
             session: mySession,
             is_final: false,
@@ -224,8 +228,10 @@ export class StreamingSTT {
 
   private sendMediaNow(audioData: ArrayBuffer): void {
     if (this.aborted || !this.socket || this.socket.readyState !== 1) return;
+    const readyState = this.socket.readyState as number;
     this.socket.sendMedia(audioData);
     this.chunksSent += 1;
+    voicePipelineDiagnostics.recordWsPacket(audioData.byteLength, readyState);
     if (this.chunksSent === 1 || this.chunksSent % 50 === 0) {
       voiceDebug('CHUNK_SENT', { chunk: this.chunksSent, bytes: audioData.byteLength });
     }
@@ -239,6 +245,7 @@ export class StreamingSTT {
     }
     // Queue while CONNECTING — flushed on 'open'.
     this.pcmBuffer.enqueue(audioData);
+    voicePipelineDiagnostics.recordPcmQueued(this.pcmBuffer.queuedBytes);
     if (this.pcmBuffer.queuedChunks === 1 || this.pcmBuffer.queuedChunks % 25 === 0) {
       voiceDebug('CHUNK_QUEUED', {
         queued_chunks: this.pcmBuffer.queuedChunks,

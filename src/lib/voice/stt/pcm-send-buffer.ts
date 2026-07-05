@@ -4,6 +4,8 @@
  *
  * Capacity defaults to ~3s of 16 kHz mono int16 (~96 KB).
  */
+import { voicePipelineDiagnostics } from '@/lib/voice/voice-pipeline-diagnostics'
+
 export class PcmSendBuffer {
   private readonly chunks: ArrayBuffer[] = []
   private totalBytes = 0
@@ -26,6 +28,7 @@ export class PcmSendBuffer {
     while (this.totalBytes > this.maxBytes && this.chunks.length > 0) {
       const dropped = this.chunks.shift()!
       this.totalBytes -= dropped.byteLength
+      voicePipelineDiagnostics.recordPcmDropped(dropped.byteLength)
     }
   }
 

@@ -1,8 +1,8 @@
 /**
- * Hourly provider health snapshot cron.
+ * Daily provider health snapshot cron.
  *
  * Vercel cron config (vercel.json):
- *   { "path": "/api/cron/health-snapshot", "schedule": "0 * * * *" }
+ *   { "path": "/api/cron/health-snapshot", "schedule": "0 1 * * *" }
  *
  * Reads live intelligence state from provider-intelligence.ts and writes a
  * point-in-time snapshot to provider_health_logs for historical trending.

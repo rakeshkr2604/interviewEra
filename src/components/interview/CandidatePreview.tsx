@@ -6,7 +6,8 @@ import { useCandidateCamera } from '@/hooks/useCandidateCamera'
 interface CandidatePreviewProps {
   /** Request webcam while the candidate is answering. */
   cameraActive: boolean
-  isListening: boolean
+  /** True when voice input is confirmed live (transcript path or Deepgram WS open). */
+  voiceLive: boolean
   micArmed: boolean
   userMicMuted: boolean
   questionLabel?: string
@@ -14,14 +15,14 @@ interface CandidatePreviewProps {
 
 export function CandidatePreview({
   cameraActive,
-  isListening,
+  voiceLive,
   micArmed,
   userMicMuted,
   questionLabel,
 }: CandidatePreviewProps) {
   const { videoRef, status } = useCandidateCamera({ active: cameraActive })
   const showLive = status === 'active'
-  const liveMic = isListening && micArmed && !userMicMuted
+  const liveMic = voiceLive && micArmed && !userMicMuted
 
   return (
     <div className="session-flush-panel dashboard-premium-card flex min-h-0 flex-1 flex-col overflow-hidden">

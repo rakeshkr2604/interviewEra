@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { mergeFinalTranscript, shouldPromoteInterimOnEnd } from '@/lib/voice/stt-transcript'
+import {
+  mergeFinalTranscript,
+  shouldPromoteInterimOnEnd,
+  shouldSuppressInterimAsDuplicate,
+} from '@/lib/voice/stt-transcript'
 
 describe('mergeFinalTranscript', () => {
   it('appends non-overlapping segments', () => {
@@ -24,6 +28,24 @@ describe('mergeFinalTranscript', () => {
     const r = mergeFinalTranscript('the quick brown', 'brown fox', { androidCumulative: false })
     expect(r.action).toBe('append')
     expect(r.text).toBe('the quick brown fox')
+  })
+})
+
+describe('shouldSuppressInterimAsDuplicate', () => {
+  it('suppresses exact duplicate interim', () => {
+    expect(shouldSuppressInterimAsDuplicate('hello hello', 'hello hello')).toBe(true)
+  })
+
+  it('suppresses strict substring interim', () => {
+    expect(shouldSuppressInterimAsDuplicate('hello hello', 'hello')).toBe(true)
+  })
+
+  it('allows cumulative interim that extends final', () => {
+    expect(shouldSuppressInterimAsDuplicate('hello hello', 'hello hello world')).toBe(false)
+  })
+
+  it('allows distinct new interim', () => {
+    expect(shouldSuppressInterimAsDuplicate('hello hello', 'testing')).toBe(false)
   })
 })
 

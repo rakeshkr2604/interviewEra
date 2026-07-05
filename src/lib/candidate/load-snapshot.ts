@@ -11,6 +11,7 @@ import type {
   ResumeSnapshot,
 } from './types';
 import type { UserProgressRow } from '@/lib/retention/types';
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status';
 import type { DimensionScores } from '@/types/app.types';
 import { normalizeRadarRowToDimensionKey } from '@/lib/utils/report-radar-dimensions';
 
@@ -163,7 +164,9 @@ export async function loadCandidateSnapshot(userId: string): Promise<CandidateSn
   }
 
   const completedInterviews = (interviews ?? []).filter((i) => i.status === 'completed');
-  const inProgress = (interviews ?? []).find((i) => i.status !== 'completed') ?? null;
+  // Only pending/in_progress are resumable server-side — abandoned is terminal.
+  const inProgress =
+    (interviews ?? []).find((i) => isResumableInterviewStatus(i.status)) ?? null;
 
   const radarRows = completedInterviews.flatMap((interview) => {
     const reports = (interview.reports ?? []) as { radar_data?: { dimension: string; score: number }[] }[];

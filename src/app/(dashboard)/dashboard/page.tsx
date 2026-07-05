@@ -16,6 +16,7 @@ import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracke
 import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
 import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { computeReadinessScore } from '@/lib/candidate/readiness-score'
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
 import type { InterviewWithReportsRow } from './dashboard-types'
@@ -119,7 +120,9 @@ export default async function DashboardPage() {
     userData && typeof userData.avatar_path === 'string' ? userData.avatar_path : null
   const oauthPictureUrl = resolveOAuthPictureUrl(user.user_metadata)
 
-  const inProgressInterview = rows.find((row) => row.status !== 'completed') ?? null
+  // Only pending/in_progress are resumable server-side — abandoned is terminal.
+  const inProgressInterview =
+    rows.find((row) => isResumableInterviewStatus(row.status)) ?? null
 
   const candidateSnapshot = await loadCandidateSnapshot(user.id)
   const readiness = computeReadinessScore(candidateSnapshot)

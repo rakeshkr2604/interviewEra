@@ -18,7 +18,7 @@ import {
   registerCaptureAudioContext,
   unregisterCaptureAudioContext,
 } from '@/lib/voice/audio-gesture'
-import { getMicAudioConstraints } from '@/lib/settings/client-preferences'
+import { micCaptureCoordinator } from '@/lib/voice/mic-capture-coordinator'
 import { createPcmCaptureGraph } from '@/lib/voice/audio/pcm-capture-graph'
 import { createVoiceLogger } from '@/lib/voice/core/observability'
 import type {
@@ -52,7 +52,7 @@ export class BrowserAudioDriver implements AudioDriver {
       throw new Error('Microphone is not available in this browser.')
     }
 
-    const stream = await navigator.mediaDevices.getUserMedia(getMicAudioConstraints())
+    const stream = await micCaptureCoordinator.acquire({ owner: 'pcm' })
     this.captureStream = stream
 
     const ctx = new AudioContext({ sampleRate: CAPTURE_SAMPLE_RATE })
@@ -89,11 +89,7 @@ export class BrowserAudioDriver implements AudioDriver {
         } catch {
           /* */
         }
-        try {
-          stream.getTracks().forEach((t) => t.stop())
-        } catch {
-          /* */
-        }
+        micCaptureCoordinator.release('pcm')
         unregisterCaptureAudioContext(ctx)
         try {
           void ctx.close()
@@ -214,11 +210,7 @@ export class BrowserAudioDriver implements AudioDriver {
   async dispose(): Promise<void> {
     this.stopActiveSource()
     if (this.captureStream) {
-      try {
-        this.captureStream.getTracks().forEach((t) => t.stop())
-      } catch {
-        /* */
-      }
+      micCaptureCoordinator.release('pcm')
       this.captureStream = null
     }
     if (this.captureContext) {

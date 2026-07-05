@@ -63,7 +63,21 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (!interview) {
       return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
     }
-    if (interview.status !== 'in_progress') {
+    if (interview.status === 'completed' || interview.status === 'abandoned') {
+      return NextResponse.json({ error: 'Interview is not in progress' }, { status: 400 });
+    }
+
+    if (interview.status === 'pending') {
+      const now = new Date().toISOString();
+      await serviceClient
+        .from('interviews')
+        .update({
+          status: 'in_progress',
+          started_at: now,
+        })
+        .eq('id', interviewId)
+        .eq('user_id', user.id);
+    } else if (interview.status !== 'in_progress') {
       return NextResponse.json({ error: 'Interview is not in progress' }, { status: 400 });
     }
 

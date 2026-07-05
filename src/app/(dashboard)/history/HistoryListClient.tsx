@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useMemo, useState } from 'react'
 import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { CommunityCTA } from '@/components/community/CommunityCTA'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
@@ -79,6 +80,9 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
         ) : (
           filteredItems.map((interview) => {
             const isCompleted = interview.status === 'completed'
+            // Server only accepts answers/checkpoints for pending/in_progress —
+            // abandoned sessions are terminal and must not offer "Continue".
+            const isResumable = isResumableInterviewStatus(interview.status)
             const date = formatInterviewDateEnIn(interview.startedAt, interview.completedAt)
             const reportHref =
               isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
@@ -120,11 +124,11 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                         color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
                       }}
                     >
-                      {isCompleted ? 'Completed' : 'Incomplete'}
+                      {isCompleted ? 'Completed' : interview.status === 'abandoned' ? 'Ended' : 'Incomplete'}
                     </span>
                   </div>
 
-                  {!isCompleted ? (
+                  {isResumable ? (
                     <Link
                       href={`/interview/session/${interview.id}`}
                       className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 active:opacity-90 sm:text-sm"

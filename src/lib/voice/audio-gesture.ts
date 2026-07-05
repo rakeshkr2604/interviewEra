@@ -16,6 +16,15 @@ export function __clearCaptureAudioContextsForTests(): void {
   captureAudioContexts.clear()
 }
 
+/** Read-only snapshot of live capture AudioContext states (telemetry). */
+export function getCaptureAudioContextStates(): string[] {
+  const states: string[] = []
+  for (const ctx of captureAudioContexts) {
+    states.push(ctx.state)
+  }
+  return states
+}
+
 export function registerCaptureAudioContext(ctx: AudioContext): void {
   if (ctx.state !== 'closed') captureAudioContexts.add(ctx)
 }

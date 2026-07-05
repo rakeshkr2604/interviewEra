@@ -39,6 +39,7 @@ import { storeSessionContext, patchSessionContext } from '@/lib/feedback/collect
 import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interviewLog } from '@/lib/voice/lifecycle-log'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import type { RuntimePhase } from '@/lib/interview/runtime-phase'
+import { isTerminalInterviewStatus } from '@/lib/interview/interview-status'
 import { InterviewPhaseAnnouncer } from '@/components/interview/InterviewPhaseAnnouncer'
 import { progressRingLabel } from '@/lib/interview/runtime-phase'
 import {
@@ -55,6 +56,8 @@ import { useInterviewPwaLifecycle } from '@/hooks/useInterviewPwaLifecycle'
 import { useInterviewVoiceUi } from '@/hooks/useInterviewVoiceUi'
 import type { AvatarAnsweringReason } from '@/lib/voice/avatar-completion'
 import { trackAvatarTelemetry } from '@/lib/voice/avatar-telemetry'
+import { useMicPipelineLifecycle } from '@/hooks/useMicPipelineLifecycle'
+import { emitMicPipelineTelemetry, beaconMicPipelineMetrics } from '@/lib/voice/mic-pipeline-telemetry'
 import { trackMicTelemetry } from '@/lib/voice/mic-telemetry'
 import { clearElevenLabsTtsBlock } from '@/lib/voice/elevenlabs-tts-gate'
 import type { SttTelemetryCallback } from '@/lib/voice/stt-telemetry'
@@ -189,6 +192,50 @@ function useThinkingMessage(active: boolean, interviewerName: string): string {
   return active ? msgs[idx] : msgs[0]
 }
 
+type AnswerPostResult = {
+  feedback?: string
+  fallback?: boolean
+  score?: number | null
+}
+
+/** POST /api/interview/answer — accepts server fallback bodies on 429. */
+async function postInterviewAnswer(payload: {
+  questionId?: string
+  answerText: string
+  interviewId: string
+  answerMode: 'text' | 'voice'
+  answerStyle?: string
+  durationSeconds: number
+}): Promise<{ data: AnswerPostResult }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 60_000)
+  try {
+    const res = await fetch('/api/interview/answer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    })
+    let json: Record<string, unknown> = {}
+    try {
+      const parsed: unknown = await res.json()
+      if (parsed && typeof parsed === 'object') json = parsed as Record<string, unknown>
+    } catch {
+      /* empty body */
+    }
+    if (res.ok) {
+      return { data: json as AnswerPostResult }
+    }
+    if (json.fallback === true && (json.feedback || json.score != null)) {
+      return { data: json as AnswerPostResult }
+    }
+    throw new Error(JSON.stringify({ status: res.status, error: json.error ?? res.statusText }))
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 interface InterviewData {
   interviewId: string
   interviewerId: InterviewerId
@@ -258,12 +305,20 @@ export default function InterviewSessionPage() {
   const [lastFillerAnalysis, setLastFillerAnalysis] = useState<FillerAnalysis | null>(null)
   const [answerStartTime, setAnswerStartTime] = useState<number>(0)
   const [fetchError, setFetchError] = useState('')
+  // Terminal interview loaded (completed/abandoned) — the server rejects every
+  // write on these (checkpoint 409, answer 400), so the session must not start.
+  const [endedStatus, setEndedStatus] = useState<'completed' | 'abandoned' | null>(null)
   const [manualAnswer, setManualAnswer] = useState('')
   const [showEmptyWarning, setShowEmptyWarning] = useState(false)
   const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>(() => {
     if (typeof window === 'undefined') return 'voice'
     return resolvePreferredVoiceInputMode()
   })
+  const inputModeRef = useRef(inputMode)
+  useEffect(() => {
+    inputModeRef.current = inputMode
+  }, [inputMode])
+  const micCaptureLostRef = useRef<(reason: 'track_ended' | 'track_muted' | 'released' | 'superseded') => void>(() => {})
 
   const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
   const telemetryCtx = useMemo(
@@ -274,6 +329,8 @@ export default function InterviewSessionPage() {
     }),
     [interviewId, currentIndex, phase],
   )
+  const telemetryCtxRef = useRef(telemetryCtx)
+  telemetryCtxRef.current = telemetryCtx
   const voiceRecovery = useVoiceInterviewRecovery(interviewId, track, telemetryCtx)
   /** Matches TimerCircle denominator for the active answering phase */
   const [answerTimeBudget, setAnswerTimeBudget] = useState(TIME_PER_QUESTION)
@@ -362,7 +419,10 @@ export default function InterviewSessionPage() {
 
   // ─── Deepgram Microphone (Deepgram mode) ──────────────────
   const { isRecording: dgIsRecording, startRecording: dgStartRecording, stopRecording: dgStopRecording } =
-    useMicrophone(interviewId)
+    useMicrophone(interviewId, {
+      onCaptureLost: (reason) => micCaptureLostRef.current(reason),
+      telemetryCtx,
+    })
 
   // ─── Timer ────────────────────────────────────────────────
   const { timeLeft, start: startTimer, stop: stopTimer, reset: resetTimer } =
@@ -511,6 +571,9 @@ export default function InterviewSessionPage() {
     sttTelemetryRef.current?.(event, data)
   }, [])
   const prepareForMicCapture = useCallback(async () => {
+    emitMicPipelineTelemetry('audio_context_suspended', telemetryCtxRef.current, {
+      source: 'pre_mic_capture',
+    })
     try { stopSpeaking() } catch { /* */ }
     try { elStop() } catch { /* */ }
     await releaseAudioForMicCapture()
@@ -552,6 +615,7 @@ export default function InterviewSessionPage() {
     onSttTelemetry,
     prepareForMicCapture,
     onWebSpeechStalled,
+    telemetryCtx,
   })
   // The ONLY state that may surface "Listening…" in the Deepgram path.
   // Requires: local mic stream is up AND the Deepgram WebSocket is OPEN.
@@ -593,7 +657,7 @@ export default function InterviewSessionPage() {
     reconcile: reconcileDraft,
     setUnloadGuard: setDraftUnloadGuard,
   } = useInterviewDraft(interviewId)
-  const { persistCheckpoint, flushCheckpoint } = useInterviewCheckpoint(interviewId)
+  const { persistCheckpoint, flushCheckpoint, setCheckpointEnabled } = useInterviewCheckpoint(interviewId)
   // Holds a reconciled draft between the load fetch and the startup→runtime
   // handoff, so a refresh restores the in-progress answer (transcript + timer)
   // instead of restarting the question from the server's answeredCount.
@@ -612,6 +676,12 @@ export default function InterviewSessionPage() {
   permissionStateRef.current = permissionState
   micErrorRef.current = micError
   isListeningRef.current = isListening
+
+  useEffect(() => {
+    const status = interviewData?.status
+    const active = !status || status === 'in_progress' || status === 'pending'
+    setCheckpointEnabled(active)
+  }, [interviewData?.status, setCheckpointEnabled])
 
   useEffect(() => {
     dgTranscriptRef.current = dgTranscript
@@ -732,6 +802,16 @@ export default function InterviewSessionPage() {
         let result = await api.get<InterviewData & { preparing?: boolean }>(`/api/interview/${interviewId}`)
         window.clearTimeout(loadTimeoutId)
         if (timedOut || !mountedRef.current) return
+        // Terminal interviews are read-only server-side: checkpoint returns 409
+        // and answer/process-answer return 400 for them. Block the session here
+        // instead of letting the candidate speak answers that can't be saved.
+        const loadedStatus = result.data.status
+        if (isTerminalInterviewStatus(loadedStatus)) {
+          interviewStartupLog('session_already_ended', { interviewId, status: loadedStatus })
+          track('INTERVIEW_FLOW', 'terminal_session_blocked', { status: loadedStatus }, { critical: true })
+          setEndedStatus(loadedStatus)
+          return
+        }
         if (!result.data.interviewerId) {
           setFetchError('Interviewer configuration is missing for this interview.')
           return
@@ -1394,6 +1474,9 @@ export default function InterviewSessionPage() {
   const [videoRecoverTick, setVideoRecoverTick] = useState(0)
   const onVisibleResume = useCallback(() => {
     setVideoRecoverTick((t) => t + 1)
+    emitMicPipelineTelemetry('audio_context_resumed', telemetryCtxRef.current, {
+      source: 'visibility',
+    })
   }, [])
   const onAvatarSpeakingResume = useCallback(() => {
     if (!audioActuallyStartedRef.current && phaseRef.current === 'avatar_speaking') {
@@ -1581,10 +1664,11 @@ export default function InterviewSessionPage() {
       setDgWsOpen(false)
       setDgVoiceUiState('idle')
       setDgVoiceUiMessage(null)
+      emitMicPipelineTelemetry('deepgram_disconnected', telemetryCtx, { source: 'stop' })
     }
     dgControllerRef.current?.stop()
     dgMicCleanupRef.current = null
-  }, [])
+  }, [telemetryCtx])
 
   const startDgListening = useCallback(async (opts?: { preserveTranscript?: boolean; isRefresh?: boolean }) => {
     if (!mountedRef.current) {
@@ -1635,7 +1719,10 @@ export default function InterviewSessionPage() {
             stopDgListening()
           },
           onWsOpen: () => {
-            if (mountedRef.current) setDgWsOpen(true)
+            if (mountedRef.current) {
+              setDgWsOpen(true)
+              emitMicPipelineTelemetry('deepgram_connected', telemetryCtx, {})
+            }
           },
           onRefreshRestart: () => {
             if (phaseRef.current !== 'candidate_answering') return
@@ -1718,6 +1805,73 @@ export default function InterviewSessionPage() {
     startDgListeningRef.current = startDgListening
     startListeningRef.current = startListening
   }, [startDgListening, startListening])
+
+  // Re-acquire Deepgram PCM when the OS ends the mic track mid-answer (Bluetooth
+  // disconnect, exclusive access, permission revoke). Without this, dgListening
+  // stays true while no audio reaches the websocket.
+  const recoverMicCapture = useCallback(
+    (source: 'track' | 'device' | 'permission') => {
+      if (!mountedRef.current) return
+      if (phaseRef.current !== 'candidate_answering') return
+      if (userMicMutedRef.current) return
+      if (inputModeRef.current === 'text') return
+
+      const startedAt = Date.now()
+      const finishRecovery = (ok: boolean) => {
+        emitMicPipelineTelemetry(
+          ok ? 'mic_recovered' : 'interview_audio_failure',
+          telemetryCtx,
+          { source, recovery_ms: Date.now() - startedAt },
+          ok ? 'info' : 'warn',
+        )
+        if (ok) trackMicTelemetry('mic_recovered', telemetryCtx, { source })
+      }
+
+      if (inputModeRef.current === 'deepgram') {
+        lifecycleWarn('session', 'dg_capture_recover', { source })
+        trackMicTelemetry('mic_session_expired', telemetryCtx, { reason: source, mode: 'deepgram' })
+        stopDgListening()
+        void startDgListeningRef.current({ preserveTranscript: true, isRefresh: true }).then(
+          () => finishRecovery(true),
+          () => finishRecovery(false),
+        )
+        return
+      }
+
+      if (inputModeRef.current === 'voice') {
+        stopListening('phase_change')
+        void startListeningRef.current().then(
+          (ok) => finishRecovery(Boolean(ok)),
+          () => finishRecovery(false),
+        )
+      }
+    },
+    [stopDgListening, stopListening, telemetryCtx],
+  )
+
+  useEffect(() => {
+    micCaptureLostRef.current = (reason) => {
+      if (reason !== 'track_ended') return
+      recoverMicCapture('track')
+    }
+  }, [recoverMicCapture])
+
+  useMicPipelineLifecycle({
+    enabled: Boolean(interviewId),
+    telemetryCtx,
+    phaseRef,
+    inputModeRef,
+    onPermissionRevoked: () => {
+      stopListening('permission_revoked')
+      stopDgListening()
+    },
+    onPermissionGranted: () => {
+      /* permissionState synced in useSpeechRecognition */
+    },
+    onCaptureInvalid: (source) => {
+      recoverMicCapture(source)
+    },
+  })
 
   // If post-avatar auto-start did not reach active capture, retry quietly.
   useEffect(() => {
@@ -1806,6 +1960,7 @@ export default function InterviewSessionPage() {
       dgControllerRef.current?.stop()
       dgControllerRef.current = null
       dgMicCleanupRef.current = null
+      beaconMicPipelineMetrics(telemetryCtxRef.current)
       lifecycleLog('session', 'unmounted')
     }
   }, [])
@@ -1912,7 +2067,7 @@ export default function InterviewSessionPage() {
       // authority — drives follow-ups, tone, memory) in parallel. The orchestrator
       // runs for ALL input modes, not just Deepgram: probing is the core product.
       const [result, orchestratorResult] = await Promise.all([
-        api.post('/api/interview/answer', {
+        postInterviewAnswer({
           questionId: currentQuestion?.id,
           answerText: finalTranscript,
           interviewId,
@@ -2010,15 +2165,28 @@ export default function InterviewSessionPage() {
       // done. Clear the draft so a refresh now uses authoritative server state.
       clearDraft()
       setPhase('feedback')
-    } catch {
+    } catch (err) {
       if (!mountedRef.current) return
-      interviewLog('submit_failed', { source, questionIndex: currentIndex })
+      const errMsg = err instanceof Error ? err.message : String(err)
+      let httpStatus: number | undefined
+      try {
+        const parsed = JSON.parse(errMsg) as { status?: number }
+        httpStatus = parsed.status
+      } catch {
+        /* not structured */
+      }
+      interviewLog('submit_failed', {
+        source,
+        questionIndex: currentIndex,
+        httpStatus,
+        error: errMsg,
+      })
       // Critical: a failed evaluation is the visible "stuck after answering"
       // symptom — beacon it so mobile failures surface in the server log.
       track(
         'SUBMIT',
         'submit_failed',
-        { source, questionIndex: currentIndex },
+        { source, questionIndex: currentIndex, httpStatus },
         { critical: true, level: 'error' },
       )
       track('EVALUATION', 'evaluation_failed', { source, questionIndex: currentIndex }, { critical: true, level: 'error' })
@@ -2194,6 +2362,7 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     if (timeLeft !== 0 || phase !== 'candidate_answering' || !answerTimerArmed) return
     if (!answerText.trim()) return
+    if (submitInFlightRef.current) return
     void handleSubmitAnswer('timer')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, phase, answerText, answerTimerArmed])
@@ -2503,6 +2672,39 @@ export default function InterviewSessionPage() {
   }, [phase, voiceRecovery])
 
   // ─── Loading / Error States ───────────────────────────────
+  if (endedStatus) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-4"
+           style={{ background: 'var(--page-gradient)' }}>
+        <div className="dashboard-premium-card max-w-md space-y-4 p-8 text-center">
+          <p className="font-semibold text-(--text-primary)">
+            {endedStatus === 'completed'
+              ? 'This interview is already completed.'
+              : 'This interview session has ended.'}
+          </p>
+          <p className="text-sm text-(--text-muted)">
+            {endedStatus === 'completed'
+              ? 'You can find its report in your Interview History, or start a new practice session.'
+              : 'It was closed before completion and can no longer be resumed. Start a new practice session to keep practicing.'}
+          </p>
+          <button
+            onClick={() => router.push('/interview/new')}
+            className="w-full rounded-xl bg-(--accent-primary) px-6 py-2 text-sm font-semibold text-white"
+          >
+            Start a New Interview
+          </button>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="w-full rounded-xl border border-(--card-border) bg-(--bg-secondary) px-6 py-2
+                       text-sm font-semibold text-(--text-primary)"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   if (fetchError) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4"
@@ -2859,7 +3061,7 @@ export default function InterviewSessionPage() {
                   phase === 'submitting' ||
                   phase === 'feedback')
                 }
-                isListening={isListening || webSpeechActive || dgListening}
+                voiceLive={inputMode === 'deepgram' ? dgListening : webSpeechActive}
                 micArmed={micArmed}
                 userMicMuted={userMicMuted}
                 questionLabel={secondaryQuestionLabel}
