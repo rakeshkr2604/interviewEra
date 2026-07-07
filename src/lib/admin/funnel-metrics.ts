@@ -127,7 +127,14 @@ async function countCohortWithResume(
   return new Set((resumes ?? []).map((r) => r.user_id as string)).size;
 }
 
-async function countCohortFirstInterview(
+/**
+ * "Started" excludes 'pending' — a row stuck in 'pending' means question
+ * generation never resolved (or the user left before it did), so the
+ * candidate never actually began answering. Counting it as "started" both
+ * inflates the started count and understates true started→completed
+ * conversion (a denominator padded with sessions nobody could have finished).
+ */
+export async function countCohortFirstInterview(
   svc: SupabaseClient,
   sinceIso: string,
   completed: boolean,
@@ -140,7 +147,7 @@ async function countCohortFirstInterview(
   if (ids.length === 0) return 0;
 
   let query = svc.from('interviews').select('user_id').in('user_id', ids);
-  if (completed) query = query.eq('status', 'completed');
+  query = completed ? query.eq('status', 'completed') : query.neq('status', 'pending');
   const { data: rows } = await query;
   return new Set((rows ?? []).map((r) => r.user_id as string)).size;
 }

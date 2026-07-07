@@ -166,6 +166,25 @@ export default async function ReportPage({ params }: ReportPageProps) {
     .select('answer_id, overall_score, feedback_text, detailed_analysis, dimension_scores')
     .in('answer_id', answerIds);
 
+  // FM-5: answers saved during a Redis outage are awaiting evaluation backfill.
+  // They carry no score by design — labeled explicitly per question below, and
+  // the banner over the score overview says they are excluded from the overall
+  // score. Separate defensive query so environments without migration 053
+  // render the legacy report unchanged.
+  let pendingEvalAnswerIds = new Set<string>();
+  try {
+    const { data: pendingRows, error: pendingErr } = await supabase
+      .from('answers')
+      .select('id')
+      .in('id', answerIds)
+      .eq('evaluation_status', 'pending_backfill');
+    if (!pendingErr && pendingRows) {
+      pendingEvalAnswerIds = new Set(pendingRows.map((r) => r.id as string));
+    }
+  } catch {
+    /* evaluation_status column absent (migration 053 pending) */
+  }
+
   const perAnswerJustifications: ScoreJustification[] = (evaluations ?? []).flatMap((e) => {
     const d = e.detailed_analysis as DetailedAnalysis | null | undefined;
     const j = d?.score_justification;
@@ -205,6 +224,10 @@ export default async function ReportPage({ params }: ReportPageProps) {
     return {
       question: q,
       answer,
+      // Awaiting backfill AND no evaluation row yet → honest pending label.
+      // (Once the backfill script has inserted a real evaluation, it renders
+      // normally even if the status flip hasn't landed.)
+      pendingEvaluation: Boolean(answer && !rawEval && pendingEvalAnswerIds.has(answer.id)),
       evaluation: rawEval
         ? {
             overall_score: rawEval.overall_score as number,
@@ -279,6 +302,29 @@ export default async function ReportPage({ params }: ReportPageProps) {
       {sessionQualityFeedback ? (
         <SessionQualityNotice feedback={sessionQualityFeedback} />
       ) : null}
+
+      {/* FM-5 honesty banner: degraded (pending-backfill) answers are never
+          silently folded into the score. */}
+      {(() => {
+        const pendingCount = breakdown.filter((b) => b.pendingEvaluation).length;
+        if (pendingCount === 0) return null;
+        return (
+          <div
+            role="status"
+            className="rounded-xl border-2 px-4 py-3 text-sm font-medium"
+            style={{
+              borderColor: 'color-mix(in srgb, var(--accent-warning) 45%, transparent)',
+              background: 'color-mix(in srgb, var(--accent-warning) 12%, transparent)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            {pendingCount} of {breakdown.filter((b) => b.answer).length} answers{' '}
+            {pendingCount === 1 ? 'is' : 'are'} still awaiting evaluation and{' '}
+            {pendingCount === 1 ? 'is' : 'are'} not included in the overall score. The answer
+            {pendingCount === 1 ? ' was' : 's were'} recorded — evaluation is pending.
+          </div>
+        );
+      })()}
 
       <DashboardPageHeader
         eyebrow="Insights"
@@ -662,7 +708,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
                   </div>
                 ) : (
                   <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                    Evaluation not available for this answer.
+                    {item.pendingEvaluation
+                      ? 'Answer recorded — evaluation pending.'
+                      : 'Evaluation not available for this answer.'}
                   </p>
                 )}
               </div>

@@ -11,6 +11,7 @@ import { getExperimentFirstInterviewQuestionCount } from '@/lib/analytics/experi
 import { getUserProgress } from '@/lib/retention';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
+import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -274,6 +275,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     trackInterviewEvent('interview_created', {
       userId: user.id,
       interviewId: interview.id,
+      role,
+      difficulty,
+      async: useAsyncPrepare,
+    });
+
+    // Durable lifecycle event — fresh creation only (the recentPending dedupe
+    // branch above reuses an existing interviewId, which would either no-op
+    // against the unique index or double-report an already-started session).
+    // Dedupe: partial unique index on (event_name, interview_id) — migration 052.
+    persistMilestoneEventOnce('interview_started', {
+      user_id: user.id,
+      interview_id: interview.id,
       role,
       difficulty,
       async: useAsyncPrepare,

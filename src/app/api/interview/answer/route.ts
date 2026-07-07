@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { evaluateAnswer } from '@/lib/openai/evaluate-answer';
-import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
+import {
+  checkRateLimit,
+  buildRateLimitHttpResponse,
+  rateLimitUnavailableResponse,
+} from '@/lib/redis/rate-limit';
 import { checkLLMCostGuard, estimateLLMCallCostUSD, recordLLMSpend } from '@/lib/ai/llm-cost-guard';
 import { interviewAnswerSchema } from '@/lib/validations/schemas';
 import { analyzeFillerWords } from '@/lib/filler-words/analyze';
@@ -23,15 +27,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── Step 2: Rate limiting (5 req / 10s per user) ──────────────────────────
     const rateLimit = await checkRateLimit(`answer:${user.id}`, 10, 5, { failClosed: true });
-    const blocked = buildRateLimitHttpResponse(
-      rateLimit,
-      'Too many requests. Please wait a moment before submitting.',
-    );
-    if (blocked) {
-      return NextResponse.json(blocked.body, {
-        status: blocked.status,
-        headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
-      });
+    // FM-5: a Redis outage must not discard the candidate's answer. failClosed
+    // stays on so `redisUnavailable` is surfaced, but THIS ROUTE ONLY degrades
+    // to save-without-evaluation below instead of 503ing: the answer row is
+    // persisted with evaluation_status='pending_backfill', no LLM call is made
+    // (Redis also backs the cost guard, so an unmetered call must never fire),
+    // and scripts/backfill-pending-evaluations.ts re-evaluates it later.
+    // Every other failClosed route keeps its 503 behavior.
+    const redisDegraded = rateLimit.redisUnavailable === true;
+    if (!redisDegraded) {
+      const blocked = buildRateLimitHttpResponse(
+        rateLimit,
+        'Too many requests. Please wait a moment before submitting.',
+      );
+      if (blocked) {
+        return NextResponse.json(blocked.body, {
+          status: blocked.status,
+          headers: { ...blocked.headers, 'X-RateLimit-Remaining': '0' },
+        });
+      }
     }
 
     let rawBody: unknown;
@@ -129,11 +143,27 @@ export async function POST(request: Request): Promise<NextResponse> {
         question_id: questionId,
         answer_text: answerText,
         answer_mode: answerMode ?? 'text',
+        // Degraded submits are explicitly marked so completion/report never
+        // fabricate a neutral score for them (they are backfilled instead).
+        ...(redisDegraded ? { evaluation_status: 'pending_backfill' } : {}),
       })
       .select('id')
       .single();
 
     if (answerError || !answer) {
+      if (redisDegraded && /evaluation_status/i.test(answerError?.message ?? '')) {
+        // Migration 053 not applied in this environment. Without the marker the
+        // degraded answer would be silently neutral-scored at completion —
+        // dishonest. Preserve the legacy fail-closed 503 instead.
+        console.error(
+          '[interview/answer] Redis degraded path requires migration 053 (evaluation_status) — failing closed:',
+          answerError?.message,
+        );
+        return NextResponse.json(rateLimitUnavailableResponse(rateLimit.resetInSeconds), {
+          status: 503,
+          headers: { 'Retry-After': String(rateLimit.resetInSeconds) },
+        });
+      }
       console.error('[interview/answer] Answer insert error:', answerError);
       return NextResponse.json({ error: 'Failed to save answer' }, { status: 500 });
     }
@@ -176,6 +206,25 @@ export async function POST(request: Request): Promise<NextResponse> {
       } catch (metricsEx) {
         console.warn('[interview/answer] speech_metrics compute failed (non-fatal):', metricsEx);
       }
+    }
+
+    // ── FM-5 degraded exit: answer saved, evaluation deferred ────────────────
+    // Redis is down, so neither the rate limiter nor the Redis-backed LLM cost
+    // guard can run — an evaluation here would be an unmetered LLM call. The
+    // answer is durably saved as pending_backfill; be honest with the candidate
+    // instead of returning a fabricated score.
+    if (redisDegraded) {
+      console.warn(
+        '[interview/answer] Redis unavailable — answer saved as pending_backfill (evaluation deferred)',
+        { answerId: answer.id, userId: user.id, interviewId },
+      );
+      return NextResponse.json({
+        evaluationId: null,
+        score: null,
+        feedback:
+          'Answer recorded — evaluation pending. Your response was saved and will be evaluated automatically.',
+        pendingEvaluation: true,
+      });
     }
 
     // ── Step 5: LLM cost guard (enforce max_llm_cost_per_month_usd) ──────────

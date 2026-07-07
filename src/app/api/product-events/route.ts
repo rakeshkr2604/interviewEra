@@ -13,10 +13,17 @@
 //     log-spam amplifier. Over-limit requests are dropped silently (still 204).
 //   • Accepts text/plain (sendBeacon default) and application/json.
 //   • Each event is emitted as a single greppable `[client-telemetry]` JSON line.
+//
+// Durable persistence: this endpoint remains console-only for the general
+// beacon stream. A small, explicit allowlist of recognized startup-funnel
+// milestones is additionally translated + persisted to `product_events` via
+// `persistMilestoneEventOnce` (see resolveMilestoneEvent below) — everything
+// else is unaffected.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { NextResponse } from 'next/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { persistMilestoneEventOnce, type MilestoneEventName } from '@/lib/analytics/milestone-events-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,6 +59,73 @@ function coerceEvents(parsed: unknown): ClientEvent[] {
   return [];
 }
 
+function asString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+type MilestoneResolution = {
+  name: MilestoneEventName;
+  props: Record<string, string | number | boolean | undefined>;
+};
+
+/**
+ * Recognize a small allowlist of client beacons and translate them into a
+ * durable startup-funnel milestone. Returns null for every other event —
+ * those remain console-only, exactly as before this endpoint persisted
+ * anything. `interviewId` is required for every milestone: it is both the
+ * attribution key and the dedupe key (migration 052).
+ */
+function resolveMilestoneEvent(evt: ClientEvent): MilestoneResolution | null {
+  const interviewId = asString(evt.interviewId);
+  if (!interviewId) return null;
+  const event = asString(evt.event);
+
+  switch (event) {
+    case 'interview_session_opened':
+      return {
+        name: 'interview_session_opened',
+        props: {
+          interview_id: interviewId,
+          run_id: asString(evt.runId),
+          user_id: asString(evt.userId),
+        },
+      };
+    case 'avatar_audio_started':
+      // First confirmed TTS playback. This fires on every question; the
+      // partial unique index on (event_name, interview_id) keeps only the
+      // first one — no "is this question 0" check needed here.
+      return {
+        name: 'interview_first_question_played',
+        props: { interview_id: interviewId },
+      };
+    case 'mic_permission_denied':
+      return {
+        name: 'interview_mic_blocked',
+        props: { interview_id: interviewId, reason: asString(evt.reason) ?? 'unknown' },
+      };
+    case 'submit_blocked':
+      // Only the empty-payload variant is a genuine user-facing block; the
+      // wrong_phase/in_flight variants are internal race guards, not a
+      // candidate-visible failure, and are not beaconed as critical today.
+      if (evt.reason !== 'empty_payload') return null;
+      return {
+        name: 'interview_first_answer_blocked',
+        props: { interview_id: interviewId, reason: 'empty_payload' },
+      };
+    case 'submit_failed':
+      return {
+        name: 'interview_first_answer_blocked',
+        props: {
+          interview_id: interviewId,
+          reason: 'evaluation_failed',
+          http_status: typeof evt.httpStatus === 'number' ? evt.httpStatus : undefined,
+        },
+      };
+    default:
+      return null;
+  }
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   try {
     const raw = await request.text();
@@ -80,6 +154,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         '[client-telemetry]',
         JSON.stringify({ serverTs: new Date().toISOString(), ...evt }),
       );
+
+      const milestone = resolveMilestoneEvent(evt);
+      if (milestone) persistMilestoneEventOnce(milestone.name, milestone.props);
     }
 
     return NO_CONTENT;
