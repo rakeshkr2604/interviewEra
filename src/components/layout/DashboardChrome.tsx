@@ -160,11 +160,20 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           <StreakCounter />
         </header>
 
+        {/*
+         * iPhone scroll freeze (do not reintroduce): below `lg` the shell column
+         * grows with content, so the WINDOW is the only real scroller and this
+         * <main> is a full-viewport overflow container with nothing to scroll.
+         * `overscroll-behavior: contain` (ie-overscroll-contain) here blocks
+         * touch-scroll chaining from <main> to the window even though <main>
+         * cannot scroll — freezing onboarding/session pages on iOS at scrollY 0.
+         * Drawer rubber-banding is already handled by the body scroll lock above.
+         */}
         <main
           className={cn(
             'ie-landing-premium ie-landing-type relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden',
             isImmersiveViewport
-              ? 'ie-touch-scroll ie-overscroll-contain min-h-0 overflow-y-auto lg:overflow-hidden'
+              ? 'ie-touch-scroll min-h-0 overflow-y-auto lg:overflow-hidden'
               : 'overflow-y-visible',
           )}
           style={{
