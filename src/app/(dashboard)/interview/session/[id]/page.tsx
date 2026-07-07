@@ -21,7 +21,13 @@ import type { InterviewQuestion, AnswerRecord } from '@/types/interview.types'
 import { DeepgramSessionController } from '@/lib/voice/deepgram-session-controller'
 import type { VoiceConnectionState } from '@/lib/voice/deepgram-health'
 import { DeepgramVoiceStatusBanner } from '@/components/interview/DeepgramVoiceStatusBanner'
-import { getSpeechSynthesisProbeError, resolvePreferredVoiceInputMode } from '@/lib/voice/browser-capabilities'
+import {
+  getSpeechSynthesisProbeError,
+  resolvePreferredVoiceInputMode,
+  isIosSafari,
+  IOS_SAFARI_EMPTY_TRANSCRIPT_FALLBACK_MS,
+} from '@/lib/voice/browser-capabilities'
+import { countWords, isTooShortVoiceAnswer } from '@/lib/voice/answer-guard'
 import { useInterviewKeyboardViewport } from '@/hooks/useInterviewKeyboardViewport'
 import type { VoiceMetadata } from '@/lib/interview/interview-orchestrator'
 import type { InterviewerTone } from '@/lib/voice/tts-client'
@@ -97,6 +103,16 @@ const TIME_PER_QUESTION = 60
 /** Typed answers get longer; voice keeps {@link TIME_PER_QUESTION} */
 const TEXT_ANSWER_TIME_MULTIPLIER = 2
 const MAX_SKIPS = 2
+
+/**
+ * FM-2: a passive mobile user who never taps the audio-unlock CTA was
+ * previously stuck in `awaiting_audio_unlock` forever. Matches the
+ * AUDIO_STUCK_MS stuck-audio timer in useInterviewAvatarSpeaking.ts — after
+ * this long with no gesture, give up on audio for this question and let the
+ * candidate proceed on text/captions alone (the unlock CTA itself is
+ * unchanged and still works if tapped before this fires).
+ */
+const AUDIO_UNLOCK_STUCK_MS = 8_000
 
 const THINKING_BAR_HEIGHTS = [0.4, 0.7, 1, 0.6, 0.9, 0.5, 0.8, 0.4, 0.7, 1, 0.6, 0.9]
 
@@ -308,8 +324,16 @@ export default function InterviewSessionPage() {
   // Terminal interview loaded (completed/abandoned) — the server rejects every
   // write on these (checkpoint 409, answer 400), so the session must not start.
   const [endedStatus, setEndedStatus] = useState<'completed' | 'abandoned' | null>(null)
+  // Optional explicit reason for the ended screen (e.g. a 0-answer completion
+  // attempt) — overrides the default status-based copy when present.
+  const [endedMessageOverride, setEndedMessageOverride] = useState<string | null>(null)
   const [manualAnswer, setManualAnswer] = useState('')
   const [showEmptyWarning, setShowEmptyWarning] = useState(false)
+  // FM-3 Phase 4: a voice transcript under MIN_VOICE_ANSWER_WORDS was blocked at
+  // submit (never scored). Separate from showEmptyWarning because that flag is
+  // gated on an empty payload and auto-clears the moment any text exists — a
+  // 1–4 word answer has a non-empty payload, so it needs its own banner + clear.
+  const [showShortWarning, setShowShortWarning] = useState(false)
   const [inputMode, setInputMode] = useState<'voice' | 'text' | 'deepgram'>(() => {
     if (typeof window === 'undefined') return 'voice'
     return resolvePreferredVoiceInputMode()
@@ -318,6 +342,16 @@ export default function InterviewSessionPage() {
   useEffect(() => {
     inputModeRef.current = inputMode
   }, [inputMode])
+  // ── iOS Safari hybrid fallback (FM-3) ──
+  // iOS Safari can run Web Speech with a permanently empty transcript. After
+  // IOS_SAFARI_EMPTY_TRANSCRIPT_FALLBACK_MS of recognition with no transcript,
+  // the session silently switches THIS question to Deepgram. Fires at most once
+  // per question index; reverted to Web Speech when the question advances.
+  const iosHybridFiredForIndexRef = useRef<number>(-1)
+  const iosAutoDeepgramActiveRef = useRef(false)
+  // Overrides the manual-input banner copy when voice (Web Speech AND Deepgram)
+  // is unusable and the session fell back to typing.
+  const [voiceUnavailableNotice, setVoiceUnavailableNotice] = useState<string | null>(null)
   const micCaptureLostRef = useRef<(reason: 'track_ended' | 'track_muted' | 'released' | 'superseded') => void>(() => {})
 
   const { track } = useInterviewTelemetry({ interviewId, questionIndex: currentIndex, phase })
@@ -710,6 +744,12 @@ export default function InterviewSessionPage() {
       setInputMode(preferred)
     }
   }, [isMicSupported, permissionState, inputMode, voiceRecovery.isActive])
+
+  // The voice-unavailable notice only applies while the FM-3 text fallback is
+  // active — leaving text mode (retry voice, recovery) clears it.
+  useEffect(() => {
+    if (inputMode !== 'text' && voiceUnavailableNotice) setVoiceUnavailableNotice(null)
+  }, [inputMode, voiceUnavailableNotice])
 
   // Deepgram recording duration counter (debug + UI)
   useEffect(() => {
@@ -1224,8 +1264,12 @@ export default function InterviewSessionPage() {
         role: interviewData.role,
         source: 'live_session',
       })
+      // Durable milestone: session view mounted with a valid, ready interview.
+      // Beaconed (critical) so it reaches /api/product-events and is persisted
+      // — dedupe on interviewId + runId (migration 052).
+      track('INTERVIEW_FLOW', 'interview_session_opened', { userId, role: interviewData.role }, { critical: true })
     })()
-  }, [phase, interviewId, interviewData])
+  }, [phase, interviewId, interviewData, track])
 
   // ─── Current question ref ──────────────────────────────────
   const currentQuestion = interviewData?.questions[currentIndex]
@@ -1289,7 +1333,13 @@ export default function InterviewSessionPage() {
         question_index: currentIndex,
         has_follow_up: !!pendingFollowUp,
       })
-      if (inputMode === 'deepgram' && resolvePreferredVoiceInputMode() === 'deepgram') {
+      // iosAutoDeepgramActiveRef: FM-3 hybrid fallback keeps Deepgram armed for a
+      // follow-up asked on the same question, even though iOS Safari's preferred
+      // mode is 'voice'.
+      if (
+        inputMode === 'deepgram' &&
+        (resolvePreferredVoiceInputMode() === 'deepgram' || iosAutoDeepgramActiveRef.current)
+      ) {
         voiceDebug('start_listening_triggered', { source: 'post_avatar_finished', mode: 'deepgram' })
         interviewStartupLog('listening_started', { mode: 'deepgram', source: 'post_avatar_finished' })
         trackMicTelemetry('mic_started', telemetryCtx, { mode: 'deepgram' })
@@ -1495,6 +1545,25 @@ export default function InterviewSessionPage() {
     }
   }, [phase, telemetryCtx, inputMode])
 
+  // FM-2: auto-advance out of awaiting_audio_unlock if the candidate never
+  // taps the unlock CTA. Drives the SAME finishAuthorized('user_continue')
+  // path the manual "Continue Without Audio" button uses (avatar_speaking ->
+  // avatar_finished -> candidate_answering) — phaseRef is synced immediately
+  // before calling it, mirroring the existing enterAnsweringPhase convention,
+  // so the guard inside finishAuthorized sees the expected phase.
+  useEffect(() => {
+    if (phase !== 'awaiting_audio_unlock') return
+    const timer = window.setTimeout(() => {
+      if (!mountedRef.current) return
+      if (phaseRef.current !== 'awaiting_audio_unlock') return
+      trackAvatarTelemetry('avatar_unlock_timeout_auto_advance', telemetryCtx, { mode: inputMode })
+      setPhase('avatar_speaking')
+      phaseRef.current = 'avatar_speaking'
+      continueWithoutAudio()
+    }, AUDIO_UNLOCK_STUCK_MS)
+    return () => window.clearTimeout(timer)
+  }, [phase, telemetryCtx, inputMode, continueWithoutAudio, mountedRef, phaseRef, setPhase])
+
   const voiceUi = useInterviewVoiceUi({
     inputMode,
     useManualInput,
@@ -1582,6 +1651,9 @@ export default function InterviewSessionPage() {
       const result = await api.post<{
         reportId?: string
         error?: string
+        abandoned?: boolean
+        reason?: string
+        message?: string
         retention?: InterviewCompleteRetentionPayload | null
         funnelComplete?: FunnelCompleteGa4Payload
       }>('/api/interview/complete', { interviewId })
@@ -1589,6 +1661,23 @@ export default function InterviewSessionPage() {
       // a report — can take 3-8 s on slow providers). Bail if the page is gone.
       if (!mountedRef.current) {
         lifecycleWarn('session', 'complete_response_after_unmount')
+        return
+      }
+      // Server refused to complete a session with no persisted answers and moved
+      // it to 'abandoned'. Retrying cannot help (there is nothing to score), so
+      // show the terminal ended-session screen with the explicit reason instead
+      // of the retryable "report failed" error.
+      if (result.data.abandoned) {
+        track(
+          'REPORT_GENERATION',
+          'complete_abandoned',
+          { reason: result.data.reason ?? 'no_answers_recorded' },
+          { critical: true, level: 'error' },
+        )
+        setEndedMessageOverride(
+          result.data.message ?? 'No answers were recorded for this session.',
+        )
+        setEndedStatus('abandoned')
         return
       }
       const reportId = result.data.reportId
@@ -1634,15 +1723,32 @@ export default function InterviewSessionPage() {
         return
       }
       router.push(href)
-    } catch {
+    } catch (err) {
       if (!mountedRef.current) return
+      // FM-5: /complete responds 503 code=evaluations_pending_backfill when
+      // every answer was saved during a Redis outage and is awaiting
+      // re-evaluation. That is not a failure to retry-spam — tell the
+      // candidate their answers are safe.
+      let pendingBackfill = false
+      if (err instanceof Error) {
+        try {
+          const body = JSON.parse(err.message) as { code?: string }
+          pendingBackfill = body.code === 'evaluations_pending_backfill'
+        } catch {
+          /* not a structured error body */
+        }
+      }
       track(
         'REPORT_GENERATION',
         'complete_failed',
-        { reason: 'request_failed' },
+        { reason: pendingBackfill ? 'evaluations_pending_backfill' : 'request_failed' },
         { critical: true, level: 'error' },
       )
-      setFetchError('Report generation failed. Please try again.')
+      setFetchError(
+        pendingBackfill
+          ? 'Your answers are recorded, but evaluation is temporarily delayed. Please try again in a few minutes — nothing was lost.'
+          : 'Report generation failed. Please try again.',
+      )
       setPhase('feedback')
     }
   }, [interviewId, router, track, clearDraft])
@@ -1740,6 +1846,18 @@ export default function InterviewSessionPage() {
           },
           onFatalError: (message, fatalOpts) => {
             if (!mountedRef.current) return
+            if (iosAutoDeepgramActiveRef.current) {
+              // FM-3 hybrid fallback is active: Web Speech already produced an
+              // empty transcript on this question, so reverting to it would
+              // strand the candidate on a dead recognizer. Type mode instead.
+              iosAutoDeepgramActiveRef.current = false
+              stopDgListening()
+              setDgError(null)
+              setDgVoiceShowActions(false)
+              setVoiceUnavailableNotice('Voice unavailable — please type your answer')
+              setInputMode('text')
+              return
+            }
             if (resolvePreferredVoiceInputMode() === 'voice') {
               stopDgListening()
               setDgError(null)
@@ -1940,6 +2058,110 @@ export default function InterviewSessionPage() {
     handleSwitchToAiVoiceRef.current = handleSwitchToAiVoice
   }, [handleSwitchToAiVoice])
 
+  // ── iOS Safari hybrid fallback (FM-3): silent Web Speech → Deepgram ──
+  // Invisible to the candidate: no banner, no toast, no error state. The
+  // transcript surface swaps from CandidateTranscript to the Deepgram panel,
+  // both of which show the same "Listening…" affordance. If Deepgram cannot
+  // start either, fall back to typing with an explicit notice — a broken
+  // recognition session must never silently swallow the candidate's answer.
+  const handleIosSafariHybridFallback = useCallback(async () => {
+    if (phaseRef.current !== 'candidate_answering') return
+    if (inputModeRef.current !== 'voice') return
+    track(
+      'VOICE',
+      'ios_safari_hybrid_deepgram_fallback',
+      { questionIndex: currentIndex },
+      { critical: true },
+    )
+    voiceDebug('ios_safari_hybrid_fallback', { questionIndex: currentIndex })
+    webSpeechFallbackLockedRef.current = true
+    iosAutoDeepgramActiveRef.current = true
+    stopListening('phase_change')
+    stopDgListening()
+    clearStormBudgetForAnswer()
+    clearRecognitionFailure()
+    setInputMode('deepgram')
+    setUserMicMuted(false)
+    await startDgListeningRef.current({ preserveTranscript: true })
+    if (!mountedRef.current) return
+    if (phaseRef.current !== 'candidate_answering') return
+    if (!dgControllerRef.current?.isActive()) {
+      // Deepgram unavailable too — voice is not possible for this candidate.
+      // Switch to typing with clear copy (never a silent dead mic).
+      stopDgListening()
+      iosAutoDeepgramActiveRef.current = false
+      setDgError(null)
+      setDgVoiceShowActions(false)
+      setVoiceUnavailableNotice('Voice unavailable — please type your answer')
+      setInputMode('text')
+      track(
+        'VOICE',
+        'ios_safari_hybrid_fallback_text',
+        { questionIndex: currentIndex },
+        { critical: true, level: 'warn' },
+      )
+    }
+  }, [
+    currentIndex,
+    track,
+    stopListening,
+    stopDgListening,
+    clearStormBudgetForAnswer,
+    clearRecognitionFailure,
+  ])
+
+  // Arm the 10s empty-transcript watchdog while Web Speech recognition is
+  // running on iOS Safari. The timeout is anchored to isListening — if
+  // recognition restarts, the window restarts ("10 seconds of recognition
+  // running"). Fires at most once per question index.
+  useEffect(() => {
+    if (phase !== 'candidate_answering') return
+    if (inputMode !== 'voice' || useManualInput || userMicMuted) return
+    if (!isListening) return
+    if (!isIosSafari()) return
+    if (iosHybridFiredForIndexRef.current === currentIndex) return
+
+    const timer = window.setTimeout(() => {
+      if (phaseRef.current !== 'candidate_answering') return
+      if (inputModeRef.current !== 'voice') return
+      if (userMicMutedRef.current || useManualInputRef.current) return
+      if (!isListeningRef.current) return
+      if (iosHybridFiredForIndexRef.current === currentIndex) return
+      // getMergedTranscript() unions finalized + interim — any speech at all
+      // means recognition works and the fallback must not fire.
+      if (getMergedTranscript().trim()) return
+      iosHybridFiredForIndexRef.current = currentIndex
+      void handleIosSafariHybridFallback()
+    }, IOS_SAFARI_EMPTY_TRANSCRIPT_FALLBACK_MS)
+
+    return () => window.clearTimeout(timer)
+  }, [
+    phase,
+    inputMode,
+    useManualInput,
+    userMicMuted,
+    isListening,
+    currentIndex,
+    getMergedTranscript,
+    handleIosSafariHybridFallback,
+  ])
+
+  // The hybrid switch is scoped to the question it fired on. When the static
+  // question index advances, release the fallback lock and return to Web
+  // Speech so the next question starts exactly as a fresh iOS Safari session.
+  const iosHybridPrevIndexRef = useRef(currentIndex)
+  useEffect(() => {
+    if (iosHybridPrevIndexRef.current === currentIndex) return
+    iosHybridPrevIndexRef.current = currentIndex
+    if (!iosAutoDeepgramActiveRef.current) return
+    iosAutoDeepgramActiveRef.current = false
+    webSpeechFallbackLockedRef.current = false
+    if (inputModeRef.current === 'deepgram') {
+      stopDgListening()
+      setInputMode('voice')
+    }
+  }, [currentIndex, stopDgListening])
+
   // Tear down cloud STT when Chrome/Edge should use browser speech-to-text.
   useEffect(() => {
     if (webSpeechFallbackLockedRef.current) return
@@ -2024,6 +2246,32 @@ export default function InterviewSessionPage() {
       return
     }
 
+    // FM-3 Phase 4 — too-short voice guard. A voice transcript under
+    // MIN_VOICE_ANSWER_WORDS is a probable STT failure (dropped audio, iOS
+    // Safari empty/partial recognition) and must NEVER be sent to the evaluator
+    // as a real answer. Block like the empty case (keep the mic live so the
+    // candidate can keep talking) rather than forcing text — a genuinely terse
+    // spoken answer must not be penalised by yanking them out of voice. A typed
+    // answer (inputMode === 'text') is intentional input and is exempt.
+    if (isTooShortVoiceAnswer(submittedText, inputMode)) {
+      const wordCount = countWords(submittedText)
+      console.log('[speech] submit_blocked', { reason: 'too_short_voice', wordCount })
+      interviewLog('submit_blocked', {
+        reason: 'too_short_voice',
+        source,
+        wordCount,
+        mode: inputMode,
+      })
+      track(
+        'SUBMIT',
+        'submit_blocked',
+        { reason: 'too_short_voice', source, wordCount, mode: inputMode },
+        { critical: true, level: 'warn' },
+      )
+      setShowShortWarning(true)
+      return
+    }
+
     interviewLog('submit_started', {
       source,
       payload_length: submittedText.length,
@@ -2036,6 +2284,7 @@ export default function InterviewSessionPage() {
     submitInFlightRef.current = true
     setPhase('submitting')
     setShowEmptyWarning(false)
+    setShowShortWarning(false)
     stopTimer()
     voiceDebug('stop_listening_triggered', { source: 'submit', mode: inputMode })
     stopListening('answer_submitted')
@@ -2417,6 +2666,15 @@ export default function InterviewSessionPage() {
     if (showEmptyWarning && answerText) setShowEmptyWarning(false)
   }, [showEmptyWarning, answerText])
 
+  // ─── Too-short voice warning (FM-3) ───────────────────────
+  // Auto-dismiss once the answer is no longer too short — either it reaches the
+  // minimum word count, or the candidate switches to typing (an intentional
+  // short typed answer is fine).
+  useEffect(() => {
+    if (!showShortWarning) return
+    if (!isTooShortVoiceAnswer(answerText, inputMode)) setShowShortWarning(false)
+  }, [showShortWarning, answerText, inputMode])
+
   // ─── Next Question ────────────────────────────────────────
   const handleNextQuestion = useCallback(() => {
     interviewLog('advance_question', {
@@ -2678,14 +2936,18 @@ export default function InterviewSessionPage() {
            style={{ background: 'var(--page-gradient)' }}>
         <div className="dashboard-premium-card max-w-md space-y-4 p-8 text-center">
           <p className="font-semibold text-(--text-primary)">
-            {endedStatus === 'completed'
-              ? 'This interview is already completed.'
-              : 'This interview session has ended.'}
+            {endedMessageOverride
+              ? endedMessageOverride
+              : endedStatus === 'completed'
+                ? 'This interview is already completed.'
+                : 'This interview session has ended.'}
           </p>
           <p className="text-sm text-(--text-muted)">
-            {endedStatus === 'completed'
-              ? 'You can find its report in your Interview History, or start a new practice session.'
-              : 'It was closed before completion and can no longer be resumed. Start a new practice session to keep practicing.'}
+            {endedMessageOverride
+              ? 'This session was closed without a scored answer, so no report was generated. Start a new practice session to keep practicing.'
+              : endedStatus === 'completed'
+                ? 'You can find its report in your Interview History, or start a new practice session.'
+                : 'It was closed before completion and can no longer be resumed. Start a new practice session to keep practicing.'}
           </p>
           <button
             onClick={() => router.push('/interview/new')}
@@ -3002,16 +3264,20 @@ export default function InterviewSessionPage() {
                     className="bg-(--bg-secondary)"
                   />
                   {awaitingAudioTap && (
+                    // Full-viewport overlay (not scoped to this small video panel) — on
+                    // mobile the interviewer panel is only half of a short top strip,
+                    // which made the previous in-panel CTA easy to miss entirely (FM-2).
                     <button
                       type="button"
                       onClick={handleUnlockAudioGesture}
-                      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black/45 px-6 text-center backdrop-blur-[2px]"
-                      aria-label="Tap to hear the interviewer ask the question"
+                      className="fixed inset-0 z-[60] flex flex-col items-center justify-center gap-5 bg-black/80 px-6 text-center backdrop-blur-sm"
+                      aria-label="Tap anywhere to hear the interviewer ask the question"
                     >
-                      <span className="rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-(--text-primary) shadow-lg">
-                        Tap to hear the question
+                      <span className="text-5xl" aria-hidden="true">🔊</span>
+                      <span className="rounded-2xl bg-white px-6 py-4 text-lg font-bold text-(--text-primary) shadow-2xl">
+                        Tap anywhere to hear the question
                       </span>
-                      <span className="max-w-[16rem] text-xs text-white/90">
+                      <span className="max-w-[20rem] text-sm text-white/85">
                         Required on iPhone so {resolvedInterviewer?.name ?? 'Priya'} can speak before you answer.
                       </span>
                     </button>
@@ -3235,9 +3501,10 @@ export default function InterviewSessionPage() {
               {phase === 'candidate_answering' && useManualInput && (
                 <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col space-y-2">
                   <p className={IE_ALERT_BANNER_CLASS} style={IE_ALERT_WARNING_STYLE} role="status">
-                    {isMicSupported
-                      ? 'Microphone unavailable right now. Please type your answer.'
-                      : 'Speech input not supported. Please type your answer.'}
+                    {voiceUnavailableNotice ??
+                      (isMicSupported
+                        ? 'Microphone unavailable right now. Please type your answer.'
+                        : 'Speech input not supported. Please type your answer.')}
                   </p>
                   {isMicSupported && (
                     <button
@@ -3401,6 +3668,19 @@ export default function InterviewSessionPage() {
               >
                 <p className="text-xs font-semibold">
                   We didn&apos;t catch your answer yet. Please speak (or type) before submitting.
+                </p>
+              </div>
+            )}
+
+            {/* ── Too-short voice warning (FM-3): blocked, not scored ── */}
+            {phase === 'candidate_answering' && showShortWarning && (
+              <div
+                className={`session-flush-panel dashboard-premium-card w-full min-w-0 border-2 p-3 ${IE_ALERT_BANNER_CLASS}`}
+                style={IE_ALERT_WARNING_STYLE}
+                role="status"
+              >
+                <p className="text-xs font-semibold">
+                  We only caught a few words. Please add a little more before submitting.
                 </p>
               </div>
             )}

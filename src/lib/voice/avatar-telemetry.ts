@@ -4,6 +4,7 @@ import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-teleme
 export type AvatarTelemetryEvent =
   | 'avatar_unlock_required'
   | 'avatar_unlock_success'
+  | 'avatar_unlock_timeout_auto_advance'
   | 'avatar_audio_started'
   | 'avatar_audio_completed'
   | 'avatar_audio_failed'

@@ -444,23 +444,43 @@ export function useSpeechRecognition(
       if (err instanceof DOMException && err.name === 'NotAllowedError') {
         setPermissionState('denied');
         setError('Microphone permission denied. Click Retry to request again.');
+        if (telemetryCtxRef.current) {
+          emitMicPipelineTelemetry('mic_permission_denied', telemetryCtxRef.current, {
+            reason: 'permission_denied',
+          });
+        }
         return false;
       }
 
       if (err instanceof DOMException && err.name === 'NotFoundError') {
         setPermissionState('denied');
         setError('No microphone device found. Please connect a mic and try again.');
+        if (telemetryCtxRef.current) {
+          emitMicPipelineTelemetry('mic_permission_denied', telemetryCtxRef.current, {
+            reason: 'no_device',
+          });
+        }
         return false;
       }
 
       if (err instanceof DOMException && err.name === 'NotReadableError') {
         setPermissionState('prompt');
         setError('Microphone is busy in another app. Close other apps and retry.');
+        if (telemetryCtxRef.current) {
+          emitMicPipelineTelemetry('mic_permission_denied', telemetryCtxRef.current, {
+            reason: 'device_busy',
+          });
+        }
         return false;
       }
 
       setPermissionState('prompt');
       setError('Unable to access microphone right now. Please retry.');
+      if (telemetryCtxRef.current) {
+        emitMicPipelineTelemetry('mic_permission_denied', telemetryCtxRef.current, {
+          reason: 'unknown',
+        });
+      }
       return false;
     }
   }, [releaseMicKeepAliveStream]);

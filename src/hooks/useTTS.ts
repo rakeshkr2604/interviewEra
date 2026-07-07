@@ -20,6 +20,18 @@ interface UseTTSReturn {
   error: string | null
 }
 
+/**
+ * FM-1: on iOS Safari, `speechSynthesis` can silently stall (muted / tab
+ * backgrounded / autoplay-gated) with `onend` never firing, leaving the
+ * avatar state machine parked in avatar_speaking forever. This is a hard
+ * safety net, not a normal completion path — if the utterance hasn't
+ * naturally settled (onend/onerror) within this window, force-treat it as
+ * complete so the interview can advance. ElevenLabs and the browser
+ * speechSynthesis fallback itself are unchanged; this only bounds how long a
+ * single browser-TTS attempt can hang.
+ */
+const BROWSER_TTS_HARD_TIMEOUT_MS = 12_000
+
 export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -90,17 +102,35 @@ export function useTTS(interviewerId: InterviewerId | null): UseTTSReturn {
       utterance.lang = voice?.lang ?? resolveSttLocale()
       if (voice) utterance.voice = voice
 
+      // Guards against BOTH the forced timeout and the natural onend/onerror
+      // firing twice (e.g. a late onend arriving after the timeout already
+      // forced completion) — whichever settles this utterance first wins.
+      let settled = false
+      const forceCompleteTimer = setTimeout(() => {
+        if (settled) return
+        settled = true
+        setIsSpeaking(false)
+        interviewFlowLog('tts', 'browser_tts_onend_timeout_forced', { textLen: text.length })
+        callbacks.onPlaybackComplete?.()
+      }, BROWSER_TTS_HARD_TIMEOUT_MS)
+
       utterance.onstart = () => {
         setIsSpeaking(true)
         interviewFlowLog('tts', 'browser_tts_onstart', { textLen: text.length })
         callbacks.onPlaybackStarted?.()
       }
       utterance.onend = () => {
+        if (settled) return
+        settled = true
+        clearTimeout(forceCompleteTimer)
         setIsSpeaking(false)
         interviewFlowLog('tts', 'browser_tts_onend', { textLen: text.length })
         callbacks.onPlaybackComplete?.()
       }
       utterance.onerror = (event) => {
+        if (settled) return
+        settled = true
+        clearTimeout(forceCompleteTimer)
         setIsSpeaking(false)
         const code = (event as SpeechSynthesisErrorEvent).error
         let failMessage = `Speech failed (${code ?? 'unknown'})`

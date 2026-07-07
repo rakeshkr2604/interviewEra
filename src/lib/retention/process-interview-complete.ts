@@ -19,6 +19,7 @@ import {
   meanSessionScore,
   rollingAverage,
   roundToTwo,
+  summarize,
 } from './scoring';
 import { buildCompletionReinforcement } from './completion-reinforcement';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
@@ -176,6 +177,96 @@ async function idlePayload(
   };
 }
 
+/**
+ * Ground truth for `user_progress.total_sessions`: a COUNT of the user's
+ * `interviews` rows with `status = 'completed'`.
+ *
+ * Deliberately NOT derived from `session_quality_log` row count. A completed
+ * interview whose evaluations never persisted (`aggregateEvaluationsFromInterview`
+ * returns null, or dimension scores are incomplete) throws before the
+ * session_quality_log insert below ever runs — that interview is genuinely
+ * completed but never gets a log row. Counting log rows silently undercounts
+ * real completed sessions (observed production drift: 46 completed interviews
+ * vs. 30 log rows for the same user). `status = 'completed'` is already
+ * written to `interviews` before this pipeline ever runs (see the two
+ * `/api/interview/complete` write paths), so this count always includes the
+ * interview currently being processed.
+ *
+ * Returns null (rather than 0) on a read failure so callers can choose to
+ * leave the existing `total_sessions` value untouched instead of clobbering
+ * it with a false zero.
+ */
+async function getCompletedInterviewCount(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+): Promise<number | null> {
+  const { count, error } = await supabase
+    .from('interviews')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('status', 'completed');
+
+  if (error) {
+    logger.error('completed_interview_count_failed', { userId, error: error.message });
+    return null;
+  }
+  return count ?? 0;
+}
+
+/**
+ * Recompute the pure roll-up counters on `user_progress` from the durable
+ * `session_quality_log` rows (overall avg, last-5 avg, lifetime max dimension)
+ * plus the completed-interview count (total_sessions — see
+ * {@link getCompletedInterviewCount}). All four are a pure function of durable
+ * state, so recomputing them is safe and idempotent.
+ *
+ * Called in two situations:
+ *   1. Self-repair a PARTIAL WRITE on retry: a prior attempt inserted the
+ *      quality-log row but failed before the roll-up landed (root-cause F3).
+ *   2. Immediately after every fresh session_quality_log insert (not just on
+ *      retry) — so a later throw in this same call (unlock/streak/etc.) cannot
+ *      leave user_progress stale without requiring a second /complete call to
+ *      repair it.
+ *
+ * Does NOT touch tier / streak / XP state — those depend on unlock history
+ * that is not reconstructable from the log alone.
+ */
+async function recomputeProgressRollupsFromLogs(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+): Promise<void> {
+  const { data: rows, error: readErr } = await supabase
+    .from('session_quality_log')
+    .select('*')
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false });
+
+  if (readErr) {
+    logger.error('retention_rollup_recompute_read_failed', { userId, error: readErr.message });
+    return;
+  }
+
+  const summary = summarize((rows ?? []) as SessionQualityRow[]);
+  const completedCount = await getCompletedInterviewCount(supabase, userId);
+
+  const update: Record<string, unknown> = {
+    overall_avg_score: summary.overallAvg,
+    last_5_sessions_avg: summary.last5Avg,
+    max_dimension_score: summary.maxDimensionScoreLifetime,
+  };
+  // Omit rather than write a false 0 if the count read failed.
+  if (completedCount !== null) update.total_sessions = completedCount;
+
+  const { error: upErr } = await supabase
+    .from('user_progress')
+    .update(update)
+    .eq('user_id', userId);
+
+  if (upErr) {
+    logger.error('retention_rollup_recompute_update_failed', { userId, error: upErr.message });
+  }
+}
+
 export async function processInterviewRetention(
   userId: string,
   interviewId: string,
@@ -189,6 +280,9 @@ export async function processInterviewRetention(
     .maybeSingle();
 
   if (existingLog) {
+    // Self-repair partial writes (log inserted, roll-up never landed) so stale
+    // user_progress counters converge on retry instead of staying wrong forever.
+    await recomputeProgressRollupsFromLogs(supabase, userId);
     return idlePayload(userId, interviewId, 'session_quality_log exists');
   }
 
@@ -326,6 +420,12 @@ export async function processInterviewRetention(
     throw new Error(insErr.message);
   }
 
+  // Sync the pure roll-up counters immediately — not only on a retry's
+  // existingLog short-circuit. If checkAndUnlockTier/updateStreak/anything
+  // below throws, user_progress is already caught up on this session rather
+  // than staying stale until (if ever) another /complete call retries.
+  await recomputeProgressRollupsFromLogs(supabase, userId);
+
   const unlockResult = await checkAndUnlockTier({ userId });
 
   const unlockedOk = unlockResult.ok === true && unlockResult.unlocked === true;
@@ -442,6 +542,11 @@ export async function processInterviewRetention(
     rollupRows.length > 0 ? rollingAverage(rollupRows, 5) : null;
   const maxDimRollup =
     rollupRows.length > 0 ? lifetimeMaxDimensionScore(rollupRows) : null;
+  // Ground truth for total_sessions is the completed-interview COUNT (see
+  // getCompletedInterviewCount), not the log-row count — falls back to the
+  // log-row count only if the count query itself failed.
+  const completedCountFinal = await getCompletedInterviewCount(supabase, userId);
+  const totalSessionsFinal = completedCountFinal ?? rollupRows.length;
 
   await supabase
     .from('session_quality_log')
@@ -458,7 +563,7 @@ export async function processInterviewRetention(
   const { error: upErr } = await supabase
     .from('user_progress')
     .update({
-      total_sessions: rollupRows.length,
+      total_sessions: totalSessionsFinal,
       overall_avg_score: overallAvgRollup ?? null,
       last_5_sessions_avg: last5AvgRollup ?? null,
       max_dimension_score: maxDimRollup ?? null,
@@ -479,7 +584,7 @@ export async function processInterviewRetention(
     previousStreak: streakResult.previousStreak,
     currentTier: tierAfterRpc,
     progressSlice: {
-      total_sessions: rollupRows.length,
+      total_sessions: totalSessionsFinal,
       sessions_at_current_tier: sessionsAtTier,
       max_dimension_score: maxDimRollup,
       last_5_sessions_avg: last5AvgRollup,
@@ -512,9 +617,14 @@ export async function processInterviewRetentionSafely(
   try {
     return await processInterviewRetention(userId, interviewId);
   } catch (err) {
-    logger.error('processInterviewRetention_outer', {
+    // Non-blocking for /complete, but NOT silent: emit a stable, countable
+    // structured marker (grep `retention_pipeline_failed`) with interview_id so
+    // retention failures can be alerted/graphed per interview instead of
+    // vanishing into a null return (root-cause F3).
+    logger.error('retention_pipeline_failed', {
       userId,
       interviewId,
+      failed: true,
       error: err instanceof Error ? err.message : 'unknown_error',
     });
     return null;

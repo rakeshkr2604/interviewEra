@@ -30,9 +30,39 @@ function hasGetUserMedia(): boolean {
   return Boolean(navigator.mediaDevices?.getUserMedia)
 }
 
+/**
+ * iOS Safari (incl. iOS PWA) exposes webkitSpeechRecognition but can run an
+ * entire recognition session without ever emitting a result — the candidate
+ * speaks, "Listening…" shows, and the transcript stays empty. Detected here so
+ * the session page can arm the silent hybrid fallback (Web Speech → Deepgram)
+ * for the current question only.
+ */
+export function isIosSafari(): boolean {
+  if (typeof window === 'undefined') return false
+  const ctx = getPlatformContext()
+  return ctx.platform === 'ios' && ctx.browser === 'safari'
+}
+
+/**
+ * How long recognition may run with a completely empty transcript (final +
+ * interim) on iOS Safari before the session silently switches that question
+ * to Deepgram. Silence-only vs broken-recognition is indistinguishable client
+ * side, so the switch must be invisible: a silent candidate loses nothing, a
+ * broken session gains a working transcript path.
+ */
+export const IOS_SAFARI_EMPTY_TRANSCRIPT_FALLBACK_MS = 10_000
+
 /** Best voice input mode for this browser — prefer free Web Speech when available. */
 export function resolvePreferredVoiceInputMode(): InterviewInputMode {
   if (typeof window === 'undefined') return 'voice'
+  if (isIosSafari()) {
+    // Start with Web Speech exactly as before — the hybrid fallback in the
+    // session page (see IOS_SAFARI_EMPTY_TRANSCRIPT_FALLBACK_MS) handles the
+    // empty-transcript failure mode per question.
+    if (hasWebSpeechRecognition()) return 'voice'
+    if (hasGetUserMedia()) return 'deepgram'
+    return 'text'
+  }
   if (hasWebSpeechRecognition()) return 'voice'
   if (hasGetUserMedia()) return 'deepgram'
   return 'text'

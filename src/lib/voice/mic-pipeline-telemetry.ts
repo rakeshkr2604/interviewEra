@@ -190,6 +190,7 @@ export function emitMicPipelineTelemetry(
 
     const critical =
       event === 'mic_permission_revoked' ||
+      event === 'mic_permission_denied' ||
       event === 'mic_acquire_failed' ||
       event === 'interview_audio_failure' ||
       event === 'track_ended'
