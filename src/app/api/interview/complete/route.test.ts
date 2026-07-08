@@ -34,8 +34,9 @@ vi.mock('@/lib/retention/process-interview-complete', () => ({
 vi.mock('@/lib/analytics/funnel-server', () => ({
   buildFunnelCompleteGa4Payload: vi.fn(async () => ({ interviewId: 'iv-1' })),
 }));
+const sendInterviewCompletedEmail = vi.fn(async () => undefined);
 vi.mock('@/lib/email/lifecycle/send-interview-completed', () => ({
-  sendInterviewCompletedEmail: vi.fn(async () => undefined),
+  sendInterviewCompletedEmail: (...args: unknown[]) => sendInterviewCompletedEmail(...args),
 }));
 const trackInterviewEvent = vi.fn();
 vi.mock('@/lib/analytics/interview-events', () => ({
@@ -70,6 +71,7 @@ const validDims = {
 beforeEach(() => {
   trackInterviewEvent.mockClear();
   persistMilestoneEventOnce.mockClear();
+  sendInterviewCompletedEmail.mockClear();
   aggregateReportMock = vi.fn(async () => ({
     reportId: 'rep-new',
     overallScore: 6,
@@ -256,6 +258,33 @@ describe('POST /complete — repair-aware idempotency under new ordering', () =>
     expect(db.reports).toHaveLength(1);
     // Repair path never reaches the fresh-completion code — no duplicate event.
     expect(persistMilestoneEventOnce).not.toHaveBeenCalled();
+  });
+
+  it('report exists but status not completed (resumed session) → still sends the completion email', async () => {
+    // Regression: a session interrupted between report-insert and email-send,
+    // then resumed and re-completed, must still receive its completion email —
+    // not silently lose it because a report already existed.
+    db.reports = [
+      {
+        id: 'rep-existing',
+        interview_id: IV,
+        generated_at: '2026-07-05T00:00:00Z',
+        overall_score: 6,
+        radar_data: [],
+      },
+    ];
+    db.interviews[0].status = 'in_progress';
+
+    await POST(req({ interviewId: IV }));
+
+    expect(sendInterviewCompletedEmail).toHaveBeenCalledTimes(1);
+    expect(sendInterviewCompletedEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        interviewId: IV,
+        reportId: 'rep-existing',
+        recipientEmail: USER.email,
+      }),
+    );
   });
 
   it('already completed with a report → returns stored report, regenerates nothing', async () => {

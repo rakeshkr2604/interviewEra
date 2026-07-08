@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { formatDateTimeEnIn } from '@/lib/datetime/ist';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
 import { Badge } from '@/components/ui/badge';
@@ -283,11 +284,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
   });
 
   const completedAt = interview.completed_at
-    ? new Date(interview.completed_at as string).toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      })
+    ? formatDateTimeEnIn(interview.completed_at as string)
     : 'N/A';
 
   return (

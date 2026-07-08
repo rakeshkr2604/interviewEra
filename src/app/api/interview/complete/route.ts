@@ -16,7 +16,7 @@ import { isValidPersistedEvaluation } from '@/lib/evaluation/evaluation-validity
 import { sendInterviewCompletedEmail } from '@/lib/email/lifecycle/send-interview-completed';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
-import type { InterviewSessionContext } from '@/types/app.types';
+import type { InterviewSessionContext, RadarDataPoint } from '@/types/app.types';
 
 type RetentionResponsePayload = InterviewCompleteRetentionPayload;
 
@@ -210,7 +210,7 @@ export async function POST(request: Request): Promise<NextResponse> {
      */
     const { data: existingReport } = await serviceClient
       .from('reports')
-      .select('id')
+      .select('id, overall_score, radar_data')
       .eq('interview_id', interviewId)
       .order('generated_at', { ascending: false })
       .limit(1)
@@ -234,6 +234,27 @@ export async function POST(request: Request): Promise<NextResponse> {
           });
         }
       }
+
+      // A prior attempt may have persisted the report but crashed/timed out
+      // before the fresh-completion email fire below ever ran (see FM-... bug:
+      // resuming and re-completing an interrupted session silently ate the
+      // completion email). sendInterviewCompletedEmail's own idempotency guard
+      // (lifecycle_email_log, keyed on interview_completed:{interviewId}) makes
+      // this call a no-op if the email genuinely already went out, so firing it
+      // here unconditionally is safe and finally delivers it when it didn't.
+      if (user.email) {
+        void sendInterviewCompletedEmail({
+          interviewId,
+          userId: user.id,
+          reportId: existingReport.id as string,
+          overallScore: existingReport.overall_score as number,
+          radarData: existingReport.radar_data as RadarDataPoint[],
+          recipientEmail: user.email,
+        }).catch((emailErr) => {
+          console.error('[interview/complete] interview completed email failed (repair path):', emailErr);
+        });
+      }
+
       return NextResponse.json(
         await buildReportResponseBody(
           serviceClient,

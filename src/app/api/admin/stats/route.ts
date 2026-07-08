@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { getCached, setCached } from '@/lib/admin/cache';
+import { istDayStartUtcIso } from '@/lib/datetime/ist';
 
 const CACHE_KEY = 'admin:stats';
 const CACHE_TTL = 60_000; // 60 seconds
@@ -44,8 +45,7 @@ export async function GET(request: Request) {
   try {
     const svc = createServiceClient();
     const now = Date.now();
-    const todayISO   = new Date().toISOString().slice(0, 10);
-    const todayStart = `${todayISO}T00:00:00.000Z`;
+    const todayStart = istDayStartUtcIso(); // IST calendar day, not UTC — this is an India-facing product
 
     const [
       totalUsers,
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
 
       svc.from('interviews')
         .select('id', { count: 'exact', head: true })
-        .gte('started_at', todayStart)
+        .gte('completed_at', todayStart)
         .eq('status', 'completed'),
 
       svc.from('ai_call_logs')

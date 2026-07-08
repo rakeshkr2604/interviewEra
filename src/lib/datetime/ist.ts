@@ -14,6 +14,11 @@ export function istCalendarDateKey(date: Date | string): string {
   return calendarDateKeyFormatter.format(value);
 }
 
+/** UTC instant corresponding to 00:00:00 IST on `date`'s IST calendar day — for "today" DB filters. */
+export function istDayStartUtcIso(date: Date = new Date()): string {
+  return new Date(`${istCalendarDateKey(date)}T00:00:00+05:30`).toISOString();
+}
+
 /** Whole IST calendar days from `from` until `targetIso` (placement-style countdown). */
 export function daysUntilIstCalendarDate(
   targetIso: string,
@@ -66,4 +71,32 @@ export function formatInterviewDateEnIn(
   completedAt: string | null | undefined,
 ): string {
   return formatDateEnIn(resolveInterviewDisplayIso(startedAt, completedAt));
+}
+
+const dateTimeFormatter = new Intl.DateTimeFormat('en-IN', {
+  timeZone: IST_TIMEZONE,
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  hour12: true,
+});
+
+/** `D MMM YYYY, h:mm A` in IST — e.g. `8 Jul 2026, 2:34 PM`. Returns em dash when invalid. */
+export function formatDateTimeEnIn(iso: string | null | undefined): string {
+  const value = parseValidDate(iso);
+  if (!value) return '—';
+  const parts = dateTimeFormatter.formatToParts(value);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? '';
+  const dayPeriod = get('dayPeriod').toUpperCase();
+  return `${get('day')} ${get('month')} ${get('year')}, ${get('hour')}:${get('minute')} ${dayPeriod}`;
+}
+
+/** Interview list label with time — e.g. `6 Apr 2026, 2:34 PM` in IST. */
+export function formatInterviewDateTimeEnIn(
+  startedAt: string | null | undefined,
+  completedAt: string | null | undefined,
+): string {
+  return formatDateTimeEnIn(resolveInterviewDisplayIso(startedAt, completedAt));
 }

@@ -18,15 +18,46 @@ import { checkElevenLabsHealth } from '@/lib/voice/elevenlabs-health';
 
 const CACHE_KEY = 'admin:system';
 const CACHE_TTL = 60_000; // 60 seconds
+const HEALTH_CHECK_TIMEOUT_MS = 3_000;
 
 type ServiceStatus = 'healthy' | 'degraded' | 'offline';
+
+// createServiceClient() builds a stateless supabase-js REST wrapper (no
+// network I/O at construction, no raw pg connection held client-side), so
+// reuse only saves object-construction cost — but it's free, so cache it at
+// module scope for this route, same pattern as the Redis singleton below.
+let healthCheckServiceClient: ReturnType<typeof createServiceClient> | null = null;
+function getHealthCheckServiceClient(): ReturnType<typeof createServiceClient> {
+  if (!healthCheckServiceClient) healthCheckServiceClient = createServiceClient();
+  return healthCheckServiceClient;
+}
+
+/** Races a thenable against a hard deadline. Resolves `null` on timeout instead of hanging. */
+function withHealthTimeout<T>(thenable: PromiseLike<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    thenable.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      () => { clearTimeout(timer); resolve(null); },
+    );
+  });
+}
 
 async function checkDatabase(): Promise<{ status: ServiceStatus; latency_ms: number }> {
   const t0 = Date.now();
   try {
-    const svc = createServiceClient();
-    const { error } = await svc.from('users').select('id', { count: 'exact', head: true });
-    return { status: error ? 'degraded' : 'healthy', latency_ms: Date.now() - t0 };
+    const svc = getHealthCheckServiceClient();
+    // Reachability ping, not an aggregate. The prior `count: 'exact'` made
+    // PostgREST run SELECT count(*) FROM users (full scan) on every load —
+    // that's why this took ~2s. `.limit(1)` + head-only is a cheap index probe.
+    const result = await withHealthTimeout(
+      svc.from('users').select('id', { head: true }).limit(1),
+      HEALTH_CHECK_TIMEOUT_MS,
+    );
+    if (result === null) {
+      return { status: 'degraded', latency_ms: Date.now() - t0 };
+    }
+    return { status: result.error ? 'degraded' : 'healthy', latency_ms: Date.now() - t0 };
   } catch {
     return { status: 'offline', latency_ms: Date.now() - t0 };
   }
@@ -36,8 +67,8 @@ async function checkRedis(): Promise<{ status: ServiceStatus; latency_ms: number
   const t0 = Date.now();
   try {
     const redis = getRedis();
-    await redis.ping();
-    return { status: 'healthy', latency_ms: Date.now() - t0 };
+    const result = await withHealthTimeout(redis.ping(), HEALTH_CHECK_TIMEOUT_MS);
+    return { status: result === null ? 'degraded' : 'healthy', latency_ms: Date.now() - t0 };
   } catch {
     return { status: 'degraded', latency_ms: Date.now() - t0 };
   }

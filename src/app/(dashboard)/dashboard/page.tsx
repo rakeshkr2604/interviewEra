@@ -57,6 +57,7 @@ export default async function DashboardPage() {
     { data: userData, error: userError },
     { data: interviewsRaw },
     { data: progressSnap, error: progressErr },
+    { count: completedCountTotal },
   ] = await Promise.all([
     supabase
       .from('users')
@@ -70,6 +71,13 @@ export default async function DashboardPage() {
       .order('started_at', { ascending: false })
       .limit(5),
     supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
+    // Lifetime count, independent of the 5-row cap above — the "Completed" stat
+    // tile must reflect all-time completions, not just the 5 most recent rows.
+    supabase
+      .from('interviews')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'completed'),
   ])
 
   if (userError) {
@@ -95,7 +103,7 @@ export default async function DashboardPage() {
   }
 
   const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
-  const completedCount = rows.filter((i) => i.status === 'completed').length
+  const completedCount = completedCountTotal ?? 0
   const reports = rows.flatMap((i) =>
     i.status === 'completed'
       ? (i.reports ?? []).map((r) => ({

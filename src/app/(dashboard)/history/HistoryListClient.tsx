@@ -1,10 +1,20 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
-import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
+import { formatInterviewDateTimeEnIn } from '@/lib/datetime/ist'
 import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { CommunityCTA } from '@/components/community/CommunityCTA'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
@@ -26,13 +36,24 @@ interface HistoryListClientProps {
 const TABS: FilterTab[] = ['All', 'Completed', 'In-progress']
 
 export function HistoryListClient({ items }: HistoryListClientProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState<FilterTab>('All')
+  const [continueTargetId, setContinueTargetId] = useState<string | null>(null)
 
   const filteredItems = useMemo(() => {
     if (activeTab === 'All') return items
     if (activeTab === 'Completed') return items.filter((item) => item.status === 'completed')
     return items.filter((item) => item.status !== 'completed')
   }, [activeTab, items])
+
+  const tabCounts = useMemo<Record<FilterTab, number>>(
+    () => ({
+      All: items.length,
+      Completed: items.filter((item) => item.status === 'completed').length,
+      'In-progress': items.filter((item) => item.status !== 'completed').length,
+    }),
+    [items],
+  )
 
   return (
     <>
@@ -49,7 +70,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
               border: '1px solid var(--card-border)',
             }}
           >
-            {tab}
+            {tab} ({tabCounts[tab]})
           </button>
         ))}
       </div>
@@ -83,7 +104,8 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
             // Server only accepts answers/checkpoints for pending/in_progress —
             // abandoned sessions are terminal and must not offer "Continue".
             const isResumable = isResumableInterviewStatus(interview.status)
-            const date = formatInterviewDateEnIn(interview.startedAt, interview.completedAt)
+            const isEnded = interview.status === 'abandoned'
+            const date = formatInterviewDateTimeEnIn(interview.startedAt, interview.completedAt)
             const reportHref =
               isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
 
@@ -129,13 +151,14 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                   </div>
 
                   {isResumable ? (
-                    <Link
-                      href={`/interview/session/${interview.id}`}
+                    <button
+                      type="button"
+                      onClick={() => setContinueTargetId(interview.id)}
                       className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 active:opacity-90 sm:text-sm"
                       style={{ background: 'var(--accent-primary)' }}
                     >
                       Continue
-                    </Link>
+                    </button>
                   ) : reportHref ? (
                     <Link
                       href={reportHref}
@@ -146,11 +169,57 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                     </Link>
                   ) : null}
                 </div>
+
+                {isEnded ? (
+                  <p className="w-full text-sm" style={{ color: 'var(--text-muted)' }}>
+                    Session ended without completion — credit was deducted
+                  </p>
+                ) : null}
+
+                {isResumable ? (
+                  <div
+                    className="w-full rounded-lg border px-3 py-2 text-xs leading-relaxed"
+                    style={{
+                      borderColor: 'color-mix(in srgb, var(--accent-warning) 35%, transparent)',
+                      background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    ⚠ Complete in one sitting — if you exit without finishing, this credit will be
+                    deducted and the interview will be marked as Ended. You won&apos;t be able to
+                    continue it.
+                  </div>
+                ) : null}
               </div>
             )
           })
         )}
       </div>
+
+      <Dialog open={continueTargetId !== null} onOpenChange={(open) => !open && setContinueTargetId(null)}>
+        <DialogContent className="max-w-md sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Continue your interview?</DialogTitle>
+            <DialogDescription>
+              This is your only attempt. Exiting without completing will mark it as Ended and
+              deduct your credit.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button type="button" variant="outline" onClick={() => setContinueTargetId(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (continueTargetId) router.push(`/interview/session/${continueTargetId}`)
+              }}
+            >
+              Continue Interview
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
