@@ -83,6 +83,6 @@ export function resolveElevenLabsModelId(): string {
     readTrimmedEnv(
       'ELEVENLABS_MODEL_ID',
       'ELEVENLABS_MODEL_PRIMARY',
-    ) ?? 'eleven_multilingual_v2'
+    ) ?? 'eleven_flash_v2_5'
   );
 }

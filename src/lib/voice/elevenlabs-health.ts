@@ -26,6 +26,8 @@ export interface ElevenLabsHealthResult {
   reason?: ElevenLabsHealthReason;
   quota_remaining_pct?: number;
   tts_recent_success_rate?: number;
+  /** Time-to-first-audio-chunk from the streaming TTS probe, when it ran. */
+  ttfa_ms?: number;
 }
 
 const USER_ENDPOINT = 'https://api.elevenlabs.io/v1/user';
@@ -125,13 +127,30 @@ async function probeUserEndpoint(apiKey: string): Promise<ProbeAttemptResult> {
   return last;
 }
 
-async function probeTtsEndpoint(apiKey: string): Promise<{ ok: boolean; status: number | null; latency_ms: number }> {
+/** TTFA (time to first audio chunk) thresholds for the streaming TTS probe. */
+const TTFA_HEALTHY_MS = 500;
+const TTFA_WARNING_MS = 1_000;
+
+interface TtsProbeResult {
+  ok: boolean;
+  status: number | null;
+  /** Time to first byte of the audio stream — what the probe now measures instead of full-generation time. */
+  latency_ms: number;
+}
+
+/**
+ * Probes the streaming endpoint (matches what /api/tts calls in production)
+ * and measures time-to-first-chunk rather than waiting for the full stream to
+ * drain — a scope-limited key can still be "healthy" even if full generation
+ * is slow, since what matters for interview UX is TTFA.
+ */
+async function probeTtsEndpoint(apiKey: string): Promise<TtsProbeResult> {
   const t0 = Date.now();
   const voiceId = ELEVENLABS_VOICE_IDS.priya;
   const modelId = resolveElevenLabsModelId();
 
   try {
-    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+    const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`, {
       method: 'POST',
       headers: {
         Accept: 'audio/mpeg',
@@ -147,11 +166,28 @@ async function probeTtsEndpoint(apiKey: string): Promise<{ ok: boolean; status: 
           style: 0.2,
           use_speaker_boost: true,
         },
+        output_format: 'mp3_44100_128',
       }),
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
 
-    return { ok: res.ok, status: res.status, latency_ms: Date.now() - t0 };
+    if (!res.ok || !res.body) {
+      return { ok: res.ok, status: res.status, latency_ms: Date.now() - t0 };
+    }
+
+    // Read only the first chunk — that's the TTFA moment. Cancel the rest of
+    // the stream so the probe doesn't pay for/wait on full generation. If
+    // stream reading isn't available for some reason, fall back to the
+    // already-known "ok" result rather than misreporting the probe as failed.
+    try {
+      const reader = res.body.getReader();
+      await reader.read();
+      void reader.cancel().catch(() => {});
+    } catch {
+      /* fall through — res.ok already confirms the endpoint is reachable */
+    }
+
+    return { ok: true, status: res.status, latency_ms: Date.now() - t0 };
   } catch {
     return { ok: false, status: null, latency_ms: Date.now() - t0 };
   }
@@ -283,19 +319,23 @@ export async function checkElevenLabsHealth(): Promise<ElevenLabsHealthResult> {
     if (ttsProbe.ok) {
       // TTS probe succeeded: interview voice pipeline is operational even when
       // the account endpoint is scope-restricted (common with limited API keys).
+      // Classify by TTFA, not raw probe round-trip — that's what interview UX feels.
       const result: ElevenLabsHealthResult = {
-        status: 'healthy',
+        status: ttsProbe.latency_ms < TTFA_HEALTHY_MS ? 'healthy' : 'degraded',
         latency_ms: userProbe.latency_ms + ttsProbe.latency_ms,
         reason: 'scope_limited',
         tts_recent_success_rate: ttsRecentSuccessRate,
+        ttfa_ms: ttsProbe.latency_ms,
       };
       logHealthCheck({
         ...baseLog,
         classification: result.status,
         reason: result.reason,
-        fallback_endpoint: '/v1/text-to-speech',
+        fallback_endpoint: '/v1/text-to-speech/stream',
         fallback_status: ttsProbe.status,
         fallback_latency_ms: ttsProbe.latency_ms,
+        ttfa_ms: ttsProbe.latency_ms,
+        ttfa_warning: ttsProbe.latency_ms > TTFA_WARNING_MS,
       });
       return result;
     }
@@ -310,7 +350,7 @@ export async function checkElevenLabsHealth(): Promise<ElevenLabsHealthResult> {
       ...baseLog,
       classification: result.status,
       reason: result.reason,
-      fallback_endpoint: '/v1/text-to-speech',
+      fallback_endpoint: '/v1/text-to-speech/stream',
       fallback_status: ttsProbe.status,
       fallback_latency_ms: ttsProbe.latency_ms,
     });
@@ -391,16 +431,17 @@ export async function checkElevenLabsHealth(): Promise<ElevenLabsHealthResult> {
   ) {
     const ttsProbe = await probeTtsEndpoint(apiKey);
     const result: ElevenLabsHealthResult = {
-      status: ttsProbe.ok ? 'healthy' : 'degraded',
+      status: ttsProbe.ok ? (ttsProbe.latency_ms < TTFA_HEALTHY_MS ? 'healthy' : 'degraded') : 'degraded',
       latency_ms: userProbe.latency_ms + ttsProbe.latency_ms,
       reason: ttsProbe.ok ? 'scope_limited' : 'tts_probe_failed',
       tts_recent_success_rate: ttsRecentSuccessRate,
+      ttfa_ms: ttsProbe.ok ? ttsProbe.latency_ms : undefined,
     };
     logHealthCheck({
       ...baseLog,
       classification: result.status,
       reason: result.reason,
-      fallback_endpoint: '/v1/text-to-speech',
+      fallback_endpoint: '/v1/text-to-speech/stream',
       fallback_status: ttsProbe.status,
       fallback_latency_ms: ttsProbe.latency_ms,
     });

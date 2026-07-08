@@ -43,6 +43,21 @@ export class ProsodicTTS {
   constructor(_apiKey?: string) {}
 
   async speak(text: string, options: TTSOptions, signal?: AbortSignal): Promise<ArrayBuffer> {
+    const response = await this.fetchTts(text, options, signal);
+    console.log('[TTS] ✓ Successfully received audio');
+    return response.arrayBuffer();
+  }
+
+  /**
+   * Same request/error handling as `speak()`, but returns the raw streaming
+   * Response instead of buffering it — lets the caller start playback before
+   * the full audio has downloaded (time-to-first-audio, not full-generation-time).
+   */
+  async speakStream(text: string, options: TTSOptions, signal?: AbortSignal): Promise<Response> {
+    return this.fetchTts(text, options, signal);
+  }
+
+  private async fetchTts(text: string, options: TTSOptions, signal?: AbortSignal): Promise<Response> {
     if (isElevenLabsTtsBlocked()) {
       throw new TTSFallbackToBrowserError(
         503,
@@ -101,7 +116,6 @@ export class ProsodicTTS {
       throw new Error(`TTS failed (${response.status}): ${parsedBody?.error ?? rawBody}`);
     }
 
-    console.log('[TTS] ✓ Successfully received audio');
-    return response.arrayBuffer();
+    return response;
   }
 }

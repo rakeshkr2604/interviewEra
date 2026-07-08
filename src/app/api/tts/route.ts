@@ -144,13 +144,12 @@ export async function POST(request: NextRequest) {
     model_id: ttsModelId,
   }));
 
-  // ── 8. ElevenLabs call ───────────────────────────────────────────────────────
-  let success = false;
+  // ── 8. ElevenLabs call (streaming endpoint) ───────────────────────────────────
   let errorCategory: string | undefined;
 
   try {
     const upstream = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
       {
         method: 'POST',
         headers: {
@@ -162,10 +161,15 @@ export async function POST(request: NextRequest) {
           text:           spokenText,
           model_id:       ttsModelId,
           voice_settings: voiceSettings,
+          output_format:  'mp3_44100_128',
         }),
-        signal: AbortSignal.timeout(12_000), // 12s hard timeout
+        signal: AbortSignal.timeout(12_000), // 12s hard timeout (covers full stream drain)
       },
     );
+
+    // Time-to-first-byte from ElevenLabs — the metric that actually matters now
+    // that we forward the stream instead of buffering the full response.
+    const ttfbMs = Date.now() - t0;
 
     if (!upstream.ok) {
       const errBody = await upstream.text().catch(() => upstream.statusText);
@@ -173,24 +177,19 @@ export async function POST(request: NextRequest) {
       errorCategory = 'http_error';
       void logTTSCall({
         user_id: user.id, interview_id: interview_id ?? undefined,
-        tts_chars: spokenText.length, tts_model: 'eleven_turbo_v2_5',
-        tts_voice_id: voiceId, latency_ms: Date.now() - t0,
+        tts_chars: spokenText.length, tts_model: ttsModelId,
+        tts_voice_id: voiceId, latency_ms: ttfbMs,
         success: false, error_category: errorCategory, ip,
       });
       return NextResponse.json({ error: `ElevenLabs ${upstream.status}: ${errBody}`, fallback: 'browser_tts' }, { status: upstream.status });
     }
 
-    const audio = await upstream.arrayBuffer();
-    success = true;
-
-    const ttsLatencyMs = Date.now() - t0;
-
     // ── 9. Post-success: record usage + telemetry (non-blocking) ───────────────
     void recordTTSUsage(user.id, spokenText.length);
     void logTTSCall({
       user_id: user.id, interview_id: interview_id ?? undefined,
-      tts_chars: spokenText.length, tts_model: 'eleven_turbo_v2_5',
-      tts_voice_id: voiceId, latency_ms: ttsLatencyMs,
+      tts_chars: spokenText.length, tts_model: ttsModelId,
+      tts_voice_id: voiceId, latency_ms: ttfbMs,
       success: true, ip,
     });
 
@@ -199,24 +198,30 @@ export async function POST(request: NextRequest) {
       ts:            new Date().toISOString(),
       event:         'tts_call_success',
       provider:      'elevenlabs',
-      model:         'eleven_turbo_v2_5',
-      latency_ms:    ttsLatencyMs,
+      model:         ttsModelId,
+      latency_ms:    ttfbMs,
       chars:         spokenText.length,
       plan_tier:     planTier,
       quota_warning: quota.warning,
+      streamed:      Boolean(upstream.body),
     }));
 
+    const responseHeaders: Record<string, string> = { 'Content-Type': 'audio/mpeg' };
     if (quota.warning === 'warning' || quota.warning === 'critical') {
-      return new NextResponse(audio, {
-        headers: {
-          'Content-Type': 'audio/mpeg',
-          'X-TTS-Quota-Warning': quota.warning,
-          'X-TTS-Quota-Remaining': String(quota.remaining_chars),
-        },
-      });
+      responseHeaders['X-TTS-Quota-Warning'] = quota.warning;
+      responseHeaders['X-TTS-Quota-Remaining'] = String(quota.remaining_chars);
     }
 
-    return new NextResponse(audio, { headers: { 'Content-Type': 'audio/mpeg' } });
+    // Forward the upstream stream body directly — no server-side buffering, so
+    // the client can start decoding/playing before generation finishes. Falls
+    // back to a buffered response only if the runtime doesn't expose a body
+    // stream (defensive; not expected under `runtime = 'nodejs'`).
+    if (!upstream.body) {
+      const audio = await upstream.arrayBuffer();
+      return new NextResponse(audio, { headers: responseHeaders });
+    }
+
+    return new NextResponse(upstream.body, { headers: responseHeaders });
 
   } catch (err) {
     const isTimeout = err instanceof Error && err.name === 'TimeoutError';
@@ -225,14 +230,14 @@ export async function POST(request: NextRequest) {
     console.error('[TTS proxy] Fetch failed:', isTimeout ? 'timeout' : err);
     void logTTSCall({
       user_id: user.id, interview_id: interview_id ?? undefined,
-      tts_chars: spokenText.length, tts_model: 'eleven_turbo_v2_5',
+      tts_chars: spokenText.length, tts_model: ttsModelId,
       latency_ms: ttsFailLatencyMs, success: false, error_category: errorCategory, ip,
     });
     console.log(JSON.stringify({
       ts:         new Date().toISOString(),
       event:      'tts_call_failure',
       provider:   'elevenlabs',
-      model:      'eleven_turbo_v2_5',
+      model:      ttsModelId,
       latency_ms: ttsFailLatencyMs,
       error_code: errorCategory,
       plan_tier:  planTier,
@@ -242,8 +247,6 @@ export async function POST(request: NextRequest) {
       { status: 502 },
     );
   }
-
-  void success; // used above
 }
 
 export const runtime = 'nodejs';
