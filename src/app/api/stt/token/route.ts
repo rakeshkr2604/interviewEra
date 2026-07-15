@@ -46,38 +46,46 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // ── 3. Abuse gate ─────────────────────────────────────────────────────────
-  const abuse = await abuseGate(user.id, ip);
-  if (!abuse.allowed) {
-    return NextResponse.json(
-      { error: 'Request blocked. Please try again later.' },
-      { status: 429, headers: abuse.block_ttl_s ? { 'Retry-After': String(abuse.block_ttl_s) } : {} },
+  // Local dev only — repeated interview restarts while debugging the voice pipeline
+  // burn through these budgets fast (they're sized for real usage: 20 tokens/IP/hr,
+  // 10/user/hr). Skipping them outside production means no manual re-enable step is
+  // needed; every production request still goes through all three checks below.
+  const isDev = process.env.NODE_ENV !== 'production';
+
+  if (!isDev) {
+    // ── 3. Abuse gate ─────────────────────────────────────────────────────────
+    const abuse = await abuseGate(user.id, ip);
+    if (!abuse.allowed) {
+      return NextResponse.json(
+        { error: 'Request blocked. Please try again later.' },
+        { status: 429, headers: abuse.block_ttl_s ? { 'Retry-After': String(abuse.block_ttl_s) } : {} },
+      );
+    }
+
+    // ── 4. IP rate limit — 20 tokens per IP per hour ─────────────────────────
+    const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20, { failClosed: true });
+    const ipBlocked = buildRateLimitHttpResponse(
+      ipRL,
+      'Too many requests from this IP. Try again later.',
     );
-  }
+    if (ipBlocked) {
+      return NextResponse.json(ipBlocked.body, {
+        status: ipBlocked.status,
+        headers: ipBlocked.headers,
+      });
+    }
 
-  // ── 4. IP rate limit — 20 tokens per IP per hour ─────────────────────────
-  const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20, { failClosed: true });
-  const ipBlocked = buildRateLimitHttpResponse(
-    ipRL,
-    'Too many requests from this IP. Try again later.',
-  );
-  if (ipBlocked) {
-    return NextResponse.json(ipBlocked.body, {
-      status: ipBlocked.status,
-      headers: ipBlocked.headers,
-    });
-  }
-
-  const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10, { failClosed: true });
-  const userBlocked = buildRateLimitHttpResponse(
-    userRL,
-    'Too many recording sessions. Please wait and try again.',
-  );
-  if (userBlocked) {
-    return NextResponse.json(userBlocked.body, {
-      status: userBlocked.status,
-      headers: userBlocked.headers,
-    });
+    const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10, { failClosed: true });
+    const userBlocked = buildRateLimitHttpResponse(
+      userRL,
+      'Too many recording sessions. Please wait and try again.',
+    );
+    if (userBlocked) {
+      return NextResponse.json(userBlocked.body, {
+        status: userBlocked.status,
+        headers: userBlocked.headers,
+      });
+    }
   }
 
   // ── 6. Resolve plan tier + session validation (parallel) ─────────────────

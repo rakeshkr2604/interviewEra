@@ -246,6 +246,14 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
         const finishWithFallback = (reason: string) => {
           if (settled) return;
           settled = true;
+          if (mySeq !== seqRef.current || !mountedRef.current) {
+            // Superseded by a newer speak() call — cancel this stale reader only.
+            // Do not touch streamAudioElRef; it may already belong to the new call.
+            lifecycleLog('voice-player', 'stream_fallback_superseded', { mySeq, current: seqRef.current, reason });
+            void reader.cancel().catch(() => {});
+            resolve();
+            return;
+          }
           lifecycleWarn('voice-player', 'stream_playback_fallback', { mySeq, reason });
           void fallbackToBuffered().finally(resolve);
         };
@@ -326,12 +334,20 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
         audio.addEventListener('ended', () => {
           if (settled) return;
           settled = true;
+          if (mySeq !== seqRef.current || !mountedRef.current) {
+            // Superseded by a newer speak() call (re-hear, next turn, etc). The
+            // shared streamAudioElRef may already belong to that newer call — do
+            // not tear it down, and do not fire onPlaybackComplete for a turn
+            // that is no longer current (this was re-kicking off STT for a stale
+            // turn and clobbering the real, already-connected voice session).
+            lifecycleLog('voice-player', 'stream_ended_superseded', { mySeq, current: seqRef.current });
+            resolve();
+            return;
+          }
           clearProgressLoop();
           teardownStreamAudioEl();
-          if (mountedRef.current && mySeq === seqRef.current) {
-            setPlaybackProgress(1);
-            setIsPlaying(false);
-          }
+          setPlaybackProgress(1);
+          setIsPlaying(false);
           lifecycleLog('voice-player', 'stream_speak_end', { seq: mySeq });
           callbacks.onPlaybackComplete?.();
           resolve();

@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: 'bottom-right',
   },
+  turbopack: {
+    root: __dirname,
+  },
+  allowedDevOrigins: ['192.168.1.104'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
     /** App Router + multipart uploads: default ~1 MB body — PDFs fail before the handler with HTML/plain errors. Keep ≤ Vercel ~4.5 MB. */
@@ -28,7 +32,6 @@ const nextConfig: NextConfig = {
     },
   },
   webpack: (config) => config,
-  turbopack: {},
   images: {
     formats: ['image/avif', 'image/webp'],
     remotePatterns: [
@@ -145,12 +148,16 @@ const nextConfig: NextConfig = {
 
     const cspDirectives = [
       "default-src 'self'",
-      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} ${siteTwin} ${razorpayScript} ${ga4Script} ${clarityScript} https://va.vercel-scripts.com`,
+      // blob: is required for AudioWorklet .addModule(blobUrl) calls (Deepgram STT processor).
+      // AudioWorklet module loading is governed by script-src, not worker-src.
+      `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} blob: ${siteTwin} ${razorpayScript} ${ga4Script} ${clarityScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com https://checkout-static-next.razorpay.com`,
       `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg}`,
       "media-src 'self' blob:",
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${ga4Connect} ${clarityConnect} https://va.vercel-scripts.com`,
+      // wss://api.deepgram.com: Deepgram STT WebSocket connection.
+      // https://api.elevenlabs.io: ElevenLabs TTS API requests.
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${ga4Connect} ${clarityConnect} https://va.vercel-scripts.com wss://api.deepgram.com https://api.elevenlabs.io`,
       "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "child-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "worker-src 'self' blob:",

@@ -33,6 +33,7 @@ const SUPPRESS_PREFIXES = [
   '/reset-password',
   '/auth',
   '/interview/session',
+  '/interview/script',
   '/onboarding',
   '/upgrade',
   COMMUNITY_HUB_PATH,

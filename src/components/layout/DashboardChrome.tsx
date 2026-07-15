@@ -16,8 +16,9 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
   const isOnboarding = pathname.startsWith('/onboarding')
-  /** Live interview — viewport-fitted shell (no footer scroll, compact chrome). */
-  const isInterviewSession = pathname.startsWith('/interview/session/')
+  /** Live interview (v1 or v2.1 script engine) — viewport-fitted shell (no footer scroll, compact chrome). */
+  const isInterviewSession =
+    pathname.startsWith('/interview/session/') || pathname.startsWith('/interview/script/')
   const isImmersiveViewport = isOnboarding || isInterviewSession
 
   /*

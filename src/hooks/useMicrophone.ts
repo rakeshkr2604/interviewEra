@@ -179,7 +179,11 @@ export function useMicrophone(
           startInFlightRef.current = false;
           abortRef.current = null;
           lifecycleWarn('mic', 'start_aborted_unmounted');
-          return () => {};
+          // Throw instead of returning an empty cleanup so the caller
+          // (DeepgramSessionController) knows the mic did not start and can
+          // retry or fall back, rather than treating a no-op cleanup as success
+          // and silently producing a connected-but-deaf voice session.
+          throw new Error('Mic start aborted: component unmounted during initialisation');
         }
 
         audioContext = new AudioContext({ sampleRate: 16000 });

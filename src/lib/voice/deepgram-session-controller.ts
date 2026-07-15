@@ -59,6 +59,12 @@ export interface DeepgramSessionStartOptions {
 
 const MAX_TOKEN_ATTEMPTS = 4
 const MAX_CONNECT_RETRIES = 3
+// stt.start() resolving only means connect() returned a socket object — NOT that
+// Deepgram actually authenticated/opened the connection (browsers can't set
+// WebSocket auth headers; see stt-client.ts). Bound how long we wait for the real
+// 'open' event so a silently-failed handshake surfaces as a retry/fallback instead
+// of leaving the UI on "Connecting microphone…" indefinitely.
+const WS_OPEN_TIMEOUT_MS = 8_000
 
 export class DeepgramSessionController {
   private stt: StreamingSTT | null = null
@@ -326,8 +332,22 @@ export class DeepgramSessionController {
       if (this.stt !== stt) return
 
       try {
+        let resolveOpened: (() => void) | null = null
+        let rejectOpened: ((err: Error) => void) | null = null
+        const opened = new Promise<void>((resolve, reject) => {
+          resolveOpened = resolve
+          rejectOpened = reject
+        })
+
         await stt.start({
           onOpen: () => {
+            // Release the open-race FIRST, unconditionally. Resolving a local
+            // promise has no side effects; gating it behind isMounted/
+            // supersession checks silently swallowed genuine opens — the
+            // attempt then died on the open-timeout with zero error events.
+            // abortConnectAttempt below still decides whether this attempt
+            // proceeds to mic capture.
+            resolveOpened?.()
             if (!this.callbacks.isMounted() || this.stt !== stt) return
             trackDeepgramEvent('deepgram_connect_success', this.telemetryCtx, this.track, {
               attempt: attempt + 1,
@@ -346,20 +366,49 @@ export class DeepgramSessionController {
           },
           onError: (err) => {
             this.handleWsError(err, stt)
+            rejectOpened?.(err)
           },
           onClose: (info) => {
             trackDeepgramEvent('deepgram_ws_closed', this.telemetryCtx, this.track, info)
+            // While the open-race is still pending, a close means the
+            // handshake failed (auth rejected, server dropped) — fail this
+            // attempt immediately instead of waiting out the open-timeout.
+            // No-op once `opened` has already settled.
+            rejectOpened?.(
+              new Error(`Voice connection closed before opening (code ${info.code ?? 'unknown'}).`),
+            )
           },
         })
 
         if (this.abortConnectAttempt(stt)) return
 
+        // Wait for the real 'open' event (bounded) before trusting this attempt —
+        // do not let a silently-unauthenticated socket look like a success.
+        let openTimeoutId: ReturnType<typeof setTimeout> | undefined
+        const openTimedOut = new Promise<never>((_, reject) => {
+          openTimeoutId = setTimeout(
+            () => reject(new Error('Voice connection timed out waiting to open.')),
+            WS_OPEN_TIMEOUT_MS,
+          )
+        })
+        try {
+          await Promise.race([opened, openTimedOut])
+        } finally {
+          clearTimeout(openTimeoutId)
+        }
+
+        if (this.abortConnectAttempt(stt)) return
+
         await this.callbacks.releaseAudio()
         const cleanup = await this.callbacks.startMic((data) => stt.sendAudio(data))
-
-        if (this.abortConnectAttempt(stt, cleanup)) return
-
+        // Store BEFORE the abort check so stop() can run the cleanup if the
+        // component unmounted or was superseded between startMic and here.
+        // Previously passing cleanup to abortConnectAttempt ran micCleanup()
+        // unconditionally (before the isMounted/supersession guards), causing
+        // the mic to stop immediately after starting → Deepgram 1011 "no audio".
         this.micCleanup = cleanup
+
+        if (this.abortConnectAttempt(stt)) return
         this.health.markSessionStarted()
         trackDeepgramEvent('voice_session_started', this.telemetryCtx, this.track, {
           is_refresh: isRefresh,

@@ -1,7 +1,8 @@
 'use client'
 
-import { User } from 'lucide-react'
+import { User, Video, VideoOff } from 'lucide-react'
 import { useCandidateCamera } from '@/hooks/useCandidateCamera'
+import { IE_FOCUS_VISIBLE } from '@/lib/theme/component-classes'
 
 interface CandidatePreviewProps {
   /** Request webcam while the candidate is answering. */
@@ -11,6 +12,9 @@ interface CandidatePreviewProps {
   micArmed: boolean
   userMicMuted: boolean
   questionLabel?: string
+  /** Candidate-facing camera on/off toggle, rendered below the preview. Omit to hide the control. */
+  cameraEnabled?: boolean
+  onToggleCamera?: () => void
 }
 
 export function CandidatePreview({
@@ -19,6 +23,8 @@ export function CandidatePreview({
   micArmed,
   userMicMuted,
   questionLabel,
+  cameraEnabled,
+  onToggleCamera,
 }: CandidatePreviewProps) {
   const { videoRef, status } = useCandidateCamera({ active: cameraActive })
   const showLive = status === 'active'
@@ -35,11 +41,25 @@ export function CandidatePreview({
           />
           You
         </span>
-        {questionLabel ? (
-          <span className="ie-timer-secondary shrink-0 tabular-nums sm:text-[11px]">
-            {questionLabel}
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-2">
+          {questionLabel ? (
+            <span className="ie-timer-secondary shrink-0 tabular-nums sm:text-[11px]">
+              {questionLabel}
+            </span>
+          ) : null}
+          {onToggleCamera ? (
+            <button
+              type="button"
+              onClick={onToggleCamera}
+              title={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+              aria-label={cameraEnabled ? 'Turn camera off' : 'Turn camera on'}
+              className={`flex h-6 w-6 items-center justify-center rounded-lg border text-(--text-muted) transition-colors hover:text-(--text-primary) ${IE_FOCUS_VISIBLE}`}
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              {cameraEnabled ? <VideoOff className="size-3" /> : <Video className="size-3" />}
+            </button>
+          ) : null}
+        </div>
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden bg-(--bg-secondary)">

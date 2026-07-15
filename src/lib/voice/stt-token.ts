@@ -130,9 +130,14 @@ export async function fetchSTTTokenWithRetry(
       if (!isRetryable || attempt >= maxAttempts - 1) {
         throw err;
       }
+      // Cap the wait even when the server reports a long retryAfterSeconds (abuse-prevention
+      // windows can be tens of minutes). Blocking the UI on "Connecting microphone…" for that
+      // long is worse than giving up after a bounded wait and falling back to text mode —
+      // the candidate can always retry voice manually once the real window has passed.
+      const MAX_RETRY_WAIT_MS = 15_000;
       const waitMs =
         err.retryAfterSeconds != null
-          ? err.retryAfterSeconds * 1000
+          ? Math.min(err.retryAfterSeconds * 1000, MAX_RETRY_WAIT_MS)
           : Math.min(16_000, 1000 * 2 ** attempt) + Math.floor(Math.random() * 400);
       opts?.onRetry?.(attempt + 1, waitMs, err);
       await new Promise((r) => setTimeout(r, waitMs));
@@ -183,7 +188,10 @@ export function tokenErrorMessage(err: unknown): string {
       return err.message;
     }
     if (err.isRateLimit) {
-      return 'Voice service is temporarily busy. Retrying automatically…';
+      // This is the terminal message shown after retries are exhausted (see
+      // fetchSTTTokenWithRetry's bounded wait) — do not imply retries are
+      // still happening, since they are not.
+      return 'Voice service is busy right now. Please type your answer — you can try voice again on a later question.';
     }
     return err.message;
   }

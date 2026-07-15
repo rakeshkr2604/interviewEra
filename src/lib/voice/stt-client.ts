@@ -1,11 +1,3 @@
-import {
-  DeepgramClient,
-  ListenV1InterimResults,
-  ListenV1SmartFormat,
-  ListenV1Punctuate,
-  ListenV1VadEvents,
-  type ListenV1Model,
-} from '@deepgram/sdk';
 import { resolveSttLocale, type SttLocale } from '@/lib/voice/speech-locale';
 import { PcmSendBuffer } from '@/lib/voice/stt/pcm-send-buffer';
 import { lifecycleLog, lifecycleWarn, voiceDebug } from './lifecycle-log';
@@ -24,9 +16,9 @@ export interface STTCallbacks {
   /**
    * Fires exactly once when the underlying WebSocket reaches OPEN state.
    * Callers should treat this as the only authoritative signal that the
-   * Deepgram pipeline is ready to receive audio — the connect() promise
-   * resolving is necessary but not sufficient because the socket goes
-   * through CONNECTING → OPEN asynchronously.
+   * Deepgram pipeline is ready to receive audio — start() resolving is
+   * necessary but not sufficient because the socket goes through
+   * CONNECTING → OPEN asynchronously.
    *
    * UI must NOT render "Listening…" before this fires.
    */
@@ -39,37 +31,63 @@ export interface STTStartOptions {
   locale?: SttLocale;
 }
 
+const DEEPGRAM_LISTEN_URL = 'wss://api.deepgram.com/v1/listen';
+
+/** Shape of the JSON frames Deepgram's live API sends over the socket. */
+type DeepgramLiveMessage = {
+  type?: string;
+  is_final?: boolean;
+  channel?: { alternatives?: Array<{ transcript?: string; confidence?: number }> };
+};
+
 // Deepgram Nova-3 streaming STT with VAD via utterance_end_ms.
 // Optimised for Indian English + Hinglish (en-IN locale).
-// SDK v4 API: new DeepgramClient({ apiKey }) → client.listen.v1.connect() → V1Socket
+//
+// TRANSPORT: direct native browser WebSocket — NOT the @deepgram/sdk socket.
+// The SDK v5 browser path is broken for this use case in two independent ways:
+//   1. Auth: it forwards `Authorization` as a `headers` option on
+//      `new WebSocket(url, protocols, options)`. Native browser WebSocket only
+//      accepts (url, protocols); the third argument is silently ignored, so the
+//      handshake reached Deepgram unauthenticated and `open` never fired.
+//   2. Failure visibility: the SDK creates the socket inside an internal
+//      promise chain with no rejection handler — a constructor throw (CSP,
+//      malformed subprotocol) dies as an unhandled rejection with no error
+//      event, leaving callers waiting forever on an `open` that can't come.
+// Browsers authenticate Deepgram WS connections via the Sec-WebSocket-Protocol
+// header instead: `new WebSocket(url, ['token', apiKey])` — the mechanism the
+// SDK itself documents in its own browser helper (CustomClient.js) but does not
+// apply on the listen.v1.connect() path.
+//
+// AUDIO FORMAT: the mic pipeline (useMicrophone → pcm-capture-graph) sends raw
+// headerless PCM — Float32 → Int16, 16 kHz, mono. Raw PCM REQUIRES explicit
+// `encoding=linear16&sample_rate=16000&channels=1` query params; without them
+// Deepgram tries container auto-detection, cannot decode the stream, and never
+// emits a transcript even on a healthy authenticated connection.
 //
 // LIFECYCLE OWNERSHIP
 // -------------------
 // Owns: one WebSocket at a time. Two invariants the audit caller relies on:
-//   1. If stop() is called BEFORE start() resolves, the socket that connect()
-//      eventually returns must be closed immediately and never deliver callbacks.
+//   1. If stop() is called BEFORE start() resolves, the socket that start()
+//      created must be closed immediately and never deliver callbacks.
 //   2. After stop() returns, no message/error/close callback may invoke the
 //      caller-supplied STTCallbacks — they may close over React state.
 // Both invariants are enforced by a generation counter `gen`. Every start()
-// claims a fresh gen; the message handler and the late-resolved-socket guard
-// compare against the live gen and become no-ops if superseded.
+// claims a fresh gen; every event handler compares against the live gen and
+// becomes a no-op if superseded.
 export class StreamingSTT {
-  private client: DeepgramClient;
   private apiKey: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private socket: any = null;
+  private socket: WebSocket | null = null;
   private fullTranscript = '';
   private lastFinal = '';
   private chunksSent = 0;
   private readonly pcmBuffer = new PcmSendBuffer();
   // Monotonic id of the current session. Bumped on every start() and stop().
   private gen = 0;
-  // Set true after stop() — any in-flight connect() resolution must close.
+  // Set true after stop() — any in-flight connect resolution must close.
   private aborted = false;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
-    this.client = new DeepgramClient({ apiKey });
   }
 
   async start(callbacks: STTCallbacks, options?: STTStartOptions): Promise<void> {
@@ -80,46 +98,54 @@ export class StreamingSTT {
     this.aborted = false;
     const mySession = ++this.gen;
 
-    // ConnectArgs requires Authorization for WebSocket auth (SDK v4 doesn't
-    // auto-inject the header for live streaming connections).
     const language = options?.locale ?? resolveSttLocale();
-    let socket: unknown;
+    const params = new URLSearchParams({
+      model: 'nova-3',
+      language,
+      smart_format: 'true',
+      interim_results: 'true',
+      punctuate: 'true', // cleaner sentence boundaries
+      vad_events: 'true', // explicit speech events → steadier VAD
+      // More patient endpointing: campus candidates pause mid-thought; the old
+      // 300/1000 ms cut them off and produced fragmented "unstable" transcripts.
+      endpointing: '500', // 500 ms silence → utterance end detection
+      utterance_end_ms: '1500', // 1.5 s of silence → UtteranceEnd fires
+      // Raw headerless PCM from the mic pipeline — mandatory, see header comment.
+      encoding: 'linear16',
+      sample_rate: '16000',
+      channels: '1',
+    });
+
+    let socket: WebSocket;
     try {
-      socket = await this.client.listen.v1.connect({
-        model: 'nova-3' as ListenV1Model,
-        language,
-        smart_format: ListenV1SmartFormat.True,
-        interim_results: ListenV1InterimResults.True,
-        punctuate: ListenV1Punctuate.True,   // cleaner sentence boundaries
-        vad_events: ListenV1VadEvents.True,  // explicit speech events → steadier VAD
-        // More patient endpointing: campus candidates pause mid-thought; the old
-        // 300/1000 ms cut them off and produced fragmented "unstable" transcripts.
-        endpointing: 500,        // 500 ms silence → utterance end detection
-        utterance_end_ms: 1500,  // 1.5 s of silence → UtteranceEnd fires
-        Authorization: `Token ${this.apiKey}`,
-      });
+      // Subprotocol auth: browsers cannot set an Authorization header on a
+      // WebSocket; Deepgram accepts `Sec-WebSocket-Protocol: token, <key>`.
+      socket = new WebSocket(`${DEEPGRAM_LISTEN_URL}?${params.toString()}`, ['token', this.apiKey]);
     } catch (err) {
-      lifecycleWarn('stt', 'connect_failed', { mySession, err: err instanceof Error ? err.message : String(err) });
-      // Surface as an STTCallbacks error so the caller can recover.
+      // Synchronous constructor throws: CSP connect-src violation or a
+      // malformed subprotocol value. Surface loudly — this exact class of
+      // failure previously died silently inside the SDK.
+      lifecycleWarn('stt', 'connect_failed', {
+        mySession,
+        err: err instanceof Error ? err.message : String(err),
+      });
       try { callbacks.onError(err instanceof Error ? err : new Error(String(err))); } catch { /* */ }
       throw err;
     }
+    socket.binaryType = 'arraybuffer';
 
-    // If stop() was called while connect() was awaiting, the socket we just
-    // received must be closed silently — nobody is listening for it, and
-    // delivering callbacks would re-enter a torn-down React tree.
+    // If stop() was called synchronously after start() (unlikely but possible
+    // via re-entrant callbacks), close the socket we just created silently.
     if (this.aborted || mySession !== this.gen) {
       lifecycleWarn('stt', 'connect_resolved_after_abort', { mySession, current: this.gen });
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      try { (socket as any)?.close?.(); } catch { /* */ }
+      try { socket.close(); } catch { /* */ }
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.socket = socket as any;
+    this.socket = socket;
     lifecycleLog('stt', 'open', { session: mySession });
 
-    this.socket.on('open', () => {
+    socket.addEventListener('open', () => {
       // Stale-event gate: a delayed 'open' on a superseded session must not
       // unblock UI for the new session.
       if (mySession !== this.gen || this.aborted) {
@@ -142,8 +168,15 @@ export class StreamingSTT {
       try { callbacks.onOpen?.(); } catch { /* */ }
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    this.socket.on('message', (msg: any) => {
+    socket.addEventListener('message', (event: MessageEvent) => {
+      if (typeof event.data !== 'string') return; // Deepgram results are JSON text frames
+      let msg: DeepgramLiveMessage;
+      try {
+        msg = JSON.parse(event.data) as DeepgramLiveMessage;
+      } catch {
+        return;
+      }
+
       // Stale-event gate: a late frame after stop() must not surface to React.
       if (mySession !== this.gen || this.aborted) {
         if (msg?.type === 'Results' && msg?.channel?.alternatives?.[0]?.transcript) {
@@ -159,7 +192,8 @@ export class StreamingSTT {
       if (msg?.type === 'Results') {
         const alt = msg.channel?.alternatives?.[0];
         if (!alt?.transcript) return;
-        const { transcript, confidence } = alt as { transcript: string; confidence: number };
+        const transcript = alt.transcript;
+        const confidence = alt.confidence ?? 0;
 
         if (msg.is_final) {
           const clean = transcript.trim();
@@ -199,37 +233,41 @@ export class StreamingSTT {
       }
     });
 
-    this.socket.on('error', (error: unknown) => {
+    socket.addEventListener('error', () => {
       if (mySession !== this.gen || this.aborted) return;
-      const err = error instanceof Error ? error : new Error(String(error));
+      // Browser 'error' events carry no detail; the specifics (401 handshake
+      // rejection, DNS, TLS) are only visible in the DevTools Network tab.
+      const err = new Error(
+        'Deepgram WebSocket connection failed — handshake rejected or blocked (see the browser Network tab).',
+      );
       voiceDebug('dg_ws_error', { session: mySession, message: err.message });
       lifecycleWarn('stt', 'ws_error', { session: mySession, err: err.message });
       try { callbacks.onError(err); } catch { /* */ }
     });
 
-    this.socket.on('close', (event?: { code?: number; reason?: string; wasClean?: boolean }) => {
+    socket.addEventListener('close', (event: CloseEvent) => {
       voiceDebug('dg_ws_closed', {
         session: mySession,
         was_aborted: this.aborted,
         was_superseded: mySession !== this.gen,
-        code: event?.code,
+        code: event.code,
       });
-      lifecycleLog('stt', 'ws_close', { session: mySession, code: event?.code });
+      lifecycleLog('stt', 'ws_close', { session: mySession, code: event.code });
       if (mySession !== this.gen || this.aborted) return;
       try {
         callbacks.onClose?.({
-          code: event?.code,
-          reason: typeof event?.reason === 'string' ? event.reason : undefined,
-          wasClean: event?.wasClean,
+          code: event.code,
+          reason: typeof event.reason === 'string' ? event.reason : undefined,
+          wasClean: event.wasClean,
         });
       } catch { /* */ }
     });
   }
 
   private sendMediaNow(audioData: ArrayBuffer): void {
-    if (this.aborted || !this.socket || this.socket.readyState !== 1) return;
-    const readyState = this.socket.readyState as number;
-    this.socket.sendMedia(audioData);
+    if (this.aborted || !this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const readyState = this.socket.readyState;
+    this.socket.send(audioData);
     this.chunksSent += 1;
     voicePipelineDiagnostics.recordWsPacket(audioData.byteLength, readyState);
     if (this.chunksSent === 1 || this.chunksSent % 50 === 0) {
@@ -239,7 +277,7 @@ export class StreamingSTT {
 
   sendAudio(audioData: ArrayBuffer): void {
     if (this.aborted) return;
-    if (this.socket?.readyState === 1) {
+    if (this.socket?.readyState === WebSocket.OPEN) {
       this.sendMediaNow(audioData);
       return;
     }

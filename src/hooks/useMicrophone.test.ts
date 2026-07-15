@@ -5,40 +5,40 @@ import { PcmSendBuffer } from '@/lib/voice/stt/pcm-send-buffer'
 describe('StreamingSTT.sendAudio', () => {
   it('sends PCM when websocket is open', () => {
     const stt = new StreamingSTT('test-key')
-    const sendMedia = vi.fn()
-    ;(stt as unknown as { socket: { readyState: number; sendMedia: typeof sendMedia } }).socket = {
+    const send = vi.fn()
+    ;(stt as unknown as { socket: { readyState: number; send: typeof send } }).socket = {
       readyState: 1,
-      sendMedia,
+      send,
     }
 
     const buf = new ArrayBuffer(8)
     stt.sendAudio(buf)
     stt.sendAudio(buf)
 
-    expect(sendMedia).toHaveBeenCalledTimes(2)
-    expect(sendMedia).toHaveBeenCalledWith(buf)
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send).toHaveBeenCalledWith(buf)
   })
 
   it('queues PCM while websocket is connecting', () => {
     const stt = new StreamingSTT('test-key')
-    const sendMedia = vi.fn()
-    ;(stt as unknown as { socket: { readyState: number; sendMedia: typeof sendMedia } }).socket = {
+    const send = vi.fn()
+    ;(stt as unknown as { socket: { readyState: number; send: typeof send } }).socket = {
       readyState: 0,
-      sendMedia,
+      send,
     }
 
     const buf = new ArrayBuffer(8)
     stt.sendAudio(buf)
 
-    expect(sendMedia).not.toHaveBeenCalled()
+    expect(send).not.toHaveBeenCalled()
     const buffer = (stt as unknown as { pcmBuffer: PcmSendBuffer }).pcmBuffer
     expect(buffer.queuedChunks).toBe(1)
   })
 
   it('flushes queued PCM when socket opens', () => {
     const stt = new StreamingSTT('test-key')
-    const sendMedia = vi.fn()
-    const socket = { readyState: 0, sendMedia }
+    const send = vi.fn()
+    const socket = { readyState: 0, send }
     ;(stt as unknown as { socket: typeof socket }).socket = socket
 
     const buf = new ArrayBuffer(8)
@@ -49,6 +49,6 @@ describe('StreamingSTT.sendAudio', () => {
       (chunk) => stt.sendAudio(chunk),
     )
     expect(flushed).toBe(1)
-    expect(sendMedia).toHaveBeenCalledWith(buf)
+    expect(send).toHaveBeenCalledWith(buf)
   })
 })
