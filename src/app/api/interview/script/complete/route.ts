@@ -1,6 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { loadOrGenerateScriptReport } from '@/lib/interview/script-report/generate';
+import { sendScriptInterviewCompletedEmail } from '@/lib/email/lifecycle/send-script-interview-completed';
+import type { DimensionKey } from '@/lib/interview/answer-score/rubric';
 
 const completeSchema = z.object({
   interviewId: z.string().uuid(),
@@ -78,6 +81,66 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to complete interview' }, { status: 500 });
     }
 
+    const recipientEmail = user.email?.trim() ?? '';
+
+    // Warm report via Next.js after() → platform waitUntil when available
+    // (Vercel). Survives after the response is sent; not a void fire-and-forget.
+    // Generate-on-view remains the safety net with generating-claim idempotency.
+    // Completion email fires after report is ready (needs scores + synthesis).
+    after(() => {
+      void loadOrGenerateScriptReport({
+        serviceClient,
+        interviewId,
+        userId: user.id,
+      })
+        .then(async (result) => {
+          if (!result.ok) {
+            console.warn(
+              `[interview/script/complete] after() report warm failed (interviewId=${interviewId}): ${result.error}`,
+            );
+            return;
+          }
+          console.info(
+            `[interview/script/complete] after() report warm ok (interviewId=${interviewId}, status=${result.report.status}, created=${result.created})`,
+          );
+
+          if (!recipientEmail) {
+            console.warn(
+              `[interview/script/complete] skip completion email — no user email (interviewId=${interviewId})`,
+            );
+            return;
+          }
+
+          const report = result.report;
+          if (
+            report.overall == null ||
+            !report.dimension_averages ||
+            report.scored_answer_count <= 0
+          ) {
+            console.info(
+              `[interview/script/complete] skip completion email — insufficient report data (interviewId=${interviewId}, status=${report.status})`,
+            );
+            return;
+          }
+
+          await sendScriptInterviewCompletedEmail({
+            interviewId,
+            userId: user.id,
+            recipientEmail,
+            overallScore10: Number(report.overall),
+            dimensionAverages: report.dimension_averages as Record<DimensionKey, number>,
+            scoredAnswerCount: report.scored_answer_count,
+            synthesis: report.synthesis,
+          });
+        })
+        .catch((err) => {
+          console.error(
+            `[interview/script/complete] after() report/email failed (interviewId=${interviewId}):`,
+            err,
+          );
+        });
+    });
+
     // Step 4 — done
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (err) {
@@ -87,3 +150,4 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 }
 
 export const runtime = 'nodejs';
+export const maxDuration = 60;

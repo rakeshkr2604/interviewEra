@@ -11,7 +11,10 @@ interface Interview {
   status: string
   started_at: string | null
   completed_at?: string | null
+  engine?: 'v1' | 'v2.1'
   reportId?: string | null
+  reportHref?: string | null
+  continueHref?: string | null
   score?: number | null
 }
 
@@ -40,12 +43,20 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
     <div className="space-y-2.5">
       {interviews.map((interview) => {
         const isCompleted = interview.status === 'completed'
-        // Server only accepts answers/checkpoints for pending/in_progress —
-        // abandoned sessions are terminal and must not offer "Continue".
         const isResumable = isResumableInterviewStatus(interview.status)
         const date = formatInterviewDateEnIn(interview.started_at, interview.completed_at)
+        const continueHref =
+          interview.continueHref ??
+          (interview.engine === 'v2.1'
+            ? `/interview/script/${interview.id}`
+            : `/interview/session/${interview.id}`)
         const reportHref =
-          isCompleted && interview.reportId ? `/report/${interview.reportId}` : null
+          interview.reportHref ??
+          (isCompleted && interview.reportId
+            ? interview.engine === 'v2.1'
+              ? `/report/script/${interview.id}`
+              : `/report/${interview.reportId}`
+            : null)
 
         return (
           <div
@@ -68,7 +79,7 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
             <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-end sm:gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                  {interview.score != null ? `${interview.score}/10` : '—'}
+                  {interview.score != null ? `${Number(interview.score).toFixed(1)}/10` : '—'}
                 </span>
                 <span
                   className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold"
@@ -83,14 +94,19 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
 
               {isResumable ? (
                 <Link
-                  href={`/interview/session/${interview.id}`}
+                  href={continueHref}
                   className={actionBtnClass}
                   style={{ background: 'var(--accent-primary)' }}
                 >
                   Continue
                 </Link>
               ) : reportHref ? (
-                <Link href={reportHref} className={actionBtnClass} style={{ background: 'var(--accent-primary)' }}>
+                <Link
+                  href={reportHref}
+                  prefetch={false}
+                  className={actionBtnClass}
+                  style={{ background: 'var(--accent-primary)' }}
+                >
                   View report
                 </Link>
               ) : null}

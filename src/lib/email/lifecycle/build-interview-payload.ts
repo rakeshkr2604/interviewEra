@@ -1,6 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import type { DetailedAnalysis, RadarDataPoint } from '@/types/app.types';
-import { getBaseUrl } from '@/lib/server/get-base-url';
+import { getEmailAppUrl } from '@/lib/server/get-base-url';
 import type { InterviewCompletedEmailProps } from '@/emails/InterviewCompletedEmail';
 
 function scaleScore(score10: number): number {
@@ -44,7 +44,7 @@ export async function buildInterviewCompletedEmailPayload(
   radarData: RadarDataPoint[],
 ): Promise<InterviewCompletedEmailProps | null> {
   const supabase = createServiceClient();
-  const baseUrl = getBaseUrl();
+  const baseUrl = getEmailAppUrl();
 
   const { data: user } = await supabase
     .from('users')

@@ -36,15 +36,37 @@ export function DashboardMain({
   const hiddenCount = countHiddenInterviews(rows, visibleRows)
   const completedCount = rows.filter((row) => row.status === 'completed').length
 
-  const reports = rows.flatMap((row) =>
-    row.status === 'completed'
-      ? (row.reports ?? []).map((report) => ({
+  type DashboardReportRow = {
+    interview_id: string
+    overall_score: number
+    generated_at: string | null
+    reportKind: 'script' | 'v1'
+    reportId: string
+  }
+
+  const reports: DashboardReportRow[] = rows.flatMap((row): DashboardReportRow[] => {
+    if (row.status !== 'completed') return []
+    if (row.engine === 'v2.1') {
+      return (row.script_interview_reports ?? [])
+        .filter((r) => (r.status === 'ready' || r.status === 'partial') && r.overall != null)
+        .map((report) => ({
           interview_id: row.id,
-          overall_score: report.overall_score,
+          overall_score: Number(report.overall),
           generated_at: report.generated_at,
+          reportKind: 'script' as const,
+          reportId: report.id,
         }))
-      : [],
-  )
+    }
+    return (row.reports ?? [])
+      .filter((report) => report.overall_score != null)
+      .map((report) => ({
+        interview_id: row.id,
+        overall_score: Number(report.overall_score),
+        generated_at: report.generated_at,
+        reportKind: 'v1' as const,
+        reportId: report.id,
+      }))
+  })
 
   const trendData = reports
     .filter((report) => typeof report.overall_score === 'number' && !!report.generated_at)
@@ -59,8 +81,15 @@ export function DashboardMain({
     }))
 
   const scoreMap = new Map(reports.map((report) => [report.interview_id, report.overall_score]))
-  const reportIdMap = new Map(
-    rows.flatMap((row) => (row.reports ?? []).map((report) => [row.id, report.id] as const)),
+  const reportMetaMap = new Map(
+    reports.map((report) => [
+      report.interview_id,
+      {
+        reportId: report.reportId,
+        reportKind: report.reportKind,
+        engine: report.reportKind === 'script' ? ('v2.1' as const) : ('v1' as const),
+      },
+    ]),
   )
 
   const showTrend = completedCount >= 2
@@ -118,16 +147,31 @@ export function DashboardMain({
         </div>
 
         <RecentInterviews
-          interviews={visibleRows.map((row) => ({
-            id: row.id,
-            role: row.role,
-            difficulty: row.difficulty,
-            status: row.status,
-            started_at: row.started_at ?? null,
-            completed_at: row.completed_at ?? null,
-            reportId: reportIdMap.get(row.id) ?? null,
-            score: scoreMap.get(row.id) ?? null,
-          }))}
+          interviews={visibleRows.map((row) => {
+            const meta = reportMetaMap.get(row.id)
+            const engine = row.engine === 'v2.1' ? ('v2.1' as const) : ('v1' as const)
+            return {
+              id: row.id,
+              role: row.role,
+              difficulty: row.difficulty,
+              status: row.status,
+              started_at: row.started_at ?? null,
+              completed_at: row.completed_at ?? null,
+              engine,
+              reportId: meta?.reportId ?? null,
+              reportHref:
+                row.status === 'completed'
+                  ? engine === 'v2.1'
+                    ? `/report/script/${row.id}`
+                    : meta?.reportId
+                      ? `/report/${meta.reportId}`
+                      : null
+                  : null,
+              continueHref:
+                engine === 'v2.1' ? `/interview/script/${row.id}` : `/interview/session/${row.id}`,
+              score: scoreMap.get(row.id) ?? null,
+            }
+          })}
         />
 
         {hiddenCount > 0 ? (

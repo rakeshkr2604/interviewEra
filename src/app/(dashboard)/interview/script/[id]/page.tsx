@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
@@ -31,6 +31,23 @@ import type { DeepgramSessionCallbacks } from '@/lib/voice/deepgram-session-cont
 import type { VoiceConnectionState } from '@/lib/voice/deepgram-health'
 import type { TranscriptChunk } from '@/lib/voice/stt-client'
 import { releaseAudioForMicCapture } from '@/lib/voice/audio-gesture'
+import {
+  createScriptSessionPrepController,
+  probeMicrophoneReadiness,
+  PREP_CHECKLIST,
+  type PrepSnapshot,
+  type ScriptSessionPrepController,
+} from '@/lib/interview/script-session-prep'
+import { buildReviewLoadTurnPayload } from '@/lib/interview/build-review-load-turn-payload'
+import {
+  classifyMicStartError,
+  micFallbackMessageForKind,
+  type MicStartErrorClassification,
+  type MicStartErrorKind,
+} from '@/lib/interview/mic-error-classification'
+import { interviewTelemetry } from '@/lib/telemetry/interview-telemetry'
+import { ReviewAnswerHighlightEditor } from '@/components/interview/ReviewAnswerHighlightEditor'
+import { AnswerScoreCard, type AnswerScore } from '@/components/interview/AnswerScoreCard'
 
 // ── iOS browser detection ──────────────────────────────────────────────────────
 // Apple forces all iOS browsers (CriOS/Chrome, FxiOS/Firefox, OPiOS/Opera, etc.)
@@ -76,17 +93,44 @@ type UIPhase =
   | 'completed'
 
 type StructuredAnswer = {
-  structured_points: string[]
-  technical_terms: Array<{ term: string; definition: string; pronunciation?: string }>
-  missing_elements: string[]
+  corrected_transcript: string
+  coaching_reference: {
+    feedback: string
+    restructured_example: string[]
+    technical_terms: Array<{ term: string; definition: string; pronunciation?: string }>
+    missing_elements: string[]
+  }
 }
 
 const AUTO_ADVANCE_MS = 1_500
 
+/**
+ * Dedup parallel boot `[NONE]` turn fetches across React Strict Mode remounts.
+ * Keyed by interviewId — second mount awaits the same promise instead of racing
+ * another insert of turn_index=1 (unique constraint 23505).
+ */
+const inFlightBootTurnByInterview = new Map<string, Promise<TurnApiResponse>>()
+
 type LoadTurnParams = {
   lastAnswer: string
   prevTurnIndex?: number
-  submittedAs?: 'raw' | 'structured' | 'auto_submit'
+  submittedAs?: 'raw' | 'corrected' | 'auto_submit'
+  /** Original STT text for write-once raw_transcript (never overwritten by corrected submit). */
+  sttRawTranscript?: string
+  /**
+   * When set, sent as `currentPhase` instead of reading currentPhaseRef.
+   * Used by review-step next-turn prefetch: phase advances on Continue, but
+   * the /turn request must already use the *next* phase while feedback is open.
+   */
+  requestPhase?: string
+}
+
+/** In-flight / completed next-turn fetch started on Approve (feedback step). */
+type NextTurnPrefetch = {
+  params: LoadTurnParams
+  promise: Promise<TurnApiResponse>
+  result: TurnApiResponse | null
+  error: unknown
 }
 
 type TurnApiResponse = {
@@ -128,12 +172,12 @@ export default function ScriptInterviewPage() {
   // True once the first turn has ever been displayed — drives whether
   // turn_loading shows the branded prep screen (first load) or a bare
   // spinner (subsequent turns, where a full prep screen would be redundant).
-  const firstTurnShownRef = useRef(false)
+  const [firstTurnShown, setFirstTurnShown] = useState(false)
   // True once the mic has connected at least once this session — separate
-  // from firstTurnShownRef because turn_ready fires (and flips that ref)
+  // from firstTurnShown because turn_ready fires (and flips that flag)
   // well before TTS finishes and the mic actually starts connecting, so
-  // firstTurnShownRef alone can't gate the "first connect" status label.
-  const firstMicConnectedRef = useRef(false)
+  // firstTurnShown alone can't gate the "first connect" status label.
+  const [firstMicConnected, setFirstMicConnected] = useState(false)
   // Mirrors `interview` state for reads inside loadTurn/submitAnswer. Those
   // callbacks must not depend on `interview` directly — including it in their
   // useCallback deps recreates the callback (and everything chained through
@@ -147,7 +191,12 @@ export default function ScriptInterviewPage() {
   // ── Voice: mounted guard ────────────────────────────────────────────────────
   // Required by DeepgramSessionController callbacks and TTS callbacks
   // to know if the component is still alive before calling setState.
+  // Reset in useLayoutEffect (not during render) so Strict Mode cleanup gap
+  // cannot leave this false while TTS/mic kickoff is in flight.
   const mountedRef = useRef(true)
+  useLayoutEffect(() => {
+    mountedRef.current = true
+  })
 
   // ── Voice: TTS ──────────────────────────────────────────────────────────────
   // elIsPlaying drives AvatarPlayer.isSpeaking (avatar video plays/pauses with voice).
@@ -166,27 +215,65 @@ export default function ScriptInterviewPage() {
   const [dgInterim, setDgInterim] = useState('')
   const [dgVoiceUiState, setDgVoiceUiState] = useState<VoiceConnectionState>('idle')
   const [micFallback, setMicFallback] = useState(false)
+  // Live transcript panel — auto-scrolls to the latest words as STT updates.
+  const liveTranscriptScrollRef = useRef<HTMLDivElement | null>(null)
+  // Why voice fell back (M11 fix): drives distinct fallback copy for
+  // denied / no-mic / unsupported. null = fallback not active or cause unknown.
+  const [micFallbackKind, setMicFallbackKind] = useState<MicStartErrorKind | null>(null)
+  // Classification of the most recent getUserMedia/mic failure in the CURRENT
+  // start attempt. Captured in the startMic callback (the only place the raw
+  // DOMException is visible — DeepgramSessionController swallows it before
+  // start() resolves) and consumed by onFatalError / the start catch block.
+  const lastMicErrorRef = useRef<MicStartErrorClassification | null>(null)
 
-  // ── Review popup (Phase 3C) ─────────────────────────────────────────────────
-  // Shown after the candidate finishes speaking on show_auto_structure turns.
-  // Closed only by the two choice buttons — no X / escape dismissal.
+  // ── Review flow (2-step full-screen) ────────────────────────────────────────
+  // Step 1 — transcript: edit / accept STT fixes, then Approve.
+  // Step 2 — feedback: coaching + 5-dim score for the APPROVED transcript, then Continue.
+  // Closed only by Continue on step 2 — no X / escape dismissal.
   const [reviewOpen, setReviewOpen] = useState(false)
-  const [reviewRaw, setReviewRaw] = useState('')
-  // Editable copy of reviewRaw — candidate can correct transcription errors.
+  const [reviewStep, setReviewStep] = useState<'transcript' | 'feedback'>('transcript')
+  // Editable transcript on step 1; frozen as the approved answer once step 2 opens.
   const [editedRaw, setEditedRaw] = useState('')
   const [reviewStructured, setReviewStructured] = useState<StructuredAnswer | null>(null)
   const [reviewStructuredLoading, setReviewStructuredLoading] = useState(false)
-  // Holds the deferred loadTurn callback; cleared when user makes a choice.
-  // editedAnswer is provided by "Keep my answer" to support editable transcript.
-  const reviewResolveRef = useRef<((chosenAs: 'raw' | 'structured', editedAnswer?: string) => void) | null>(null)
-  // Ref copy of reviewStructured so the resolve callback always reads the
-  // latest value without needing it in deps.
+  // score-v1 per-answer rubric. Fetched for the approved transcript (prefetched
+  // on raw during step 1; re-fetched after Approve if the candidate edited).
+  const [reviewScore, setReviewScore] = useState<AnswerScore | null>(null)
+  const [reviewScoreLoading, setReviewScoreLoading] = useState(false)
+  // Holds the deferred loadTurn callback; cleared when user Continues from step 2.
+  const reviewResolveRef = useRef<((chosenAs: 'raw' | 'corrected', editedAnswer?: string) => void) | null>(null)
   const reviewStructuredRef = useRef<StructuredAnswer | null>(null)
+  // Original STT/typed capture at review open — never overwritten by panel edits.
+  const reviewRawAnswerRef = useRef('')
+  // Phase the Continue click will advance to — needed to prefetch /turn early.
+  const reviewNextPhaseRef = useRef<string | null>(null)
+  // Snapshot of turn metadata so Approve can re-fire coaching/score against
+  // the approved text without re-reading potentially stale render closures.
+  const reviewContextRef = useRef<{
+    turnIndex: number
+    displayQuestion: string
+    questionType?: 'technical' | 'behavioral'
+    sttMinConfidence?: number
+  } | null>(null)
+  // Generation counter: bumped when re-fetching after an edit so a late
+  // response from the raw prefetch cannot overwrite approved-text results.
+  const reviewFetchGenRef = useRef(0)
+  // Next-question /turn prefetch started on Approve while the candidate reads
+  // feedback — Continue applies this instead of waiting on a cold LLM call.
+  const nextTurnPrefetchRef = useRef<NextTurnPrefetch | null>(null)
+  const [nextTurnPrefetchReady, setNextTurnPrefetchReady] = useState(false)
+  // True while Continue is waiting for / applying the prefetched next turn —
+  // keeps the feedback overlay up so the main pane never flashes blank.
+  const [continuingFromReview, setContinuingFromReview] = useState(false)
 
-  // ── Loading step animation ───────────────────────────────────────────────────
-  // 0 = "Reading your profile", 1 = "Crafting your questions", 2 = "Almost ready…"
-  // Purely cosmetic — does not affect actual turn loading logic.
-  const [loadingStep, setLoadingStep] = useState<0|1|2>(0)
+  // ── Session prep controller (profile ∥ turn ∥ mic) ──────────────────────────
+  // Real readiness, not cosmetic timers — drives the branded checklist UI.
+  const [prepBundle] = useState(() => {
+    const controller = createScriptSessionPrepController()
+    return { controller, initialSnap: controller.snapshot() }
+  })
+  const prepControllerRef = useRef<ScriptSessionPrepController>(prepBundle.controller)
+  const [prepSnap, setPrepSnap] = useState<PrepSnapshot>(prepBundle.initialSnap)
 
   const dgControllerRef = useRef<DeepgramSessionController | null>(null)
   const dgMicCleanupRef = useRef<(() => void) | null>(null)
@@ -195,9 +282,16 @@ export default function ScriptInterviewPage() {
   // (re-hear, retry, a remount, or any other concurrent trigger) can never clobber
   // a newer, already-connected session — mirrors useVoicePlayer's seqRef pattern.
   const dgStartSeqRef = useRef(0)
+  // Per-answer Deepgram final-segment confidences (0–1). Reset when a new
+  // answer's listening session starts; min value ships with answer-score so
+  // low-reliability transcripts get flagged (score_suspect: low_stt_confidence).
+  const dgFinalConfidencesRef = useRef<number[]>([])
   // Ref to startDgListening (defined below) — allows onRefreshRestart callback
   // to call it without creating a circular dep in useCallback.
-  const startDgListeningRef = useRef<(opts?: { clearTranscript?: boolean }) => Promise<void>>(async () => {})
+  const startDgListeningRef = useRef<(opts?: {
+    clearTranscript?: boolean
+    retryOnUnmountRace?: boolean
+  }) => Promise<void>>(async () => {})
 
   // ── Voice: thinking-phase gates ─────────────────────────────────────────────
   // After TTS ends, we enter 'thinking' phase: a per-question countdown (from
@@ -268,11 +362,15 @@ export default function ScriptInterviewPage() {
   // doesn't re-fire when unlock state changes.
   const interviewAudio = useInterviewAudio(interviewId ?? undefined)
   const interviewAudioRef = useRef(interviewAudio)
-  interviewAudioRef.current = interviewAudio
+  useEffect(() => {
+    interviewAudioRef.current = interviewAudio
+  }, [interviewAudio])
 
   // Keep uiPhaseRef fresh so async callbacks (onWsOpen, onFatalError) can
   // read the current phase without a stale closure.
-  uiPhaseRef.current = uiPhase
+  useEffect(() => {
+    uiPhaseRef.current = uiPhase
+  }, [uiPhase])
 
   // ── Thinking-phase countdown ─────────────────────────────────────────────────
   // Ticks thinkingCountdown down to 0, then sets the countdown gate. If the
@@ -284,8 +382,13 @@ export default function ScriptInterviewPage() {
       thinkingGateRef.current.countdownDone = true
       const g = thinkingGateRef.current
       if (g.micReady && mountedRef.current && uiPhaseRef.current === 'thinking') {
-        setUiPhase('candidate_answering')
-        setTimeout(() => { if (mountedRef.current) timerStartRef.current() }, 0)
+        // Defer phase flip so we don't nest setState inside this effect body.
+        const t = setTimeout(() => {
+          if (!mountedRef.current || uiPhaseRef.current !== 'thinking') return
+          setUiPhase('candidate_answering')
+          setTimeout(() => { if (mountedRef.current) timerStartRef.current() }, 0)
+        }, 0)
+        return () => clearTimeout(t)
       }
       return
     }
@@ -362,13 +465,21 @@ export default function ScriptInterviewPage() {
   useEffect(() => { stopDgListeningRef.current = stopDgListening }, [stopDgListening])
 
   // ── STT: start ──────────────────────────────────────────────────────────────
-  const startDgListening = useCallback(async ({ clearTranscript = true }: { clearTranscript?: boolean } = {}) => {
+  const startDgListening = useCallback(async ({
+    clearTranscript = true,
+    retryOnUnmountRace = true,
+  }: {
+    clearTranscript?: boolean
+    /** One automatic retry when mic start races Strict Mode / remount. */
+    retryOnUnmountRace?: boolean
+  } = {}) => {
     if (!mountedRef.current || !interviewId) return
     // Chrome/Firefox/etc on iOS cannot access the microphone (Apple restricts
     // getUserMedia to Safari only). Skip all voice attempts immediately — the
     // 3×retry loop would waste ~24s before falling back to text.
     if (VOICE_UNSUPPORTED_ON_THIS_BROWSER) {
       setMicFallback(true)
+      setMicFallbackKind('unsupported')
       return
     }
 
@@ -390,13 +501,52 @@ export default function ScriptInterviewPage() {
     if (clearTranscript) {
       setDgTranscript('')
       setDgInterim('')
+      dgFinalConfidencesRef.current = []
     }
     setMicFallback(false)
+    setMicFallbackKind(null)
+    // Fresh attempt — a stale classification from a previous attempt must not
+    // mislabel this one's failure.
+    lastMicErrorRef.current = null
+
+    // Shared failure sink for both paths that engage the typed-answer fallback
+    // (onFatalError callback + the start() catch below). Classifies by the real
+    // error name captured in startMic (M11 fix) instead of assuming denial, and
+    // emits a queryable VOICE telemetry event carrying error_name/error_kind.
+    const engageMicFallback = (source: 'fatal_error' | 'start_catch', rawErr?: unknown) => {
+      const cls =
+        lastMicErrorRef.current ??
+        (rawErr !== undefined ? classifyMicStartError(rawErr) : null)
+      console.warn(
+        `[VOICE_PIPELINE] mic/STT start failed (${cls ? `${cls.errorName ?? 'no-name'} → ${cls.kind}` : 'no mic error captured — WS/token/pipeline failure'}) — text fallback engaged`,
+      )
+      interviewTelemetry(
+        'VOICE',
+        'mic_start_failed',
+        telemetryCtxRef.current,
+        {
+          source,
+          error_kind: cls?.kind ?? 'pipeline_failure',
+          error_name: cls?.errorName ?? null,
+          error_message: cls?.errorMessage ?? (rawErr instanceof Error ? rawErr.message : null),
+        },
+        { critical: true, level: 'warn' },
+      )
+      if (mountedRef.current && mySeq === dgStartSeqRef.current) {
+        setMicFallback(true)
+        setMicFallbackKind(cls?.kind ?? null)
+      }
+    }
 
     const callbacks: DeepgramSessionCallbacks = {
       onPartial: (chunk: TranscriptChunk) => {
         if (!mountedRef.current || mySeq !== dgStartSeqRef.current) return
         if (chunk.isFinal) {
+          // Segment-level STT confidence — consumed by answer-score to flag
+          // low-reliability transcripts (score_suspect: low_stt_confidence).
+          if (typeof chunk.confidence === 'number' && chunk.confidence > 0) {
+            dgFinalConfidencesRef.current.push(chunk.confidence)
+          }
           setDgTranscript((prev) => prev + chunk.text + ' ')
           setDgInterim('')
         } else {
@@ -416,7 +566,7 @@ export default function ScriptInterviewPage() {
       },
       onWsOpen: () => {
         if (!mountedRef.current || mySeq !== dgStartSeqRef.current) return
-        firstMicConnectedRef.current = true
+        setFirstMicConnected(true)
         setDgVoiceUiState('connected')
         // Fire the one-shot mic-ready callback (set by kickoffVoiceInput or
         // "Try voice again"). It either triggers the thinking→answering
@@ -437,14 +587,13 @@ export default function ScriptInterviewPage() {
       },
       onFatalError: () => {
         if (!mountedRef.current || mySeq !== dgStartSeqRef.current) return
-        // Non-user-facing marker so Clarity session recordings capture when a
-        // privacy browser (DuckDuckGo/Brave) blocks mic access or the STT
-        // pipeline dies and the session falls back to typing.
-        console.warn('[VOICE_PIPELINE] voice input unavailable — falling back to text input')
+        // Non-user-facing marker (classified by real error name — M11 fix) so
+        // Clarity session recordings capture when a privacy browser blocks mic
+        // access or the STT pipeline dies and the session falls back to typing.
+        engageMicFallback('fatal_error')
         // Clear any pending mic-ready callback so the timer never starts.
         onMicReadyRef.current = null
         stopDgListeningRef.current()
-        setMicFallback(true)
         // If we were in the thinking phase, drop straight to answering so the
         // candidate can type. No timer — typing fallback has no countdown.
         if (uiPhaseRef.current === 'thinking') setUiPhase('candidate_answering')
@@ -461,9 +610,17 @@ export default function ScriptInterviewPage() {
       // per-callback seq gates above/below.
       isMounted: () => mountedRef.current,
       startMic: async (sendAudio) => {
-        const cleanup = await dgStartRecording(sendAudio)
-        dgMicCleanupRef.current = cleanup
-        return cleanup
+        try {
+          const cleanup = await dgStartRecording(sendAudio)
+          dgMicCleanupRef.current = cleanup
+          return cleanup
+        } catch (err) {
+          // Capture the raw getUserMedia DOMException here — the controller
+          // swallows it (handleStartFailure → onFatalError) before start()
+          // resolves, so this is the only hop where error.name is visible.
+          lastMicErrorRef.current = classifyMicStartError(err)
+          throw err
+        }
       },
       stopMic: () => {
         dgStopRecording()
@@ -480,11 +637,25 @@ export default function ScriptInterviewPage() {
 
     try {
       await dgControllerRef.current.start()
-    } catch {
-      // Deepgram start failed (getUserMedia denied, WebSocket blocked) — fall
-      // back to text input silently. Warn so Clarity recordings capture it.
-      console.warn('[VOICE_PIPELINE] mic/STT start failed (possible getUserMedia denial) — text fallback engaged')
-      if (mountedRef.current && mySeq === dgStartSeqRef.current) setMicFallback(true)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const isUnmountRace = /unmounted during initialisation/i.test(msg)
+      if (
+        isUnmountRace &&
+        retryOnUnmountRace &&
+        mountedRef.current &&
+        mySeq === dgStartSeqRef.current
+      ) {
+        console.warn('[VOICE_PIPELINE] mic start raced with remount — retrying once')
+        await startDgListeningRef.current({
+          clearTranscript,
+          retryOnUnmountRace: false,
+        })
+        return
+      }
+      // Deepgram start failed — fall back to text input silently, classified
+      // by the real error name (M11 fix) instead of assuming denial.
+      engageMicFallback('start_catch', err)
     }
   }, [interviewId, dgStartRecording, dgStopRecording])
 
@@ -519,11 +690,27 @@ export default function ScriptInterviewPage() {
   // what they're saying. Only active when Deepgram WebSocket is open.
   // Typed text takes precedence once the user starts typing (they can edit).
   useEffect(() => {
-    if (dgVoiceUiState === 'connected') {
-      const live = (dgTranscript + dgInterim).trim()
-      if (live) setAnswerText(live)
-    }
+    if (dgVoiceUiState !== 'connected') return
+    const live = (dgTranscript + dgInterim).trim()
+    if (!live) return
+    const t = setTimeout(() => {
+      if (mountedRef.current) setAnswerText(live)
+    }, 0)
+    return () => clearTimeout(t)
   }, [dgTranscript, dgInterim, dgVoiceUiState])
+
+  // Keep the latest spoken words in view as the transcript grows. If the
+  // candidate has scrolled up to re-read earlier text (>80px from bottom),
+  // don't yank them — only pin to bottom when already following the live end.
+  useLayoutEffect(() => {
+    const el = liveTranscriptScrollRef.current
+    if (!el) return
+    if (!(dgTranscript || dgInterim)) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    if (distanceFromBottom < 80) {
+      el.scrollTop = el.scrollHeight
+    }
+  }, [dgTranscript, dgInterim])
 
   // Cleanup voice resources when the page unmounts (exit interview, navigate away).
   // Always stop in order: timer → STT → TTS.
@@ -550,15 +737,16 @@ export default function ScriptInterviewPage() {
     }
   }, [interviewId])
 
-  const loadTurn = useCallback(
-    async (p: LoadTurnParams) => {
-      clearAutoTimer()
-      setUiPhase('turn_loading')
-      setErrorMessage(null)
-      setAnswerText('')
-      retryRef.current = () => void loadTurnRef.current(p)
+  /** HTTP-only turn fetch — used by parallel boot so TTS/mic wait on a join barrier. */
+  const fetchTurnPayload = useCallback(
+    async (p: LoadTurnParams): Promise<TurnApiResponse> => {
+      const isBoot = p.lastAnswer === '[NONE]'
+      if (isBoot && interviewId) {
+        const existing = inFlightBootTurnByInterview.get(interviewId)
+        if (existing) return existing
+      }
 
-      try {
+      const run = (async (): Promise<TurnApiResponse> => {
         const res = await fetch('/api/interview/script/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -566,201 +754,308 @@ export default function ScriptInterviewPage() {
           body: JSON.stringify({
             interviewId,
             lastAnswer: p.lastAnswer,
-            currentPhase: currentPhaseRef.current,
+            currentPhase: p.requestPhase ?? currentPhaseRef.current,
             questionNumber: questionNumberRef.current,
             ...(p.prevTurnIndex != null ? { prevTurnIndex: p.prevTurnIndex } : {}),
             ...(p.submittedAs ? { submittedAs: p.submittedAs } : {}),
+            ...(p.sttRawTranscript != null ? { sttRawTranscript: p.sttRawTranscript } : {}),
           }),
         })
 
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null
           if (res.status === 422) {
-            // Invalid turn output from LLM — do not retry (would loop forever).
-            setErrorMessage('The interviewer produced an unexpected response. Please try again.')
-            setUiPhase('turn_ready')
-            return
+            throw new Error('invalid_turn_output')
           }
           throw new Error(body?.error || `The interviewer could not respond (status ${res.status}).`)
         }
 
-        const data = (await res.json()) as TurnApiResponse
-        const turn = data.turn
+        return (await res.json()) as TurnApiResponse
+      })()
 
-        setCurrentTurn(turn)
-        lastTurnWasQuestionRef.current = turn.is_question
-        setCurrentTurnIndex(data.turnIndex)
-        currentTurnIndexRef.current = data.turnIndex
-        setCurrentPhase(turn.phase)
-
-        // Running count of core questions asked — drives "Question X of Y".
-        // questionNumberRef is the synchronous source of truth; only core
-        // questions advance it (warmup/self_intro turns leave it untouched).
-        if (turn.is_question && turn.phase === 'core') {
-          questionNumberRef.current += 1
+      if (isBoot && interviewId) {
+        inFlightBootTurnByInterview.set(interviewId, run)
+        try {
+          return await run
+        } finally {
+          inFlightBootTurnByInterview.delete(interviewId)
         }
-        const runningQuestionNumber = questionNumberRef.current
-        setQuestionNumber(runningQuestionNumber)
+      }
 
-        firstTurnShownRef.current = true
-        setUiPhase('turn_ready')
+      return run
+    },
+    [interviewId],
+  )
 
-        if (turn.phase === 'closing' || currentPhaseRef.current === 'closing') {
-          setUiPhase('completed')
-          void completeInterview()
+  const fetchTurnPayloadRef = useRef(fetchTurnPayload)
+  useEffect(() => {
+    fetchTurnPayloadRef.current = fetchTurnPayload
+  }, [fetchTurnPayload])
+
+  /** Apply a fetched turn: state + TTS + voice kickoff. Requires interviewRef for voice id. */
+  const applyTurnPayload = useCallback(
+    async (data: TurnApiResponse) => {
+      const turn = data.turn
+
+      setCurrentTurn(turn)
+      lastTurnWasQuestionRef.current = turn.is_question
+      setCurrentTurnIndex(data.turnIndex)
+      currentTurnIndexRef.current = data.turnIndex
+      setCurrentPhase(turn.phase)
+
+      if (turn.is_question && turn.phase === 'core') {
+        questionNumberRef.current += 1
+      }
+      const runningQuestionNumber = questionNumberRef.current
+      setQuestionNumber(runningQuestionNumber)
+
+      setFirstTurnShown(true)
+      setUiPhase('turn_ready')
+
+      if (turn.phase === 'closing' || currentPhaseRef.current === 'closing') {
+        setUiPhase('completed')
+        void completeInterview()
+        return
+      }
+
+      const tone =
+        turn.interviewer_emotion === 'warm' ? ('encouraging' as const)
+        : turn.interviewer_emotion === 'challenging' ? ('challenging' as const)
+        : ('neutral' as const)
+
+      if (!turn.is_question) {
+        consecutiveAutoTurnsRef.current += 1
+        if (consecutiveAutoTurnsRef.current > 3) {
+          consecutiveAutoTurnsRef.current = 0
+          setUiPhase('candidate_answering')
           return
         }
 
-        // Derive TTS tone from interviewer's emotional state for this turn.
-        // Maps LLM emotion field → TTSVoiceKey tone parameter.
-        const tone =
-          turn.interviewer_emotion === 'warm' ? 'encouraging' as const
-          : turn.interviewer_emotion === 'challenging' ? 'challenging' as const
-          : 'neutral' as const
+        setUiPhase('auto_turn')
 
-        if (!turn.is_question) {
-          // ── Non-question turn (acknowledgment / transition) ──────────────────
-          // Play TTS for the acknowledgment speech, then auto-advance after a
-          // short beat. No timer, no STT — candidate does not answer these turns.
-          consecutiveAutoTurnsRef.current += 1
-          if (consecutiveAutoTurnsRef.current > 3) {
-            // Safety: break potential auto-advance loop
-            consecutiveAutoTurnsRef.current = 0
+        const scheduleAdvance = () => {
+          if (!mountedRef.current) return
+          const stayPhase = getNextPhase(
+            currentPhaseRef.current,
+            false,
+            questionNumberRef.current,
+            interviewRef.current?.question_count ?? 4,
+            interviewRef.current?.self_intro_enabled ?? true,
+          )
+          currentPhaseRef.current = stayPhase
+          autoTimerRef.current = setTimeout(() => {
+            void loadTurnRef.current({ lastAnswer: turn.speech })
+          }, AUTO_ADVANCE_MS)
+        }
+
+        let advanceCalled = false
+        const guardedAdvance = () => {
+          if (advanceCalled) return
+          advanceCalled = true
+          scheduleAdvance()
+        }
+
+        void elSpeakRef.current(turn.speech, tone, {
+          onPlaybackComplete: guardedAdvance,
+          onPlaybackFailed: guardedAdvance,
+        })
+      } else {
+        consecutiveAutoTurnsRef.current = 0
+        timerExpiredRef.current = false
+        setUiPhase('turn_ready')
+
+        const kickoffVoiceInput = () => {
+          if (!mountedRef.current) return
+          const thinkingSecs = (turn.reading_buffer_seconds ?? 0) > 0
+            ? turn.reading_buffer_seconds
+            : 3
+          timerResetRef.current(turn.timer_seconds > 0 ? turn.timer_seconds : 60)
+          thinkingGateRef.current = { countdownDone: false, micReady: false }
+          setThinkingCountdown(thinkingSecs)
+          setUiPhase('thinking')
+
+          onMicReadyRef.current = () => {
+            thinkingGateRef.current.micReady = true
+            const g = thinkingGateRef.current
+            if (!g.countdownDone || !mountedRef.current) return
+            if (uiPhaseRef.current !== 'thinking') return
             setUiPhase('candidate_answering')
+            setTimeout(() => { if (mountedRef.current) timerStartRef.current() }, 0)
+          }
+
+          void startDgListeningRef.current()
+        }
+
+        let kickoffCalled = false
+        const guardedKickoff = () => {
+          if (kickoffCalled) return
+          kickoffCalled = true
+          kickoffVoiceInput()
+        }
+
+        void elSpeakRef.current(turn.speech, tone, {
+          onPlaybackComplete: () => {
+            if (!mountedRef.current) return
+            guardedKickoff()
+          },
+          onPlaybackFailed: () => {
+            if (!mountedRef.current) return
+            guardedKickoff()
+          },
+        })
+      }
+    },
+    [completeInterview],
+  )
+
+  const applyTurnPayloadRef = useRef(applyTurnPayload)
+  useEffect(() => {
+    applyTurnPayloadRef.current = applyTurnPayload
+  }, [applyTurnPayload])
+
+  const loadTurn = useCallback(
+    async (p: LoadTurnParams) => {
+      clearAutoTimer()
+      setErrorMessage(null)
+      setAnswerText('')
+      retryRef.current = () => void loadTurnRef.current(p)
+      prepControllerRef.current?.setTrack('turn', 'running')
+
+      // Reuse next-turn prefetch started on Approve (feedback step), if it
+      // matches this load. Avoids a second LLM round-trip after Continue.
+      const prefetch = nextTurnPrefetchRef.current
+      const prefetchMatches =
+        !!prefetch &&
+        prefetch.params.lastAnswer.trim() === p.lastAnswer.trim() &&
+        prefetch.params.prevTurnIndex === p.prevTurnIndex &&
+        prefetch.params.submittedAs === p.submittedAs &&
+        (prefetch.params.sttRawTranscript ?? '').trim() === (p.sttRawTranscript ?? '').trim()
+
+      try {
+        let data: TurnApiResponse
+        if (prefetchMatches) {
+          nextTurnPrefetchRef.current = null
+          setNextTurnPrefetchReady(false)
+          if (prefetch.result) {
+            // Already warm — skip the blank turn_loading screen.
+            prepControllerRef.current?.setTrack('turn', 'ready')
+            if (!mountedRef.current) return
+            await applyTurnPayload(prefetch.result)
             return
           }
-
-          setUiPhase('auto_turn')
-
-          const scheduleAdvance = () => {
-            if (!mountedRef.current) return
-            const stayPhase = getNextPhase(
-              currentPhaseRef.current,
-              false,
-              questionNumberRef.current,
-              interviewRef.current?.question_count ?? 4,
-              interviewRef.current?.self_intro_enabled ?? true,
-            )
-            currentPhaseRef.current = stayPhase
-            // Store in autoTimerRef so clearAutoTimer() (called at loadTurn start)
-            // can cancel a pending advance if a new turn fires before it fires.
-            autoTimerRef.current = setTimeout(() => {
-              void loadTurnRef.current({ lastAnswer: turn.speech })
-            }, AUTO_ADVANCE_MS)
+          setUiPhase('turn_loading')
+          try {
+            data = await prefetch.promise
+          } catch {
+            // Prefetch failed while candidate read feedback — one cold retry.
+            data = await fetchTurnPayload(p)
           }
-
-          // One-shot guard: both onPlaybackComplete and onPlaybackFailed can fire
-          // for the same TTS call. Without this, scheduleAdvance() runs twice —
-          // advancing currentPhaseRef and fetching the next turn twice, which was
-          // corrupting phase tracking and showing the wrong turn's text as "the
-          // current question" (same class of bug as the question-turn kickoff fix).
-          let advanceCalled = false
-          const guardedAdvance = () => {
-            if (advanceCalled) return
-            advanceCalled = true
-            scheduleAdvance()
-          }
-
-          // Play TTS, then advance. If TTS fails, still advance (graceful degradation).
-          void elSpeakRef.current(turn.speech, tone, {
-            onPlaybackComplete: guardedAdvance,
-            onPlaybackFailed: guardedAdvance,
-          })
         } else {
-          // ── Question turn ─────────────────────────────────────────────────────
-          // Flow: show question → play TTS → wait reading_buffer_seconds
-          //        → start countdown timer + STT → candidate answers.
-          consecutiveAutoTurnsRef.current = 0
-          timerExpiredRef.current = false
-
-          // Show the question text immediately (turn_ready). Avatar video will play
-          // via isSpeaking={elIsPlaying} while TTS audio is streaming.
-          setUiPhase('turn_ready')
-
-          const kickoffVoiceInput = () => {
-            if (!mountedRef.current) return
-            const thinkingSecs = (turn.reading_buffer_seconds ?? 0) > 0
-              ? turn.reading_buffer_seconds
-              : 3
-            timerResetRef.current(turn.timer_seconds > 0 ? turn.timer_seconds : 60)
-            // Reset gates for this question's thinking phase.
-            thinkingGateRef.current = { countdownDone: false, micReady: false }
-            setThinkingCountdown(thinkingSecs)
-            setUiPhase('thinking')
-
-            // Wire the one-shot callback that fires when mic opens.
-            // It sets the mic gate and — if countdown is already done —
-            // transitions to candidate_answering and starts the answer timer.
-            onMicReadyRef.current = () => {
-              thinkingGateRef.current.micReady = true
-              const g = thinkingGateRef.current
-              if (!g.countdownDone || !mountedRef.current) return
-              if (uiPhaseRef.current !== 'thinking') return
-              setUiPhase('candidate_answering')
-              // reset() + start() in separate ticks: useTimer's start() reads
-              // timeLeftRef which the reset() useEffect updates after render.
-              setTimeout(() => { if (mountedRef.current) timerStartRef.current() }, 0)
-            }
-
-            void startDgListeningRef.current()
+          if (prefetch) {
+            // Stale / mismatched prefetch — drop it and fetch fresh.
+            nextTurnPrefetchRef.current = null
+            setNextTurnPrefetchReady(false)
           }
-
-          // One-shot guard: both onPlaybackComplete and onPlaybackFailed can fire
-          // for the same TTS call. Without this, kickoffVoiceInput() (and therefore
-          // startDgListening) runs twice — the second call supersedes the first
-          // Deepgram session while it is still in 'connecting' state, leaving
-          // dgVoiceUiState permanently stuck at 'connecting'.
-          let kickoffCalled = false
-          const guardedKickoff = () => {
-            if (kickoffCalled) return
-            kickoffCalled = true
-            kickoffVoiceInput()
-          }
-
-          void elSpeakRef.current(turn.speech, tone, {
-            onPlaybackComplete: () => {
-              if (!mountedRef.current) return
-              // No buffer timeout here — the 'thinking' phase (set by
-              // kickoffVoiceInput) shows the countdown visually while STT
-              // connects in the background. reading_buffer_seconds drives
-              // the thinking countdown, not a hidden setTimeout.
-              guardedKickoff()
-            },
-            onPlaybackFailed: () => {
-              // TTS failed (network, quota, audio blocked) — still start timer + STT.
-              // Candidate can still answer via voice or typing.
-              if (!mountedRef.current) return
-              guardedKickoff()
-            },
-          })
+          setUiPhase('turn_loading')
+          data = await fetchTurnPayload(p)
         }
+        if (!mountedRef.current) return
+        prepControllerRef.current?.setTrack('turn', 'ready')
+        await applyTurnPayload(data)
       } catch (err) {
+        if (!mountedRef.current) return
+        nextTurnPrefetchRef.current = null
+        setNextTurnPrefetchReady(false)
+        prepControllerRef.current?.setTrack('turn', 'failed', {
+          error: err instanceof Error ? err.message : 'turn_failed',
+        })
+        if (err instanceof Error && err.message === 'invalid_turn_output') {
+          setErrorMessage('The interviewer produced an unexpected response. Please try again.')
+          setUiPhase('turn_ready')
+          return
+        }
         setErrorMessage(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
       }
     },
-    [interviewId, clearAutoTimer, completeInterview],
+    [clearAutoTimer, fetchTurnPayload, applyTurnPayload],
   )
 
   useEffect(() => {
     loadTurnRef.current = loadTurn
   }, [loadTurn])
 
-  // ── Initial load: fetch interview, guard, then request the first turn ──────
+  // Subscribe to prep controller for checklist UI.
+  useEffect(() => {
+    const prep = prepControllerRef.current
+    if (!prep) return
+    return prep.subscribe((snap) => {
+      if (mountedRef.current) setPrepSnap(snap)
+    })
+  }, [])
+
+  // ── Initial load: profile ∥ first turn ∥ mic probe (join before TTS) ───────
   useEffect(() => {
     let cancelled = false
+    const prep = prepControllerRef.current
 
     async function boot() {
+      prep?.reset()
+      prep?.setTrack('profile', 'running')
+      prep?.setTrack('mic', 'running')
+
+      const audio = interviewAudioRef.current
+      const needsUnlock = Boolean(
+        audio.needsUnlock && !audio.isUnlocked && IS_IOS_SAFARI,
+      )
+
+      const sessionPromise = (async (): Promise<ScriptInterviewSession> => {
+        const res = await fetch(
+          `/api/interview/script/session?id=${encodeURIComponent(interviewId)}`,
+          { credentials: 'include' },
+        )
+        if (!res.ok) throw new Error('session_unavailable')
+        return (await res.json()) as ScriptInterviewSession
+      })()
+
+      // Mic status only — do NOT call getUserMedia here. Warming the device
+      // races Deepgram's later acquire and triggers false "unmounted" aborts.
+      const micPromise = probeMicrophoneReadiness({
+        allowGetUserMedia: false,
+        unsupported: VOICE_UNSUPPORTED_ON_THIS_BROWSER,
+      })
+
+      // First turn can start without waiting for session — turn API re-validates.
+      // TTS still waits for the session barrier below (correct interviewer voice).
+      let turnPromise: Promise<TurnApiResponse> | null = null
+      if (!needsUnlock && !bootCalledRef.current) {
+        bootCalledRef.current = true
+        prep?.setTrack('turn', 'running')
+        turnPromise = fetchTurnPayloadRef.current({ lastAnswer: '[NONE]' })
+      } else {
+        prep?.setTrack('turn', needsUnlock ? 'idle' : 'idle')
+      }
+
       try {
-        const res = await fetch(`/api/interview/script/session?id=${encodeURIComponent(interviewId)}`, {
-          credentials: 'include',
-        })
-        if (!res.ok) {
+        const [sessionSettled, micResult, turnSettled] = await Promise.all([
+          sessionPromise.then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+          micPromise,
+          (turnPromise ?? Promise.resolve(null)).then(
+            (value) => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error }),
+          ),
+        ])
+
+        if (cancelled || !mountedRef.current) return
+
+        if (!sessionSettled.ok) {
           router.replace('/dashboard')
           return
         }
-        const row = (await res.json()) as ScriptInterviewSession
-        if (cancelled) return
 
+        const row = sessionSettled.value
         if (row.engine !== 'v2.1' || row.status === 'completed' || row.status === 'abandoned') {
           router.replace('/dashboard')
           return
@@ -768,24 +1063,59 @@ export default function ScriptInterviewPage() {
 
         setInterview(row)
         interviewRef.current = row
+        prep?.setTrack('profile', 'ready')
 
-        // Guard the kickoff, not the fetch — this must survive Strict Mode's
-        // dev-only mount→cleanup→remount without either skipping the real
-        // mount or firing the first turn request twice.
-        if (!bootCalledRef.current) {
-          const audio = interviewAudioRef.current
-          if (audio.needsUnlock && !audio.isUnlocked && IS_IOS_SAFARI) {
-            // iOS Safari: hold the first turn behind a tap so TTS has a live
-            // user gesture. bootCalledRef stays false — handleUnlockAudio
-            // owns the kickoff on tap.
-            setUiPhase('awaiting_audio_unlock')
-          } else {
+        prep?.setMicDetail(micResult.detail)
+        if (micResult.status === 'ready') {
+          prep?.setTrack('mic', 'ready')
+        } else if (micResult.status === 'failed') {
+          prep?.setTrack('mic', 'failed')
+          if (
+            micResult.detail === 'denied' ||
+            micResult.detail === 'unsupported' ||
+            VOICE_UNSUPPORTED_ON_THIS_BROWSER
+          ) {
+            setMicFallback(true)
+            setMicFallbackKind(micResult.detail === 'denied' ? 'permission_denied' : 'unsupported')
+          }
+        } else {
+          prep?.setTrack('mic', 'skipped')
+        }
+
+        if (needsUnlock) {
+          setUiPhase('awaiting_audio_unlock')
+          return
+        }
+
+        if (!turnSettled.ok) {
+          const msg =
+            turnSettled.error instanceof Error
+              ? turnSettled.error.message
+              : 'Something went wrong preparing your session. Please try again.'
+          prep?.setTrack('turn', 'failed', { error: msg })
+          setErrorMessage(msg)
+          setUiPhase('loading')
+          bootCalledRef.current = false
+          retryRef.current = () => {
             bootCalledRef.current = true
             void loadTurnRef.current({ lastAnswer: '[NONE]' })
           }
+          return
         }
+
+        if (!turnSettled.value) {
+          // Unexpected — kick first turn serially as fallback.
+          prep?.setTrack('turn', 'running')
+          void loadTurnRef.current({ lastAnswer: '[NONE]' })
+          return
+        }
+
+        prep?.setTrack('turn', 'ready')
+        setErrorMessage(null)
+        await applyTurnPayloadRef.current(turnSettled.value)
       } catch {
-        if (!cancelled) router.replace('/dashboard')
+        if (cancelled || !mountedRef.current) return
+        router.replace('/dashboard')
       }
     }
 
@@ -796,26 +1126,6 @@ export default function ScriptInterviewPage() {
   }, [interviewId, router])
 
   useEffect(() => clearAutoTimer, [clearAutoTimer])
-
-  // ── Loading step animation ───────────────────────────────────────────────────
-  useEffect(() => {
-    if (uiPhase !== 'loading') {
-      setLoadingStep(0)
-      return
-    }
-    setLoadingStep(0)
-    const t1 = setTimeout(() => setLoadingStep(1), 1_500)
-    const t2 = setTimeout(() => setLoadingStep(2), 3_500)
-    return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-    }
-  }, [uiPhase])
-
-  // ── Review popup editedRaw initializer ──────────────────────────────────────
-  useEffect(() => {
-    if (reviewOpen) setEditedRaw(reviewRaw)
-  }, [reviewOpen, reviewRaw])
 
   // ── Submit / skip ──────────────────────────────────────────────────────────
   const submitAnswer = useCallback(
@@ -853,30 +1163,57 @@ export default function ScriptInterviewPage() {
         !isSpecialAnswer
 
       if (shouldShowReview) {
-        // Open the review popup; defer loadTurn until the candidate chooses.
+        // Open step 1 (transcript). loadTurn waits until Continue on step 2.
         setReviewOpen(true)
-        setReviewRaw(rawAnswer)
+        setReviewStep('transcript')
+        setUiPhase('review')
+        setEditedRaw(rawAnswer)
         setReviewStructured(null)
         reviewStructuredRef.current = null
         setReviewStructuredLoading(true)
+        setReviewScore(null)
+        setReviewScoreLoading(true)
+        reviewRawAnswerRef.current = rawAnswer
+        reviewNextPhaseRef.current = nextPhase
+        nextTurnPrefetchRef.current = null
+        setNextTurnPrefetchReady(false)
+        reviewFetchGenRef.current += 1
+        const prefetchGen = reviewFetchGenRef.current
 
-        // Store the deferred advance+submit. Cleared by the button handlers.
-        // editedAnswer is the (possibly user-edited) raw transcript from the popup.
-        reviewResolveRef.current = (chosenAs: 'raw' | 'structured', editedAnswer?: string) => {
-          currentPhaseRef.current = nextPhase
-          const lastAnswer =
-            chosenAs === 'structured' && reviewStructuredRef.current
-              ? reviewStructuredRef.current.structured_points.join('\n')
-              : (editedAnswer ?? rawAnswer)
-          void loadTurnRef.current({
-            lastAnswer,
-            prevTurnIndex: currentTurnIndexRef.current,
-            submittedAs: chosenAs,
-          })
+        // Snapshot + reset so a later typed answer can't inherit stale voice confidences.
+        const finalConfidences = dgFinalConfidencesRef.current
+        dgFinalConfidencesRef.current = []
+        const sttMinConfidence =
+          finalConfidences.length > 0 ? Math.min(...finalConfidences) : undefined
+        reviewContextRef.current = {
+          turnIndex: currentTurnIndexRef.current,
+          displayQuestion: turn.display_question ?? '',
+          ...(turn.question_type ? { questionType: turn.question_type } : {}),
+          ...(sttMinConfidence !== undefined ? { sttMinConfidence } : {}),
         }
 
-        // Fire auto-structure; populate the right panel on success.
-        // On failure or >15 s timeout: silently auto-dismiss and submit raw.
+        // Deferred advance — fired only from Continue on the feedback step.
+        // Payload wiring (submittedAs / lastAnswer / sttRawTranscript) is pure —
+        // see buildReviewLoadTurnPayload (unit-tested).
+        reviewResolveRef.current = (chosenAs: 'raw' | 'corrected', editedAnswer?: string) => {
+          currentPhaseRef.current = nextPhase
+          const editedRawForChoice = chosenAs === 'raw' ? (editedAnswer ?? rawAnswer) : rawAnswer
+          const editedCorrectedForChoice =
+            chosenAs === 'corrected' ? (editedAnswer ?? '') : ''
+          const payload = buildReviewLoadTurnPayload({
+            chosenAs,
+            editedRaw: editedRawForChoice,
+            editedCorrected: editedCorrectedForChoice,
+            rawAnswer,
+            prevTurnIndex: currentTurnIndexRef.current,
+          })
+          void loadTurnRef.current(payload)
+        }
+
+        // Prefetch on the original capture: STT highlights (corrected_transcript)
+        // for step 1, plus coaching + score ready for step 2 when the candidate
+        // Approves without editing. If they edit, Approve bumps the gen and
+        // re-fires both against the approved text.
         fetch('/api/interview/script/auto-structure', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -890,10 +1227,10 @@ export default function ScriptInterviewPage() {
             scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
             ...(turn.question_type ? { questionType: turn.question_type } : {}),
           }),
-          signal: AbortSignal.timeout(15_000),
+          signal: AbortSignal.timeout(22_000),
         })
           .then(async (res) => {
-            if (!mountedRef.current) return
+            if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
             if (!res.ok) throw new Error(`auto-structure ${res.status}`)
             const data = (await res.json()) as { structuredAnswer: StructuredAnswer }
             const sa = data.structuredAnswer
@@ -904,13 +1241,36 @@ export default function ScriptInterviewPage() {
             }
           })
           .catch(() => {
-            if (!mountedRef.current) return
-            if (!reviewResolveRef.current) return
+            // Step 1 can proceed without highlights; do NOT auto-dismiss.
+            if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
             setReviewStructuredLoading(false)
-            const resolve = reviewResolveRef.current
-            reviewResolveRef.current = null
-            setReviewOpen(false)
-            resolve('raw')
+          })
+
+        fetch('/api/interview/script/answer-score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            interviewId,
+            turnIndex: currentTurnIndexRef.current,
+            transcript: rawAnswer,
+            displayQuestion: turn.display_question,
+            targetRole: interviewRef.current?.role ?? '',
+            ...(turn.question_type ? { questionType: turn.question_type } : {}),
+            ...(sttMinConfidence !== undefined ? { sttMinConfidence } : {}),
+          }),
+          signal: AbortSignal.timeout(40_000),
+        })
+          .then(async (res) => {
+            if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
+            if (!res.ok) throw new Error(`answer-score ${res.status}`)
+            const data = (await res.json()) as { score: AnswerScore }
+            setReviewScore(data.score)
+            setReviewScoreLoading(false)
+          })
+          .catch(() => {
+            if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
+            setReviewScoreLoading(false)
           })
 
         return
@@ -923,12 +1283,134 @@ export default function ScriptInterviewPage() {
         lastAnswer: rawAnswer,
         prevTurnIndex: currentTurnIndexRef.current,
         submittedAs,
+        sttRawTranscript: isSpecialAnswer ? undefined : rawAnswer,
       })
     },
     [currentTurn, interviewId, clearAutoTimer],
   )
 
   useEffect(() => { submitAnswerRef.current = submitAnswer }, [submitAnswer])
+
+  /**
+   * Start generating the next interviewer turn as soon as the candidate
+   * Approves their transcript — overlaps LLM latency with feedback reading.
+   * Continue then applies the warm result (or awaits the same promise).
+   */
+  const startNextTurnPrefetch = useCallback((approvedTranscript: string) => {
+    const nextPhase = reviewNextPhaseRef.current
+    if (!interviewId || !nextPhase) return
+
+    const payload = buildReviewLoadTurnPayload({
+      chosenAs: 'raw',
+      editedRaw: approvedTranscript,
+      editedCorrected: '',
+      rawAnswer: reviewRawAnswerRef.current,
+      prevTurnIndex: currentTurnIndexRef.current,
+    })
+    const params: LoadTurnParams = {
+      ...payload,
+      requestPhase: nextPhase,
+    }
+
+    setNextTurnPrefetchReady(false)
+    const promise = fetchTurnPayloadRef.current(params)
+    const entry: NextTurnPrefetch = {
+      params,
+      promise,
+      result: null,
+      error: null,
+    }
+    nextTurnPrefetchRef.current = entry
+    void promise
+      .then((data) => {
+        if (nextTurnPrefetchRef.current !== entry) return
+        entry.result = data
+        if (mountedRef.current) setNextTurnPrefetchReady(true)
+      })
+      .catch((err) => {
+        if (nextTurnPrefetchRef.current !== entry) return
+        entry.error = err
+        // Leave result null — Continue/loadTurn will fall through to a fresh fetch
+        // only if we clear the broken prefetch; keep the rejected promise so
+        // loadTurn can catch the same error OR we clear for retry.
+        nextTurnPrefetchRef.current = null
+        if (mountedRef.current) setNextTurnPrefetchReady(false)
+      })
+  }, [interviewId])
+
+  /**
+   * Step 2 coaching + score for the APPROVED transcript.
+   * Called after Approve when the candidate edited (or accepted STT fixes).
+   * Bumps reviewFetchGenRef so any late raw-prefetch response is ignored.
+   */
+  const fetchFeedbackForApprovedTranscript = useCallback((approvedTranscript: string) => {
+    const ctx = reviewContextRef.current
+    if (!interviewId || !ctx) return
+
+    reviewFetchGenRef.current += 1
+    const gen = reviewFetchGenRef.current
+    setReviewStructured(null)
+    reviewStructuredRef.current = null
+    setReviewStructuredLoading(true)
+    setReviewScore(null)
+    setReviewScoreLoading(true)
+
+    fetch('/api/interview/script/auto-structure', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        interviewId,
+        turnIndex: ctx.turnIndex,
+        rawTranscript: approvedTranscript,
+        displayQuestion: ctx.displayQuestion,
+        targetRole: interviewRef.current?.role ?? '',
+        scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
+        ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
+      }),
+      signal: AbortSignal.timeout(22_000),
+    })
+      .then(async (res) => {
+        if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+        if (!res.ok) throw new Error(`auto-structure ${res.status}`)
+        const data = (await res.json()) as { structuredAnswer: StructuredAnswer }
+        const sa = data.structuredAnswer
+        reviewStructuredRef.current = sa
+        setReviewStructured(sa)
+        setReviewStructuredLoading(false)
+      })
+      .catch(() => {
+        if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+        setReviewStructuredLoading(false)
+      })
+
+    // Edited transcript is no longer STT ground truth — omit sttMinConfidence.
+    fetch('/api/interview/script/answer-score', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        interviewId,
+        turnIndex: ctx.turnIndex,
+        transcript: approvedTranscript,
+        displayQuestion: ctx.displayQuestion,
+        targetRole: interviewRef.current?.role ?? '',
+        ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
+      }),
+      signal: AbortSignal.timeout(40_000),
+    })
+      .then(async (res) => {
+        if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+        if (!res.ok) throw new Error(`answer-score ${res.status}`)
+        const data = (await res.json()) as { score: AnswerScore }
+        setReviewScore(data.score)
+        setReviewScoreLoading(false)
+      })
+      .catch(() => {
+        if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+        setReviewScoreLoading(false)
+      })
+  }, [interviewId])
 
   const handleSubmit = useCallback(() => {
     if (!answerText.trim()) return
@@ -950,15 +1432,63 @@ export default function ScriptInterviewPage() {
     }
   }, [router])
 
-  // iOS Safari unlock CTA — the tap itself is the user gesture that unlocks
-  // the shared AudioContext; only after that does the first turn (and its TTS)
-  // fire. Mirrors v1's handleUnlockAudioGesture flow.
+  // iOS Safari unlock CTA — tap unlocks AudioContext, then runs turn ∥ mic warm.
   const handleUnlockAudio = useCallback(() => {
     interviewAudioRef.current.unlock()
-    if (!bootCalledRef.current) {
-      bootCalledRef.current = true
-      void loadTurnRef.current({ lastAnswer: '[NONE]' })
-    }
+    if (bootCalledRef.current) return
+    bootCalledRef.current = true
+
+    const prep = prepControllerRef.current
+    prep?.setTrack('turn', 'running')
+    prep?.setTrack('mic', 'running')
+    setUiPhase('loading')
+    setErrorMessage(null)
+
+    void (async () => {
+      try {
+        const [micResult, turnResult] = await Promise.all([
+          probeMicrophoneReadiness({
+            allowGetUserMedia: false,
+            unsupported: VOICE_UNSUPPORTED_ON_THIS_BROWSER,
+          }),
+          fetchTurnPayloadRef.current({ lastAnswer: '[NONE]' }),
+        ])
+        if (!mountedRef.current) return
+
+        prep?.setMicDetail(micResult.detail)
+        if (micResult.status === 'ready') {
+          prep?.setTrack('mic', 'ready')
+        } else if (micResult.status === 'failed') {
+          prep?.setTrack('mic', 'failed')
+          if (
+            micResult.detail === 'denied' ||
+            micResult.detail === 'unsupported' ||
+            VOICE_UNSUPPORTED_ON_THIS_BROWSER
+          ) {
+            setMicFallback(true)
+            setMicFallbackKind(micResult.detail === 'denied' ? 'permission_denied' : 'unsupported')
+          }
+        } else {
+          prep?.setTrack('mic', 'skipped')
+        }
+
+        prep?.setTrack('turn', 'ready')
+        await applyTurnPayloadRef.current(turnResult)
+      } catch (err) {
+        if (!mountedRef.current) return
+        prep?.setTrack('turn', 'failed', {
+          error: err instanceof Error ? err.message : 'turn_failed',
+        })
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Something went wrong. Please try again.',
+        )
+        bootCalledRef.current = false
+        retryRef.current = () => {
+          bootCalledRef.current = true
+          void loadTurnRef.current({ lastAnswer: '[NONE]' })
+        }
+      }
+    })()
   }, [])
 
   // ── Derived display values ───────────────────────────────────────────────────
@@ -1103,11 +1633,11 @@ export default function ScriptInterviewPage() {
   // mic…") because only the answer box handled the non-connecting/non-connected
   // states explicitly. Both now read this one label.
   const micStatusLabel: string = micFallback
-    ? 'Voice unavailable — type your answer'
+    ? micFallbackMessageForKind(micFallbackKind)
     : dgVoiceUiState === 'connected'
       ? "Mic is live — start answering using your voice, or type below."
       : dgVoiceUiState === 'connecting'
-        ? (!firstMicConnectedRef.current ? 'Getting ready…' : 'Connecting microphone…')
+        ? (!firstMicConnected ? 'Getting ready…' : 'Connecting microphone…')
         : dgVoiceUiState === 'reconnecting'
           ? 'Reconnecting…'
           : dgVoiceUiState === 'retrying' || dgVoiceUiState === 'rate_limited'
@@ -1128,6 +1658,7 @@ export default function ScriptInterviewPage() {
           : uiPhase === 'turn_ready' && elIsPlaying ? 'Interviewer is speaking'
           : uiPhase === 'candidate_answering' ? 'Answer the question'
           : uiPhase === 'submitting' ? 'Submitting your answer'
+          : uiPhase === 'review' ? 'Reviewing your answer'
           : uiPhase === 'completed' ? 'Interview complete'
           : ''}
       </p>
@@ -1283,7 +1814,7 @@ export default function ScriptInterviewPage() {
                   it's still the very first turn — prevents the old spinner from
                   flashing in as a second, visually-different loading state right
                   after this screen. */}
-              {(uiPhase === 'loading' || (uiPhase === 'turn_loading' && !firstTurnShownRef.current)) && (
+              {(uiPhase === 'loading' || (uiPhase === 'turn_loading' && !firstTurnShown)) && (
                 <div className="flex h-full min-h-[300px] flex-1 items-center justify-center rounded-xl p-4"
                   style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)' }}>
                   <div className="w-full max-w-sm rounded-2xl bg-(--card-bg) p-6 shadow-lg">
@@ -1308,28 +1839,48 @@ export default function ScriptInterviewPage() {
                       </div>
                     </div>
 
-                    {/* Animated step list */}
+                    {/* Live prep checklist — driven by SessionPrepController */}
                     <div className="mb-5 flex flex-col gap-3">
-                      {(['Reading your profile', 'Crafting your questions', 'Almost ready…'] as const).map((label, i) => {
-                        const done = loadingStep > i
-                        const active = loadingStep === i
+                      {PREP_CHECKLIST.map(({ id, label }, i) => {
+                        const status = prepSnap[id]
+                        const done = status === 'ready' || status === 'skipped'
+                        const failed = status === 'failed'
+                        const active = status === 'running' || (status === 'idle' && !done && !failed && (
+                          // Highlight the first pending track so idle isn't all blank.
+                          PREP_CHECKLIST.findIndex((row) => {
+                            const s = prepSnap[row.id]
+                            return s === 'running' || s === 'idle'
+                          }) === i
+                        ))
                         return (
-                          <div key={i} className="flex items-center gap-3">
+                          <div key={id} className="flex items-center gap-3">
                             <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold transition-colors duration-300 ${
-                              done
-                                ? 'bg-(--accent-primary) text-white'
-                                : active
-                                  ? 'border-2 border-(--accent-primary) text-(--accent-primary)'
-                                  : 'border-2 border-(--card-border) text-(--text-muted)'
+                              failed
+                                ? 'bg-red-500 text-white'
+                                : done
+                                  ? 'bg-(--accent-primary) text-white'
+                                  : active
+                                    ? 'border-2 border-(--accent-primary) text-(--accent-primary)'
+                                    : 'border-2 border-(--card-border) text-(--text-muted)'
                             }`}>
-                              {done ? '✓' : i + 1}
+                              {failed ? '!' : done ? '✓' : i + 1}
                             </span>
                             <span className={`text-sm transition-colors duration-300 ${
-                              done || active ? 'font-medium text-(--text-primary)' : 'text-(--text-muted)'
+                              failed
+                                ? 'font-medium text-red-600'
+                                : done || active
+                                  ? 'font-medium text-(--text-primary)'
+                                  : 'text-(--text-muted)'
                             }`}>
-                              {label}
+                              {id === 'mic' && status === 'failed' && prepSnap.micDetail === 'denied'
+                                ? 'Microphone blocked — typing is ready'
+                                : id === 'mic' && status === 'failed' && prepSnap.micDetail === 'unsupported'
+                                  ? 'Voice unavailable on this browser'
+                                  : id === 'mic' && status === 'ready'
+                                    ? 'Microphone ready'
+                                    : label}
                             </span>
-                            {active && (
+                            {active && !done && !failed && (
                               <span className={`ml-auto h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-(--card-border) border-t-(--accent-primary)`} />
                             )}
                           </div>
@@ -1338,22 +1889,28 @@ export default function ScriptInterviewPage() {
                     </div>
 
                     <p className="text-center text-[11px] text-(--text-muted)">
-                      Usually ready in 5–10 seconds — stay on this page.
+                      {prepSnap.profile === 'ready' && prepSnap.turn === 'running'
+                        ? 'Building your first question from the script…'
+                        : prepSnap.mic === 'running'
+                          ? 'Warming mic while questions prepare…'
+                          : 'Usually ready in a few seconds — stay on this page.'}
                     </p>
                   </div>
                 </div>
               )}
 
               {/* ── TURN LOADING — simple spinner (subsequent turns only) ── */}
-              {uiPhase === 'turn_loading' && firstTurnShownRef.current && (
+              {uiPhase === 'turn_loading' && firstTurnShown && (
                 <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 text-(--text-secondary)">
                   <span className={`${IE_SPINNER_LG_CLASS} rounded-full border-2 border-(--card-border) border-t-(--accent-primary)`} />
                   <p className="text-sm">Loading…</p>
                 </div>
               )}
 
-              {/* ── INTERVIEWER SPEAKING (turn_ready with TTS playing) ── */}
-              {uiPhase === 'turn_ready' && elIsPlaying && (
+              {/* ── INTERVIEWER SPEAKING / turn ready ── */}
+              {/* Show question text as soon as the turn is applied — do NOT wait
+                  for TTS isPlaying (that gap was the blank white screen after Continue). */}
+              {uiPhase === 'turn_ready' && (
                 <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
                   <div className="flex shrink-0 items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5 shrink-0">
@@ -1361,15 +1918,23 @@ export default function ScriptInterviewPage() {
                       <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-(--accent-primary)" />
                     </span>
                     <span className="text-xs font-semibold uppercase tracking-widest text-(--text-secondary)">
-                      {interviewer?.name ?? 'Priya'} is speaking
+                      {elIsPlaying
+                        ? `${interviewer?.name ?? 'Priya'} is speaking`
+                        : `${interviewer?.name ?? 'Priya'} is starting…`}
                     </span>
                   </div>
 
                   {currentTurn?.speech && (
-                    <CaptionDisplay
-                      fullText={currentTurn.speech}
-                      currentWordIndex={captionWordIndex}
-                    />
+                    elIsPlaying ? (
+                      <CaptionDisplay
+                        fullText={currentTurn.speech}
+                        currentWordIndex={captionWordIndex}
+                      />
+                    ) : (
+                      <p className="min-h-0 flex-1 overflow-y-auto text-base leading-relaxed text-(--text-primary) sm:text-lg">
+                        {currentTurn.speech}
+                      </p>
+                    )
                   )}
 
                   <p className="shrink-0 text-center text-[11px] text-(--text-muted)">
@@ -1484,7 +2049,7 @@ export default function ScriptInterviewPage() {
                   {!micFallback ? (
                     <div className="flex min-h-0 flex-1 flex-col gap-2">
                       <div className="flex min-h-0 flex-col w-full rounded-xl border border-(--card-border) bg-(--bg-secondary) px-4 py-3.5"
-                        style={{ flex: dgVoiceUiState === 'retrying' || dgVoiceUiState === 'rate_limited' ? '0 0 auto' : '1 1 0', minHeight: 80 }}>
+                        style={{ flex: dgVoiceUiState === 'retrying' || dgVoiceUiState === 'rate_limited' ? '0 0 auto' : '1 1 0', minHeight: 120 }}>
                         <div className="mb-2 flex shrink-0 items-baseline justify-between gap-2">
                           <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
                             {dgListening ? 'Live transcript' : 'Your answer'}
@@ -1497,9 +2062,10 @@ export default function ScriptInterviewPage() {
                           )}
                         </div>
                         <div
+                          ref={liveTranscriptScrollRef}
                           data-clarity-mask="true"
-                          className="touch-pan-y overflow-y-auto"
-                          style={{ maxHeight: 120, WebkitOverflowScrolling: 'touch' }}
+                          className="min-h-0 flex-1 touch-pan-y overflow-y-auto"
+                          style={{ WebkitOverflowScrolling: 'touch' }}
                         >
                           {dgTranscript || dgInterim ? (
                             <p className="text-sm leading-relaxed text-(--text-primary)">
@@ -1600,7 +2166,7 @@ export default function ScriptInterviewPage() {
                     <p className="max-w-md text-base text-(--text-secondary)">{currentTurn.speech}</p>
                   )}
                   <Link
-                    href={`/report/${interviewId}`}
+                    href={`/report/script/${interviewId}`}
                     className="mt-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
                     style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
                   >
@@ -1781,143 +2347,248 @@ export default function ScriptInterviewPage() {
         </div>
       </div>
 
-      {/* ── REVIEW POPUP ── */}
+      {/* ── FULL-WINDOW REVIEW: step 1 transcript → step 2 coaching + score ── */}
       {reviewOpen && (() => {
         const wordCount = editedRaw.trim().split(/\s+/).filter(Boolean).length
+        const coachName = interviewer?.name ?? 'Priya'
+        const coaching = reviewStructured?.coaching_reference
+        const coachFeedback =
+          coaching?.feedback?.trim() ||
+          (reviewStructured && !reviewStructuredLoading
+            ? 'Solid answer. Keep the same clarity on the next question.'
+            : '')
+        const missingSummary =
+          coaching && coaching.missing_elements.length > 0
+            ? `Next time, add: ${coaching.missing_elements.join(' · ')}`
+            : null
+
+        const approveTranscript = () => {
+          const approved = editedRaw
+          const original = reviewRawAnswerRef.current
+          // Coaching + score must reflect what the candidate actually approved.
+          // Unchanged → reuse step-1 prefetch. Edited / STT-accepts → re-fetch.
+          if (approved.trim() !== original.trim()) {
+            fetchFeedbackForApprovedTranscript(approved)
+          }
+          // Overlap next-question LLM with feedback reading time.
+          startNextTurnPrefetch(approved)
+          setReviewStep('feedback')
+        }
+
+        const continueAfterFeedback = () => {
+          if (continuingFromReview) return
+          setContinuingFromReview(true)
+
+          // Keep the feedback overlay up until the next turn is in hand and
+          // applied — closing first was painting a blank main pane (uiPhase
+          // was still 'review' / turn_ready without TTS).
+          void (async () => {
+            const nextPhase = reviewNextPhaseRef.current
+            const resolve = reviewResolveRef.current
+
+            try {
+              // Ensure prefetch exists (Approve should have started it).
+              if (!nextTurnPrefetchRef.current) {
+                startNextTurnPrefetch(editedRaw)
+              }
+              const prefetch = nextTurnPrefetchRef.current
+              let data: TurnApiResponse | null = null
+              if (prefetch) {
+                try {
+                  data = prefetch.result ?? (await prefetch.promise)
+                } catch {
+                  data = null
+                }
+                nextTurnPrefetchRef.current = null
+                setNextTurnPrefetchReady(false)
+              }
+
+              if (data && nextPhase) {
+                reviewResolveRef.current = null
+                currentPhaseRef.current = nextPhase
+                clearAutoTimer()
+                setAnswerText('')
+                setErrorMessage(null)
+                // Apply BEFORE closing overlay so the first paint after close
+                // already has currentTurn + turn_ready content.
+                await applyTurnPayloadRef.current(data)
+                if (!mountedRef.current) return
+                setReviewOpen(false)
+                setReviewStep('transcript')
+                return
+              }
+
+              // Prefetch missing/failed — fall back to normal loadTurn path.
+              reviewResolveRef.current = null
+              setReviewOpen(false)
+              setReviewStep('transcript')
+              setNextTurnPrefetchReady(false)
+              resolve?.('raw', editedRaw)
+            } catch {
+              if (!mountedRef.current) return
+              reviewResolveRef.current = null
+              setReviewOpen(false)
+              setReviewStep('transcript')
+              setNextTurnPrefetchReady(false)
+              resolve?.('raw', editedRaw)
+            } finally {
+              if (mountedRef.current) setContinuingFromReview(false)
+            }
+          })()
+        }
+
         return (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            className="fixed inset-0 z-50 flex flex-col bg-(--bg-primary) lg:left-[15.25rem]"
             role="dialog"
             aria-modal="true"
             aria-labelledby="review-popup-title"
           >
-            <div className="relative flex w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-(--card-bg) shadow-2xl" style={{ height: '90dvh' }}>
-              {/* Header */}
-              <div className="shrink-0 border-b border-(--card-border) px-6 py-4">
-                <h2 id="review-popup-title" className="text-base font-semibold text-(--text-primary)">
-                  Review your answer
-                </h2>
-                <p className="mt-0.5 text-sm text-(--text-secondary)">
-                  Edit your answer or use the structured version — then choose which to submit.
-                </p>
-              </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 sm:gap-3 sm:p-5 lg:overflow-hidden">
+              <h2
+                id="review-popup-title"
+                className="shrink-0 text-center text-sm font-bold tracking-wide text-(--accent-primary) sm:text-base"
+              >
+                {reviewStep === 'transcript' ? 'Review transcript' : 'Feedback on your answer'}
+              </h2>
 
-              {/* Two panels side by side */}
-              <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden sm:flex-row sm:divide-x sm:divide-(--card-border)">
-                {/* Left — editable transcript */}
-                <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-5 sm:p-6">
+              {reviewStep === 'transcript' ? (
+                <section className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col overflow-hidden rounded-2xl border border-(--card-border) bg-(--card-bg) p-4 sm:p-5">
                   <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                    Your answer <span className="ml-2 normal-case font-normal">(you can edit)</span>
+                    Your answer{' '}
+                    <span className="ml-2 normal-case font-normal">
+                      (tap highlighted words to fix STT · ¶ break for paragraphs · or click to edit)
+                    </span>
                   </p>
-                  <textarea
-                    data-clarity-mask="true"
+                  <ReviewAnswerHighlightEditor
                     value={editedRaw}
-                    onChange={(e) => setEditedRaw(e.target.value)}
-                    placeholder="Your captured answer — you can edit before submitting"
-                    className="w-full flex-1 resize-none border-0 bg-transparent p-0 text-sm leading-relaxed text-(--text-primary) outline-none placeholder:text-(--text-muted)"
-                    style={{ minHeight: 0 }}
+                    onChange={setEditedRaw}
+                    correctedTranscript={
+                      reviewStructuredLoading ? null : (reviewStructured?.corrected_transcript ?? null)
+                    }
+                    placeholder="Your captured answer"
                     autoFocus
                   />
-                  <p className="mt-2 shrink-0 text-[11px] text-(--text-muted)">
-                    {wordCount > 0 ? `${wordCount} words` : 'No answer captured'}
-                  </p>
-                </div>
-
-                {/* Right — structured version */}
-                <div className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden p-5 sm:p-6">
-                  <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                    Structured version
-                  </p>
-                  <div
-                    data-clarity-mask="true"
-                    className="min-h-0 flex-1 touch-pan-y overflow-y-auto"
-                    style={{ WebkitOverflowScrolling: 'touch' }}
-                  >
-                    {reviewStructuredLoading ? (
-                      <div className="flex animate-pulse flex-col gap-2.5 pt-1">
-                        <div className="h-3 w-3/4 rounded bg-(--bg-tertiary)" />
-                        <div className="h-3 w-full rounded bg-(--bg-tertiary)" />
-                        <div className="h-3 w-5/6 rounded bg-(--bg-tertiary)" />
-                        <div className="h-3 w-2/3 rounded bg-(--bg-tertiary)" />
-                        <div className="mt-1 h-3 w-full rounded bg-(--bg-tertiary)" />
-                        <div className="h-3 w-4/5 rounded bg-(--bg-tertiary)" />
-                      </div>
-                    ) : reviewStructured ? (
-                      <div className="flex flex-col gap-4 text-sm">
-                        {reviewStructured.structured_points.length > 0 && (
-                          <div className="flex flex-col gap-2.5">
-                            {reviewStructured.structured_points.map((pt, i) => (
-                              <p key={i} className="leading-relaxed text-(--text-primary)">
-                                {pt}
-                              </p>
-                            ))}
+                  <div className="mt-3 flex shrink-0 flex-col gap-2 border-t border-(--card-border)/60 pt-3">
+                    <p className="text-[11px] text-(--text-muted)">
+                      {wordCount > 0 ? `${wordCount} words` : 'No answer captured'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={approveTranscript}
+                      disabled={wordCount === 0}
+                      className={`flex min-h-[48px] w-full touch-manipulation items-center justify-center rounded-xl bg-(--accent-primary) px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${IE_FOCUS_VISIBLE}`}
+                    >
+                      Approve answer
+                    </button>
+                  </div>
+                </section>
+              ) : (
+                <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-3">
+                  {/* Side-by-side on lg+: each column keeps its own scroller. */}
+                  <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+                    <section
+                      className="flex min-h-[16rem] flex-col overflow-hidden rounded-2xl border px-4 py-3 sm:px-5 lg:min-h-0"
+                      style={{
+                        background:
+                          'color-mix(in srgb, var(--accent-primary) 8%, var(--card-bg))',
+                        borderColor:
+                          'color-mix(in srgb, var(--accent-primary) 28%, var(--card-border))',
+                      }}
+                      aria-live="polite"
+                    >
+                      <p className="mb-1 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-(--accent-primary)">
+                        How you could strengthen this
+                      </p>
+                      <p className="mb-3 shrink-0 text-[11px] text-(--text-muted)">
+                        Coaching only — based on the answer you just approved. Not submitted as your answer.
+                      </p>
+                      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+                        {reviewStructuredLoading ? (
+                          <div className="flex animate-pulse flex-col gap-2">
+                            <div className="h-3 w-full rounded bg-(--bg-tertiary)" />
+                            <div className="h-3 w-4/5 rounded bg-(--bg-tertiary)" />
+                            <div className="h-3 w-3/5 rounded bg-(--bg-tertiary)" />
                           </div>
-                        )}
-                        {reviewStructured.technical_terms.length > 0 && (
-                          <div className="border-t border-(--card-border)/60 pt-3">
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">Key terms</p>
-                            <div className="flex flex-col gap-1.5">
-                              {reviewStructured.technical_terms.map((tt, i) => (
-                                <p key={i} className="text-[12px] text-(--text-secondary)">
-                                  <span className="font-semibold text-(--text-primary)">{tt.term}</span>
-                                  {tt.pronunciation && (
-                                    <span className="text-(--text-muted)"> ({tt.pronunciation})</span>
-                                  )}
-                                  {' — '}{tt.definition}
+                        ) : coaching ? (
+                          <div className="flex gap-3">
+                            <div
+                              className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-(--accent-primary)/20 text-xs font-bold text-(--accent-primary)"
+                              aria-hidden
+                            >
+                              {coachName.charAt(0)}
+                            </div>
+                            <div className="min-w-0 flex-1 space-y-3">
+                              {coachFeedback && (
+                                <p className="text-sm leading-snug text-(--text-primary) sm:text-[15px]">
+                                  {coachFeedback}
                                 </p>
-                              ))}
+                              )}
+                              {missingSummary && (
+                                <p className="text-[12px] leading-snug text-(--text-secondary)">
+                                  <span className="text-(--accent-warning)">⚠</span> {missingSummary}
+                                </p>
+                              )}
+                              {coaching.restructured_example.length > 0 && (
+                                <div className="rounded-xl border border-(--card-border)/70 bg-(--card-bg)/70 p-3">
+                                  <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                                    Stronger example (reference)
+                                  </p>
+                                  <div className="flex flex-col gap-1.5">
+                                    {coaching.restructured_example.map((line, i) => (
+                                      <p key={i} className="text-[13px] leading-relaxed text-(--text-secondary)">
+                                        {line}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {coaching.technical_terms.length > 0 && (
+                                <div>
+                                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                                    Key terms
+                                  </p>
+                                  <div className="flex flex-col gap-1">
+                                    {coaching.technical_terms.map((tt, i) => (
+                                      <p key={i} className="text-[12px] text-(--text-secondary)">
+                                        <span className="font-semibold text-(--text-primary)">{tt.term}</span>
+                                        {tt.pronunciation && (
+                                          <span className="text-(--text-muted)"> ({tt.pronunciation})</span>
+                                        )}
+                                        {' — '}
+                                        {tt.definition}
+                                      </p>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
-                        {reviewStructured.missing_elements.length > 0 && (
-                          <div className="border-t border-(--card-border)/60 pt-3">
-                            <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">Could be stronger</p>
-                            <ul className="flex flex-col gap-1">
-                              {reviewStructured.missing_elements.map((m, i) => (
-                                <li key={i} className="flex items-start gap-1.5 text-[12px] text-(--text-secondary)">
-                                  <span className="shrink-0 text-(--accent-warning)">⚠</span>
-                                  <span>{m}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
+                        ) : (
+                          <p className="text-sm text-(--text-muted)">Coaching unavailable for this turn.</p>
                         )}
                       </div>
-                    ) : (
-                      <p className="text-sm text-(--text-muted)">Structuring unavailable</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+                    </section>
 
-              {/* Footer */}
-              <div className="flex shrink-0 flex-col gap-2 border-t border-(--card-border) px-5 py-4 sm:flex-row sm:justify-end sm:px-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const resolve = reviewResolveRef.current
-                    reviewResolveRef.current = null
-                    setReviewOpen(false)
-                    resolve?.('raw', editedRaw)
-                  }}
-                  className={`flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl border border-(--card-border) bg-(--bg-secondary) px-5 py-2.5 text-sm font-semibold text-(--text-primary) transition-colors hover:bg-(--bg-tertiary) ${IE_FOCUS_VISIBLE}`}
-                >
-                  Keep my answer
-                </button>
-                <button
-                  type="button"
-                  disabled={reviewStructuredLoading || !reviewStructured || reviewStructured.structured_points.length === 0}
-                  onClick={() => {
-                    const resolve = reviewResolveRef.current
-                    reviewResolveRef.current = null
-                    setReviewOpen(false)
-                    resolve?.('structured')
-                  }}
-                  className={`flex min-h-[44px] touch-manipulation items-center justify-center rounded-xl bg-(--accent-primary) px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40 ${IE_FOCUS_VISIBLE}`}
-                >
-                  {reviewStructuredLoading ? 'Structuring…' : 'Use structured answer'}
-                </button>
-              </div>
+                    <div className="flex min-h-[16rem] flex-col overflow-hidden lg:min-h-0">
+                      <AnswerScoreCard score={reviewScore} loading={reviewScoreLoading} />
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={continueAfterFeedback}
+                    disabled={continuingFromReview}
+                    className={`flex min-h-[48px] w-full shrink-0 touch-manipulation items-center justify-center rounded-xl bg-(--accent-primary) px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-wait disabled:opacity-80 ${IE_FOCUS_VISIBLE}`}
+                  >
+                    {continuingFromReview
+                      ? 'Opening next question…'
+                      : nextTurnPrefetchReady
+                        ? 'Continue to next question'
+                        : 'Continue · preparing next…'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )

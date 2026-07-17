@@ -47,3 +47,15 @@ export function getBaseUrl(): string {
 
   return 'https://interviewera.com';
 }
+
+/**
+ * Base URL for links inside transactional email (Resend).
+ * Always production — never localhost, never a Vercel preview hostname.
+ */
+export function getEmailAppUrl(): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
+  if (appUrl && !isLocalhostUrl(appUrl)) {
+    return appUrl;
+  }
+  return 'https://interviewera.com';
+}

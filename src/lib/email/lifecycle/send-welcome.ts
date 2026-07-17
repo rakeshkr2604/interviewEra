@@ -1,5 +1,5 @@
 import { createServiceClient } from '@/lib/supabase/server';
-import { getBaseUrl } from '@/lib/server/get-base-url';
+import { getEmailAppUrl } from '@/lib/server/get-base-url';
 import { sendLifecycleTemplate } from './send-template';
 
 const LOG_PREFIX = '[welcome-email]';
@@ -54,7 +54,7 @@ export async function sendWelcomeEmailIfNeeded(userId: string): Promise<SendWelc
     (typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()) ||
     'there';
 
-  const baseUrl = getBaseUrl();
+  const baseUrl = getEmailAppUrl();
   const dashboardUrl = `${baseUrl}/dashboard`;
 
   return sendLifecycleTemplate({

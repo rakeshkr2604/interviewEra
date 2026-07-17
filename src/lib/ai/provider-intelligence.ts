@@ -126,6 +126,10 @@ const OPERATION_CLASSES: Record<string, RequestClass> = {
   jd_validate:          'lightweight_parse',
   document_classify:    'lightweight_parse',
   question_generation:  'lightweight_parse',
+  script_turn_generation: 'realtime_critical',
+  auto_structure:       'lightweight_parse',
+  answer_score:         'structured_evaluation',
+  script_report_synthesis: 'batch_analysis',
   free_tool:            'lightweight_parse',
 };
 

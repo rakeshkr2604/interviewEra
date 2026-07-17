@@ -46,6 +46,7 @@ export default async function DashboardPage() {
         status,
         completed_at,
         started_at,
+        engine,
         reports (
           id,
           overall_score,
@@ -102,15 +103,44 @@ export default async function DashboardPage() {
     console.error('dashboard user_progress fetch', progressErr.message)
   }
 
-  const rows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const baseRows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const recentIds = baseRows.map((r) => r.id)
+  const { data: scriptReportsRaw } =
+    recentIds.length > 0
+      ? await supabase
+          .from('script_interview_reports')
+          .select('id, interview_id, overall, generated_at, status')
+          .in('interview_id', recentIds)
+      : { data: [] as { id: string; interview_id: string; overall: number | null; generated_at: string | null; status: string }[] }
+
+  const scriptByInterview = new Map<string, InterviewWithReportsRow['script_interview_reports']>()
+  for (const r of scriptReportsRaw ?? []) {
+    const list = scriptByInterview.get(r.interview_id as string) ?? []
+    list.push({
+      id: r.id as string,
+      overall: r.overall as number | null,
+      generated_at: r.generated_at as string | null,
+      status: r.status as string,
+    })
+    scriptByInterview.set(r.interview_id as string, list)
+  }
+
+  const rows: InterviewWithReportsRow[] = baseRows.map((row) => ({
+    ...row,
+    script_interview_reports: scriptByInterview.get(row.id) ?? [],
+  }))
   const completedCount = completedCountTotal ?? 0
-  const reports = rows.flatMap((i) =>
-    i.status === 'completed'
-      ? (i.reports ?? []).map((r) => ({
-          overall_score: r.overall_score,
-        }))
-      : [],
-  )
+  const reports = rows.flatMap((i) => {
+    if (i.status !== 'completed') return []
+    if (i.engine === 'v2.1') {
+      return (i.script_interview_reports ?? [])
+        .filter((r) => (r.status === 'ready' || r.status === 'partial') && r.overall != null)
+        .map((r) => ({ overall_score: Number(r.overall) }))
+    }
+    return (i.reports ?? []).map((r) => ({
+      overall_score: r.overall_score,
+    }))
+  })
   const avgScore =
     reports.length > 0
       ? (reports.reduce((s, r) => s + (r.overall_score || 0), 0) / reports.length).toFixed(1)

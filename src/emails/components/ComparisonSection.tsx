@@ -9,17 +9,24 @@ interface ComparisonSectionProps {
     problemSolving: number;
     structure: number;
   };
+  labels?: {
+    communication: string;
+    technical: string;
+    confidence: string;
+    problemSolving: string;
+    structure: string;
+  };
   role: string;
   style?: React.CSSProperties;
 }
 
-export function ComparisonSection({ scores, role, style }: ComparisonSectionProps) {
+export function ComparisonSection({ scores, labels, role, style }: ComparisonSectionProps) {
   const categories = [
-    { label: 'Communication', score: scores.communication },
-    { label: 'Technical Depth', score: scores.technical },
-    { label: 'Confidence', score: scores.confidence },
-    { label: 'Problem Solving', score: scores.problemSolving },
-    { label: 'Answer Structure', score: scores.structure },
+    { label: labels?.communication ?? 'Communication', score: scores.communication },
+    { label: labels?.technical ?? 'Technical Depth', score: scores.technical },
+    { label: labels?.confidence ?? 'Confidence', score: scores.confidence },
+    { label: labels?.problemSolving ?? 'Problem Solving', score: scores.problemSolving },
+    { label: labels?.structure ?? 'Answer Structure', score: scores.structure },
   ];
 
   return (

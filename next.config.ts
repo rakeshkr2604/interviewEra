@@ -16,6 +16,11 @@ function pdfTraceGlobs(): string[] {
     "./node_modules/pdf-parse/**",
   ];
 }
+
+/** v2.1 script engine prompts — must ship into serverless /var/task (NFT). */
+function scriptEngineTraceGlobs(): string[] {
+  return ["./src/lib/ai/scripts/*.md"];
+}
 const nextConfig: NextConfig = {
   devIndicators: {
     position: 'bottom-right',
@@ -51,10 +56,13 @@ const nextConfig: NextConfig = {
   // bundle that needs them. `'/**'` plus explicit route IDs reduces risk of Next
   // picomatch drift per deployment (ATS server action vs API routes).
   outputFileTracingIncludes: {
-    '/**': pdfTraceGlobs(),
+    '/**': [...pdfTraceGlobs(), ...scriptEngineTraceGlobs()],
     '/tools/ats-checker': pdfTraceGlobs(),
     '/api/resume/upload': pdfTraceGlobs(),
     '/api/job-description/extract': pdfTraceGlobs(),
+    '/api/interview/script/turn': scriptEngineTraceGlobs(),
+    '/api/interview/script/auto-structure': scriptEngineTraceGlobs(),
+    '/api/interview/script/start': scriptEngineTraceGlobs(),
   },
   // Performance
   compress: true,

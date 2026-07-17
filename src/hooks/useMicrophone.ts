@@ -84,7 +84,10 @@ export function useMicrophone(
   const [isRecording, setIsRecording] = useState(false);
   const cleanupRef = useRef<CleanupFn | null>(null);
   const startInFlightRef = useRef<boolean>(false);
+  // Keep true during render so Strict Mode's mount→cleanup→remount gap cannot
+  // leave this false while an in-flight acquire resolves (false "unmounted" abort).
   const mountedRef = useRef<boolean>(true);
+  mountedRef.current = true;
   const visibilityHandlerRef = useRef<(() => void) | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const onCaptureLostRef = useRef(options?.onCaptureLost);
@@ -174,6 +177,11 @@ export function useMicrophone(
           })),
         });
 
+        if (!mountedRef.current) {
+          // Yield once — Strict Mode remount sets mounted=true on the next render
+          // between cleanup and remount; without this yield we false-positive abort.
+          await Promise.resolve();
+        }
         if (!mountedRef.current) {
           micCaptureCoordinator.release('pcm');
           startInFlightRef.current = false;
@@ -278,13 +286,11 @@ export function useMicrophone(
     [stopRecording, removeVisibilityHandler, interviewId],
   );
 
-  // StrictMode remount fix — mirror useSpeechRecognition / useVoicePlayer.
+  // StrictMode remount: cleanup sets mountedRef false; reset true on every
+  // render (above) + remount effect so async acquire cannot permanently brick voice.
   useEffect(() => {
     mountedRef.current = true;
     voiceDebug('mount_flag_reset', { source: 'useMicrophone_mount' });
-  }, []);
-
-  useEffect(() => {
     return () => {
       mountedRef.current = false;
       abortRef.current?.abort();

@@ -1,8 +1,13 @@
-import fs from 'fs'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 
 export type ScriptType = 'SCRIPT_H' | 'SCRIPT_T' | 'SCRIPT_M'
 
+/**
+ * Paths under process.cwd()/src/... are only available on Vercel when listed in
+ * next.config `outputFileTracingIncludes`. Without that include, /var/task has
+ * no SCRIPT_*.md and the turn route crashes with ENOENT.
+ */
 const SCRIPTS_DIR = path.join(process.cwd(), 'src/lib/ai/scripts')
 
 function loadScriptFile(filename: string): string {
@@ -13,7 +18,9 @@ function loadScriptFile(filename: string): string {
     const detail = error instanceof Error ? error.message : String(error)
     throw new Error(
       `[script-loader] Fatal config error: interview script "${filename}" could not be read at ${filePath}. ` +
-        `The v2.1 script engine cannot run without all three script files. Underlying error: ${detail}`
+        `The v2.1 script engine cannot run without all three script files. ` +
+        `If this is production, ensure next.config outputFileTracingIncludes covers ./src/lib/ai/scripts/*.md. ` +
+        `Underlying error: ${detail}`,
     )
   }
 }

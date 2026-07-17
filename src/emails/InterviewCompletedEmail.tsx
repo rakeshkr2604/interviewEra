@@ -26,6 +26,14 @@ import {
   InputRoadmapItem,
 } from './utils/helpers';
 
+export type InterviewEmailScoreLabels = {
+  communication: string;
+  technical: string;
+  confidence: string;
+  problemSolving: string;
+  structure: string;
+};
+
 export interface InterviewCompletedEmailProps {
   candidateName: string;
   overallScore: number;
@@ -36,6 +44,10 @@ export interface InterviewCompletedEmailProps {
     problemSolving: number;
     structure: number;
   };
+  /** Override ScoreCard / ComparisonSection labels (e.g. score-v1.2 for script engine). */
+  scoreLabels?: InterviewEmailScoreLabels;
+  /** When true, hide fabricated peer-percentile copy (v2.1 has no population ranks). */
+  hidePeerPercentile?: boolean;
   overallSummary?: string;
   strengths: string[];
   weaknesses: string[];
@@ -61,6 +73,14 @@ export interface InterviewCompletedEmailProps {
   streak?: number;
   highlights?: HighlightsData;
 }
+
+const DEFAULT_SCORE_LABELS: InterviewEmailScoreLabels = {
+  communication: 'Communication',
+  technical: 'Technical',
+  confidence: 'Confidence',
+  problemSolving: 'Problem Solving',
+  structure: 'Answer Structure',
+};
 
 const defaultMockData: InterviewCompletedEmailProps = {
   candidateName: 'Rakesh',
@@ -124,6 +144,8 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
     candidateName,
     overallScore,
     scores,
+    scoreLabels: scoreLabelsProp,
+    hidePeerPercentile = false,
     overallSummary,
     strengths,
     weaknesses,
@@ -138,6 +160,8 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
     streak,
     highlights,
   } = data;
+
+  const scoreLabels = { ...DEFAULT_SCORE_LABELS, ...scoreLabelsProp };
 
   const greeting = candidateName && candidateName.toLowerCase() !== 'there'
     ? `Hi ${candidateName} 👋`
@@ -156,7 +180,21 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
     recommendation: { title: 'Practice Next', description: 'Complete a tailored mock track.' },
   });
 
-  const scoreInsights = calculateScoreInsights(scores);
+  const scoreInsightsRaw = calculateScoreInsights(scores);
+  const scoreInsights = {
+    strongest: {
+      ...scoreInsightsRaw.strongest,
+      name:
+        scoreLabels[scoreInsightsRaw.strongest.key as keyof typeof scoreLabels] ||
+        scoreInsightsRaw.strongest.name,
+    },
+    weakest: {
+      ...scoreInsightsRaw.weakest,
+      name:
+        scoreLabels[scoreInsightsRaw.weakest.key as keyof typeof scoreLabels] ||
+        scoreInsightsRaw.weakest.name,
+    },
+  };
   const badgeName = generateAchievementBadge(scores);
   const readiness = calculateHiringReadiness(overallScore);
   const coachNote = aiCoachNotes || generateCoachingNote(scores);
@@ -302,14 +340,25 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
           }}>
             🏅 {badgeName}
           </span>
-          <p style={{
-            fontSize: '11px',
-            color: '#71717a',
-            margin: '6px 0 0 0',
-            fontWeight: '600',
-          }} className="text-secondary">
-            Top {calculatePercentile(scoreInsights.strongest.score)}% among candidates practicing this role.
-          </p>
+          {!hidePeerPercentile ? (
+            <p style={{
+              fontSize: '11px',
+              color: '#71717a',
+              margin: '6px 0 0 0',
+              fontWeight: '600',
+            }} className="text-secondary">
+              Top {calculatePercentile(scoreInsights.strongest.score)}% among candidates practicing this role.
+            </p>
+          ) : (
+            <p style={{
+              fontSize: '11px',
+              color: '#71717a',
+              margin: '6px 0 0 0',
+              fontWeight: '600',
+            }} className="text-secondary">
+              Session-scoped score-v1.2 — not a peer percentile.
+            </p>
+          )}
         </div>
       </div>
 
@@ -371,7 +420,7 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
       />
 
       {/* Score Comparison Section */}
-      <ComparisonSection scores={scores} role={stats.role} />
+      <ComparisonSection scores={scores} labels={scoreLabels} role={stats.role} />
 
       {/* Score Breakdowns */}
       <div style={{ margin: '28px 0' }}>
@@ -389,11 +438,11 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
           Breakdown Scores
         </h3>
         <div style={{ textAlign: 'center', margin: '0 -6px' }}>
-          <ScoreCard label="Communication" score={scores.communication} />
-          <ScoreCard label="Technical" score={scores.technical} />
-          <ScoreCard label="Confidence" score={scores.confidence} />
-          <ScoreCard label="Problem Solving" score={scores.problemSolving} />
-          <ScoreCard label="Structure" score={scores.structure} />
+          <ScoreCard label={scoreLabels.communication} score={scores.communication} />
+          <ScoreCard label={scoreLabels.technical} score={scores.technical} />
+          <ScoreCard label={scoreLabels.confidence} score={scores.confidence} />
+          <ScoreCard label={scoreLabels.problemSolving} score={scores.problemSolving} />
+          <ScoreCard label={scoreLabels.structure} score={scores.structure} />
         </div>
       </div>
 

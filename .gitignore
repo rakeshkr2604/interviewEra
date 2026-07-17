@@ -63,11 +63,27 @@ CLAUDE*.md
 *_STRATEGY.md
 *_AUDIT.md
 
-# Temporary / debug scratch docs
+# Temporary / debug scratch docs (directories)
 notes/
 scratch/
 temp/
 drafts/
+
+# Root-level local scratch markdown — keep on disk, never push.
+# Tracked durable root docs (do NOT add these patterns for them):
+#   README.md, CLAUDE.md, TECH_DEBT.md, MASTER_ENGINEERING_ROADMAP.md,
+#   PAYMENT_ARCHITECTURE.md, DEAD_CODE_REPORT.md, REPOSITORY_CONFIDENCE_PROGRAM.md,
+#   PRE_DEPLOY_SEO_CHECKLIST.md
+# Prefer putting new personal/session notes under notes/ or scratch/, or name them
+# to match one of the patterns below so they cannot be committed by accident.
+/NOTES*.md
+/SESSION_*.md
+/CURSOR_*.md
+/WIP_*.md
+/TMP_*.md
+/*_SCRATCH.md
+/*_LOCAL.md
+/*_SESSION_NOTES.md
 
 # Local testing artifacts
 manual-test*

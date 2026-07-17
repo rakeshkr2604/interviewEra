@@ -1,25 +1,24 @@
 name: CI
 
-# Validates on every push to any branch (direct-branch iteration, Dependabot
-# pushes) AND on pull requests targeting main (so required-status-check
-# branch protection has something to bind to once enabled — see
-# docs/BRANCH_PROTECTION_SETUP.md). A branch with an open PR will trigger
-# both events on the same commit; this is accepted duplication for now
-# (see docs/ENGINEERING_PLATFORM.md Phase 9) — path filtering to reduce it
-# is a later phase, not part of this change.
+# Triggers (updated to stop PR/push double-runs on feature branches):
+# - pull_request → main: primary verification for branch work + Dependabot
+# - push → main only: post-merge safety net (squash-merge commit ≠ PR HEAD)
+# - workflow_dispatch: manual re-run
+# Direct pushes to non-main branches without an open PR no longer run CI —
+# open a PR (or dispatch) to verify. See docs/CI_CD_ARCHITECTURE.md.
 on:
   push:
     branches:
-      - '**'
+      - main
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
       - main
   workflow_dispatch:
 
-# Cancel any in-progress run on the same branch when a new commit is pushed
+# Cancel superseded runs on the same PR or branch (new push cancels in-flight)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

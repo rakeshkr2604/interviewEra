@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
+import { guardCorrectedTranscript } from '@/lib/interview/corrected-transcript-guard';
 
-const LLM_TIMEOUT_MS = 12_000;
+const LLM_TIMEOUT_MS = 22_000;
 
 const autoStructureSchema = z.object({
   interviewId: z.string().uuid(),
@@ -15,37 +16,62 @@ const autoStructureSchema = z.object({
   questionType: z.enum(['technical', 'behavioral']).optional(),
 });
 
-const AUTO_STRUCTURE_SYSTEM = `You are an expert interview coach helping candidates present their answers more clearly and professionally.
-Preserve the candidate's original facts, experiences, and claims exactly — do not add, invent, or embellish any details.
-The structured_points should flow naturally as complete sentences that a candidate would naturally say in an interview, not bullet fragments.
-For missing_elements, only list things that are genuinely absent and would realistically improve the answer — maximum 2 items.
-For technical_terms, only include terms the candidate actually used that a non-technical interviewer might not know — skip common words.
+/**
+ * Single LLM call returns BOTH:
+ *  - corrected_transcript: STT cleanup only (submittable)
+ *  - coaching_reference: read-only coaching (never submittable as the answer)
+ * Kept as one op (`auto_structure`) to avoid double latency; fields are strictly separated in the prompt.
+ * A deterministic word-diff guardrail post-processes corrected_transcript before response.
+ */
+const AUTO_STRUCTURE_SYSTEM = `You help mock-interview candidates in two separate ways. Never mix them.
+
+1) corrected_transcript — Fix ONLY clear speech-to-text garbling of technical terms / names (e.g. "super a base" → "Supabase", "react jay es" → "React.js", "next jay es" → "Next.js").
+Hard rules for corrected_transcript (violations are failures):
+- Do NOT correct grammar, verb tense, or subject-verb agreement. If the candidate said "connect" keep "connect" (not "connected"). If they said "store" keep "store" (not "stored").
+- Do NOT split or merge sentences. Preserve the candidate's original sentence boundaries and pause words (then/and/so) exactly as spoken.
+- Do NOT add, remove, or "improve" punctuation for correctness. Minimal punctuation only inside a fixed tech term (e.g. "Next.js"). Do NOT capitalize the first word of a sentence merely for correctness if the raw started lowercase.
+- Do NOT rephrase for polish, do NOT add STAR structure, do NOT invent facts, do NOT add or remove content words.
+- Only substitute the garbled span with the inferred proper term; leave every other word character-for-character the same aside from that substitution.
+
+Few-shot examples for corrected_transcript (input → output):
+Example A — keep informal tense, fix only the garble:
+  IN:  "I use super a base and connect it with my app"
+  OUT: "I use Supabase and connect it with my app"
+Example B — keep dropped grammar, fix only the garble:
+  IN:  "then I store session in redis and use next jay es"
+  OUT: "then I store session in redis and use Next.js"
+Example C — multi-word garble only; no sentence split:
+  IN:  "we used react jay es query for caching then ship it"
+  OUT: "we used React Query for caching then ship it"
+
+2) coaching_reference — Separate coaching only. May restructure into clearer interview form for LEARNING (STAR when behavioral; concept → how → trade-off when technical). feedback is a warm 2–3 sentence coach reaction. missing_elements max 2. technical_terms only for terms the candidate actually used. Put all rewriting / stronger phrasing HERE — never in corrected_transcript.
+
 Output ONLY valid JSON. Nothing else.`;
 
 const AUTO_STRUCTURE_USER = `Question asked: {displayQuestion}
 Role context: {targetRole}
 Raw transcript: {rawTranscript}
 
-Transform this answer into 3-4 clear, complete sentences that a candidate would naturally say in an interview.
-
 Output ONLY valid JSON:
 {
-  "structured_points": ["Full sentence 1.", "Full sentence 2.", "Full sentence 3."],
-  "technical_terms": [
-    { "term": "exact term", "definition": "one sentence", "pronunciation": "phonetic if non-obvious" }
-  ],
-  "missing_elements": ["Item that was genuinely absent (max 2)"]
+  "corrected_transcript": "Same answer with STT garbling fixed only — grammar/tense/sentence boundaries unchanged.",
+  "coaching_reference": {
+    "feedback": "2-3 sentence coach reaction.",
+    "restructured_example": ["Optional clearer sentences for learning — NOT the candidate's submitted answer."],
+    "technical_terms": [
+      { "term": "exact term from transcript", "definition": "one sentence", "pronunciation": "phonetic if non-obvious" }
+    ],
+    "missing_elements": ["Genuinely absent improvement (max 2)"]
+  }
 }
 
 Rules:
-- structured_points: 3-4 complete sentences. Natural interview speech. No bullet fragments.
-- Behavioral answers: STAR format woven into sentences (Situation, Action, Result).
-- Technical answers: core concept, how it works, trade-off — as full sentences.
-- technical_terms: only terms the candidate actually used that a non-technical interviewer might not know.
-- pronunciation: only if non-obvious (nginx → engine-x, kubectl → kube-control).
-- missing_elements: 0-2 items only. Only genuinely absent things that would improve the answer.
-- If transcript is empty or fewer than 10 words: return { "structured_points": [], "technical_terms": [], "missing_elements": ["No answer detected — try again"] }
-- Output ONLY JSON. Nothing else.`;
+- corrected_transcript: STT cleanup ONLY. Same grammar, tense, and sentence boundaries as raw. Empty/near-empty input (<10 words) → copy raw or empty string.
+- coaching_reference.restructured_example: 0-4 learning sentences; may restructure. Never treat as what the candidate said.
+- coaching_reference.feedback: conversational, no invented facts.
+- technical_terms: only terms present in the raw/corrected transcript.
+- missing_elements: 0-2 items.
+- Output ONLY JSON.`;
 
 function isTimeoutError(err: unknown): boolean {
   if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
@@ -54,7 +80,6 @@ function isTimeoutError(err: unknown): boolean {
   return err instanceof Error && /timeout|aborted/i.test(err.message);
 }
 
-/** LLM output may arrive fenced or with stray prose when json_object falls back to plain. */
 function parseLlmJson(content: string): unknown {
   try {
     return JSON.parse(content);
@@ -68,10 +93,122 @@ function parseLlmJson(content: string): unknown {
   }
 }
 
+type CoachingReference = {
+  feedback: string;
+  restructured_example: string[];
+  technical_terms: Array<{ term: string; definition: string; pronunciation?: string }>;
+  missing_elements: string[];
+};
+
+type NormalizedAutoStructure = {
+  corrected_transcript: string;
+  coaching_reference: CoachingReference;
+};
+
+/** Normalize new shape; also accept legacy { structured_points, feedback, ... } from older model replies. */
+function normalizeAutoStructureOutput(parsed: unknown, rawTranscript: string): NormalizedAutoStructure {
+  const fallbackFeedback =
+    'Solid answer. Keep practicing the same clarity on the next question.';
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return {
+      corrected_transcript: rawTranscript,
+      coaching_reference: {
+        feedback: fallbackFeedback,
+        restructured_example: [],
+        technical_terms: [],
+        missing_elements: [],
+      },
+    };
+  }
+
+  const row = parsed as Record<string, unknown>;
+
+  // New shape
+  if (typeof row.corrected_transcript === 'string' || row.coaching_reference) {
+    const coachingRaw =
+      row.coaching_reference && typeof row.coaching_reference === 'object' && !Array.isArray(row.coaching_reference)
+        ? (row.coaching_reference as Record<string, unknown>)
+        : {};
+
+    const restructured = Array.isArray(coachingRaw.restructured_example)
+      ? coachingRaw.restructured_example.filter((s): s is string => typeof s === 'string')
+      : Array.isArray(coachingRaw.structured_points)
+        ? coachingRaw.structured_points.filter((s): s is string => typeof s === 'string')
+        : [];
+
+    const technical_terms = Array.isArray(coachingRaw.technical_terms)
+      ? coachingRaw.technical_terms.filter(
+          (t): t is { term: string; definition: string; pronunciation?: string } =>
+            !!t &&
+            typeof t === 'object' &&
+            typeof (t as { term?: unknown }).term === 'string' &&
+            typeof (t as { definition?: unknown }).definition === 'string',
+        )
+      : [];
+
+    const missing_elements = Array.isArray(coachingRaw.missing_elements)
+      ? coachingRaw.missing_elements.filter((m): m is string => typeof m === 'string' && m.trim().length > 0).slice(0, 2)
+      : [];
+
+    const feedback =
+      typeof coachingRaw.feedback === 'string' && coachingRaw.feedback.trim()
+        ? coachingRaw.feedback.trim()
+        : missing_elements.length > 0
+          ? `Good start — next time, tighten this: ${missing_elements[0]}`
+          : fallbackFeedback;
+
+    const corrected =
+      typeof row.corrected_transcript === 'string' && row.corrected_transcript.trim()
+        ? row.corrected_transcript.trim()
+        : rawTranscript;
+
+    return {
+      corrected_transcript: corrected,
+      coaching_reference: {
+        feedback,
+        restructured_example: restructured,
+        technical_terms,
+        missing_elements,
+      },
+    };
+  }
+
+  // Legacy shape → map structured_points into coaching only; leave corrected ≈ raw
+  const structured_points = Array.isArray(row.structured_points)
+    ? row.structured_points.filter((s): s is string => typeof s === 'string')
+    : [];
+  const technical_terms = Array.isArray(row.technical_terms)
+    ? row.technical_terms.filter(
+        (t): t is { term: string; definition: string; pronunciation?: string } =>
+          !!t &&
+          typeof t === 'object' &&
+          typeof (t as { term?: unknown }).term === 'string' &&
+          typeof (t as { definition?: unknown }).definition === 'string',
+      )
+    : [];
+  const missing_elements = Array.isArray(row.missing_elements)
+    ? row.missing_elements.filter((m): m is string => typeof m === 'string' && m.trim().length > 0).slice(0, 2)
+    : [];
+  const feedback =
+    typeof row.feedback === 'string' && row.feedback.trim()
+      ? row.feedback.trim()
+      : fallbackFeedback;
+
+  return {
+    corrected_transcript: rawTranscript,
+    coaching_reference: {
+      feedback,
+      restructured_example: structured_points,
+      technical_terms,
+      missing_elements,
+    },
+  };
+}
+
 export async function POST(request: Request): Promise<NextResponse> {
   let interviewIdForLog = 'unknown';
   try {
-    // Auth + ownership (same pattern as turn route Step 1)
     const supabase = await createClient();
     const {
       data: { user },
@@ -133,7 +270,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           { role: 'system', content: AUTO_STRUCTURE_SYSTEM },
           { role: 'user', content: filledUser },
         ],
-        temperature: 0.3,
+        temperature: 0.2,
         operation: 'auto_structure',
         jsonMode: true,
         signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
@@ -165,9 +302,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    const normalized = normalizeAutoStructureOutput(parsedOutput, rawTranscript);
+
+    // Deterministic guardrail: never show / persist over-corrected STT cleanup.
+    const guard = guardCorrectedTranscript(rawTranscript, normalized.corrected_transcript);
+    if (!guard.accepted) {
+      console.warn(
+        `[interview/script/auto-structure] corrected_transcript rejected (interviewId=${interviewId}, turnIndex=${turnIndex}, reason=${guard.reason}, diffRatio=${guard.diffRatio.toFixed(3)}, disallowed=${guard.disallowedChangedWords}/${guard.totalWords})`,
+        {
+          raw: rawTranscript,
+          attempted: normalized.corrected_transcript,
+          diffRatio: guard.diffRatio,
+          reason: guard.reason,
+        },
+      );
+      normalized.corrected_transcript = guard.transcript; // raw fallback
+    }
+
     const { error: updateError } = await serviceClient
       .from('script_turns')
-      .update({ structured_answer: parsedOutput })
+      .update({ structured_answer: normalized })
       .eq('interview_id', interviewId)
       .eq('turn_index', turnIndex);
 
@@ -176,7 +330,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to save structured answer' }, { status: 500 });
     }
 
-    return NextResponse.json({ structuredAnswer: parsedOutput }, { status: 200 });
+    return NextResponse.json({ structuredAnswer: normalized }, { status: 200 });
   } catch (err) {
     console.error(`[interview/script/auto-structure] Unexpected error (interviewId=${interviewIdForLog}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -111,7 +111,7 @@ export function OnboardingStepGoalProfile({
 
       {/* ── Left: Brand Panel (desktop only) ──────────────────────────────── */}
       <div
-        className="relative hidden overflow-hidden rounded-2xl border border-(--card-border)/60 lg:flex lg:flex-col lg:justify-center lg:px-5 lg:py-6 xl:px-6 xl:py-7"
+        className="relative hidden overflow-hidden rounded-2xl border border-(--card-border)/60 lg:flex lg:min-h-0 lg:flex-col lg:justify-center lg:px-5 lg:py-6 xl:px-6 xl:py-7"
         style={{ background: 'color-mix(in srgb, var(--card-bg) 55%, transparent)' }}
       >
         {/* Decorative radial glow — top-right */}

@@ -210,13 +210,20 @@ export async function POST(request: NextRequest) {
         status: res.status,
         duration_ms: Date.now() - t0,
         error: body.slice(0, 500),
+        hint: res.status === 401
+          ? 'DEEPGRAM_API_KEY rejected by Deepgram — rotate key in console.deepgram.com and update .env.local'
+          : undefined,
         ts: new Date().toISOString(),
       }));
       if (!refreshLeaseId) {
         await releaseSession(user.id);
       }
       return NextResponse.json(
-        { error: 'Could not create voice session. Please try again.' },
+        {
+          error: res.status === 401 && process.env.NODE_ENV !== 'production'
+            ? 'Deepgram rejected DEEPGRAM_API_KEY (401). Update the key in .env.local and restart npm run dev.'
+            : 'Could not create voice session. Please try again.',
+        },
         { status: 502 },
       );
     }

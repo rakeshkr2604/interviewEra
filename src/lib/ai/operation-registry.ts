@@ -36,6 +36,10 @@ export type AiOperation =
   | 'jd_parse'
   | 'jd_validate'
   | 'document_classify'
+  | 'script_turn_generation'
+  | 'auto_structure'
+  | 'answer_score'
+  | 'script_report_synthesis'
   | 'free_tool';
 
 export type AiProvider = 'openrouter' | 'openai' | 'mistral';
@@ -221,6 +225,68 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
       maxHistoryTurnChars:  0,
     },
     estimatedInputTokens: 300,
+  },
+  // v2.1 script engine — large SCRIPT_*.md system prompts + JSON turn output.
+  // Stack under /api/interview/script/turn maxDuration=60.
+  script_turn_generation: {
+    requestClass:         'realtime_critical',
+    temperature:          0.7,
+    maxOutputTokens:      1_200,
+    llmAttemptTimeoutMs:    35_000,
+    timeoutMs:            45_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        12_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 4_000,
+  },
+  auto_structure: {
+    requestClass:         'lightweight_parse',
+    temperature:          0.3,
+    maxOutputTokens:      1_000,
+    llmAttemptTimeoutMs:    18_000,
+    timeoutMs:            22_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        6_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 800,
+  },
+  // v2.1 per-answer 5-dimension scoring (score-v1). Runs concurrently with
+  // auto_structure while the candidate reviews — moderate deadline, small JSON.
+  answer_score: {
+    requestClass:         'structured_evaluation',
+    temperature:          0.2,
+    maxOutputTokens:      600,
+    llmAttemptTimeoutMs:    13_000,
+    timeoutMs:            15_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        8_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 1_100,
+  },
+  // v2.1 end-of-interview narrative synthesis over score-v1.2 aggregates.
+  // One call per report; stacks under /api/interview/script/report maxDuration.
+  script_report_synthesis: {
+    requestClass:         'batch_analysis',
+    temperature:          0.3,
+    maxOutputTokens:      2_400,
+    llmAttemptTimeoutMs:    18_000,
+    timeoutMs:            22_500,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        14_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 2_200,
   },
   free_tool: {
     requestClass:         'lightweight_parse',

@@ -25,3 +25,8 @@ export const TrendChart = dynamic(
     />
   ) }
 );
+
+export const ScriptRadarChart = dynamic(
+  () => import('@/components/report/ScriptRadarChart').then((mod) => mod.ScriptRadarChart),
+  { ssr: false, loading: () => chartFallback }
+);

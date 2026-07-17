@@ -6,19 +6,27 @@ import { buildRuntimeContext, experienceYearsToLevel } from '@/lib/ai/scripts/ru
 import { validateTurnOutput, TurnValidationError } from '@/lib/ai/scripts/turn-validator';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { buildCompactResumeSummary } from '@/lib/interview/question-gen-input';
+import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 
 const SPECIAL_VALUES = ['[NONE]', '[SKIPPED]', '[TIMEOUT]'] as const;
 
-const LLM_TIMEOUT_MS = 15_000;
+const LLM_TIMEOUT_MS = 45_000;
 
 const turnRequestSchema = z.object({
   interviewId: z.string().uuid(),
   lastAnswer: z.string(),
   currentPhase: z.enum(['warmup', 'self_intro', 'core', 'candidate_questions', 'closing']),
   questionNumber: z.number(),
-  submittedAs: z.enum(['raw', 'structured', 'auto_submit']).optional(),
+  // 'structured' kept for legacy clients; new UI submits 'corrected' (STT cleanup only).
+  submittedAs: z.enum(['raw', 'corrected', 'structured', 'auto_submit']).optional(),
   prevTurnIndex: z.number().optional(),
+  /**
+   * Original STT (or typed) transcript for the previous turn.
+   * Written once into script_turns.raw_transcript and never overwritten when
+   * the candidate later submits a corrected version as answer_text.
+   */
+  sttRawTranscript: z.string().optional(),
 });
 
 type InterviewRow = {
@@ -97,7 +105,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { interviewId, lastAnswer, currentPhase, questionNumber, submittedAs, prevTurnIndex } =
+    const {
+      interviewId,
+      lastAnswer,
+      currentPhase,
+      questionNumber,
+      submittedAs,
+      prevTurnIndex,
+      sttRawTranscript,
+    } =
       validation.data;
     interviewIdForLog = interviewId;
 
@@ -300,23 +316,84 @@ export async function POST(request: Request): Promise<NextResponse> {
       is_question: validated.is_question,
       llm_output: validated,
       timer_seconds: validated.timer_seconds,
-      question_type: validated.question_type ?? null,
+      // Tag question_type at generation time (drives score-v1 structure routing):
+      // SCRIPT_M emits it per turn; H/T are single-type scripts so derive it.
+      question_type:
+        validated.question_type ??
+        (validated.is_question ? questionTypeFromScript(interview.script_type) : null),
     });
 
+    let turnForResponse = validated;
+    let reusedExistingTurn = false;
+
     if (turnInsertError) {
-      console.error(`[interview/script/turn] script_turns insert failed (interviewId=${interviewId}):`, turnInsertError);
-      return NextResponse.json({ error: 'Failed to save turn' }, { status: 500 });
+      // Concurrent duplicate /script/turn (Strict Mode double-boot, retry overlap):
+      // unique (interview_id, turn_index) — return the winner's row as 200.
+      const isDuplicate =
+        turnInsertError.code === '23505' ||
+        /duplicate key|unique constraint/i.test(turnInsertError.message ?? '');
+
+      if (!isDuplicate) {
+        console.error(`[interview/script/turn] script_turns insert failed (interviewId=${interviewId}):`, turnInsertError);
+        return NextResponse.json({ error: 'Failed to save turn' }, { status: 500 });
+      }
+
+      console.warn(
+        `[interview/script/turn] duplicate turn_index=${newTurnIndex} (interviewId=${interviewId}) — returning existing row`,
+      );
+
+      const { data: existing, error: existingErr } = await serviceClient
+        .from('script_turns')
+        .select('turn_index, llm_output, timer_seconds, question_type, is_question, phase')
+        .eq('interview_id', interviewId)
+        .eq('turn_index', newTurnIndex)
+        .maybeSingle();
+
+      if (existingErr || !existing?.llm_output) {
+        console.error(
+          `[interview/script/turn] duplicate insert but existing row missing (interviewId=${interviewId}, turnIndex=${newTurnIndex}):`,
+          existingErr,
+        );
+        return NextResponse.json({ error: 'Failed to save turn' }, { status: 500 });
+      }
+
+      try {
+        turnForResponse = validateTurnOutput(existing.llm_output, interview.script_type);
+      } catch {
+        // Stored JSON may be the already-validated shape — trust it for resume.
+        turnForResponse = existing.llm_output as typeof validated;
+      }
+      reusedExistingTurn = true;
     }
 
-    // STEP 9 — record the candidate's answer on the previous turn
+    // STEP 9 — record the candidate's answer on the previous turn.
+    // raw_transcript: write-once from original STT (sttRawTranscript ?? lastAnswer when first set).
+    // answer_text: whatever they actually submit (raw or corrected) — varies by submitted_as.
+    // TODO: unsafe if a redo-this-answer path is added later — raw_transcript is write-once per turn
     if (prevTurnIndex != null && lastAnswer !== '[NONE]') {
+      const { data: prevTurn } = await serviceClient
+        .from('script_turns')
+        .select('raw_transcript')
+        .eq('interview_id', interviewId)
+        .eq('turn_index', prevTurnIndex)
+        .maybeSingle();
+
+      const updatePayload: Record<string, unknown> = {
+        submitted_as: submittedAs ?? 'raw',
+        answer_text: lastAnswer,
+      };
+
+      if (!isSpecialValue && (prevTurn?.raw_transcript == null || prevTurn.raw_transcript === '')) {
+        const original =
+          typeof sttRawTranscript === 'string' && sttRawTranscript.trim().length > 0
+            ? sttRawTranscript
+            : lastAnswer;
+        updatePayload.raw_transcript = original;
+      }
+
       const { error: prevUpdateError } = await serviceClient
         .from('script_turns')
-        .update({
-          raw_transcript: isSpecialValue ? null : lastAnswer,
-          submitted_as: submittedAs ?? 'raw',
-          answer_text: lastAnswer,
-        })
+        .update(updatePayload)
         .eq('interview_id', interviewId)
         .eq('turn_index', prevTurnIndex);
 
@@ -325,14 +402,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    // STEP 10 — advance interview state
+    // STEP 10 — advance interview state (always sync cursor even on idempotent reuse)
     const interviewUpdate: Record<string, unknown> = {
       current_turn_index: newTurnIndex,
     };
-    if (validated.question_type != null) {
+    if (!reusedExistingTurn && validated.question_type != null) {
       interviewUpdate.last_question_type = validated.question_type;
     }
-    if (lastAnswer === '[SKIPPED]') {
+    if (!reusedExistingTurn && lastAnswer === '[SKIPPED]') {
       interviewUpdate.skips_used = interview.skips_used + 1;
     }
 
@@ -348,7 +425,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // STEP 11 — respond
     return NextResponse.json(
-      { turn: validated, turnIndex: newTurnIndex, interviewId },
+      { turn: turnForResponse, turnIndex: newTurnIndex, interviewId },
       { status: 200 },
     );
   } catch (err) {
