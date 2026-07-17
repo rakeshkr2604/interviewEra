@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { loadOrGenerateScriptReport } from '@/lib/interview/script-report/generate';
+import { trySendScriptCompletionEmail } from '@/lib/email/lifecycle/try-send-script-completion-email';
 
 export const maxDuration = 60;
 
@@ -18,6 +19,7 @@ const querySchema = z.object({
  *
  * Loads a persisted v2.1 report, or generates + upserts on first view.
  * Ownership: authenticated user must own the interview.
+ * Also retries the completion email if the complete-route race skipped it.
  */
 export async function GET(request: Request): Promise<NextResponse> {
   try {
@@ -53,6 +55,20 @@ export async function GET(request: Request): Promise<NextResponse> {
 
     if (!result.ok) {
       return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+
+    // Safety net: if complete()'s after() skipped email (score race), send now.
+    const recipientEmail = user.email?.trim() ?? '';
+    if (recipientEmail && result.report.scored_answer_count > 0 && result.report.overall != null) {
+      void trySendScriptCompletionEmail({
+        serviceClient,
+        interviewId: parsed.data.interviewId,
+        userId: user.id,
+        recipientEmail,
+        waitForScores: false,
+      }).catch((err) => {
+        console.error('[interview/script/report] completion email safety-net failed:', err);
+      });
     }
 
     return NextResponse.json(

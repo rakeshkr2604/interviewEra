@@ -5,7 +5,10 @@ import { getScript } from '@/lib/ai/scripts/script-loader';
 import { buildRuntimeContext, experienceYearsToLevel } from '@/lib/ai/scripts/runtime-context';
 import { validateTurnOutput, TurnValidationError } from '@/lib/ai/scripts/turn-validator';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
-import { buildCompactResumeSummary } from '@/lib/interview/question-gen-input';
+import {
+  buildScriptResumeSummary,
+  clampJobDescriptionForQuestions,
+} from '@/lib/interview/question-gen-input';
 import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 
@@ -175,7 +178,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     ]);
 
     const resumeSummary = resume?.parsed_data
-      ? buildCompactResumeSummary(resume.parsed_data, interview.role)
+      ? buildScriptResumeSummary(resume.parsed_data, interview.role)
       : 'Not available';
 
     const displayName =
@@ -200,6 +203,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // STEP 4 — system prompt = script + runtime context block
     const sessionContext = interview.session_context ?? {};
+    const jdClamped = clampJobDescriptionForQuestions(sessionContext.jobDescription);
     const runtimeContext = buildRuntimeContext({
       candidate_name: displayName,
       target_role: interview.role,
@@ -209,6 +213,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       company_type: 'unknown',
       difficulty: interview.difficulty,
       resume_summary: resumeSummary,
+      job_description: jdClamped ?? 'Not provided',
       question_pool: 'Not available',
       current_phase: currentPhase,
       question_number: questionNumber,

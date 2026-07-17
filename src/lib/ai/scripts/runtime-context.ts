@@ -7,6 +7,8 @@ export type RuntimeContextParams = {
   company_type: string
   difficulty: string
   resume_summary: string
+  /** Clamped JD text, or "Not provided" when absent. */
+  job_description: string
   question_pool: string
   current_phase: string
   question_number: number
@@ -30,16 +32,33 @@ function contextLine(key: string, value: string | number | boolean | null): stri
   return `${(key + ':').padEnd(KEY_COLUMN_WIDTH)} ${String(value)}`
 }
 
+/** Human-readable gloss for onboarding goal enums (injected beside the raw value). */
+export function interviewGoalGlossary(goal: string): string {
+  switch (goal) {
+    case 'fresher_placement':
+      return 'fresher_placement (campus / first-job prep — no assumed full-time work history)'
+    case 'job_switch':
+      return 'job_switch (has work history; contrast prior role vs target)'
+    case 'promotion_prep':
+      return 'promotion_prep (deeper ownership / leadership within current track)'
+    case 'general_practice':
+      return 'general_practice (flexible practice; still respect experience_level)'
+    default:
+      return goal
+  }
+}
+
 export function buildRuntimeContext(params: RuntimeContextParams): string {
   const lines = [
     contextLine('candidate_name', params.candidate_name),
     contextLine('target_role', params.target_role),
     contextLine('experience_level', params.experience_level),
-    contextLine('interview_goal', params.interview_goal),
+    contextLine('interview_goal', interviewGoalGlossary(params.interview_goal)),
     contextLine('company_name', params.company_name),
     contextLine('company_type', params.company_type),
     contextLine('difficulty', params.difficulty),
     contextLine('resume_summary', params.resume_summary),
+    contextLine('job_description', params.job_description),
     contextLine('question_pool', params.question_pool),
     contextLine('current_phase', params.current_phase),
     contextLine('question_number', params.question_number),
@@ -67,4 +86,9 @@ export function experienceYearsToLevel(years: number): string {
   if (years <= 3) return `${years} years`
   if (years <= 7) return `${years} years (Mid-level)`
   return `${years} years (Senior)`
+}
+
+/** True when behavioral questions must avoid assumed workplace history. */
+export function isFresherExperienceLevel(experienceLevel: string): boolean {
+  return /fresher|0-1\s*years/i.test(experienceLevel)
 }

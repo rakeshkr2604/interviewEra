@@ -8,8 +8,10 @@ import {
   validateRefreshLease,
 } from '@/lib/quota/stt-session-lease';
 import { releaseSession } from '@/lib/quota/voice-quota';
+import { recommendedSttRateLimits } from '@/lib/voice/stt-token-budget';
 
-const EPHEMERAL_TTL_SECONDS = 120;
+const STT_LIMITS = recommendedSttRateLimits();
+const EPHEMERAL_TTL_SECONDS = STT_LIMITS.ephemeralTtlSeconds;
 
 function extractIP(request: NextRequest): string {
   const forwarded = request.headers.get('x-forwarded-for');
@@ -47,10 +49,16 @@ export async function POST(request: NextRequest) {
   }
 
   // Local dev only — repeated interview restarts while debugging the voice pipeline
-  // burn through these budgets fast (they're sized for real usage: 20 tokens/IP/hr,
-  // 10/user/hr). Skipping them outside production means no manual re-enable step is
-  // needed; every production request still goes through all three checks below.
+  // burn through these budgets fast. Skipping them outside production means no
+  // manual re-enable step; every production request still goes through the checks.
+  //
+  // Budget evidence (see stt-token-budget.ts): without lease preservation a single
+  // 4-question interview alone can mint ~7–10 keys (one per listening phase +
+  // mid-answer refresh). The old 10/user/hr ceiling therefore 429'd legitimate
+  // sessions. New mints and refreshes are budgeted separately; refreshes are
+  // mandatory for long answers / inter-question reconnects, not abuse.
   const isDev = process.env.NODE_ENV !== 'production';
+  const isRefreshRequest = Boolean(refreshLeaseId);
 
   if (!isDev) {
     // ── 3. Abuse gate ─────────────────────────────────────────────────────────
@@ -62,29 +70,76 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 4. IP rate limit — 20 tokens per IP per hour ─────────────────────────
-    const ipRL = await checkRateLimit(`stt:ip:${ip}`, 3600, 20, { failClosed: true });
-    const ipBlocked = buildRateLimitHttpResponse(
-      ipRL,
-      'Too many requests from this IP. Try again later.',
-    );
-    if (ipBlocked) {
-      return NextResponse.json(ipBlocked.body, {
-        status: ipBlocked.status,
-        headers: ipBlocked.headers,
-      });
-    }
+    if (isRefreshRequest) {
+      // ── 4a. Refresh budget — continuing an existing lease ───────────────────
+      const refreshRL = await checkRateLimit(
+        `stt:user:refresh:${user.id}`,
+        3600,
+        STT_LIMITS.refreshesPerUserPerHour,
+        { failClosed: true },
+      );
+      const refreshBlocked = buildRateLimitHttpResponse(
+        refreshRL,
+        'Too many voice reconnects. Please wait and try again.',
+      );
+      if (refreshBlocked) {
+        return NextResponse.json(refreshBlocked.body, {
+          status: refreshBlocked.status,
+          headers: refreshBlocked.headers,
+        });
+      }
+    } else {
+      // ── 4b. New-mint budgets — IP + user/hour + per-interview ───────────────
+      const ipRL = await checkRateLimit(
+        `stt:ip:${ip}`,
+        3600,
+        STT_LIMITS.newMintsPerIpPerHour,
+        { failClosed: true },
+      );
+      const ipBlocked = buildRateLimitHttpResponse(
+        ipRL,
+        'Too many requests from this IP. Try again later.',
+      );
+      if (ipBlocked) {
+        return NextResponse.json(ipBlocked.body, {
+          status: ipBlocked.status,
+          headers: ipBlocked.headers,
+        });
+      }
 
-    const userRL = await checkRateLimit(`stt:user:${user.id}`, 3600, 10, { failClosed: true });
-    const userBlocked = buildRateLimitHttpResponse(
-      userRL,
-      'Too many recording sessions. Please wait and try again.',
-    );
-    if (userBlocked) {
-      return NextResponse.json(userBlocked.body, {
-        status: userBlocked.status,
-        headers: userBlocked.headers,
-      });
+      const userRL = await checkRateLimit(
+        `stt:user:${user.id}`,
+        3600,
+        STT_LIMITS.newMintsPerUserPerHour,
+        { failClosed: true },
+      );
+      const userBlocked = buildRateLimitHttpResponse(
+        userRL,
+        'Too many recording sessions. Please wait and try again.',
+      );
+      if (userBlocked) {
+        return NextResponse.json(userBlocked.body, {
+          status: userBlocked.status,
+          headers: userBlocked.headers,
+        });
+      }
+
+      const interviewRL = await checkRateLimit(
+        `stt:interview:${interviewId}`,
+        3600,
+        STT_LIMITS.newMintsPerInterview,
+        { failClosed: true },
+      );
+      const interviewBlocked = buildRateLimitHttpResponse(
+        interviewRL,
+        'Too many voice sessions for this interview. Please type your answer or restart.',
+      );
+      if (interviewBlocked) {
+        return NextResponse.json(interviewBlocked.body, {
+          status: interviewBlocked.status,
+          headers: interviewBlocked.headers,
+        });
+      }
     }
   }
 

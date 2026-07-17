@@ -60,6 +60,10 @@ export async function sendScriptInterviewCompletedEmail(
       error: result.error,
     });
   } else if (result.sent) {
-    console.info(`${LOG_PREFIX} sent`, { interviewId: input.interviewId });
+    console.info(`${LOG_PREFIX} sent`, {
+      interviewId: input.interviewId,
+      providerMessageId: result.providerMessageId ?? null,
+      to: input.recipientEmail,
+    });
   }
 }

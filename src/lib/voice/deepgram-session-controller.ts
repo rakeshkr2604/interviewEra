@@ -55,6 +55,17 @@ export interface DeepgramSessionStopOptions {
 export interface DeepgramSessionStartOptions {
   preserveTranscript?: boolean
   isRefresh?: boolean
+  /**
+   * Reuse an existing server lease across question boundaries (submit tears
+   * down the WS/mic but keeps the lease). Avoids burning a new-mint rate-limit
+   * slot on every turn.
+   */
+  refreshLeaseId?: string
+  /**
+   * Mid-answer expiry refresh must mint a new Deepgram key even if a
+   * still-valid prefetch residue sits in the client cache.
+   */
+  forceNewKey?: boolean
 }
 
 const MAX_TOKEN_ATTEMPTS = 4
@@ -246,31 +257,35 @@ export class DeepgramSessionController {
     }
 
     this.startInFlight = true
-    const uiState: VoiceConnectionState = opts?.isRefresh ? 'reconnecting' : 'connecting'
+    if (opts?.refreshLeaseId) {
+      this.sessionLeaseId = opts.refreshLeaseId
+    }
+    const isRefresh = Boolean(opts?.isRefresh || opts?.refreshLeaseId)
+    const uiState: VoiceConnectionState = isRefresh ? 'reconnecting' : 'connecting'
     this.callbacks.onUiState(
       uiState,
-      opts?.isRefresh ? 'Reconnecting voice channel…' : 'Connecting voice channel…',
+      isRefresh ? 'Reconnecting voice channel…' : 'Connecting voice channel…',
     )
     this.health.setConnectionState(uiState, null)
 
     try {
-      const tokenMeta = await this.fetchToken(opts?.isRefresh ?? false)
+      const tokenMeta = await this.fetchToken(isRefresh, Boolean(opts?.forceNewKey))
       if (this.stopIfUnmounted()) return
 
       const stt = new StreamingSTT(tokenMeta.token)
       this.stt = stt
 
       trackDeepgramEvent('deepgram_connect_attempt', this.telemetryCtx, this.track)
-      await this.connectWithRetry(stt, tokenMeta, opts?.isRefresh ?? false)
+      await this.connectWithRetry(stt, tokenMeta, isRefresh)
       if (this.stopIfUnmounted()) return
     } catch (err) {
-      this.handleStartFailure(err, opts?.isRefresh ?? false)
+      this.handleStartFailure(err, isRefresh)
     } finally {
       this.startInFlight = false
     }
   }
 
-  private async fetchToken(isRefresh: boolean): Promise<STTTokenResponse> {
+  private async fetchToken(isRefresh: boolean, forceNewKey = false): Promise<STTTokenResponse> {
     const event = isRefresh ? 'deepgram_refresh_attempt' : 'deepgram_token_requested'
     trackDeepgramEvent(event, this.telemetryCtx, this.track)
 
@@ -280,6 +295,7 @@ export class DeepgramSessionController {
     const data = await fetchSTTTokenWithRetry(this.interviewId, {
       maxAttempts: MAX_TOKEN_ATTEMPTS,
       refreshLeaseId: isRefresh ? this.sessionLeaseId ?? undefined : undefined,
+      bypassCache: forceNewKey,
       onRetry: (retryNum, waitMs, error) => {
         attempt = retryNum
         if (error.fallback === 'text_mode') return

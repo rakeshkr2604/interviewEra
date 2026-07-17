@@ -40,6 +40,14 @@ import {
 } from '@/lib/interview/script-session-prep'
 import { buildReviewLoadTurnPayload } from '@/lib/interview/build-review-load-turn-payload'
 import {
+  claimBootTurnApply,
+  decideBootTurnFetch,
+  releaseBootTurnApplyClaim,
+  shouldFallbackLoadFirstTurn,
+} from '@/lib/interview/script-boot-guard'
+import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
+import { fetchSTTTokenWithRetry, releaseSTTSession, clearCachedSTTToken } from '@/lib/voice/stt-token'
+import {
   classifyMicStartError,
   micFallbackMessageForKind,
   type MicStartErrorClassification,
@@ -187,6 +195,13 @@ export default function ScriptInterviewPage() {
   // Guards the very first loadTurn('[NONE]', 'warmup', 0) call so it can
   // never fire twice for one mounted session.
   const bootCalledRef = useRef(false)
+  // Preserve Deepgram session lease across question boundaries so each turn
+  // reconnect is a refresh (not a new-mint rate-limit slot). Cleared on
+  // unmount / hard release.
+  const dgLeaseIdRef = useRef<string | null>(null)
+  // Wall-clock markers for greeting → mic-ready / next-turn latency telemetry.
+  const greetingPlaybackEndedAtRef = useRef<number | null>(null)
+  const turnFetchStartedAtRef = useRef<number | null>(null)
 
   // ── Voice: mounted guard ────────────────────────────────────────────────────
   // Required by DeepgramSessionController callbacks and TTS callbacks
@@ -291,6 +306,8 @@ export default function ScriptInterviewPage() {
   const startDgListeningRef = useRef<(opts?: {
     clearTranscript?: boolean
     retryOnUnmountRace?: boolean
+    releasePriorQuota?: boolean
+    forceNewKey?: boolean
   }) => Promise<void>>(async () => {})
 
   // ── Voice: thinking-phase gates ─────────────────────────────────────────────
@@ -455,9 +472,17 @@ export default function ScriptInterviewPage() {
   }, [])
 
   // ── STT: stop ───────────────────────────────────────────────────────────────
-  const stopDgListening = useCallback(() => {
-    dgControllerRef.current?.stop()
+  const stopDgListening = useCallback((opts?: { releaseQuota?: boolean }) => {
+    const releaseQuota = opts?.releaseQuota !== false
+    if (!releaseQuota && dgControllerRef.current) {
+      const lease = dgControllerRef.current.getSessionLeaseId()
+      if (lease) dgLeaseIdRef.current = lease
+    }
+    dgControllerRef.current?.stop({ releaseQuota })
     dgMicCleanupRef.current = null
+    if (releaseQuota) {
+      dgLeaseIdRef.current = null
+    }
     if (mountedRef.current) setDgVoiceUiState('idle')
   }, [])
 
@@ -468,10 +493,19 @@ export default function ScriptInterviewPage() {
   const startDgListening = useCallback(async ({
     clearTranscript = true,
     retryOnUnmountRace = true,
+    releasePriorQuota = false,
+    forceNewKey = false,
   }: {
     clearTranscript?: boolean
     /** One automatic retry when mic start races Strict Mode / remount. */
     retryOnUnmountRace?: boolean
+    /**
+     * When true, tear down any prior session AND release its lease (fatal /
+     * unmount paths). Default false preserves the lease for refresh reconnects.
+     */
+    releasePriorQuota?: boolean
+    /** Mid-answer token expiry — mint a fresh Deepgram key. */
+    forceNewKey?: boolean
   } = {}) => {
     if (!mountedRef.current || !interviewId) return
     // Chrome/Firefox/etc on iOS cannot access the microphone (Apple restricts
@@ -484,8 +518,10 @@ export default function ScriptInterviewPage() {
     }
 
     // Tear down any lingering session before creating a new one.
+    // Preserve lease by default so the next start() can refresh instead of
+    // burning a new-mint rate-limit slot on every question.
     if (dgControllerRef.current?.isActive()) {
-      stopDgListeningRef.current()
+      stopDgListeningRef.current({ releaseQuota: releasePriorQuota })
     }
 
     // Bump the generation counter for this attempt. Every state-touching
@@ -568,6 +604,16 @@ export default function ScriptInterviewPage() {
         if (!mountedRef.current || mySeq !== dgStartSeqRef.current) return
         setFirstMicConnected(true)
         setDgVoiceUiState('connected')
+        const lease = dgControllerRef.current?.getSessionLeaseId()
+        if (lease) dgLeaseIdRef.current = lease
+        if (greetingPlaybackEndedAtRef.current != null) {
+          interviewFlowLog('voice', 'mic_ready_after_greeting', {
+            interviewId,
+            elapsed_ms: Date.now() - greetingPlaybackEndedAtRef.current,
+            phase: currentPhaseRef.current,
+          })
+          greetingPlaybackEndedAtRef.current = null
+        }
         // Fire the one-shot mic-ready callback (set by kickoffVoiceInput or
         // "Try voice again"). It either triggers the thinking→answering
         // transition (initial flow) or restarts the timer (retry flow).
@@ -580,7 +626,7 @@ export default function ScriptInterviewPage() {
       onRefreshRestart: () => {
         if (mySeq !== dgStartSeqRef.current) return
         // Token refresh mid-answer — preserve the in-progress transcript.
-        void startDgListeningRef.current({ clearTranscript: false })
+        void startDgListeningRef.current({ clearTranscript: false, forceNewKey: true })
       },
       onUiState: (state: VoiceConnectionState) => {
         if (mountedRef.current && mySeq === dgStartSeqRef.current) setDgVoiceUiState(state)
@@ -593,7 +639,7 @@ export default function ScriptInterviewPage() {
         engageMicFallback('fatal_error')
         // Clear any pending mic-ready callback so the timer never starts.
         onMicReadyRef.current = null
-        stopDgListeningRef.current()
+        stopDgListeningRef.current({ releaseQuota: true })
         // If we were in the thinking phase, drop straight to answering so the
         // candidate can type. No timer — typing fallback has no countdown.
         if (uiPhaseRef.current === 'thinking') setUiPhase('candidate_answering')
@@ -635,8 +681,19 @@ export default function ScriptInterviewPage() {
       callbacks,
     )
 
+    const refreshLeaseId = dgLeaseIdRef.current ?? undefined
     try {
-      await dgControllerRef.current.start()
+      await dgControllerRef.current.start(
+        refreshLeaseId || forceNewKey
+          ? {
+              isRefresh: Boolean(refreshLeaseId),
+              refreshLeaseId,
+              forceNewKey,
+            }
+          : undefined,
+      )
+      const lease = dgControllerRef.current.getSessionLeaseId()
+      if (lease) dgLeaseIdRef.current = lease
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       const isUnmountRace = /unmounted during initialisation/i.test(msg)
@@ -679,7 +736,7 @@ export default function ScriptInterviewPage() {
       const typed = answerText.trim()
       // Prefer voice transcript; fall back to typed; last resort: [TIMEOUT] marker.
       const finalAnswer = spoken || typed || '[TIMEOUT]'
-      stopDgListeningRef.current()
+      stopDgListeningRef.current({ releaseQuota: false })
       elStopRef.current()
       // submitAnswer is stable (no voice deps in its useCallback) — call via direct ref.
       void submitAnswerRef.current(finalAnswer)
@@ -713,14 +770,20 @@ export default function ScriptInterviewPage() {
   }, [dgTranscript, dgInterim])
 
   // Cleanup voice resources when the page unmounts (exit interview, navigate away).
-  // Always stop in order: timer → STT → TTS.
+  // Always stop in order: timer → STT → TTS. Hard-release the STT lease.
   useEffect(() => {
     return () => {
       timerStopRef.current()
-      stopDgListeningRef.current()
+      const leaseId = dgLeaseIdRef.current
+      stopDgListeningRef.current({ releaseQuota: true })
+      if (leaseId && interviewId) {
+        // Cover prefetch-only leases that never reached an active controller.
+        releaseSTTSession(interviewId, leaseId, undefined, { beacon: true })
+      }
+      clearCachedSTTToken(interviewId)
       elStopRef.current()
     }
-  }, []) // Empty deps: only runs on unmount
+  }, [interviewId])
 
   const completeInterview = useCallback(async () => {
     try {
@@ -796,12 +859,37 @@ export default function ScriptInterviewPage() {
   const applyTurnPayload = useCallback(
     async (data: TurnApiResponse) => {
       const turn = data.turn
+      const isBootTurn = data.turnIndex === 1 || turn.phase === 'warmup'
+
+      // One-shot: never speak the opening greeting twice for the same interview
+      // (boot re-entry / Strict Mode race can deliver the same payload twice).
+      if (isBootTurn && data.turnIndex <= 1) {
+        if (!claimBootTurnApply(interviewId)) {
+          interviewFlowLog('session', 'boot_turn_apply_skipped_duplicate', {
+            interviewId,
+            turnIndex: data.turnIndex,
+            phase: turn.phase,
+          })
+          return
+        }
+      }
+
+      if (turnFetchStartedAtRef.current != null) {
+        interviewFlowLog('session', 'turn_applied', {
+          interviewId,
+          turnIndex: data.turnIndex,
+          phase: turn.phase,
+          fetch_to_apply_ms: Date.now() - turnFetchStartedAtRef.current,
+        })
+        turnFetchStartedAtRef.current = null
+      }
 
       setCurrentTurn(turn)
       lastTurnWasQuestionRef.current = turn.is_question
       setCurrentTurnIndex(data.turnIndex)
       currentTurnIndexRef.current = data.turnIndex
       setCurrentPhase(turn.phase)
+      currentPhaseRef.current = turn.phase
 
       if (turn.is_question && turn.phase === 'core') {
         questionNumberRef.current += 1
@@ -864,8 +952,39 @@ export default function ScriptInterviewPage() {
         timerExpiredRef.current = false
         setUiPhase('turn_ready')
 
+        // Prefetch STT token during greeting/question TTS so mic connect after
+        // playback does not pay the full /api/stt/token round-trip serially.
+        if (!VOICE_UNSUPPORTED_ON_THIS_BROWSER && interviewId) {
+          const prefetchStarted = Date.now()
+          void fetchSTTTokenWithRetry(interviewId, {
+            refreshLeaseId: dgLeaseIdRef.current ?? undefined,
+            maxAttempts: 2,
+            prefetchOnly: true,
+          })
+            .then((meta) => {
+              if (meta.session_lease_id) {
+                dgLeaseIdRef.current = meta.session_lease_id
+              }
+              interviewFlowLog('voice', 'stt_token_prefetched_during_tts', {
+                interviewId,
+                elapsed_ms: Date.now() - prefetchStarted,
+                refresh: Boolean(meta.session_lease_id && dgLeaseIdRef.current),
+                phase: turn.phase,
+              })
+            })
+            .catch(() => {
+              /* kickoff will fetch again */
+            })
+        }
+
         const kickoffVoiceInput = () => {
           if (!mountedRef.current) return
+          greetingPlaybackEndedAtRef.current = Date.now()
+          interviewFlowLog('tts', 'question_playback_complete', {
+            interviewId,
+            phase: turn.phase,
+            turnIndex: data.turnIndex,
+          })
           const thinkingSecs = (turn.reading_buffer_seconds ?? 0) > 0
             ? turn.reading_buffer_seconds
             : 3
@@ -905,7 +1024,7 @@ export default function ScriptInterviewPage() {
         })
       }
     },
-    [completeInterview],
+    [completeInterview, interviewId],
   )
 
   const applyTurnPayloadRef = useRef(applyTurnPayload)
@@ -1027,9 +1146,14 @@ export default function ScriptInterviewPage() {
       // First turn can start without waiting for session — turn API re-validates.
       // TTS still waits for the session barrier below (correct interviewer voice).
       let turnPromise: Promise<TurnApiResponse> | null = null
-      if (!needsUnlock && !bootCalledRef.current) {
+      const bootDecision = decideBootTurnFetch({
+        needsUnlock,
+        bootAlreadyCalled: bootCalledRef.current,
+      })
+      if (bootDecision.action === 'fetch_first_turn') {
         bootCalledRef.current = true
         prep?.setTrack('turn', 'running')
+        turnFetchStartedAtRef.current = Date.now()
         turnPromise = fetchTurnPayloadRef.current({ lastAnswer: '[NONE]' })
       } else {
         prep?.setTrack('turn', needsUnlock ? 'idle' : 'idle')
@@ -1096,6 +1220,7 @@ export default function ScriptInterviewPage() {
           setErrorMessage(msg)
           setUiPhase('loading')
           bootCalledRef.current = false
+          releaseBootTurnApplyClaim(interviewId)
           retryRef.current = () => {
             bootCalledRef.current = true
             void loadTurnRef.current({ lastAnswer: '[NONE]' })
@@ -1103,10 +1228,24 @@ export default function ScriptInterviewPage() {
           return
         }
 
-        if (!turnSettled.value) {
-          // Unexpected — kick first turn serially as fallback.
+        if (
+          shouldFallbackLoadFirstTurn({
+            needsUnlock,
+            bootCalled: bootCalledRef.current,
+            turnResult: turnSettled.value,
+            cancelled,
+          })
+        ) {
+          // Unexpected — kick first turn serially as fallback (boot never marked).
           prep?.setTrack('turn', 'running')
+          turnFetchStartedAtRef.current = Date.now()
           void loadTurnRef.current({ lastAnswer: '[NONE]' })
+          return
+        }
+
+        if (!turnSettled.value) {
+          // Boot re-entry with bootCalled already true — do not speak again.
+          interviewFlowLog('session', 'boot_reentry_skipped', { interviewId })
           return
         }
 
@@ -1132,8 +1271,10 @@ export default function ScriptInterviewPage() {
     (rawAnswer: string) => {
       // Always stop timer, STT, and TTS before processing the submission.
       // Order matters: timer → STT → TTS.
+      // Preserve STT lease across questions (releaseQuota: false) so the next
+      // listening start is a refresh mint, not a new-session mint.
       timerStopRef.current()
-      stopDgListeningRef.current()
+      stopDgListeningRef.current({ releaseQuota: false })
       elStopRef.current()
       setDgTranscript('')
       setDgInterim('')
@@ -1142,6 +1283,7 @@ export default function ScriptInterviewPage() {
       const turn = currentTurn
       clearAutoTimer()
       setUiPhase('submitting')
+      turnFetchStartedAtRef.current = Date.now()
 
       // Pre-compute the next phase here so both the popup and the non-popup
       // paths capture the same value. currentPhaseRef must NOT be mutated
@@ -1419,7 +1561,7 @@ export default function ScriptInterviewPage() {
 
   const handleSkip = useCallback(() => {
     timerStopRef.current()
-    stopDgListeningRef.current()
+    stopDgListeningRef.current({ releaseQuota: false })
     elStopRef.current()
     setDgTranscript('')
     setDgInterim('')
@@ -1443,6 +1585,7 @@ export default function ScriptInterviewPage() {
     prep?.setTrack('mic', 'running')
     setUiPhase('loading')
     setErrorMessage(null)
+    turnFetchStartedAtRef.current = Date.now()
 
     void (async () => {
       try {
@@ -1483,13 +1626,14 @@ export default function ScriptInterviewPage() {
           err instanceof Error ? err.message : 'Something went wrong. Please try again.',
         )
         bootCalledRef.current = false
+        releaseBootTurnApplyClaim(interviewId)
         retryRef.current = () => {
           bootCalledRef.current = true
           void loadTurnRef.current({ lastAnswer: '[NONE]' })
         }
       }
     })()
-  }, [])
+  }, [interviewId])
 
   // ── Derived display values ───────────────────────────────────────────────────
   const interviewerId = (interview?.interviewer_id ?? 'priya') as InterviewerId
@@ -1899,11 +2043,18 @@ export default function ScriptInterviewPage() {
                 </div>
               )}
 
-              {/* ── TURN LOADING — simple spinner (subsequent turns only) ── */}
+              {/* ── TURN LOADING — honest wait state (subsequent turns) ── */}
               {uiPhase === 'turn_loading' && firstTurnShown && (
                 <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-3 text-(--text-secondary)">
                   <span className={`${IE_SPINNER_LG_CLASS} rounded-full border-2 border-(--card-border) border-t-(--accent-primary)`} />
-                  <p className="text-sm">Loading…</p>
+                  <p className="text-sm font-medium text-(--text-primary)">
+                    {currentPhase === 'warmup'
+                      ? 'Preparing your first question…'
+                      : 'Preparing the next question…'}
+                  </p>
+                  <p className="max-w-xs text-center text-[11px] text-(--text-muted)">
+                    The interviewer is generating the next turn. This usually takes a few seconds.
+                  </p>
                 </div>
               )}
 
@@ -1976,7 +2127,9 @@ export default function ScriptInterviewPage() {
 
                   <p className="shrink-0 text-center text-[11px] text-(--text-muted)">
                     {thinkingCountdown > 0
-                      ? 'Take your time to think…'
+                      ? (dgVoiceUiState === 'connecting' || dgVoiceUiState === 'reconnecting' || dgVoiceUiState === 'retrying')
+                        ? 'Read the question — connecting microphone…'
+                        : 'Take your time to think…'
                       : dgVoiceUiState === 'connected'
                         ? 'Mic ready — starting timer…'
                         : 'Connecting microphone…'}
@@ -2250,7 +2403,7 @@ export default function ScriptInterviewPage() {
                       setMicFallback(false)
                       void startDgListeningRef.current()
                     } else if (dgListening) {
-                      stopDgListeningRef.current()
+                      stopDgListeningRef.current({ releaseQuota: false })
                     } else {
                       void startDgListeningRef.current()
                     }
@@ -2299,7 +2452,7 @@ export default function ScriptInterviewPage() {
                       : currentTurn.interviewer_emotion === 'challenging' ? 'challenging' as const
                       : 'neutral' as const
                     timerStopRef.current()
-                    stopDgListeningRef.current()
+                    stopDgListeningRef.current({ releaseQuota: false })
                     setUiPhase('turn_ready')
                     void elSpeakRef.current(currentTurn.speech, tone, {
                       onPlaybackComplete: () => {

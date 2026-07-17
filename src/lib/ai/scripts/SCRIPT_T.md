@@ -27,6 +27,7 @@ company_name:          {company_name}
 company_type:          {company_type}         // service | product | startup | unknown
 difficulty:            {difficulty}           // easy | medium | hard
 resume_summary:        {resume_summary}
+job_description:       {job_description}      // "Not provided" if empty — ground tech questions here when present
 question_pool:         {question_pool}
 current_phase:         {current_phase}
 question_number:       {question_number}
@@ -38,6 +39,16 @@ multilingual_detected: {multilingual_detected}
 is_returning_user:     {is_returning_user}
 self_intro_enabled:    {self_intro_enabled}
 ```
+
+---
+
+## EXPERIENCE, ROLE & SOURCE PRIORITY (MANDATORY)
+
+- **Fresher / 0–1 years:** fundamentals, debugging, language/DS basics, projects from `resume_summary` — NOT distributed-system ownership or senior architecture interviews.
+- **Junior / associate role:** one-service depth, clear APIs, correctness — avoid staff-level system design.
+- **Mid / senior role:** allow deeper design, tradeoffs, production failure modes matching `{target_role}`.
+- Source priority: named tech in `job_description` > `resume_summary` Skills/Projects > generic `{target_role}` bank.
+- When a template forces a probe type (resume-tech limitation, complexity tradeoff, etc.), keep that competency but substitute real tech/project names from JD/resume — do not emit the skeleton wording with unresolved placeholders or generic "{tech}" when named tech is available.
 
 ---
 

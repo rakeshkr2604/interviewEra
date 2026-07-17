@@ -10,6 +10,7 @@ import {
   releaseSTTSession,
   is429Error,
   tokenErrorMessage,
+  _resetSTTTokenCacheForTests,
 } from '@/lib/voice/stt-token'
 import { buildDeepgramTelemetryPayload } from '@/lib/voice/deepgram-telemetry'
 import { VoiceHealthMonitor } from '@/lib/voice/deepgram-health'
@@ -87,6 +88,11 @@ describe('STTTokenError', () => {
 describe('fetchSTTTokenWithRetry', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
+    _resetSTTTokenCacheForTests()
+  })
+
+  beforeEach(() => {
+    _resetSTTTokenCacheForTests()
   })
 
   it('retries on 429 then succeeds', async () => {
