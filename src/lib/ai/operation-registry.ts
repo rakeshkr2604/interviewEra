@@ -159,16 +159,17 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
   resume_parse: {
     requestClass:         'lightweight_parse',
     temperature:          0,
-    maxOutputTokens:      180,
-    llmAttemptTimeoutMs:    8_000,
-    timeoutMs:            10_000,
+    // parse-v2 returns experience/education/projects — needs headroom beyond the slim triad.
+    maxOutputTokens:      1_400,
+    llmAttemptTimeoutMs:    12_000,
+    timeoutMs:            16_000,
     responseFormat:       'json',
     context: {
       maxInputChars:        5_500,
       maxHistoryTurns:      0,
       maxHistoryTurnChars:  0,
     },
-    estimatedInputTokens: 350,
+    estimatedInputTokens: 700,
   },
   report_generation: {
     requestClass:         'batch_analysis',

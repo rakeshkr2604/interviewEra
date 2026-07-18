@@ -5,6 +5,7 @@
 import type { ParsedResume, ResumeParseQuality } from '@/types/app.types';
 import { sampleTextForHeuristic } from '@/lib/resume/parse-input';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import { extractSectionsHeuristic } from '@/lib/resume/section-extract-heuristic';
 
 const SKILL_HINTS =
   /\b(?:javascript|typescript|python|java|react|node\.?js|sql|aws|docker|mongodb|postgresql|mysql|next\.?js|fastapi|express|git|html|css|c\+\+|golang|go\b)\b/gi;
@@ -34,8 +35,21 @@ function inferTargetRole(text: string, skills: string[]): string {
 
 function inferExperienceEstimate(text: string): string {
   const lower = text.toLowerCase();
+  const hasInternship = /\b(?:intern(?:ship)?|trainee|apprentice|co[\s-]?op)\b/.test(lower);
+  const hasProfessionalRole =
+    /\b(?:founder|full[\s-]?stack|software\s+engineer|sde\b|full[\s-]?time|permanent)\b/.test(
+      lower,
+    ) ||
+    (/\b(?:engineer|developer)\b/.test(lower) &&
+      !/\b(?:intern(?:ship)?|trainee|apprentice)\b/.test(lower));
+
+  // Internship-only resume → fresher band (do not treat "Present" intern roles as YoE)
+  if (hasInternship && !hasProfessionalRole) {
+    return '0-1 years';
+  }
+
   if (/\b(?:fresher|student|pursuing|expected\s+\d{4}|b\.?\s*tech|mca|master\s+of)\b/.test(lower)) {
-    if (!/\b(?:present|years?\s+of\s+experience|\d+\+?\s*years?)\b/.test(lower)) {
+    if (!/\b(?:years?\s+of\s+experience|\d+\+?\s*years?)\b/.test(lower)) {
       return 'Fresher';
     }
   }
@@ -47,7 +61,7 @@ function inferExperienceEstimate(text: string): string {
     if (n >= 1) return '1-3 years';
     return '0-1 years';
   }
-  if (/\bpresent\b/i.test(text) && /\b(?:engineer|developer|intern)\b/i.test(text)) {
+  if (/\bpresent\b/i.test(text) && hasProfessionalRole) {
     return '0-2 years';
   }
   return 'Not specified';
@@ -72,10 +86,15 @@ export function buildFallbackParsedResume(rawText: string): {
   const target_role = inferTargetRole(text, skills);
   const experience_estimate = inferExperienceEstimate(text);
 
+  const sections = extractSectionsHeuristic(rawText);
   const data = coerceParsedResume({
     target_role,
     skills,
     experience_estimate,
+    experience: sections.experience,
+    education: sections.education,
+    projects: sections.projects,
+    sections_missing: sections.sections_missing,
   });
 
   const quality = assessHeuristicQuality(data);

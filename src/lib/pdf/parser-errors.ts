@@ -11,7 +11,9 @@ export type PDFParseUserCode =
   /** pdfjs-dist standard_fonts/cmaps absent from traced bundle */
   | 'PARSER_UNAVAILABLE'
   /** Node canvas/globals or parser runtime failed — not a bad file */
-  | 'PARSER_RUNTIME';
+  | 'PARSER_RUNTIME'
+  /** Resume uploads reject PDFs above the page guardrail */
+  | 'TOO_MANY_PAGES';
 
 export class PDFEncryptedError extends Error {
   readonly code: Extract<PDFParseUserCode, 'ENCRYPTED'> = 'ENCRYPTED';
@@ -60,5 +62,17 @@ export class PDFParserRuntimeError extends Error {
   constructor(message = 'PDF parser runtime failed') {
     super(message);
     this.name = 'PDFParserRuntimeError';
+  }
+}
+
+export class PDFTooManyPagesError extends Error {
+  readonly code: Extract<PDFParseUserCode, 'TOO_MANY_PAGES'> = 'TOO_MANY_PAGES';
+  readonly pageCount: number;
+  readonly maxPages: number;
+  constructor(pageCount: number, maxPages: number) {
+    super(`PDF has ${pageCount} pages; maximum allowed is ${maxPages}`);
+    this.name = 'PDFTooManyPagesError';
+    this.pageCount = pageCount;
+    this.maxPages = maxPages;
   }
 }

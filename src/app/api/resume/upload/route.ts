@@ -14,6 +14,8 @@ import {
   PDFUnsupportedError,
   type PDFErrorCode,
 } from '@/lib/pdf/parser';
+import { PDFTooManyPagesError } from '@/lib/pdf/parser-errors';
+import { assertPdfPageLimit, RESUME_PDF_MAX_PAGES } from '@/lib/pdf/page-count';
 import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
@@ -63,7 +65,8 @@ const PDF_ERROR_MESSAGES: Record<PDFErrorCode, string> = {
 type ResumeUploadPdfErrorCode =
   | PDFErrorCode
   | 'PARSER_UNAVAILABLE'
-  | 'PARSER_RUNTIME';
+  | 'PARSER_RUNTIME'
+  | 'TOO_MANY_PAGES';
 
 const PDF_PARSER_INFRA_MESSAGES: Pick<
   Record<ResumeUploadPdfErrorCode, string>,
@@ -146,6 +149,13 @@ function classifyPdfError(err: unknown): {
     return { code: 'CORRUPT', message: m.userMessage, suggestion: m.suggestion };
   }
   if (err instanceof PDFUnsupportedError) return { code: 'UNSUPPORTED', message: PDF_ERROR_MESSAGES.UNSUPPORTED };
+  if (err instanceof PDFTooManyPagesError) {
+    return {
+      code: 'TOO_MANY_PAGES',
+      message: `This PDF has ${err.pageCount} pages. Please upload a resume with at most ${err.maxPages} pages.`,
+      suggestion: 'Export a shorter PDF (≤10 pages) or a .txt resume.',
+    };
+  }
   return { code: 'PARSER_RUNTIME', message: PDF_PARSER_INFRA_MESSAGES.PARSER_RUNTIME };
 }
 
@@ -367,6 +377,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const { file } = picked;
 
+    /** Optional: add a new version lineage point on an existing resume (Prompt 2 UI). */
+    const resumeIdField = formData.get('resumeId');
+    const targetResumeId =
+      typeof resumeIdField === 'string' && /^[0-9a-f-]{36}$/i.test(resumeIdField.trim())
+        ? resumeIdField.trim()
+        : null;
+
+    const uploadId = randomUUID();
+
     trackProductEvent({ event: 'upload_started', userId: user.id });
 
     console.log('[UPLOAD_STAGE] file_meta', {
@@ -417,6 +436,16 @@ export async function POST(request: Request): Promise<NextResponse> {
     } else {
       let rawText = '';
       if (ext === '.pdf') {
+        console.log('[UPLOAD_STAGE] pdf_page_limit_start', { reqId, maxPages: RESUME_PDF_MAX_PAGES });
+        try {
+          const pageCount = await assertPdfPageLimit(parseBytes, RESUME_PDF_MAX_PAGES);
+          console.log('[UPLOAD_STAGE] pdf_page_limit_ok', { reqId, pageCount });
+        } catch (err) {
+          const { code, message, suggestion } = classifyPdfError(err);
+          trackProductEvent({ event: 'upload_failed', userId: user.id, code });
+          return uploadReject(code, message, suggestion, 422, reqId);
+        }
+
         console.log('[UPLOAD_STAGE] pdf_extract_start', { reqId });
         try {
           rawText = await extractText(parseBytes, {
@@ -566,25 +595,79 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    console.log('[UPLOAD_STAGE] db_insert_start', { reqId });
-    const { data: resume, error: insertError } = await serviceClient
-      .from('resumes')
-      .insert({ user_id: user.id, file_url: publicUrl, raw_text: sanitizedRaw, status: 'parsing' })
-      .select()
-      .single();
+    console.log('[UPLOAD_STAGE] db_write_start', { reqId, targetResumeId, uploadId });
 
-    console.log('[UPLOAD_STAGE] db_insert_result', {
+    let resume: { id: string } | null = null;
+    let writeError: { message?: string; code?: string } | null = null;
+
+    if (targetResumeId) {
+      const { data: owned, error: ownErr } = await serviceClient
+        .from('resumes')
+        .select('id')
+        .eq('id', targetResumeId)
+        .eq('user_id', user.id)
+        .is('deleted_at', null)
+        .maybeSingle();
+      if (ownErr || !owned) {
+        return jsonWithReq({ error: 'Resume not found', code: 'RESUME_NOT_FOUND' }, 404, reqId);
+      }
+      const { data: updated, error: updErr } = await serviceClient
+        .from('resumes')
+        .update({
+          file_url: publicUrl,
+          storage_path: filePath,
+          raw_text: sanitizedRaw,
+          status: 'parsing',
+          lifecycle_status: 'parsing',
+          latest_upload_id: uploadId,
+          parsed_data: null,
+        })
+        .eq('id', targetResumeId)
+        .eq('user_id', user.id)
+        .select('id')
+        .single();
+      resume = updated;
+      writeError = updErr;
+    } else {
+      const { count: existingCount } = await serviceClient
+        .from('resumes')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .is('deleted_at', null);
+
+      const makePrimary = (existingCount ?? 0) === 0;
+
+      const { data: inserted, error: insertError } = await serviceClient
+        .from('resumes')
+        .insert({
+          user_id: user.id,
+          file_url: publicUrl,
+          storage_path: filePath,
+          raw_text: sanitizedRaw,
+          status: 'parsing',
+          lifecycle_status: 'parsing',
+          latest_upload_id: uploadId,
+          is_primary: makePrimary,
+        })
+        .select('id')
+        .single();
+      resume = inserted;
+      writeError = insertError;
+    }
+
+    console.log('[UPLOAD_STAGE] db_write_result', {
       reqId,
-      ok: !insertError && !!resume,
-      insertMessage: insertError?.message ?? null,
-      insertCode: insertError?.code ?? null,
+      ok: !writeError && !!resume,
+      writeMessage: writeError?.message ?? null,
+      writeCode: writeError?.code ?? null,
       resumeId: resume?.id ?? null,
+      uploadId,
     });
 
-    if (insertError || !resume) {
+    if (writeError || !resume) {
       const isFk =
-        insertError?.code === '23503' ||
-        (typeof insertError?.message === 'string' && insertError.message.includes('foreign key'));
+        writeError?.code === '23503' ||
+        (typeof writeError?.message === 'string' && writeError.message.includes('foreign key'));
       const base: Record<string, unknown> = {
         error: isFk
           ? 'Account data is out of sync with our database. Sign out and sign in again, then retry upload.'
@@ -593,8 +676,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         requestId: reqId,
       };
       if (isUploadDiagnosticsEnabled()) {
-        base.stage = 'db_insert';
-        base.insertError = insertError;
+        base.stage = 'db_write';
+        base.insertError = writeError;
       }
       return jsonWithReq(base as Record<string, unknown>, 500, reqId);
     }
@@ -602,6 +685,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     console.log('[UPLOAD_STAGE] ok', {
       reqId,
       resume_id: resume.id,
+      upload_id: uploadId,
       extraction_warning: uploadExtractionWarning ?? null,
       total_upload_ms: Date.now() - uploadStarted,
     });
@@ -620,7 +704,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       {
         success: true,
         resumeId: resume.id,
+        uploadId,
         status: 'parsing',
+        lifecycleStatus: 'parsing',
         parsed: false,
         extractionWarning: uploadExtractionWarning,
       },

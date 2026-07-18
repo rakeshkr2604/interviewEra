@@ -4,6 +4,15 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/**
+ * DELETE /api/resume/:id/delete
+ * Soft-delete (sets deleted_at). Preserves FK integrity for completed interviews
+ * under ON DELETE NO ACTION. Blocked when an in-progress interview references it.
+ *
+ * Note: lives under a static child segment (not `[id]/route.ts`) so Turbopack
+ * also registers sibling handlers (`versions`, `primary`, …). Next 16.2 + Turbopack
+ * was returning HTML 404 for those nested routes when `[id]/route.ts` existed.
+ */
 export async function DELETE(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {
     const { id: resumeId } = await context.params;
@@ -20,7 +29,7 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
     const serviceClient = createServiceClient();
     const { data: resume, error: fetchError } = await serviceClient
       .from('resumes')
-      .select('id, user_id, file_url')
+      .select('id, user_id, file_url, deleted_at, is_primary')
       .eq('id', resumeId)
       .eq('user_id', user.id)
       .maybeSingle();
@@ -30,7 +39,7 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
       return NextResponse.json({ error: 'Failed to verify resume.' }, { status: 500 });
     }
 
-    if (!resume) {
+    if (!resume || resume.deleted_at) {
       return NextResponse.json({ error: 'Resume not found.' }, { status: 404 });
     }
 
@@ -47,15 +56,40 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
       );
     }
 
+    const deletedAt = new Date().toISOString();
     const { error: deleteError } = await serviceClient
       .from('resumes')
-      .delete()
+      .update({
+        deleted_at: deletedAt,
+        is_primary: false,
+        lifecycle_status: 'deleted',
+      })
       .eq('id', resumeId)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
 
     if (deleteError) {
-      console.error('[resume/delete] delete error:', deleteError.message);
+      console.error('[resume/delete] soft-delete error:', deleteError.message);
       return NextResponse.json({ error: 'Failed to delete resume.' }, { status: 500 });
+    }
+
+    if (resume.is_primary) {
+      const { data: next } = await serviceClient
+        .from('resumes')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'parsed')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (next?.id) {
+        await serviceClient
+          .from('resumes')
+          .update({ is_primary: true })
+          .eq('id', next.id)
+          .eq('user_id', user.id);
+      }
     }
 
     trackResumeDeletedServer({
@@ -64,7 +98,7 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
       source: 'api_resume_delete',
     });
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, softDeleted: true });
   } catch (err) {
     console.error('[resume/delete] unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -25,9 +25,10 @@ export async function GET(request: Request): Promise<NextResponse> {
     const serviceClient = createServiceClient();
     const { data: resume, error: resumeError } = await serviceClient
       .from('resumes')
-      .select('id, status, parsed_data')
+      .select('id, status, parsed_data, lifecycle_status, latest_upload_id, current_version_id')
       .eq('id', resumeId)
       .eq('user_id', user.id)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (resumeError) {
@@ -43,6 +44,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     const payload: {
       resumeId: string;
       status: string;
+      lifecycleStatus?: string | null;
+      uploadId?: string | null;
+      currentVersionId?: string | null;
       ready: boolean;
       parseQuality?: string;
       parseWarning?: string;
@@ -50,6 +54,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     } = {
       resumeId: resume.id,
       status: resume.status,
+      lifecycleStatus: resume.lifecycle_status ?? null,
+      uploadId: resume.latest_upload_id ?? null,
+      currentVersionId: resume.current_version_id ?? null,
       ready: resume.status === 'parsed',
     };
 

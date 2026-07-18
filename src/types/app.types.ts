@@ -8,6 +8,15 @@ export type InterviewStatus = 'pending' | 'in_progress' | 'completed' | 'abandon
 
 export type ResumeStatus = 'uploading' | 'parsing' | 'parsed' | 'failed';
 
+/** Workspace lifecycle — see docs/RESUME_WORKSPACE_STATE_MACHINE.md */
+export type ResumeLifecycleStatus =
+  | 'uploaded'
+  | 'parsing'
+  | 'parse_failed'
+  | 'review_ready'
+  | 'verified'
+  | 'deleted';
+
 export type AnswerMode = 'text' | 'voice';
 
 export type CreditType = 'debit' | 'credit';
@@ -92,11 +101,46 @@ export interface PaymentRecord {
 
 export type ResumeParseQuality = 'full' | 'degraded' | 'minimal';
 
-/** Minimal profile for interview question personalization (not a resume replica). */
+/** Work / internship entry for interview grounding (parse-v2+). */
+export interface ResumeExperienceEntry {
+  organization: string;
+  title: string;
+  date_range: string;
+  bullets: string[];
+}
+
+export interface ResumeEducationEntry {
+  institution: string;
+  degree: string;
+  year_range: string;
+}
+
+export interface ResumeProjectEntry {
+  name: string;
+  description: string;
+  technologies: string[];
+}
+
+/** Honest empty-section flags — never invent missing sections. */
+export interface ParsedResumeSectionsMissing {
+  experience?: boolean;
+  education?: boolean;
+  projects?: boolean;
+}
+
+/**
+ * Interview personalization profile.
+ * parse-v1: role / skills / experience_estimate only.
+ * parse-v2+: also experience, education, projects (empty + sections_missing when absent).
+ */
 export interface ParsedResume {
   target_role: string;
   skills: string[];
   experience_estimate: string;
+  experience?: ResumeExperienceEntry[];
+  education?: ResumeEducationEntry[];
+  projects?: ResumeProjectEntry[];
+  sections_missing?: ParsedResumeSectionsMissing;
   parse_quality?: ResumeParseQuality;
   parse_warning?: string;
 }
@@ -124,6 +168,31 @@ export interface Resume {
   raw_text: string | null;
   parsed_data: ParsedResume | null;
   status: ResumeStatus;
+  created_at: string;
+  /** Exactly one non-deleted resume per user should be primary when any exist. */
+  is_primary?: boolean;
+  profile_group?: string | null;
+  storage_path?: string | null;
+  current_version_id?: string | null;
+  latest_upload_id?: string | null;
+  lifecycle_status?: ResumeLifecycleStatus;
+  deleted_at?: string | null;
+}
+
+export interface ResumeVersion {
+  id: string;
+  resume_id: string;
+  user_id: string;
+  version_number: number;
+  upload_id: string | null;
+  source: 'upload' | 'user_correction' | 'backfill';
+  parser_version: string | null;
+  storage_path: string | null;
+  file_url: string | null;
+  raw_text: string | null;
+  parsed_data: ParsedResume;
+  skills_extracted: Array<{ raw: string; canonical: string }>;
+  jd_text_hash: string | null;
   created_at: string;
 }
 

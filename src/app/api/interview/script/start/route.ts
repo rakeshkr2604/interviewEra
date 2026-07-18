@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
+import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
 
 const scriptStartSchema = z.object({
   resumeId: z.string().uuid(),
@@ -105,7 +106,25 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const serviceClient = createServiceClient();
 
-    // Step 4 — returning user: any prior completed interview
+    // Step 4 — validate resume is usable (parsed / review_ready / verified)
+    const { data: resumeRow, error: resumeErr } = await serviceClient
+      .from('resumes')
+      .select('id, status, lifecycle_status, deleted_at')
+      .eq('id', resumeId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (resumeErr || !resumeRow || resumeRow.deleted_at) {
+      return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
+    }
+    if (resumeRow.status !== 'parsed') {
+      return NextResponse.json(
+        { error: 'Resume is not ready. Finish parsing before starting an interview.' },
+        { status: 422 },
+      );
+    }
+
+    // Step 5 — returning user: any prior completed interview
     const { count: completedCount, error: countError } = await serviceClient
       .from('interviews')
       .select('id', { count: 'exact', head: true })
@@ -118,13 +137,13 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const isReturningUser = (completedCount ?? 0) >= 1;
 
-    // Step 5 — credit check + deduction (same pattern as v1 start route)
+    // Step 6 — credit check + deduction (same pattern as v1 start route)
     const creditResult = await checkAndDeductCredit(user.id);
     if (!creditResult.success) {
       return NextResponse.json({ error: 'no_credits', upgradeUrl: '/upgrade' }, { status: 402 });
     }
 
-    // Step 6 — insert v2.1 interview row
+    // Step 7 — insert v2.1 interview row
     const { data: interview, error: interviewError } = await serviceClient
       .from('interviews')
       .insert({
@@ -160,9 +179,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
     }
 
-    // Step 7 — created
+    // Step 8 — freeze resume content for this interview (immutable snapshot)
+    const snapshot = await createResumeInterviewSnapshot(serviceClient, {
+      interviewId: interview.id,
+      resumeId,
+      jobDescription,
+    });
+    if (!snapshot) {
+      console.warn('[interview/script/start] snapshot not created; turn will use live fallback', {
+        interviewId: interview.id,
+        resumeId,
+      });
+    }
+
+    // Step 9 — created
     return NextResponse.json(
-      { interviewId: interview.id, scriptType },
+      {
+        interviewId: interview.id,
+        scriptType,
+        resumeSnapshotId: snapshot?.id ?? null,
+      },
       { status: 201 },
     );
   } catch (err) {

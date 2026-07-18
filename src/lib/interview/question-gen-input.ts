@@ -50,8 +50,10 @@ export function extractResumeProjectHints(resume: unknown, max = 4): string[] {
  * (critical for fresher personalization).
  */
 export function buildScriptResumeSummary(resume: ParsedResume | unknown, role: string): string {
-  const base = buildCompactResumeSummary(resume, role);
-  const projects = extractResumeProjectHints(resume);
+  // Coerce first so parse-v2 `projects[].name` (and legacy title) always reach the summary.
+  const parsed = coerceParsedResume(resume);
+  const base = buildCompactResumeSummary(parsed, role);
+  const projects = extractResumeProjectHints(parsed);
   if (projects.length === 0) return clampText(base, SCRIPT_RESUME_SUMMARY_MAX);
   return clampText(`${base}. Projects:${projects.join('; ')}`, SCRIPT_RESUME_SUMMARY_MAX);
 }

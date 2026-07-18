@@ -23,27 +23,39 @@ export default async function NewInterviewPage() {
     redirect('/login');
   }
 
-  // Fetch user profile + latest resume + domain packs in parallel
-  const [{ data: profile }, { data: resume }, { data: domainPacks }] = await Promise.all([
-    supabase
-      .from('users')
-      .select('credits_remaining, plan_tier')
-      .eq('id', user.id)
-      .single(),
-    supabase
-      .from('resumes')
-      .select('id, parsed_data, status')
-      .eq('user_id', user.id)
-      .eq('status', 'parsed')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from('domain_packs')
-      .select('id, name, domain, description, question_count, is_active')
-      .eq('is_active', true)
-      .order('name'),
-  ]);
+  // Prefer primary resume (Decision 1); fall back to latest parsed
+  const [{ data: profile }, { data: primaryResume }, { data: latestResume }, { data: domainPacks }] =
+    await Promise.all([
+      supabase
+        .from('users')
+        .select('credits_remaining, plan_tier')
+        .eq('id', user.id)
+        .single(),
+      supabase
+        .from('resumes')
+        .select('id, parsed_data, status')
+        .eq('user_id', user.id)
+        .eq('status', 'parsed')
+        .eq('is_primary', true)
+        .is('deleted_at', null)
+        .maybeSingle(),
+      supabase
+        .from('resumes')
+        .select('id, parsed_data, status')
+        .eq('user_id', user.id)
+        .eq('status', 'parsed')
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('domain_packs')
+        .select('id, name, domain, description, question_count, is_active')
+        .eq('is_active', true)
+        .order('name'),
+    ]);
+
+  const resume = primaryResume ?? latestResume;
 
   const creditsRemaining = profile?.credits_remaining ?? 0;
   const planTier = (profile?.plan_tier ?? 'free') as PlanTier;

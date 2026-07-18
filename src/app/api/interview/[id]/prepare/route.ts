@@ -11,9 +11,9 @@ import {
 } from '@/lib/telemetry/prepare-server-span';
 import type {
   InterviewSessionContext,
-  ParsedResume,
   InterviewGenerationContext,
 } from '@/types/app.types';
+import { loadResumeContextForInterview } from '@/lib/resume/interview-snapshot';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -85,14 +85,11 @@ export async function POST(
       return NextResponse.json({ error: 'Interview is not awaiting question generation.' }, { status: 409 });
     }
 
-    const { data: resume } = await serviceClient
-      .from('resumes')
-      .select('parsed_data, status')
-      .eq('id', gen.resumeId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-
-    if (!resume || resume.status !== 'parsed') {
+    const resumeCtx = await loadResumeContextForInterview(serviceClient, {
+      interviewId,
+      resumeId: gen.resumeId,
+    });
+    if (!resumeCtx.parsed) {
       return NextResponse.json({ error: 'Resume not ready.' }, { status: 409 });
     }
 
@@ -112,7 +109,7 @@ export async function POST(
       );
     }
 
-    const parsedResume = resume.parsed_data as ParsedResume;
+    const parsedResume = resumeCtx.parsed;
     prepareStartedAt = logPrepareStarted(interviewId);
     const resolved = await resolveInterviewQuestions({
       userId: user.id,

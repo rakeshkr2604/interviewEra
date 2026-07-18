@@ -1,5 +1,6 @@
 /**
- * Resume parsing — minimal JSON for interview personalization only.
+ * Resume parsing — parse-v2 JSON for interview personalization
+ * (role/skills/band + experience/education/projects).
  */
 
 import { createOpenRouterClient } from '@/lib/openrouter/client';
@@ -8,19 +9,36 @@ import { parseJsonObject } from '@/lib/ai/response-contract';
 import { withOperationDeadline } from '@/lib/ai/timeout-policy';
 import { prepareTextForAiParse } from '@/lib/resume/parse-input';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import { parsedResumeV2Schema } from '@/lib/resume/parsed-resume-schema';
 import type { ParsedResume } from '@/types/app.types';
 
 const RESUME_PARSE_MODEL =
   process.env.RESUME_PARSE_MODEL ?? 'openai/gpt-4o-mini';
 
-const SYSTEM_PROMPT = 'Return only valid JSON. No markdown.';
+const SYSTEM_PROMPT = 'Return only valid JSON. No markdown. Never invent employers, schools, or project names.';
 
 const USER_PROMPT_PREFIX =
-  'For mock interview setup only (not a full resume). Extract:\n' +
-  '{"target_role":"","skills":[],"experience_estimate":""}\n' +
-  'target_role: one primary role (e.g. Software Engineer).\n' +
-  'skills: max 12 short tech/soft skills.\n' +
-  'experience_estimate: one of Fresher, 0-1 years, 1-3 years, 3-5 years, 5+ years.\n';
+  'For mock interview setup. Extract this JSON shape (fill what exists; leave arrays empty when absent):\n' +
+  '{\n' +
+  '  "target_role":"",\n' +
+  '  "skills":[],\n' +
+  '  "experience_estimate":"",\n' +
+  '  "experience":[{"organization":"","title":"","date_range":"","bullets":[]}],\n' +
+  '  "education":[{"institution":"","degree":"","year_range":""}],\n' +
+  '  "projects":[{"name":"","description":"","technologies":[]}],\n' +
+  '  "sections_missing":{"experience":false,"education":false,"projects":false}\n' +
+  '}\n' +
+  'Rules:\n' +
+  '- target_role: one primary role (e.g. Software Engineer).\n' +
+  '- skills: max 12 short tech/soft skills.\n' +
+  '- experience_estimate: one of Fresher, 0-1 years, 1-3 years, 3-5 years, 5+ years.\n' +
+  '  CRITICAL: Internships, traineeships, apprenticeships, and co-ops do NOT count as professional years.\n' +
+  '  If experience is exclusively internships/trainees (no full-time/founder/SDE roles), use "0-1 years" (fresher).\n' +
+  '  For mixed history, estimate years from full-time/professional roles only.\n' +
+  '- experience: max 4 jobs/internships; date_range as written text; max 3 short bullets each. Freshers may have internships or [].\n' +
+  '- education: max 4; year_range or graduation year as text.\n' +
+  '- projects: max 4; highest priority — use real project names from the resume; technologies as short strings.\n' +
+  '- If a section is missing/unreadable: return [] and set the matching sections_missing.* flag to true. Do not fabricate.\n';
 
 export type ParseResumeTiming = {
   aiMs: number;
@@ -32,10 +50,24 @@ export type ParseResumeTiming = {
 };
 
 function repairInterviewProfile(data: unknown): ParsedResume | null {
-  const profile = coerceParsedResume(data);
+  const zod = parsedResumeV2Schema.safeParse(data);
+  if (!zod.success) {
+    // Still try coerce for partial objects — empty sections stay empty.
+    const profile = coerceParsedResume(data);
+    const hasSignal =
+      profile.skills.length > 0 ||
+      (profile.target_role.length > 0 && profile.target_role !== 'Software Engineer') ||
+      (profile.projects?.length ?? 0) > 0;
+    return hasSignal ? profile : null;
+  }
+
+  const profile = coerceParsedResume(zod.data);
   const hasSignal =
     profile.skills.length > 0 ||
-    (profile.target_role.length > 0 && profile.target_role !== 'Software Engineer');
+    (profile.target_role.length > 0 && profile.target_role !== 'Software Engineer') ||
+    (profile.projects?.length ?? 0) > 0 ||
+    (profile.education?.length ?? 0) > 0 ||
+    (profile.experience?.length ?? 0) > 0;
   return hasSignal ? profile : null;
 }
 
@@ -105,6 +137,9 @@ export async function parseResume(rawText: string): Promise<{
       inputChars: prepared.length,
       prompt_tokens: usage?.prompt_tokens,
       completion_tokens: usage?.completion_tokens,
+      projects: repaired.projects?.length ?? 0,
+      education: repaired.education?.length ?? 0,
+      experience: repaired.experience?.length ?? 0,
     }),
   );
 

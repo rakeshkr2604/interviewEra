@@ -102,8 +102,9 @@ export async function loadCandidateSnapshot(userId: string): Promise<CandidateSn
     supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
     supabase
       .from('resumes')
-      .select('id, status, created_at, file_url, parsed_data')
+      .select('id, status, created_at, file_url, parsed_data, is_primary')
       .eq('user_id', userId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(5),
     supabase
@@ -145,7 +146,10 @@ export async function loadCandidateSnapshot(userId: string): Promise<CandidateSn
     ...storedProfile,
   };
 
-  const latestResumeRow = resumes?.[0] ?? null;
+  const latestResumeRow =
+    (resumes ?? []).find((r) => r.is_primary && r.status === 'parsed') ??
+    resumes?.[0] ??
+    null;
   let latestResume: ResumeSnapshot | null = null;
   if (latestResumeRow) {
     const parsed =

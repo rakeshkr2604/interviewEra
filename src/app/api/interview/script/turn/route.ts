@@ -11,6 +11,7 @@ import {
 } from '@/lib/interview/question-gen-input';
 import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
+import { loadResumeContextForInterview } from '@/lib/resume/interview-snapshot';
 
 const SPECIAL_VALUES = ['[NONE]', '[SKIPPED]', '[TIMEOUT]'] as const;
 
@@ -155,12 +156,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to load interview' }, { status: 500 });
     }
 
-    const [{ data: resume }, { data: priorTurns }, { data: profile }] = await Promise.all([
-      serviceClient
-        .from('resumes')
-        .select('parsed_data')
-        .eq('id', interview.resume_id)
-        .maybeSingle(),
+    const [resumeCtx, { data: priorTurns }, { data: profile }] = await Promise.all([
+      loadResumeContextForInterview(serviceClient, {
+        interviewId,
+        resumeId: interview.resume_id,
+      }),
       // Fetch previously asked questions so the LLM can avoid repeating them.
       // Only core + self_intro question turns are relevant (warmup is conversational).
       serviceClient
@@ -177,8 +177,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         .maybeSingle(),
     ]);
 
-    const resumeSummary = resume?.parsed_data
-      ? buildScriptResumeSummary(resume.parsed_data, interview.role)
+    const resumeSummary = resumeCtx.parsed
+      ? buildScriptResumeSummary(resumeCtx.parsed, interview.role)
       : 'Not available';
 
     const displayName =

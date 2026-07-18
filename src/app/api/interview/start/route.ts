@@ -12,6 +12,7 @@ import { getUserProgress } from '@/lib/retention';
 import { trackProductEvent } from '@/lib/analytics/product-events';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
+import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
 
 export async function POST(request: Request): Promise<NextResponse> {
   try {
@@ -271,6 +272,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error('[interview/start] DB insert error:', interviewError);
       return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
     }
+
+    // Freeze resume for this interview (immutable; prepare/questions must not chase live edits)
+    await createResumeInterviewSnapshot(serviceClient, {
+      interviewId: interview.id,
+      resumeId,
+      jobDescription,
+    });
 
     trackInterviewEvent('interview_created', {
       userId: user.id,
