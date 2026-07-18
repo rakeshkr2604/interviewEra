@@ -442,6 +442,13 @@ export async function POST(request: Request): Promise<NextResponse> {
           console.log('[UPLOAD_STAGE] pdf_page_limit_ok', { reqId, pageCount });
         } catch (err) {
           const { code, message, suggestion } = classifyPdfError(err);
+          console.error('[UPLOAD_STAGE] pdf_page_limit_error', {
+            reqId,
+            code,
+            err: err instanceof Error ? err.message : err,
+            pdf_header: hasPdfHeader(parseBytes),
+            bytes: parseBytes.byteLength,
+          });
           trackProductEvent({ event: 'upload_failed', userId: user.id, code });
           return uploadReject(code, message, suggestion, 422, reqId);
         }
