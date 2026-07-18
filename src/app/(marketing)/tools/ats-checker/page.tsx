@@ -5,17 +5,20 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { webApplicationJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { canonicalUrl, getCanonicalSiteOrigin } from '@/lib/seo/site-url';
 import { AtsCheckerForm } from './AtsCheckerForm';
+import { AtsHeroExplainVisual } from './AtsHeroExplainVisual';
+import { AtsTrustRow } from './AtsTrustRow';
 import { FreeToolPageLayout } from '@/components/landing/FreeToolPageLayout';
 
-const ATS_OG_TITLE = 'Free ATS Resume Checker';
+const ATS_OG_TITLE = 'Free Resume Parser Check';
 
 export const metadata: Metadata = generateMetadata({
   title: ATS_OG_TITLE,
   description:
-    'Find out if your resume passes Applicant Tracking Systems. Instant ATS compatibility score with actionable fixes — no sign-up required.',
+    'See exactly how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match, with explainable fixes. Free, no sign-up.',
   path: '/tools/ats-checker',
   socialTitle: brandPageTitle(ATS_OG_TITLE),
-  keywords: 'ATS resume checker, applicant tracking system, resume scanner, ATS score, resume check',
+  keywords:
+    'resume parser check, ATS resume checker, parseability, resume field extraction, resume structure check',
 });
 
 export const runtime = 'nodejs';
@@ -24,9 +27,9 @@ export const maxDuration = 30;
 const ORIGIN = getCanonicalSiteOrigin();
 
 const ATS_WEBAPP_LD = webApplicationJsonLd({
-  name: 'Free ATS Resume Checker',
+  name: 'Free Resume Parser Check',
   description:
-    'Check if your resume passes Applicant Tracking Systems. Get an instant ATS compatibility score with actionable keyword and structure fixes — free, no sign-up.',
+    'See exactly how a typical parser reads your resume. InterviewEra reports Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes — free, no sign-up. Not a single universal ATS score.',
   url: canonicalUrl('/tools/ats-checker'),
   providerId: schemaIds.organization,
 });
@@ -35,15 +38,18 @@ const ATS_BREADCRUMB_LD = breadcrumbListJsonLd(
   [
     { name: 'Home', path: '/' },
     { name: 'Free Tools', path: '/tools/ats-checker' },
-    { name: 'ATS Resume Checker', path: '/tools/ats-checker' },
+    { name: 'Resume Parser Check', path: '/tools/ats-checker' },
   ],
   ORIGIN,
 );
 
 const BULLETS = [
-  { icon: Sparkles, text: 'Instant score + concrete fixes you can apply today' },
-  { icon: Zap, text: "Keyword and structure signals recruiters' ATS tools look for" },
-  { icon: Shield, text: 'No account required — file is analyzed and discarded' },
+  {
+    icon: Sparkles,
+    text: 'Four explainable scores — never one blended “ATS %”',
+  },
+  { icon: Zap, text: 'See the exact fields a parser pulls from your file' },
+  { icon: Shield, text: 'Free · no account · file analyzed then discarded' },
 ] as const;
 
 export default function AtsCheckerPage() {
@@ -54,9 +60,12 @@ export default function AtsCheckerPage() {
       <FreeToolPageLayout
         eyebrow="Free tool · no sign-up"
         eyebrowIcon={FileSearch}
-        title="Free ATS resume checker"
-        description="See if your resume survives Applicant Tracking Systems — score, risks, and fixes in one pass. Add a job description for sharper keyword alignment."
+        title="See how a parser reads your resume"
+        description="Upload a PDF, Word, or TXT. We show what a typical ATS recovers — and which layout risks bury your details."
+        leftSlot={<AtsHeroExplainVisual />}
         bullets={BULLETS}
+        bulletsLayout="row"
+        bottomSlot={<AtsTrustRow />}
       >
         <AtsCheckerForm />
       </FreeToolPageLayout>

@@ -63,7 +63,9 @@ export async function generateQuestionsAction(
     return { questions: cached.questions };
   }
 
-  const limited = checkAndConsumeFreeToolLimit('question-generator', ip);
+  const limited = await checkAndConsumeFreeToolLimit('question-generator', ip, {
+    failClosed: false,
+  });
   if (!limited.ok) {
     return { error: limited.message };
   }
@@ -99,7 +101,6 @@ Return ONLY valid JSON, no markdown:
   try {
     raw = await completeFreeToolChatChain({
       openrouterModels: [...new Set(OPENROUTER_QUESTION_MODELS.filter(Boolean))],
-      openaiModels: [],
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
     });

@@ -32,6 +32,11 @@ function setInputFile(input: HTMLInputElement, file: File) {
 
 type JdMode = 'paste' | 'upload';
 
+/** Shared resume accept copy — keep SSR/client identical (avoids hydration drift). */
+const RESUME_ACCEPT_HINT = 'PDF, DOCX, or TXT · max 5 MB';
+const RESUME_DROPZONE_HINT = 'PDF, Word (.docx), or plain text · up to 5 MB';
+const JD_MAX_CHARS = 3000;
+
 export function AtsCheckerForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -45,6 +50,7 @@ export function AtsCheckerForm() {
   const [inlineFallback, setInlineFallback] = useState(false);
   const [jdMode, setJdMode] = useState<JdMode>('paste');
   const [jdFileLabel, setJdFileLabel] = useState<string | null>(null);
+  const [jdCharCount, setJdCharCount] = useState(0);
 
   useEffect(() => {
     if (!state.result || redirectDoneRef.current) return;
@@ -72,7 +78,12 @@ export function AtsCheckerForm() {
       setDragOver(false);
       const file = e.dataTransfer.files?.[0];
       if (!file || !fileInputRef.current) return;
-      const ok = /\.(pdf|txt)$/i.test(file.name) || file.type === 'application/pdf' || file.type === 'text/plain';
+      const ok =
+        /\.(pdf|txt|docx)$/i.test(file.name) ||
+        file.type === 'application/pdf' ||
+        file.type === 'text/plain' ||
+        file.type ===
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       if (!ok) return;
       setInputFile(fileInputRef.current, file);
       setFileLabel(file.name);
@@ -89,19 +100,19 @@ export function AtsCheckerForm() {
       >
         <form
           action={formAction}
-          className="space-y-6 p-5 sm:p-7 lg:p-8"
+          className="space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8"
           onSubmit={(e) => {
             setClientError(null);
             if (!fileInputRef.current?.files?.length) {
               e.preventDefault();
-              setClientError('Please upload a resume (PDF or TXT · max 5 MB).');
+              setClientError(`Please upload a resume (${RESUME_ACCEPT_HINT}).`);
             }
           }}
         >
           <div className="space-y-2.5">
             <label className={IE_LABEL_CLASS}>
               Resume{' '}
-              <span className={IE_LABEL_OPTIONAL_CLASS}>(PDF or TXT · max 5 MB)</span>
+              <span className={IE_LABEL_OPTIONAL_CLASS}>({RESUME_ACCEPT_HINT})</span>
             </label>
             <div
               role="button"
@@ -143,7 +154,7 @@ export function AtsCheckerForm() {
                       <span className="max-w-[16rem] truncate sm:max-w-md">{fileLabel}</span>
                     </>
                   ) : (
-                    'PDF or plain text · up to 5 MB'
+                    RESUME_DROPZONE_HINT
                   )}
                 </p>
               </div>
@@ -151,7 +162,7 @@ export function AtsCheckerForm() {
                 ref={fileInputRef}
                 type="file"
                 name="file"
-                accept=".pdf,.txt"
+                accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 className="hidden"
                 onChange={syncLabelFromInput}
                 aria-invalid={Boolean(clientError)}
@@ -160,17 +171,22 @@ export function AtsCheckerForm() {
           </div>
 
           <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <label htmlFor="jobDescription" className="block text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-3">
+              <label
+                htmlFor="jobDescription"
+                className="block min-w-0 text-sm font-semibold sm:text-base"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 Job description{' '}
                 <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
-                  (optional — improves keyword analysis)
+                  <span className="sm:hidden">(optional)</span>
+                  <span className="hidden sm:inline">(optional — improves keyword analysis)</span>
                 </span>
               </label>
               <div
                 role="tablist"
                 aria-label="Job description input mode"
-                className="inline-flex rounded-lg border p-0.5 text-xs font-medium"
+                className="inline-flex w-full rounded-lg border p-0.5 text-xs font-medium sm:w-auto"
                 style={{ borderColor: 'var(--card-border)' }}
               >
                 {(['paste', 'upload'] as const).map((m) => {
@@ -182,7 +198,7 @@ export function AtsCheckerForm() {
                       role="tab"
                       aria-selected={active}
                       onClick={() => setJdMode(m)}
-                      className="rounded-md px-3 py-1.5 transition-colors"
+                      className="min-h-10 flex-1 rounded-md px-3 py-2 transition-colors sm:min-h-0 sm:flex-none sm:py-1.5"
                       style={{
                         background: active ? 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' : 'transparent',
                         color: active ? 'var(--accent-primary)' : 'var(--text-secondary)',
@@ -196,15 +212,38 @@ export function AtsCheckerForm() {
             </div>
 
             {jdMode === 'paste' ? (
-              <Textarea
-                id="jobDescription"
-                name="jobDescription"
-                placeholder="Paste the job description here…"
-                rows={5}
-                maxLength={3000}
-                className={IE_TEXTAREA_TOOL_CLASS}
-                style={IE_FIELD_SURFACE_STYLE}
-              />
+              <div className="space-y-1.5">
+                <Textarea
+                  id="jobDescription"
+                  name="jobDescription"
+                  placeholder="Paste the job description here…"
+                  rows={8}
+                  maxLength={JD_MAX_CHARS}
+                  onChange={(e) => setJdCharCount(e.target.value.length)}
+                  className={cn(
+                    IE_TEXTAREA_TOOL_CLASS,
+                    // Slightly taller than default; tuned to align with left “What you get back” card
+                    'min-h-[8.5rem] max-h-[min(18rem,38vh)] sm:min-h-[10rem] sm:max-h-[min(20rem,42vh)] lg:min-h-[10.5rem]',
+                  )}
+                  style={IE_FIELD_SURFACE_STYLE}
+                  aria-describedby="jd-char-count"
+                />
+                <p
+                  id="jd-char-count"
+                  className="text-right tabular-nums text-[11px] sm:text-xs"
+                  style={{
+                    color:
+                      jdCharCount >= JD_MAX_CHARS
+                        ? 'var(--accent-danger)'
+                        : jdCharCount >= JD_MAX_CHARS * 0.9
+                          ? 'var(--accent-warning)'
+                          : 'var(--text-muted)',
+                  }}
+                  aria-live="polite"
+                >
+                  {jdCharCount.toLocaleString()} / {JD_MAX_CHARS.toLocaleString()} characters
+                </p>
+              </div>
             ) : (
               <div
                 role="button"
@@ -216,7 +255,7 @@ export function AtsCheckerForm() {
                   }
                 }}
                 onClick={() => jdFileInputRef.current?.click()}
-                className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed px-4 py-5 transition-colors"
+                className="flex min-h-[8.5rem] cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors sm:min-h-[10rem] sm:flex-row sm:justify-start sm:gap-3 sm:py-5 sm:text-left lg:min-h-[10.5rem]"
                 style={{
                   borderColor: 'color-mix(in srgb, var(--card-border) 85%, transparent)',
                   background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)',

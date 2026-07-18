@@ -3,7 +3,7 @@
 import { createHash } from 'crypto';
 import { headers } from 'next/headers';
 import OpenAI from 'openai';
-import { completeFreeToolChatChain, getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
+import { getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
 import {
   extractText,
@@ -15,7 +15,19 @@ import {
   PDFScannedNoTextError,
   PDFUnsupportedError,
 } from '@/lib/pdf/parser';
-import type { AtsResult, AtsState } from './ats-types';
+import { runAtsAnalysis } from '@/lib/ats/score-engine';
+import {
+  DocxCorruptError,
+  DocxEmptyError,
+  extractDocxText,
+  normalizeDocxFileName,
+} from '@/lib/ats/docx-extract';
+import type { AtsSourceKind } from '@/lib/ats/parseability';
+import {
+  getCachedAtsResult,
+  setCachedAtsResult,
+} from '@/lib/redis/ats-result-cache';
+import type { AtsState } from './ats-types';
 import { RESUME_HARD_FAIL_MESSAGES } from '@/lib/resume/parse-outcome';
 
 const PDF_USER_MESSAGES: Record<
@@ -25,10 +37,13 @@ const PDF_USER_MESSAGES: Record<
   ENCRYPTED: 'This PDF is password-protected. Remove the password and re-upload.',
   SCANNED_NO_TEXT: RESUME_HARD_FAIL_MESSAGES.SCANNED_NO_TEXT.userMessage,
   CORRUPT: 'This PDF could not be read as valid. If you exported from Word or Canva, try “Save as PDF” again.',
-  UNSUPPORTED: 'Unsupported file type. Use PDF or TXT.',
+  UNSUPPORTED: 'Unsupported file type. Use PDF, DOCX, or TXT.',
   PARSER_RUNTIME:
-    'Our server could not finish reading this PDF right now — not necessarily a bad file. Please retry once; if it keeps failing, try exporting the PDF again or use a .txt file.',
+    'Our server could not finish reading this PDF right now — not necessarily a bad file. Please retry once; if it keeps failing, try exporting the PDF again or use a .txt / .docx file.',
 };
+
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 const PARSER_UNAVAILABLE_MESSAGE = 'Resume parser is temporarily unavailable. Please retry in a minute.';
 
@@ -50,32 +65,24 @@ function pdfErrorToState(err: unknown): AtsState {
   return { error: PDF_USER_MESSAGES.PARSER_RUNTIME, code: 'PARSER_RUNTIME' };
 }
 
-async function extractFileText(file: File): Promise<string> {
-  // Strip duplicate trailing extensions (`resume.pdf.pdf` → `resume.pdf`)
-  // before extension-based MIME validation; some browsers add them.
-  const normalized = normalizeFileName(file.name);
-  const ext = `.${normalized.split('.').pop()?.toLowerCase() ?? ''}`;
-  if (ext === '.txt') return await file.text();
-  if (ext === '.pdf') {
-    const headerList = await headers();
-    const arrayBuffer = await file.arrayBuffer();
-    return await extractText(arrayBuffer, {
-      mimeType: file.type,
-      fileNameHint: normalized,
-      vercelId: headerList.get('x-vercel-id') ?? '',
-      source: 'ats-checker',
-    });
+function resumeExtractErrorToState(err: unknown): AtsState {
+  if (err instanceof DocxCorruptError) {
+    return { error: err.message, code: 'CORRUPT' };
   }
-  throw new PDFUnsupportedError();
+  if (err instanceof DocxEmptyError) {
+    return { error: err.message, code: 'TOO_SHORT' };
+  }
+  return pdfErrorToState(err);
+}
+
+function normalizeAtsResumeName(name: string): string {
+  return normalizeDocxFileName(normalizeFileName(name));
 }
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const RESUME_PROMPT_CHARS = 8000;
 const JOB_DESC_MAX_CHARS = 4000;
 const MIN_RESUME_CHARS = 50;
-
-const resultCache = new Map<string, { result: AtsResult; expiresAt: number }>();
-const CACHE_TTL_MS = 60 * 60 * 1000;
+const ENGINE_CACHE_PREFIX = 'ats-v2';
 
 function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
   return (
@@ -85,133 +92,22 @@ function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
   );
 }
 
-function buildCacheKey(text: string, jd: string): string {
-  return createHash('sha256').update(`${text}|${jd}`).digest('hex');
-}
-
-function extractJSON(content: string): string {
-  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-  if (fenced) return fenced[1].trim();
-  return content.trim();
-}
-
-function isValidResult(data: unknown): data is AtsResult {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
-  if (typeof d.score !== 'number' || !Number.isFinite(d.score)) return false;
-  if (!Array.isArray(d.issues)) return false;
-  return d.issues.every(
-    (i: unknown) =>
-      i &&
-      typeof i === 'object' &&
-      typeof (i as Record<string, unknown>).type === 'string' &&
-      ['success', 'warning', 'error'].includes((i as Record<string, unknown>).type as string) &&
-      typeof (i as Record<string, unknown>).text === 'string' &&
-      String((i as Record<string, unknown>).text).trim().length > 0,
-  );
-}
-
-function normalizeResult(raw: AtsResult): AtsResult {
-  const score = Math.round(Math.min(100, Math.max(0, raw.score)));
-  const issues = raw.issues
-    .map((i) => ({
-      type: i.type,
-      text: String(i.text).trim(),
-    }))
-    .filter((i) => i.text.length > 0)
-    .slice(0, 12);
-
-  if (issues.length === 0) {
-    issues.push({
-      type: 'warning',
-      text: 'The model did not return detailed feedback. Try again, or export your resume as text-based PDF.',
-    });
-  }
-
-  return { score, issues };
-}
-
-function parseModelOutput(content: string): AtsResult {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJSON(content));
-  } catch {
-    throw new Error('Model response was not valid JSON');
-  }
-  if (!isValidResult(parsed)) {
-    throw new Error('Model JSON did not match expected ATS result shape');
-  }
-  return normalizeResult(parsed);
-}
-
-function buildPrompt(resumeSlice: string, jobDescription: string): string {
-  const jdSection = jobDescription.trim()
-    ? `Job Description:\n${jobDescription.trim()}\n\n`
-    : 'No job description provided.\n\n';
-
-  return (
-    `You are an ATS (Applicant Tracking System) compatibility expert.\n` +
-    `Analyze the following resume text for ATS compatibility.\n\n` +
-    `${jdSection}` +
-    `Resume Text:\n${resumeSlice}\n\n` +
-    `Evaluate for these criteria and return JSON only:\n` +
-    `1. Proper section headings (Experience, Education, Skills)\n` +
-    `2. Action verbs in experience bullets\n` +
-    `3. ATS-safe layout (no tables, columns, headers/footers, text boxes)\n` +
-    `4. Contact information completeness (name, email, phone)\n` +
-    `5. Keyword matching with job description (if provided)\n` +
-    `6. Quantified achievements in experience\n` +
-    `7. Standard fonts and formatting\n\n` +
-    `Return ONLY valid JSON:\n` +
-    `{\n` +
-    `  "score": number (0–100, ATS compatibility score),\n` +
-    `  "issues": [\n` +
-    `    { "type": "success" | "warning" | "error", "text": "string" }\n` +
-    `  ]\n` +
-    `}\n` +
-    `Include 4–8 issues covering all criteria. Be specific and actionable.`
-  );
-}
-
-const OPENROUTER_ATS_MODELS = [
-  process.env.OPENROUTER_ATS_MODEL?.trim() || 'openai/gpt-4o-mini',
-  'openai/gpt-4.1-mini',
-  'openai/gpt-4o-mini-2024-07-18',
-  'openai/gpt-3.5-turbo',
-  'google/gemini-2.0-flash-001',
-];
-
-const OPENAI_ATS_MODELS = [
-  process.env.OPENAI_ATS_MODEL?.trim() || 'gpt-4o-mini',
-  'gpt-4.1-mini',
-  'gpt-4o-mini-2024-07-18',
-  'gpt-3.5-turbo-0125',
-];
-
-async function analyzeAts(resumeText: string, jobDescription: string): Promise<AtsResult> {
-  const resumeSlice = resumeText.slice(0, RESUME_PROMPT_CHARS);
-  const prompt = buildPrompt(resumeSlice, jobDescription);
-
-  const content = await completeFreeToolChatChain({
-    openrouterModels: [...new Set(OPENROUTER_ATS_MODELS.filter(Boolean))],
-    openaiModels: [...new Set(OPENAI_ATS_MODELS.filter(Boolean))],
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0,
-  });
-
-  return parseModelOutput(content);
+function buildCacheKey(text: string, jd: string, routeTag: string): string {
+  return createHash('sha256')
+    .update(`${ENGINE_CACHE_PREFIX}|${text}|${jd}|${routeTag}`)
+    .digest('hex');
 }
 
 function userFacingError(err: unknown): string {
   if (err instanceof OpenAI.APIError) {
     if (err.code === 'insufficient_quota') {
-      return 'AI provider usage limit reached. Add credits (OpenRouter/OpenAI) or try again later.';
+      return 'AI provider usage limit reached. Add credits (OpenRouter) or try again later.';
     }
     if (err.status === 401) {
-      return 'Resume checker API key is invalid or missing. Check OPENROUTER_API_KEY or OPENAI_API_KEY.';
+      return 'Resume checker API key is invalid or missing. Check OPENROUTER_API_KEY.';
     }
     if (err.status === 402) {
-      return 'OpenRouter account needs credits. Top up at openrouter.ai or set OPENAI_API_KEY as fallback.';
+      return 'OpenRouter account needs credits. Top up at openrouter.ai.';
     }
     if (err.status === 429) {
       return 'Too many requests to the AI provider. Wait a minute and try again.';
@@ -220,7 +116,7 @@ function userFacingError(err: unknown): string {
       return 'The AI provider had a server error. Please try again in a moment.';
     }
     if (err.code === 'context_length_exceeded') {
-      return 'Resume or job description is too long for one request. Shorten the job description or use a smaller file.';
+      return 'Resume is too long for one request. Try a shorter file.';
     }
   }
   if (err instanceof Error) {
@@ -231,18 +127,25 @@ function userFacingError(err: unknown): string {
   return "We couldn't analyze this resume right now. Please try again in a moment.";
 }
 
+/**
+ * Pipeline order (security-relevant):
+ * 1) cheap validation (no parse)
+ * 2) rate limit — before PDF/DOCX/TXT extraction and LLM
+ * 3) extract text
+ * 4) Redis result cache (skip LLM on hit)
+ * 5) analyze + cache write
+ */
 export async function checkAtsAction(_prevState: AtsState, formData: FormData): Promise<AtsState> {
   if (!isFreeToolAiConfigured()) {
     return {
       error:
-        'Resume checker is not configured. Set OPENROUTER_API_KEY (recommended) or OPENAI_API_KEY in the environment.',
+        'Resume checker is not configured. Set OPENROUTER_API_KEY in the environment.',
       code: 'NOT_CONFIGURED',
     };
   }
 
   const headersList = await headers();
   const ip = getClientIp(headersList);
-  const now = Date.now();
 
   const file = formData.get('file');
   const rawJd = formData.get('jobDescription');
@@ -262,31 +165,23 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     return { error: 'File exceeds 5 MB limit.', code: 'TOO_LARGE' };
   }
 
-  const ext = `.${normalizeFileName(file.name).split('.').pop()?.toLowerCase() ?? ''}`;
-  if (ext !== '.pdf' && ext !== '.txt') {
+  const normalizedName = normalizeAtsResumeName(file.name);
+  const ext = `.${normalizedName.split('.').pop()?.toLowerCase() ?? ''}`;
+  const mime = (file.type || '').toLowerCase();
+  const looksDocx = ext === '.docx' || mime === DOCX_MIME;
+  const looksTxt = ext === '.txt' || mime === 'text/plain';
+  const looksPdf = ext === '.pdf' || mime === 'application/pdf';
+
+  if (!looksDocx && !looksTxt && !looksPdf) {
     return { error: PDF_USER_MESSAGES.UNSUPPORTED, code: 'UNSUPPORTED' };
   }
 
-  let resumeText = '';
-  try {
-    resumeText = await extractFileText(file);
-  } catch (pdfErr) {
-    console.error('[ats-checker] resume extract error', pdfErr);
-    return pdfErrorToState(pdfErr);
-  }
+  let sourceKind: AtsSourceKind;
+  if (ext === '.docx' || (looksDocx && !looksPdf && !looksTxt)) sourceKind = 'docx';
+  else if (ext === '.txt' || (looksTxt && !looksPdf)) sourceKind = 'txt';
+  else sourceKind = 'pdf';
 
-  const trimmed = resumeText.trim();
-  if (!trimmed || trimmed.length < MIN_RESUME_CHARS) {
-    return {
-      error:
-        'Not enough readable text (need at least 50 characters). Scanned PDFs often have no text — try "Save as PDF" from Word or paste plain text.',
-      code: 'TOO_SHORT',
-    };
-  }
-
-  // Job description: PDF/TXT upload wins over paste when both are present
-  // (last input wins — uploading a file is the more deliberate action).
-  let jobDescription = pastedJd;
+  // Cheap JD file validation only — no extract yet.
   if (jdFile && jdFile instanceof File && jdFile.size > 0) {
     if (jdFile.size > MAX_FILE_BYTES) {
       return { error: 'Job description file exceeds 5 MB limit.', code: 'TOO_LARGE' };
@@ -298,6 +193,56 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
         code: 'UNSUPPORTED',
       };
     }
+  }
+
+  // Rate limit BEFORE any resume/JD parsing or LLM work.
+  const limited = await checkAndConsumeFreeToolLimit('ats-checker', ip, {
+    failClosed: true,
+  });
+  if (!limited.ok) {
+    return { error: limited.message, code: 'RATE_LIMIT' };
+  }
+
+  let pdfBytes: Uint8Array | null = null;
+  let resumeText = '';
+
+  try {
+    if (sourceKind === 'txt') {
+      resumeText = await file.text();
+    } else if (sourceKind === 'docx') {
+      const arrayBuffer = await file.arrayBuffer();
+      resumeText = await extractDocxText(new Uint8Array(arrayBuffer));
+    } else {
+      // Clone twice: pdf.js may detach/transfer the ArrayBuffer during extractText,
+      // which would zero-out a shared Uint8Array before layout inspection.
+      const arrayBuffer = await file.arrayBuffer();
+      const extractCopy = new Uint8Array(arrayBuffer.slice(0));
+      pdfBytes = new Uint8Array(arrayBuffer.slice(0));
+      const jdHeaderList = await headers();
+      resumeText = await extractText(extractCopy, {
+        mimeType: file.type,
+        fileNameHint: normalizedName,
+        vercelId: jdHeaderList.get('x-vercel-id') ?? '',
+        source: 'ats-checker',
+      });
+    }
+  } catch (extractErr) {
+    console.error('[ats-checker] resume extract error', extractErr);
+    return resumeExtractErrorToState(extractErr);
+  }
+
+  const trimmed = resumeText.trim();
+  if (!trimmed || trimmed.length < MIN_RESUME_CHARS) {
+    return {
+      error:
+        'Not enough readable text (need at least 50 characters). Scanned PDFs and image-only Word files often have no text — try a text-based PDF/DOCX or paste plain text.',
+      code: 'TOO_SHORT',
+    };
+  }
+
+  let jobDescription = pastedJd;
+  if (jdFile && jdFile instanceof File && jdFile.size > 0) {
+    const jdExt = `.${normalizeFileName(jdFile.name).split('.').pop()?.toLowerCase() ?? ''}`;
     try {
       const jdHeaderList = await headers();
       const jdNormalized = normalizeFileName(jdFile.name);
@@ -320,20 +265,40 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   }
 
   const { route } = getToolChatClient();
-  const cacheKey = buildCacheKey(trimmed, `${jobDescription}|${route === 'openrouter' ? 'or' : 'oa'}`);
-  const cached = resultCache.get(cacheKey);
-  if (cached && now < cached.expiresAt) {
-    return { result: cached.result };
-  }
-
-  const limited = checkAndConsumeFreeToolLimit('ats-checker', ip);
-  if (!limited.ok) {
-    return { error: limited.message, code: 'RATE_LIMIT' };
+  const cacheKey = buildCacheKey(
+    trimmed,
+    `${jobDescription}|phase2-jd-match`,
+    route === 'openrouter' ? 'or' : 'oa',
+  );
+  const cached = await getCachedAtsResult(cacheKey);
+  if (cached) {
+    return { result: cached };
   }
 
   try {
-    const result = await analyzeAts(trimmed, jobDescription);
-    resultCache.set(cacheKey, { result, expiresAt: now + CACHE_TTL_MS });
+    const { result, meta } = await runAtsAnalysis({
+      rawText: trimmed,
+      pdfBytes,
+      sourceKind,
+      jobDescription: jobDescription.length >= 40 ? jobDescription : undefined,
+    });
+    console.info(
+      '[ats-checker] tokens',
+      JSON.stringify({
+        model: meta.model,
+        prompt_tokens: meta.usage?.prompt_tokens ?? null,
+        completion_tokens: meta.usage?.completion_tokens ?? null,
+        total_tokens: meta.usage?.total_tokens ?? null,
+        jdExtract_prompt_tokens: meta.jdExtractUsage?.prompt_tokens ?? null,
+        jdExtract_completion_tokens: meta.jdExtractUsage?.completion_tokens ?? null,
+        embedding_tokens: meta.embeddingUsage?.total_tokens ?? null,
+        embedding_cost: meta.embeddingUsage?.cost ?? null,
+        embedding_model: meta.embeddingModel ?? null,
+        jdPresent: jobDescription.length >= 40,
+        jdMatchScore: result.jdMatch?.score ?? null,
+      }),
+    );
+    await setCachedAtsResult(cacheKey, result);
     return { result };
   } catch (err) {
     console.error('[ats-checker] analyze failed', err);

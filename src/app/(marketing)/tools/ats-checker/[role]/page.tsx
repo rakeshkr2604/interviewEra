@@ -43,7 +43,7 @@ const ORIGIN = getCanonicalSiteOrigin()
 const WEBAPP_LD = webApplicationJsonLd({
   name: 'Free ATS Resume Checker',
   description:
-    'Check if your resume passes Applicant Tracking Systems. Get an instant ATS compatibility score with missing keyword analysis and formatting fixes — free, no sign-up.',
+    'See how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free, no sign-up. Not a single universal ATS score.',
   url: canonicalUrl('/tools/ats-checker'),
   providerId: schemaIds.organization,
 })
@@ -51,19 +51,23 @@ const WEBAPP_LD = webApplicationJsonLd({
 const FAQ_PAIRS = [
   {
     question: 'What is an ATS resume check?',
-    answer: 'An Applicant Tracking System (ATS) is software that companies use to automatically screen resumes before a human reads them. An ATS check analyses your resume for keyword match rate, formatting compatibility, and structure — and flags issues that could cause your resume to be filtered out.',
+    answer:
+      'An Applicant Tracking System (ATS) is software that companies use to automatically screen resumes before a human reads them. InterviewEra’s check reports four explainable dimensions — Parseability, Field Extraction, Structure Quality, and JD Match when you add a job description — and flags issues that could hurt visibility in automated screening.',
   },
   {
     question: 'Why do I need an ATS-optimised resume?',
-    answer: 'Over 75% of large companies use ATS software. A resume that is not ATS-friendly may be rejected before any recruiter sees it — even if you are well-qualified for the role. Optimising for ATS increases your chances of reaching the interview stage.',
+    answer:
+      'Over 75% of large companies use ATS software. A resume that parsers struggle to read may be rejected before any recruiter sees it — even if you are well-qualified for the role. Improving parseability, structure, and keyword alignment increases your chances of reaching the interview stage.',
   },
   {
     question: 'What makes a resume ATS-friendly?',
-    answer: 'ATS-friendly resumes use standard section headings (Experience, Education, Skills), avoid tables and text boxes, include role-specific keywords from the job description, and are saved as a standard .docx or .pdf file. Avoid headers/footers for critical information.',
+    answer:
+      'Resumes that parse reliably use standard section headings (Experience, Education, Skills), avoid tables and text boxes, include role-specific keywords from the job description, and are saved as a standard .docx or .pdf file. Avoid headers/footers for critical information.',
   },
   {
     question: 'Is the ATS checker free?',
-    answer: 'Yes — the InterviewEra ATS checker is completely free to use. Upload your resume, get an instant compatibility score, and see actionable fixes. No sign-up required.',
+    answer:
+      'Yes — the InterviewEra ATS checker is completely free to use. Upload your resume, review Parseability, Field Extraction, Structure Quality (and JD Match if you add a job description), and see actionable fixes. No sign-up required.',
   },
 ]
 
@@ -75,16 +79,16 @@ export default async function AtsRolePage({ params }: Props) {
   const BREADCRUMB_LD = breadcrumbListJsonLd(toolAtsRoleBreadcrumbs(role), ORIGIN)
   const FAQ_LD = faqPageJsonLd(FAQ_PAIRS)
   const HOWTO_LD = howToJsonLd(
-    `How to check if your ${role.label} resume is ATS-friendly`,
-    `Upload your ${role.label} resume to get an instant ATS compatibility score with specific fixes.`,
+    `How to check how parsers read your ${role.label} resume`,
+    `Upload your ${role.label} resume to review Parseability, Field Extraction, Structure Quality, and optional JD Match with specific fixes.`,
     [
       {
         name: 'Upload your resume',
-        text: 'Upload your resume as a .pdf or .docx file. The checker works on any resume format — it will tell you what needs fixing.',
+        text: 'Upload your resume as a .pdf, .docx, or .txt file. Field and structure checks run for all formats; full layout checks (columns, header/footer bands) apply to PDF — Word uploads disclose that layout checks are limited.',
       },
       {
-        name: 'Review your ATS score',
-        text: `You will receive an ATS compatibility score out of 100. For ${role.label} roles, aim for a score above 80 to reliably pass automated screening.`,
+        name: 'Review the four dimensions',
+        text: `You will see separate scores for Parseability, Field Extraction, and Structure Quality — plus JD Match if you paste or upload a job description. For ${role.label} roles, strengthen weak dimensions and close keyword gaps before you apply.`,
       },
       {
         name: 'Fix flagged issues',
@@ -92,7 +96,7 @@ export default async function AtsRolePage({ params }: Props) {
       },
       {
         name: 'Re-check and apply',
-        text: `Make the suggested fixes and re-upload your resume. Once your score is above 80, your ${role.label} resume is ready to submit to companies.`,
+        text: `Make the suggested fixes and re-upload your resume. When Parseability and Structure look solid and JD Match covers the role’s required skills, your ${role.label} resume is ready to submit.`,
       },
     ],
   )
@@ -133,7 +137,7 @@ export default async function AtsRolePage({ params }: Props) {
             className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Free tool · instant score · no sign-up
+            Free tool · explainable checks · no sign-up
           </p>
           <h1
             className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl"
@@ -145,8 +149,8 @@ export default async function AtsRolePage({ params }: Props) {
             className="mt-4 max-w-2xl text-base leading-relaxed sm:text-lg"
             style={{ color: 'var(--text-secondary)' }}
           >
-            Find out if your {role.label} resume passes ATS screening at top Indian companies.
-            Get an instant compatibility score, missing keyword analysis, and specific formatting fixes — free, no sign-up.
+            See how a typical parser reads your {role.label} resume — Parseability, Field Extraction,
+            Structure Quality, and JD Match when you add a job description — with specific fixes. Free, no sign-up.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">
@@ -294,7 +298,7 @@ export default async function AtsRolePage({ params }: Props) {
               className="inline-flex items-center justify-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
               style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
             >
-              Check resume ATS score
+              Check resume parseability
             </Link>
           </div>
         </div>

@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import { reconstructJdMatchScore } from '@/lib/ats/jd-match-score';
+
+describe('reconstructJdMatchScore', () => {
+  it('explains the 90 vs 78 gap at 100% required coverage (Phase 2 follow-up)', () => {
+    // Case (a)-shaped: strong preferred + strong semantic
+    const a = reconstructJdMatchScore({
+      requiredCoverage: 100,
+      preferredCoverage: 75,
+      jdRequirementCoverage: 96,
+      resumeFocusAlignment: 65,
+    });
+    // Case (c)-shaped: same required, weaker preferred + semantic
+    const c = reconstructJdMatchScore({
+      requiredCoverage: 100,
+      preferredCoverage: 33,
+      jdRequirementCoverage: 78,
+      resumeFocusAlignment: 57,
+    });
+
+    expect(a.score).toBe(90);
+    expect(c.score).toBe(78);
+
+    // Gap must be attributable to non-required components
+    const preferredDelta =
+      a.contributions.preferredExact - c.contributions.preferredExact;
+    const semanticDelta =
+      a.contributions.jdRequirementSemantic +
+      a.contributions.resumeFocusSemantic -
+      (c.contributions.jdRequirementSemantic + c.contributions.resumeFocusSemantic);
+
+    expect(a.contributions.requiredExact).toBe(c.contributions.requiredExact);
+    expect(preferredDelta).toBeGreaterThan(5); // ~6.3 pts from preferred
+    expect(semanticDelta).toBeGreaterThan(4); // ~5.7 pts from semantic pair
+    expect(a.score - c.score).toBe(12);
+  });
+
+  it('is deterministic and clamps', () => {
+    const over = reconstructJdMatchScore({
+      requiredCoverage: 120,
+      preferredCoverage: -10,
+      jdRequirementCoverage: 100,
+      resumeFocusAlignment: 100,
+    });
+    expect(over.score).toBeLessThanOrEqual(100);
+    expect(over.score).toBeGreaterThanOrEqual(0);
+  });
+});

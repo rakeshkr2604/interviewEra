@@ -13,10 +13,14 @@ interface FreeToolPageLayoutProps {
   title: string;
   description: string;
   bullets: readonly FreeToolBullet[];
+  /** Vertical list (default) or horizontal 3-up trust row */
+  bulletsLayout?: 'stack' | 'row';
   /** e.g. STAR legend grid — rendered after description, before bullets */
   leftSlot?: ReactNode;
   /** Cross-links under bullets */
   footerSlot?: ReactNode;
+  /** Full-width band under both columns (e.g. trust row spanning the page) */
+  bottomSlot?: ReactNode;
   children: ReactNode;
 }
 
@@ -29,13 +33,15 @@ export function FreeToolPageLayout({
   title,
   description,
   bullets,
+  bulletsLayout = 'stack',
   leftSlot,
   footerSlot,
+  bottomSlot,
   children,
 }: FreeToolPageLayoutProps) {
   return (
     <main
-      className="ie-landing-type relative overflow-hidden pb-20 pt-10 sm:pb-28 sm:pt-14 md:pb-32 md:pt-20"
+      className="ie-landing-type relative overflow-hidden px-4 pb-3 pt-3 sm:px-5 sm:pb-2.5 sm:pt-5 md:pt-6"
       style={{ color: 'var(--text-primary)' }}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -58,8 +64,9 @@ export function FreeToolPageLayout({
       </div>
 
       <div className={cn('relative', LANDING_PAGE_CONTAINER)}>
-        <div className="grid items-start gap-12 lg:grid-cols-12 lg:gap-14 xl:gap-16">
-          <div className="mx-auto max-w-xl space-y-7 text-center lg:col-span-5 lg:mx-0 lg:max-w-none lg:pt-2 lg:text-left">
+        {/* Mobile-first: form (tool) first, marketing copy below; desktop keeps copy | form */}
+        <div className="grid items-start gap-8 sm:gap-10 lg:grid-cols-12 lg:gap-14 xl:gap-16">
+          <div className="order-2 mx-auto max-w-xl space-y-5 text-center sm:space-y-7 lg:order-1 lg:col-span-5 lg:mx-0 lg:max-w-none lg:pt-2 lg:text-left">
             <div
               className="inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium tracking-wide"
               style={{
@@ -72,25 +79,54 @@ export function FreeToolPageLayout({
               {eyebrow}
             </div>
 
-            <div className="space-y-4">
-              <h1 className="text-[2rem] font-bold leading-[1.08] tracking-tight text-balance sm:text-4xl md:text-5xl md:leading-[1.05]">
+            <div className="space-y-3 sm:space-y-4">
+              <h1 className="text-[1.75rem] font-bold leading-[1.12] tracking-tight text-balance sm:text-4xl sm:leading-[1.08] md:text-5xl md:leading-[1.05]">
                 {title}
               </h1>
-              <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
+              <p className="text-sm leading-relaxed sm:text-base md:text-lg" style={{ color: 'var(--text-secondary)' }}>
                 {description}
               </p>
             </div>
 
             {leftSlot}
 
-            <ul className="mx-auto max-w-md space-y-3.5 text-left sm:max-w-lg lg:mx-0 lg:max-w-none">
+            <ul
+              className={cn(
+                bulletsLayout === 'row'
+                  ? 'mx-auto grid max-w-lg grid-cols-1 gap-2.5 text-left sm:grid-cols-3 sm:gap-3 lg:mx-0 lg:max-w-none'
+                  : 'mx-auto max-w-md space-y-3.5 text-left sm:max-w-lg lg:mx-0 lg:max-w-none',
+              )}
+            >
               {bullets.map((item, i) => {
                 const Icon = item.icon;
                 const key = 'text' in item ? item.text : item.title;
+                const isRow = bulletsLayout === 'row';
                 return (
-                  <li key={`${key}-${i}`} className="flex gap-3 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+                  <li
+                    key={`${key}-${i}`}
+                    className={cn(
+                      isRow
+                        ? [
+                            'group flex flex-row items-center gap-3 rounded-xl border px-3 py-3 text-left sm:flex-col sm:items-center sm:gap-2 sm:px-2 sm:py-3 sm:text-center',
+                            'border-(--card-border) bg-[color-mix(in_srgb,var(--card-bg)_88%,transparent)]',
+                            'shadow-none transition-[transform,box-shadow,border-color,background-color] duration-200 ease-out',
+                            'hover:-translate-y-0.5 hover:scale-[1.04]',
+                            'hover:border-[color-mix(in_srgb,var(--accent-primary)_40%,var(--card-border))]',
+                            'hover:bg-[color-mix(in_srgb,var(--accent-primary)_10%,var(--card-bg))]',
+                            'hover:shadow-[0_10px_28px_-12px_color-mix(in_srgb,var(--accent-primary)_35%,transparent)]',
+                            'motion-reduce:transform-none motion-reduce:transition-none',
+                          ].join(' ')
+                        : 'flex gap-3 text-sm sm:text-base',
+                    )}
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
                     <span
-                      className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl"
+                      className={cn(
+                        'flex shrink-0 items-center justify-center rounded-xl transition-transform duration-200 ease-out motion-reduce:transform-none',
+                        isRow
+                          ? 'size-9 group-hover:scale-110 sm:size-9'
+                          : 'mt-0.5 size-9',
+                      )}
                       style={{
                         background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
                         color: 'var(--accent-primary)',
@@ -98,7 +134,12 @@ export function FreeToolPageLayout({
                     >
                       <Icon className="size-4" aria-hidden />
                     </span>
-                    <span className="leading-relaxed">
+                    <span
+                      className={cn(
+                        'leading-snug',
+                        isRow ? 'text-xs font-medium sm:text-[10px] sm:font-medium md:text-xs' : 'text-sm leading-relaxed sm:text-base',
+                      )}
+                    >
                       {'text' in item ? (
                         item.text
                       ) : (
@@ -118,8 +159,12 @@ export function FreeToolPageLayout({
             {footerSlot}
           </div>
 
-          <div className="mx-auto w-full max-w-xl lg:col-span-7 lg:mx-0 lg:max-w-none lg:min-w-0">{children}</div>
+          <div className="order-1 mx-auto w-full max-w-xl lg:order-2 lg:col-span-7 lg:mx-0 lg:max-w-none lg:min-w-0">
+            {children}
+          </div>
         </div>
+
+        {bottomSlot ? <div className="mt-5 sm:mt-7">{bottomSlot}</div> : null}
       </div>
     </main>
   );

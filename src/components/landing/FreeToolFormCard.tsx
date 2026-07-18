@@ -46,8 +46,8 @@ export function FreeToolFormCard({
 }: FreeToolFormCardProps) {
   return (
     <div className={cn(cardShell, className)} style={cardShellStyle}>
-      <div className="border-b px-5 py-4 sm:px-7 sm:py-5" style={headerStripStyle}>
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="border-b px-4 py-3.5 sm:px-7 sm:py-5" style={headerStripStyle}>
+        <div className="flex flex-wrap items-start justify-between gap-2.5 sm:gap-3">
           <div className="min-w-0 flex-1">
             <p
               className="text-[10px] font-bold uppercase tracking-[0.14em] sm:text-[11px]"
@@ -55,7 +55,7 @@ export function FreeToolFormCard({
             >
               {headerEyebrow}
             </p>
-            <p className="mt-1 text-sm font-semibold sm:text-base lg:text-lg" style={{ color: 'var(--text-primary)' }}>
+            <p className="mt-1 text-sm font-semibold leading-snug sm:text-base lg:text-lg" style={{ color: 'var(--text-primary)' }}>
               {headerTitle}
             </p>
             {headerSubtitle ? (

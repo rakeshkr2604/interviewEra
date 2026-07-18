@@ -28,7 +28,6 @@ export function isFreeToolAiConfigured(): boolean {
  */
 export async function completeFreeToolChatChain(options: {
   openrouterModels: string[];
-  openaiModels: string[];
   messages: OpenAI.Chat.ChatCompletionMessageParam[];
   temperature: number;
 }): Promise<string> {

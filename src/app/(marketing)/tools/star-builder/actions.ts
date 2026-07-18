@@ -230,7 +230,6 @@ async function completePrimaryStar(prompt: string): Promise<string> {
   }
   const raw = await completeFreeToolChatChain({
     openrouterModels: [...new Set(OPENROUTER_STAR_MODELS.filter(Boolean))],
-    openaiModels: [],
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
   });
@@ -314,7 +313,9 @@ export async function buildStarAction(
 
   const headersList = await headers();
   const ip = getClientIp(headersList);
-  const limited = checkAndConsumeFreeToolLimit('star-builder', ip);
+  const limited = await checkAndConsumeFreeToolLimit('star-builder', ip, {
+    failClosed: false,
+  });
   if (!limited.ok) {
     return { error: limited.message };
   }

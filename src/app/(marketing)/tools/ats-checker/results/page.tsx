@@ -3,8 +3,9 @@ import { generateMetadata } from '@/lib/seo/metadata';
 import { AtsResultsPageClient } from './AtsResultsPageClient';
 
 export const metadata: Metadata = generateMetadata({
-  title: 'ATS check results',
-  description: 'Your ATS compatibility score and actionable resume feedback.',
+  title: 'Resume readiness results',
+  description:
+    'InterviewEra parseability, field extraction, and structure readiness — plus what a typical parser extracts from your resume.',
   path: '/tools/ats-checker/results',
   noIndex: true,
   noIndexFollow: true,

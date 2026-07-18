@@ -259,9 +259,9 @@ export const PAGE_SEO = {
     path: '/tools/question-generator',
   }),
   atsChecker: generateMetadata({
-    title: 'Free ATS Resume Checker',
+    title: 'Free Resume Parser Check',
     description:
-      'Check if your resume passes Applicant Tracking Systems. Instant ATS compatibility score. Free tool.',
+      'See how a typical parser reads your resume — Parseability, Field Extraction, and Structure. Free tool.',
     path: '/tools/ats-checker',
   }),
   campus: generateMetadata({

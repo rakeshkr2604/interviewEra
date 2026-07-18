@@ -291,7 +291,7 @@ export function toolAtsRoleMetadata(role: Role): Metadata {
 
   return generateMetadata({
     title: `ATS Resume Check: ${role.shortLabel}`,
-    description: `Check if your ${role.label} resume passes ATS screening. Instant score, keyword gaps, and formatting fixes — free, no sign-up.`,
+    description: `Check how parsers read your ${role.label} resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free, no sign-up.`,
     path,
     keywords: [
       `${role.label} ATS resume checker`,

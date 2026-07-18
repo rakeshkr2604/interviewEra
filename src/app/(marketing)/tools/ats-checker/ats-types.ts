@@ -1,36 +1,21 @@
-/** Shared ATS checker types + UI state — must NOT live in a `"use server"` file. */
+/**
+ * App-route re-exports of ATS v2 types — must NOT live in a `"use server"` file.
+ * Canonical definitions: `@/lib/ats/types`.
+ */
 
-export type AtsIssueType = 'success' | 'warning' | 'error';
+export type {
+  FindingSeverity,
+  Finding,
+  ExtractedExperience,
+  ExtractedEducation,
+  ExtractedResumeData,
+  ActionPriority,
+  AtsActionItem,
+  AtsJdMatch,
+  AtsResultV2,
+  AtsResult,
+  AtsErrorCode,
+  AtsState,
+} from '@/lib/ats/types';
 
-export interface AtsIssue {
-  type: AtsIssueType;
-  text: string;
-}
-
-export interface AtsResult {
-  score: number;
-  issues: AtsIssue[];
-}
-
-export type AtsErrorCode =
-  | 'PARSER_UNAVAILABLE'
-  | 'ENCRYPTED'
-  | 'SCANNED_NO_TEXT'
-  | 'CORRUPT'
-  | 'UNSUPPORTED'
-  | 'PARSER_RUNTIME'
-  | 'EMPTY'
-  | 'TOO_LARGE'
-  | 'NO_FILE'
-  | 'AI_ERROR'
-  | 'RATE_LIMIT'
-  | 'NOT_CONFIGURED'
-  | 'TOO_SHORT';
-
-export interface AtsState {
-  result?: AtsResult;
-  error?: string;
-  code?: AtsErrorCode;
-}
-
-export const initialState: AtsState = {};
+export { initialState, EMPTY_EXTRACTED } from '@/lib/ats/types';
