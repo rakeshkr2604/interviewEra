@@ -1,4 +1,8 @@
 # Fingerprint-level gitleaks ignores (commit:file:rule:line — narrowest possible scope).
 # QUESTIONS_RESULT_STORAGE_KEY is a sessionStorage key name ('ie-questions-result-v2'),
 # not a credential; generic-api-key flagged it on string shape/entropy alone.
+# Going forward the line carries an inline `gitleaks:allow` comment (survives
+# squash/rebase); these fingerprints cover the historical commits that predate it.
 9e52370036f87dd6f35b5e8e30681d3e9b6b4db9:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:10
+# PR #63 squash-merge re-created the same line under a new commit hash.
+4f9ffbee5bc6da0aa3d05c39d837a76b98b9563b:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:10

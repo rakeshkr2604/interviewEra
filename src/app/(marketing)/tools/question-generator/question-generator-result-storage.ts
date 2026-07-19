@@ -7,7 +7,7 @@ import { z } from 'zod';
 
 // v2: cards carry difficulty + probing, payload carries set meta.
 // Old ie-questions-result-v1 payloads are simply ignored (different key).
-export const QUESTIONS_RESULT_STORAGE_KEY = 'ie-questions-result-v2';
+export const QUESTIONS_RESULT_STORAGE_KEY = 'ie-questions-result-v2'; // gitleaks:allow — sessionStorage key name, not a credential
 
 const storedMetaSchema = z.object({
   mode: z.enum(['role', 'jd']),
