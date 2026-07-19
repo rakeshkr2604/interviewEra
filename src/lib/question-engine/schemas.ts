@@ -11,13 +11,29 @@ import { z } from 'zod';
 export const QG_CATEGORIES = ['technical', 'behavioral', 'situational'] as const;
 export const QG_DIFFICULTIES = ['easy', 'medium', 'hard'] as const;
 
+/** Form-level enums — single source of truth for the form, the Server Action, and the preference profile. */
+export const QG_LEVELS = ['fresher', '1-3 years', '3+ years'] as const;
+export const QG_DOMAINS = [
+  'general',
+  'software engineering',
+  'product management',
+  'data science',
+  'marketing',
+] as const;
+
 export type QgCategory = (typeof QG_CATEGORIES)[number];
 export type QgDifficulty = (typeof QG_DIFFICULTIES)[number];
+export type QgLevel = (typeof QG_LEVELS)[number];
+export type QgDomain = (typeof QG_DOMAINS)[number];
 
 export const QG_SET_SIZE = 10;
 
 /** Hard cap on pasted job-description length (client and server enforced). */
 export const QG_JD_MAX_CHARS = 4_000;
+/** Hard cap on the topic/subject string length (topic mode, client and server enforced). */
+export const QG_TOPIC_MAX_CHARS = 80;
+/** Hard cap on the company-name string length (company-style mode, client and server enforced). */
+export const QG_COMPANY_MAX_CHARS = 60;
 
 export const qgQuestionSchema = z
   .object({
@@ -48,14 +64,24 @@ export type QgQuestion = z.infer<typeof qgQuestionSchema>;
 export type QgSet = z.infer<typeof qgSetSchema>;
 export type QgAnswer = z.infer<typeof qgAnswerSchema>;
 
-/** Generation modes shipped in Phase 1. */
-export type QgMode = 'role' | 'jd';
+/** Generation modes: role/jd shipped in Phase 1, topic/company added in Phase 3. */
+export type QgMode = 'role' | 'jd' | 'topic' | 'company';
 
-/** Set-level metadata carried alongside the questions (storage + telemetry + CTA). */
+/**
+ * Set-level metadata carried alongside the questions (storage + telemetry + CTA).
+ * Unused fields for a given mode are empty-string sentinels (not optional) so
+ * every consumer can treat the shape uniformly — same convention as Phase 1's
+ * "role is empty in JD mode".
+ */
 export interface QgResultMeta {
   mode: QgMode;
-  /** Empty string in JD mode (role is not collected there). */
+  /** Empty string in jd/topic mode; populated in role and company mode. */
   role: string;
   level: string;
+  /** Forced to 'general' in jd/topic mode; a real domain in role and company mode. */
   domain: string;
+  /** Populated only in topic mode. */
+  topic: string;
+  /** Populated only in company mode. */
+  company: string;
 }

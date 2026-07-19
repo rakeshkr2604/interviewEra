@@ -2,13 +2,26 @@
 
 import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ChevronDown, Lightbulb, Loader2, Mic } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Info,
+  Lightbulb,
+  Loader2,
+  Mic,
+  ThumbsDown,
+  ThumbsUp,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import type { QgAnswer, QgQuestion, QgResultMeta } from '@/lib/question-engine/schemas';
 import { qgAnswerSchema } from '@/lib/question-engine/schemas';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
-import { trackQgAnswerReveal, trackQgPracticeClick } from './qg-analytics';
+import {
+  trackQgAnswerReveal,
+  trackQgPracticeClick,
+  trackQgQuestionRated,
+} from './qg-analytics';
 import { cn } from '@/lib/utils';
 
 function categoryBadgeStyle(category: QgQuestion['category']): CSSProperties {
@@ -59,6 +72,8 @@ type AnswerState =
   | { status: 'ready'; answer: QgAnswer }
   | { status: 'error'; message: string };
 
+type QuestionRating = 'up' | 'down';
+
 function AnswerSection({ title, items }: { title: string; items: readonly string[] }) {
   return (
     <div className="space-y-1.5">
@@ -92,6 +107,7 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
   const [answerState, setAnswerState] = useState<AnswerState>({ status: 'idle' });
   const [revealed, setRevealed] = useState(false);
   const [revealTracked, setRevealTracked] = useState(false);
+  const [rating, setRating] = useState<QuestionRating | null>(null);
 
   const practiceHref = meta.role
     ? `/interview/new?role=${encodeURIComponent(meta.role)}&src=qg`
@@ -114,6 +130,7 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
           category: question.category,
           ...(meta.role ? { role: meta.role } : {}),
           ...(meta.level ? { level: meta.level } : {}),
+          ...(meta.topic ? { topic: meta.topic } : {}),
         }),
       });
 
@@ -147,6 +164,18 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
         message: 'Network error. Please check your connection and try again.',
       });
     }
+  }
+
+  function rateQuestion(nextRating: QuestionRating): void {
+    if (rating !== null) return;
+    setRating(nextRating);
+    trackQgQuestionRated({
+      rating: nextRating,
+      category: question.category,
+      difficulty: question.difficulty,
+      mode: meta.mode,
+      order: question.order,
+    });
   }
 
   return (
@@ -248,7 +277,71 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
               <Mic className="size-3.5" aria-hidden />
               Practice this in a mock interview
             </Link>
+
+            <div
+              className="ml-auto flex items-center gap-1"
+              aria-label="Rate this question"
+            >
+              <button
+                type="button"
+                onClick={() => rateQuestion('up')}
+                disabled={rating !== null}
+                title="This question was helpful"
+                aria-label="This question was helpful"
+                aria-pressed={rating === 'up'}
+                className="inline-flex size-8 items-center justify-center rounded-full border transition-colors disabled:cursor-default"
+                style={{
+                  borderColor:
+                    rating === 'up' ? 'var(--accent-success)' : 'var(--card-border)',
+                  background:
+                    rating === 'up'
+                      ? 'color-mix(in srgb, var(--accent-success) 16%, transparent)'
+                      : 'transparent',
+                  color:
+                    rating === 'up' ? 'var(--accent-success)' : 'var(--text-muted)',
+                  opacity: rating === 'down' ? 0.45 : 1,
+                }}
+              >
+                <ThumbsUp
+                  className="size-3.5"
+                  fill={rating === 'up' ? 'currentColor' : 'none'}
+                  aria-hidden
+                />
+              </button>
+              <button
+                type="button"
+                onClick={() => rateQuestion('down')}
+                disabled={rating !== null}
+                title="This question wasn't helpful"
+                aria-label="This question wasn't helpful"
+                aria-pressed={rating === 'down'}
+                className="inline-flex size-8 items-center justify-center rounded-full border transition-colors disabled:cursor-default"
+                style={{
+                  borderColor:
+                    rating === 'down' ? 'var(--accent-danger)' : 'var(--card-border)',
+                  background:
+                    rating === 'down'
+                      ? 'color-mix(in srgb, var(--accent-danger) 14%, transparent)'
+                      : 'transparent',
+                  color:
+                    rating === 'down' ? 'var(--accent-danger)' : 'var(--text-muted)',
+                  opacity: rating === 'up' ? 0.45 : 1,
+                }}
+              >
+                <ThumbsDown
+                  className="size-3.5"
+                  fill={rating === 'down' ? 'currentColor' : 'none'}
+                  aria-hidden
+                />
+              </button>
+            </div>
           </div>
+
+          {rating !== null && (
+            <p className="text-right text-[11px]" style={{ color: 'var(--text-muted)' }} role="status">
+              Thanks for the feedback.
+            </p>
+          )}
 
           {answerState.status === 'error' && (
             <p className="text-xs font-medium" style={{ color: 'var(--accent-danger)' }} role="alert">
@@ -323,6 +416,29 @@ export function QuestionGeneratorResultsView({
               guide for structure, mistakes to avoid, and likely follow-ups.
             </p>
           </div>
+
+          {meta.mode === 'company' && (
+            <div
+              className="flex items-start gap-2 rounded-xl border-2 px-4 py-3"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-warning) 35%, var(--card-border))',
+                background: 'color-mix(in srgb, var(--accent-warning) 8%, transparent)',
+              }}
+              role="note"
+            >
+              <Info
+                className="mt-0.5 size-4 shrink-0"
+                style={{ color: 'var(--accent-warning)' }}
+                aria-hidden
+              />
+              <p className="text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+                AI-generated practice questions modeled on{' '}
+                <span className="font-semibold">{meta.company || 'this company'}</span>&apos;s
+                publicly known interview style and values — not real or leaked questions, and
+                actual questions will vary.
+              </p>
+            </div>
+          )}
 
           <ol className="space-y-3">
             {questions.map((q) => (

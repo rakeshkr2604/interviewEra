@@ -2,9 +2,10 @@
  * Question Engine v2 — Upstash Redis cache (follows src/lib/redis/question-cache.ts:
  * djb2 signature hash, fail-soft get/set that never throws to callers).
  *
- * Sets:    keyed on (mode, role, level, domain). JD mode is NEVER cached — the
- *          caller must not call these helpers for JD requests.
- * Answers: keyed on (question, level).
+ * Sets:    keyed per mode — role: (role, level, domain); topic: (topic, level);
+ *          company: (company, role, level, domain). JD mode is NEVER cached —
+ *          the caller must not call these helpers for JD requests.
+ * Answers: keyed on (question, level, topic).
  *
  * QG_PROMPT_VERSION is part of every key so a prompt bump invalidates
  * previously cached output.
@@ -32,18 +33,32 @@ function normalize(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
-export function buildQgSetCacheKey(input: {
-  mode: 'role';
-  role: string;
-  level: string;
-  domain: string;
-}): string {
-  const sig = [input.mode, normalize(input.role), normalize(input.level), normalize(input.domain)].join('|');
+export type QgSetCacheKeyInput =
+  | { mode: 'role'; role: string; level: string; domain: string }
+  | { mode: 'topic'; topic: string; level: string }
+  | { mode: 'company'; company: string; role: string; level: string; domain: string };
+
+export function buildQgSetCacheKey(input: QgSetCacheKeyInput): string {
+  const parts: string[] = [input.mode];
+  if (input.mode === 'role') {
+    parts.push(normalize(input.role), normalize(input.level), normalize(input.domain));
+  } else if (input.mode === 'topic') {
+    parts.push(normalize(input.topic), normalize(input.level));
+  } else {
+    parts.push(normalize(input.company), normalize(input.role), normalize(input.level), normalize(input.domain));
+  }
+  const sig = parts.join('|');
   return `qg:${QG_PROMPT_VERSION}:set:${djb2(sig)}`;
 }
 
-export function buildQgAnswerCacheKey(question: string, level: string): string {
-  const sig = `${normalize(question)}|${normalize(level)}`;
+export function buildQgAnswerCacheKey(
+  question: string,
+  level: string,
+  topic = '',
+): string {
+  // Topic is included so agentic-AI coaching cannot be shadowed by a generic
+  // cached guide for an identical question at the same experience level.
+  const sig = `${normalize(question)}|${normalize(level)}|${normalize(topic)}`;
   return `qg:${QG_PROMPT_VERSION}:ans:${djb2(sig)}`;
 }
 

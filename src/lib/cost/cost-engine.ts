@@ -29,6 +29,8 @@ const LLM_RATES: Record<string, TokenRate> = {
   'openrouter:openai/gpt-4.1-mini': { input: 0.40, output: 1.60 },  // NOT VERIFIED
   // Mistral (verified from provider-intelligence.ts)
   'mistral:mistral-small-latest':   { input: 0.10, output: 0.30 },
+  // Embeddings (ATS JD match) — APPROXIMATE rate, embeddings have no output tokens
+  'openrouter:openai/text-embedding-3-small': { input: 0.02, output: 0 },
 };
 
 // Fallback rate when model not in table
@@ -106,8 +108,9 @@ export const PLAN_MONTHLY_REVENUE_INR: Record<string, number> = {
   campus:     799, // per student/year → ~66.6/month
 };
 
-// Approximate INR → USD conversion (update when rate drifts significantly)
-const INR_TO_USD = 0.012;
+// Approximate July 2026 rate. Update manually when rate drifts significantly.
+export const USD_TO_INR = 84;
+const INR_TO_USD = 1 / USD_TO_INR;
 
 export function planMonthlyRevenueUSD(planTier: string): number {
   const inr = PLAN_MONTHLY_REVENUE_INR[planTier] ?? 0;

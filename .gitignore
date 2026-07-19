@@ -90,6 +90,7 @@ manual-test*
 test-output*
 logs/
 .voice-verify-out/
+.verify-out/
 *.log
 failed-emails.csv
 /screenshots/

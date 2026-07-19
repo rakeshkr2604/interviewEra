@@ -5,6 +5,7 @@ import { headers } from 'next/headers';
 import OpenAI from 'openai';
 import { getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
+import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
 import {
   extractText,
   normalizeFileName,
@@ -195,11 +196,14 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     }
   }
 
+  const signedIn = isSignedInFromHeaders(headersList);
+
   // Rate limit BEFORE any resume/JD parsing or LLM work.
   const limited = await checkAndConsumeFreeToolLimit('ats-checker', ip, {
     failClosed: true,
   });
   if (!limited.ok) {
+    logToolUsage({ tool: 'ats', event: 'rate_limited', signed_in: signedIn });
     return { error: limited.message, code: 'RATE_LIMIT' };
   }
 
@@ -272,6 +276,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   );
   const cached = await getCachedAtsResult(cacheKey);
   if (cached) {
+    logToolUsage({ tool: 'ats', event: 'cache_hit', signed_in: signedIn });
     return { result: cached };
   }
 
@@ -299,9 +304,13 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
       }),
     );
     await setCachedAtsResult(cacheKey, result);
+    // cost_usd is null here — per-call cost lands in ai_call_logs
+    // (ats_field_extraction / ats_jd_extraction / ats_embedding rows).
+    logToolUsage({ tool: 'ats', event: 'run', signed_in: signedIn });
     return { result };
   } catch (err) {
     console.error('[ats-checker] analyze failed', err);
+    logToolUsage({ tool: 'ats', event: 'error', signed_in: signedIn });
     return { error: userFacingError(err), code: 'AI_ERROR' };
   }
 }

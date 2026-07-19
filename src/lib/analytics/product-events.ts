@@ -73,7 +73,11 @@ export type ProductEventName =
   | 'nps_submitted'
   | 'qg_generate'
   | 'qg_answer_reveal'
-  | 'qg_practice_click';
+  | 'qg_practice_click'
+  | 'qg_question_rated'
+  | 'qg_profile_created'
+  | 'qg_profile_updated'
+  | 'qg_profile_saved_to_account';
 
 export type ProductEventPayload = {
   /** @deprecated Legacy field — use event_name at emit boundary. */

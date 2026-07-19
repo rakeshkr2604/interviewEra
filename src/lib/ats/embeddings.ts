@@ -4,6 +4,7 @@
  */
 
 import { createOpenRouterClient } from '@/lib/openrouter/client';
+import { logAICall } from '@/lib/telemetry/ai-logger';
 
 export const OPENROUTER_EMBEDDING_MODEL =
   process.env.OPENROUTER_EMBEDDING_MODEL?.trim() || 'openai/text-embedding-3-small';
@@ -72,10 +73,24 @@ export async function embedTexts(texts: string[]): Promise<EmbedBatchResult> {
     throw new Error('[ats-embeddings] OPENROUTER_API_KEY missing');
   }
 
-  const res = await client.embeddings.create({
-    model: OPENROUTER_EMBEDDING_MODEL,
-    input: cleaned,
-  });
+  const t0 = Date.now();
+  let res: Awaited<ReturnType<typeof client.embeddings.create>>;
+  try {
+    res = await client.embeddings.create({
+      model: OPENROUTER_EMBEDDING_MODEL,
+      input: cleaned,
+    });
+  } catch (err) {
+    void logAICall({
+      operation: 'ats_embedding',
+      provider: 'openrouter',
+      model: OPENROUTER_EMBEDDING_MODEL,
+      latency_ms: Date.now() - t0,
+      success: false,
+      error_category: 'http_error',
+    });
+    throw err;
+  }
 
   const vectors = res.data
     .slice()
@@ -85,6 +100,19 @@ export async function embedTexts(texts: string[]): Promise<EmbedBatchResult> {
   const usageRaw = res.usage as
     | { prompt_tokens?: number; total_tokens?: number; cost?: number }
     | undefined;
+
+  // If OpenRouter reports actual cost, use it; otherwise logAICall derives
+  // cost from the approximate embedding rate in cost-engine LLM_RATES.
+  void logAICall({
+    operation: 'ats_embedding',
+    provider: 'openrouter',
+    model: OPENROUTER_EMBEDDING_MODEL,
+    input_tokens: usageRaw?.total_tokens ?? usageRaw?.prompt_tokens,
+    output_tokens: 0,
+    cost_usd: typeof usageRaw?.cost === 'number' ? usageRaw.cost : undefined,
+    latency_ms: Date.now() - t0,
+    success: true,
+  });
 
   return {
     vectors,

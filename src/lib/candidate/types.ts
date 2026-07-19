@@ -88,6 +88,10 @@ export interface CandidateProfileFields {
   graduationYear: number | null;
   collegeName: string;
   experienceLevel: 'fresher' | 'junior' | 'mid' | 'senior';
+  /** Optional Phase-2 additions (QG preference profile) — absent on older rows. */
+  degree?: string;
+  targetRoles?: string[];
+  targetCompanies?: string[];
 }
 
 export interface ResumeSnapshot {

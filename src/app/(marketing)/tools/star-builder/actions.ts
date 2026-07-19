@@ -3,6 +3,7 @@
 import { headers } from 'next/headers';
 import { completeFreeToolChatChain, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
+import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
 
 export interface StarScores {
   structure: number;
@@ -232,6 +233,7 @@ async function completePrimaryStar(prompt: string): Promise<string> {
     openrouterModels: [...new Set(OPENROUTER_STAR_MODELS.filter(Boolean))],
     messages: [{ role: 'user', content: prompt }],
     temperature: 0.7,
+    operation: 'star_builder',
   });
   if (!raw.trim()) throw new Error('Empty primary AI content');
   return raw;
@@ -313,10 +315,12 @@ export async function buildStarAction(
 
   const headersList = await headers();
   const ip = getClientIp(headersList);
+  const signedIn = isSignedInFromHeaders(headersList);
   const limited = await checkAndConsumeFreeToolLimit('star-builder', ip, {
     failClosed: false,
   });
   if (!limited.ok) {
+    logToolUsage({ tool: 'star', event: 'rate_limited', signed_in: signedIn });
     return { error: limited.message };
   }
 
@@ -346,6 +350,11 @@ export async function buildStarAction(
       resultText,
     );
     notice = OFFLINE_NOTICE;
+  } else {
+    // Only a real AI polish counts as a run — the offline draft is a degraded
+    // fallback, not tool usage we want in cost/usage metrics.
+    // cost_usd is null here — per-call cost lands in ai_call_logs (star_builder).
+    logToolUsage({ tool: 'star', event: 'run', signed_in: signedIn });
   }
 
   return {

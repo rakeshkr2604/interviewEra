@@ -10,10 +10,14 @@ import { z } from 'zod';
 export const QUESTIONS_RESULT_STORAGE_KEY = 'ie-questions-result-v2'; // gitleaks:allow — sessionStorage key name, not a credential
 
 const storedMetaSchema = z.object({
-  mode: z.enum(['role', 'jd']),
+  mode: z.enum(['role', 'jd', 'topic', 'company']),
   role: z.string().max(100),
   level: z.string().max(40),
   domain: z.string().max(60),
+  // Defaulted, not required: tolerates a sessionStorage payload written by a
+  // tab still open from before topic/company mode shipped.
+  topic: z.string().max(80).default(''),
+  company: z.string().max(60).default(''),
 });
 
 const storedPayloadSchema = z.object({

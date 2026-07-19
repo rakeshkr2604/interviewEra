@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { CandidateProfileFields } from './types';
 
+const preferenceListSchema = z.array(z.string().trim().min(1).max(120)).max(5);
+
 export const candidateProfileSchema = z.object({
   preferredRole: z.string().trim().min(1).max(120).optional(),
   graduationYear: z
@@ -12,6 +14,10 @@ export const candidateProfileSchema = z.object({
     .optional(),
   collegeName: z.string().trim().max(200).optional(),
   experienceLevel: z.enum(['fresher', 'junior', 'mid', 'senior']).optional(),
+  // Phase-2 additions (QG preference profile) — all optional, additive.
+  degree: z.string().trim().max(120).optional(),
+  targetRoles: preferenceListSchema.optional(),
+  targetCompanies: preferenceListSchema.optional(),
 });
 
 export type CandidateProfilePatch = z.infer<typeof candidateProfileSchema>;
@@ -21,6 +27,9 @@ const storedProfileSchema = z.object({
   graduation_year: z.number().int().nullable().optional(),
   college_name: z.string().max(200).optional(),
   experience_level: z.enum(['fresher', 'junior', 'mid', 'senior']).optional(),
+  degree: z.string().max(120).optional(),
+  target_roles: z.array(z.string().max(120)).max(5).optional(),
+  target_companies: z.array(z.string().max(120)).max(5).optional(),
 });
 
 export function parseStoredCandidateProfile(raw: unknown): Partial<CandidateProfileFields> {
@@ -32,6 +41,9 @@ export function parseStoredCandidateProfile(raw: unknown): Partial<CandidateProf
     ...(d.graduation_year !== undefined ? { graduationYear: d.graduation_year } : {}),
     ...(d.college_name != null ? { collegeName: d.college_name } : {}),
     ...(d.experience_level != null ? { experienceLevel: d.experience_level } : {}),
+    ...(d.degree != null ? { degree: d.degree } : {}),
+    ...(d.target_roles != null ? { targetRoles: d.target_roles } : {}),
+    ...(d.target_companies != null ? { targetCompanies: d.target_companies } : {}),
   };
 }
 
@@ -44,6 +56,15 @@ export function mergeCandidateProfile(
     graduationYear: patch.graduationYear !== undefined ? patch.graduationYear : base.graduationYear,
     collegeName: patch.collegeName?.trim() ?? base.collegeName,
     experienceLevel: patch.experienceLevel ?? base.experienceLevel,
+    ...((patch.degree?.trim() ?? base.degree) != null
+      ? { degree: patch.degree?.trim() ?? base.degree }
+      : {}),
+    ...((patch.targetRoles ?? base.targetRoles) != null
+      ? { targetRoles: patch.targetRoles ?? base.targetRoles }
+      : {}),
+    ...((patch.targetCompanies ?? base.targetCompanies) != null
+      ? { targetCompanies: patch.targetCompanies ?? base.targetCompanies }
+      : {}),
   };
 }
 
@@ -53,6 +74,9 @@ export function profileToStorage(profile: CandidateProfileFields): Record<string
     graduation_year: profile.graduationYear,
     college_name: profile.collegeName,
     experience_level: profile.experienceLevel,
+    ...(profile.degree != null ? { degree: profile.degree } : {}),
+    ...(profile.targetRoles != null ? { target_roles: profile.targetRoles } : {}),
+    ...(profile.targetCompanies != null ? { target_companies: profile.targetCompanies } : {}),
   };
 }
 

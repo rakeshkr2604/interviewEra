@@ -16,8 +16,8 @@ import {
   getOperationTimeoutMs,
 } from '@/lib/ai/operation-registry';
 import {
-  QG_ANSWER_SYSTEM_V2,
-  QG_SYSTEM_V2,
+  QG_ANSWER_SYSTEM_V3,
+  QG_SYSTEM_V4,
   buildQgAnswerUserMessage,
   buildQgSetUserMessage,
   buildValidationRetrySuffix,
@@ -69,7 +69,7 @@ export async function generateQgSet(request: QgSetRequest): Promise<QgSetResult>
 
     let content: string;
     try {
-      content = await completeQg('qg_set_generation', QG_SYSTEM_V2, userMessage);
+      content = await completeQg('qg_set_generation', QG_SYSTEM_V4, userMessage);
     } catch (err) {
       console.warn('[question-engine] set generation LLM call failed:', err);
       return { ok: false, reason: 'llm_error' };
@@ -87,7 +87,12 @@ export async function generateQgSet(request: QgSetRequest): Promise<QgSetResult>
       continue;
     }
 
-    const distribution = validateCategoryDistribution(result.data.questions);
+    // Topic mode: a narrow subject (e.g. "SQL Joins") often can't naturally
+    // produce behavioral/situational questions without the model forcing an
+    // awkward fit. Relax the ratio check there; every other mode keeps it.
+    const distribution = validateCategoryDistribution(result.data.questions, {
+      relaxed: request.mode === 'topic',
+    });
     if (!distribution.ok) {
       lastIssues = distribution.message;
       continue;
@@ -111,7 +116,7 @@ export async function generateQgAnswer(request: QgAnswerRequest): Promise<QgAnsw
 
     let content: string;
     try {
-      content = await completeQg('qg_answer_generation', QG_ANSWER_SYSTEM_V2, userMessage);
+      content = await completeQg('qg_answer_generation', QG_ANSWER_SYSTEM_V3, userMessage);
     } catch (err) {
       console.warn('[question-engine] answer generation LLM call failed:', err);
       return { ok: false, reason: 'llm_error' };

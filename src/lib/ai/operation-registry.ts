@@ -306,7 +306,7 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     estimatedInputTokens: 600,
   },
   // Question Engine v2 — free-tool set generation (10 cards with probing +
-  // difficulty metadata). Deterministic-leaning temperature per QG_SYSTEM_V2.
+  // difficulty metadata). Deterministic-leaning temperature per QG_SYSTEM_V4.
   qg_set_generation: {
     requestClass:         'lightweight_parse',
     temperature:          0.3,

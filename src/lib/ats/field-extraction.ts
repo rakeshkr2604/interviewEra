@@ -3,12 +3,11 @@
  */
 
 import {
-  completionWithRetries,
   modelPrefersPlainJson,
   DEFAULT_ATTEMPT_TIMEOUT_MS,
 } from '@/lib/ai/chat-completion-core';
 import { getLlmAttemptTimeoutMs } from '@/lib/ai/operation-registry';
-import { getToolChatClient } from '@/lib/ai/tool-chat-completion';
+import { completeToolCompletionLogged, getToolChatClient } from '@/lib/ai/tool-chat-completion';
 import { OPENROUTER_CHEAP_MODEL } from '@/lib/ai/openrouter-model-router';
 import { extractedResumeSchema } from '@/lib/ats/extract-schema';
 import type { ExtractedResumeData } from '@/lib/ats/types';
@@ -166,29 +165,27 @@ async function completeExtraction(
   const messages = [{ role: 'user' as const, content: prompt }];
 
   try {
-    const { content, usage } = await completionWithRetries(
+    const { content, usage } = await completeToolCompletionLogged({
       client,
       model,
       messages,
-      0,
+      temperature: 0,
       jsonMode,
-      undefined,
-      undefined,
-      attemptMs,
-    );
+      attemptTimeoutMs: attemptMs,
+      operation: 'ats_field_extraction',
+    });
     return { content, usage };
   } catch (firstErr) {
     if (!jsonMode) throw firstErr;
-    const { content, usage } = await completionWithRetries(
+    const { content, usage } = await completeToolCompletionLogged({
       client,
       model,
       messages,
-      0,
-      false,
-      undefined,
-      undefined,
-      attemptMs,
-    );
+      temperature: 0,
+      jsonMode: false,
+      attemptTimeoutMs: attemptMs,
+      operation: 'ats_field_extraction',
+    });
     return { content, usage };
   }
 }
