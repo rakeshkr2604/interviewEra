@@ -12,6 +12,10 @@ import {
   QuestionGeneratorSeoSections,
 } from './QuestionGeneratorSeoSections';
 
+// generateQuestionsAction inherits this segment config: worst case is two
+// validation attempts × 22s registry deadline, which overflows the default.
+export const maxDuration = 60;
+
 const QGEN_OG_TITLE = 'Free Interview Question Generator';
 
 export const metadata: Metadata = generateMetadata({

@@ -131,6 +131,8 @@ const OPERATION_CLASSES: Record<string, RequestClass> = {
   answer_score:         'structured_evaluation',
   script_report_synthesis: 'batch_analysis',
   free_tool:            'lightweight_parse',
+  qg_set_generation:    'lightweight_parse',
+  qg_answer_generation: 'lightweight_parse',
 };
 
 export function classifyRequest(operation: string): RequestClass {

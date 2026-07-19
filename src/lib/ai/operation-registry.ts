@@ -40,7 +40,9 @@ export type AiOperation =
   | 'auto_structure'
   | 'answer_score'
   | 'script_report_synthesis'
-  | 'free_tool';
+  | 'free_tool'
+  | 'qg_set_generation'
+  | 'qg_answer_generation';
 
 export type AiProvider = 'openrouter' | 'openai' | 'mistral';
 
@@ -302,6 +304,39 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
       maxHistoryTurnChars:  0,
     },
     estimatedInputTokens: 600,
+  },
+  // Question Engine v2 — free-tool set generation (10 cards with probing +
+  // difficulty metadata). Deterministic-leaning temperature per QG_SYSTEM_V2.
+  qg_set_generation: {
+    requestClass:         'lightweight_parse',
+    temperature:          0.3,
+    maxOutputTokens:      3_000,
+    llmAttemptTimeoutMs:    18_000,
+    timeoutMs:            22_000,
+    responseFormat:       'json',
+    context: {
+      // JD paste is hard-capped at 4k chars by the tool.
+      maxInputChars:        4_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 900,
+  },
+  // Question Engine v2 — per-question lazy answer coaching (framework, steps,
+  // mistakes, follow-ups). Small JSON, clicked one question at a time.
+  qg_answer_generation: {
+    requestClass:         'lightweight_parse',
+    temperature:          0.3,
+    maxOutputTokens:      1_200,
+    llmAttemptTimeoutMs:    12_000,
+    timeoutMs:            15_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        1_000,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 400,
   },
 };
 

@@ -70,7 +70,10 @@ export type ProductEventName =
   | 'experiment_exposed'
   | 'referral_link_shared'
   | 'feedback_submitted'
-  | 'nps_submitted';
+  | 'nps_submitted'
+  | 'qg_generate'
+  | 'qg_answer_reveal'
+  | 'qg_practice_click';
 
 export type ProductEventPayload = {
   /** @deprecated Legacy field — use event_name at emit boundary. */

@@ -1,0 +1,4 @@
+# Fingerprint-level gitleaks ignores (commit:file:rule:line — narrowest possible scope).
+# QUESTIONS_RESULT_STORAGE_KEY is a sessionStorage key name ('ie-questions-result-v2'),
+# not a credential; generic-api-key flagged it on string shape/entropy alone.
+9e52370036f87dd6f35b5e8e30681d3e9b6b4db9:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:10

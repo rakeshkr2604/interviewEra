@@ -1,45 +1,48 @@
-import type { GeneratedQuestion } from './actions';
+import {
+  qgQuestionSchema,
+  type QgQuestion,
+  type QgResultMeta,
+} from '@/lib/question-engine/schemas';
+import { z } from 'zod';
 
-export const QUESTIONS_RESULT_STORAGE_KEY = 'ie-questions-result-v1';
+// v2: cards carry difficulty + probing, payload carries set meta.
+// Old ie-questions-result-v1 payloads are simply ignored (different key).
+export const QUESTIONS_RESULT_STORAGE_KEY = 'ie-questions-result-v2';
 
-type StoredPayload = {
-  v: 1;
-  savedAt: number;
-  questions: GeneratedQuestion[];
-};
+const storedMetaSchema = z.object({
+  mode: z.enum(['role', 'jd']),
+  role: z.string().max(100),
+  level: z.string().max(40),
+  domain: z.string().max(60),
+});
 
-const CATEGORIES = new Set(['technical', 'behavioral', 'situational']);
+const storedPayloadSchema = z.object({
+  v: z.literal(2),
+  savedAt: z.number(),
+  meta: storedMetaSchema,
+  questions: z.array(qgQuestionSchema).min(1),
+});
 
-function isQuestion(x: unknown): x is GeneratedQuestion {
-  if (!x || typeof x !== 'object') return false;
-  const o = x as Record<string, unknown>;
-  if (typeof o.order !== 'number' || !Number.isFinite(o.order)) return false;
-  if (typeof o.question_text !== 'string' || !String(o.question_text).trim()) return false;
-  const cat = o.category;
-  if (typeof cat !== 'string' || !CATEGORIES.has(cat)) return false;
-  return true;
+export interface StoredQuestionResult {
+  questions: QgQuestion[];
+  meta: QgResultMeta;
 }
 
-export function parseStoredQuestions(json: string): GeneratedQuestion[] | null {
+export function parseStoredQuestions(json: string): StoredQuestionResult | null {
   try {
-    const data = JSON.parse(json) as StoredPayload;
-    if (data?.v !== 1 || !Array.isArray(data.questions) || data.questions.length === 0) return null;
-    if (!data.questions.every(isQuestion)) return null;
-    return data.questions.map((q) => ({
-      order: Math.round(q.order),
-      question_text: String(q.question_text).trim(),
-      category: q.category as GeneratedQuestion['category'],
-    }));
+    const parsed = storedPayloadSchema.safeParse(JSON.parse(json));
+    if (!parsed.success) return null;
+    return { questions: parsed.data.questions, meta: parsed.data.meta };
   } catch {
     return null;
   }
 }
 
-export function serializeQuestions(questions: GeneratedQuestion[]): string {
-  const payload: StoredPayload = {
-    v: 1,
+export function serializeQuestions(questions: QgQuestion[], meta: QgResultMeta): string {
+  return JSON.stringify({
+    v: 2 as const,
     savedAt: Date.now(),
+    meta,
     questions,
-  };
-  return JSON.stringify(payload);
+  });
 }

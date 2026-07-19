@@ -1,15 +1,17 @@
 'use client';
 
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Lightbulb, Loader2, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import type { GeneratedQuestion } from './actions';
+import type { QgAnswer, QgQuestion, QgResultMeta } from '@/lib/question-engine/schemas';
+import { qgAnswerSchema } from '@/lib/question-engine/schemas';
 import { FreeToolCtaBlock } from '@/components/landing/FreeToolFormCard';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { trackQgAnswerReveal, trackQgPracticeClick } from './qg-analytics';
 import { cn } from '@/lib/utils';
 
-function categoryBadgeStyle(category: GeneratedQuestion['category']): CSSProperties {
+function categoryBadgeStyle(category: QgQuestion['category']): CSSProperties {
   const map = {
     technical: {
       background: 'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
@@ -30,12 +32,260 @@ function categoryBadgeStyle(category: GeneratedQuestion['category']): CSSPropert
   return map[category];
 }
 
+function difficultyBadgeStyle(difficulty: QgQuestion['difficulty']): CSSProperties {
+  const map = {
+    easy: {
+      background: 'color-mix(in srgb, var(--accent-success) 16%, transparent)',
+      color: 'var(--accent-success)',
+      boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent-success) 32%, transparent)',
+    },
+    medium: {
+      background: 'color-mix(in srgb, var(--accent-warning) 16%, transparent)',
+      color: 'var(--accent-warning)',
+      boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent-warning) 32%, transparent)',
+    },
+    hard: {
+      background: 'color-mix(in srgb, var(--accent-danger) 14%, transparent)',
+      color: 'var(--accent-danger)',
+      boxShadow: '0 0 0 1px color-mix(in srgb, var(--accent-danger) 30%, transparent)',
+    },
+  } as const;
+  return map[difficulty];
+}
+
+type AnswerState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; answer: QgAnswer }
+  | { status: 'error'; message: string };
+
+function AnswerSection({ title, items }: { title: string; items: readonly string[] }) {
+  return (
+    <div className="space-y-1.5">
+      <p
+        className="text-xs font-semibold uppercase tracking-wide"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {title}
+      </p>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li
+            key={i}
+            className="flex gap-2 text-sm leading-relaxed"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <span
+              className="mt-[0.45rem] size-1.5 shrink-0 rounded-full"
+              style={{ background: 'var(--accent-primary)' }}
+              aria-hidden
+            />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResultMeta }) {
+  const [answerState, setAnswerState] = useState<AnswerState>({ status: 'idle' });
+  const [revealed, setRevealed] = useState(false);
+  const [revealTracked, setRevealTracked] = useState(false);
+
+  const practiceHref = meta.role
+    ? `/interview/new?role=${encodeURIComponent(meta.role)}&src=qg`
+    : '/interview/new?src=qg';
+
+  async function revealAnswer() {
+    if (answerState.status === 'ready') {
+      setRevealed((v) => !v);
+      return;
+    }
+    if (answerState.status === 'loading') return;
+
+    setAnswerState({ status: 'loading' });
+    try {
+      const res = await fetch('/api/tools/question-generator/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: question.question_text,
+          category: question.category,
+          ...(meta.role ? { role: meta.role } : {}),
+          ...(meta.level ? { level: meta.level } : {}),
+        }),
+      });
+
+      const data = (await res.json()) as { answer?: unknown; error?: string };
+      if (!res.ok) {
+        setAnswerState({
+          status: 'error',
+          message: data.error ?? 'Could not load the answer guide. Please try again.',
+        });
+        return;
+      }
+
+      const parsed = qgAnswerSchema.safeParse(data.answer);
+      if (!parsed.success) {
+        setAnswerState({
+          status: 'error',
+          message: 'Could not load the answer guide. Please try again.',
+        });
+        return;
+      }
+
+      setAnswerState({ status: 'ready', answer: parsed.data });
+      setRevealed(true);
+      if (!revealTracked) {
+        setRevealTracked(true);
+        trackQgAnswerReveal({ category: question.category, difficulty: question.difficulty });
+      }
+    } catch {
+      setAnswerState({
+        status: 'error',
+        message: 'Network error. Please check your connection and try again.',
+      });
+    }
+  }
+
+  return (
+    <article
+      className="group relative overflow-hidden rounded-xl border-2 p-4 pl-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5"
+      style={{
+        borderColor: 'var(--card-border)',
+        background: 'color-mix(in srgb, var(--card-bg) 85%, transparent)',
+        boxShadow: 'var(--card-shadow)',
+      }}
+    >
+      <div
+        className="absolute left-0 top-0 h-full w-1 rounded-l-xl opacity-90 transition-opacity group-hover:opacity-100"
+        style={{ background: 'var(--accent-primary)' }}
+        aria-hidden
+      />
+      <div className="flex gap-3 sm:gap-4">
+        <span
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums"
+          style={{
+            background: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)',
+            color: 'var(--accent-primary)',
+          }}
+        >
+          {question.order}
+        </span>
+        <div className="min-w-0 flex-1 space-y-3">
+          <p
+            className="text-sm leading-relaxed sm:text-[0.9375rem]"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {question.question_text}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge
+              className="border-0 text-xs font-medium capitalize"
+              style={categoryBadgeStyle(question.category)}
+            >
+              {question.category}
+            </Badge>
+            <Badge
+              className="border-0 text-xs font-medium capitalize"
+              style={difficultyBadgeStyle(question.difficulty)}
+            >
+              {question.difficulty}
+            </Badge>
+          </div>
+
+          <p className="text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              What they&apos;re testing:
+            </span>{' '}
+            {question.probing}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            <button
+              type="button"
+              onClick={revealAnswer}
+              disabled={answerState.status === 'loading'}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all duration-200',
+                answerState.status === 'loading' && 'cursor-wait opacity-70',
+              )}
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
+                background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
+                color: 'var(--accent-primary)',
+              }}
+            >
+              {answerState.status === 'loading' ? (
+                <Loader2 className="size-3.5 animate-spin" aria-hidden />
+              ) : (
+                <Lightbulb className="size-3.5" aria-hidden />
+              )}
+              {answerState.status === 'ready'
+                ? revealed
+                  ? 'Hide answer guide'
+                  : 'Show answer guide'
+                : 'How to answer'}
+              {answerState.status === 'ready' && (
+                <ChevronDown
+                  className={cn('size-3.5 transition-transform', revealed && 'rotate-180')}
+                  aria-hidden
+                />
+              )}
+            </button>
+
+            <Link
+              href={practiceHref}
+              onClick={() => trackQgPracticeClick({ role: meta.role, level: meta.level })}
+              className="inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-semibold transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              style={{
+                borderColor: 'var(--card-border)',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              <Mic className="size-3.5" aria-hidden />
+              Practice this in a mock interview
+            </Link>
+          </div>
+
+          {answerState.status === 'error' && (
+            <p className="text-xs font-medium" style={{ color: 'var(--accent-danger)' }} role="alert">
+              {answerState.message}
+            </p>
+          )}
+
+          {answerState.status === 'ready' && revealed && (
+            <div
+              className="space-y-4 rounded-xl border-2 p-4"
+              style={{
+                borderColor: 'color-mix(in srgb, var(--accent-primary) 24%, var(--card-border))',
+                background: 'color-mix(in srgb, var(--accent-primary) 6%, transparent)',
+              }}
+            >
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Framework: <span style={{ color: 'var(--accent-primary)' }}>{answerState.answer.framework}</span>
+              </p>
+              <AnswerSection title="How to structure it" items={answerState.answer.answer_approach} />
+              <AnswerSection title="Common mistakes" items={answerState.answer.common_mistakes} />
+              <AnswerSection title="Likely follow-ups" items={answerState.answer.follow_ups} />
+            </div>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function QuestionGeneratorResultsView({
   questions,
+  meta,
   showBackLink = true,
   root: RootTag = 'main',
 }: {
-  questions: GeneratedQuestion[];
+  questions: QgQuestion[];
+  meta: QgResultMeta;
   showBackLink?: boolean;
   root?: 'main' | 'section';
 }) {
@@ -69,52 +319,15 @@ export function QuestionGeneratorResultsView({
               Your question set
             </h1>
             <p className="text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-              Use them for self-practice or with a peer. Category tags show what interviewers are probing.
+              Not a random list — each card shows what the interviewer is testing. Open the answer
+              guide for structure, mistakes to avoid, and likely follow-ups.
             </p>
           </div>
 
           <ol className="space-y-3">
             {questions.map((q) => (
               <li key={q.order}>
-                <article
-                  className="group relative overflow-hidden rounded-xl border-2 p-4 pl-5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg sm:p-5"
-                  style={{
-                    borderColor: 'var(--card-border)',
-                    background: 'color-mix(in srgb, var(--card-bg) 85%, transparent)',
-                    boxShadow: 'var(--card-shadow)',
-                  }}
-                >
-                  <div
-                    className="absolute left-0 top-0 h-full w-1 rounded-l-xl opacity-90 transition-opacity group-hover:opacity-100"
-                    style={{ background: 'var(--accent-primary)' }}
-                    aria-hidden
-                  />
-                  <div className="flex gap-3 sm:gap-4">
-                    <span
-                      className="flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold tabular-nums"
-                      style={{
-                        background: 'color-mix(in srgb, var(--accent-primary) 20%, transparent)',
-                        color: 'var(--accent-primary)',
-                      }}
-                    >
-                      {q.order}
-                    </span>
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <p
-                        className="text-sm leading-relaxed sm:text-[0.9375rem]"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {q.question_text}
-                      </p>
-                      <Badge
-                        className="border-0 text-xs font-medium capitalize"
-                        style={categoryBadgeStyle(q.category)}
-                      >
-                        {q.category}
-                      </Badge>
-                    </div>
-                  </div>
-                </article>
+                <QuestionCard question={q} meta={meta} />
               </li>
             ))}
           </ol>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -59,7 +59,12 @@ export function StartInterviewForm({
   planTier,
   domainPacks,
 }: StartInterviewFormProps) {
-  const [role, setRole] = useState('');
+  // Prefill-only deep link from the free question generator (?role=…&src=qg).
+  // `src` is telemetry-only (GA page attribution); no other behavior changes.
+  const searchParams = useSearchParams();
+  const [role, setRole] = useState(() =>
+    (searchParams.get('role') ?? '').trim().slice(0, 100),
+  );
   const [difficulty, setDifficulty] = useState<Difficulty>(() => readDefaultDifficulty());
   const [interviewMode, setInterviewMode] = useState<InterviewMode>('ai');
   const [selectedPackId, setSelectedPackId] = useState<string>(domainPacks[0]?.id ?? '');

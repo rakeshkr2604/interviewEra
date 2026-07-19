@@ -7,14 +7,14 @@ import { QuestionGeneratorResultsView } from '../QuestionGeneratorResultsView';
 import {
   QUESTIONS_RESULT_STORAGE_KEY,
   parseStoredQuestions,
+  type StoredQuestionResult,
 } from '../question-generator-result-storage';
-import type { GeneratedQuestion } from '../actions';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
 export function QuestionGeneratorResultsPageClient() {
   const router = useRouter();
-  const [questions, setQuestions] = useState<GeneratedQuestion[] | null>(null);
+  const [result, setResult] = useState<StoredQuestionResult | null>(null);
   const [status, setStatus] = useState<'loading' | 'ready' | 'missing'>('loading');
   const ran = useRef(false);
 
@@ -38,12 +38,12 @@ export function QuestionGeneratorResultsPageClient() {
         return;
       }
 
-      setQuestions(parsed);
+      setResult(parsed);
       setStatus('ready');
     });
   }, [router]);
 
-  if (status === 'loading' || status === 'missing') {
+  if (status === 'loading' || status === 'missing' || !result) {
     return (
       <main
         className="ie-landing-type flex min-h-[50vh] items-center justify-center py-20"
@@ -59,5 +59,5 @@ export function QuestionGeneratorResultsPageClient() {
     );
   }
 
-  return <QuestionGeneratorResultsView questions={questions!} />;
+  return <QuestionGeneratorResultsView questions={result.questions} meta={result.meta} />;
 }
