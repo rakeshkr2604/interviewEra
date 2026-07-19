@@ -5,6 +5,7 @@ import { AI_PROMPT_ENGINEERING_PATH } from '@/lib/seo/blog/agentic-spoke-prompt-
 import { CURSOR_AI_INTERVIEW_PATH } from '@/lib/seo/blog/agentic-spoke-cursor'
 import { WHAT_IS_AGENTIC_AI_PATH } from '@/lib/seo/blog/agentic-spoke-what-is'
 import { ANDROID_LAST_UPDATED } from '@/lib/seo/programmatic/android-developer-hub'
+import { qgDeepLinkPath } from '@/lib/seo/programmatic'
 import type { ContentEntry } from '@/lib/seo/content/types'
 
 /** Shared concept, tool, and learn-next presets — referenced from entry metadata. */
@@ -32,7 +33,14 @@ const TOOL = {
   qgen: { label: 'Question Generator', href: '/tools/question-generator', description: 'Role-specific practice problems' },
 } as const
 
-const BLOG_TOOLS = [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star] as const
+// Topic/role-matched QG deep links — land in the generator with the matching
+// mode + value prefilled. Labels must exactly match the form's suggestion
+// chips (SUGGESTED_TOPICS / SUGGESTED_ROLES in QuestionGeneratorForm.tsx) so
+// the corresponding chip renders pre-selected.
+const QGEN_AGENTIC = { ...TOOL.qgen, href: qgDeepLinkPath('topic', { topic: 'Agentic AI / AI Engineer' }) } as const
+const QGEN_DSA = { ...TOOL.qgen, href: qgDeepLinkPath('topic', { topic: 'Data Structures & Algorithms' }) } as const
+const QGEN_SWE = { ...TOOL.qgen, href: qgDeepLinkPath('role', { role: 'Software Engineer' }) } as const
+const QGEN_BEHAVIORAL = { ...TOOL.qgen, href: qgDeepLinkPath('topic', { topic: 'Behavioral Basics' }) } as const
 
 const AGENTIC_PATH = [
   { label: 'What Is Agentic AI?', href: WHAT_IS_AGENTIC_AI_PATH, description: 'Definitions, myths, and interview context' },
@@ -64,7 +72,8 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'Top Fresher Questions', href: '/blog/top-10-interview-questions-freshers-india-2026', description: 'Campus HR and technical prep' },
       { label: 'AI Mock Interview', href: '/signup', description: 'Practice under pressure' },
     ],
-    recommendedTools: [...BLOG_TOOLS],
+    // General prep post — no single topic match, so ATS leads (safe fallback).
+    recommendedTools: [TOOL.ats, TOOL.mock, TOOL.qgen, TOOL.star],
   },
   {
     id: 'blog-dsa-topic-map',
@@ -85,7 +94,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'What Is Agentic AI?', href: CONCEPT.agentic.href, description: 'AI-assisted rounds in 2026' },
       { label: 'AI Mock Interview', href: '/signup', description: 'Apply patterns under time pressure' },
     ],
-    recommendedTools: [TOOL.qgen, TOOL.mock, TOOL.ats, TOOL.star],
+    recommendedTools: [QGEN_DSA, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'blog-swe-questions',
@@ -105,7 +114,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'Agentic AI Interview Guide', href: CONCEPT.agenticGuide.href, description: 'AI-assisted coding rounds' },
       { label: 'AI Mock Interview', href: '/signup', description: 'Scored technical + behavioral practice' },
     ],
-    recommendedTools: [...BLOG_TOOLS],
+    recommendedTools: [QGEN_SWE, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'role-android-developer',
@@ -487,7 +496,8 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'Resume / ATS Tips', href: CONCEPT.resume.href, description: 'Improve internship applications' },
       { label: 'AI Mock Interview', href: '/signup', description: 'Practice before interviews' },
     ],
-    recommendedTools: [...BLOG_TOOLS],
+    // Application/resume-focused post — ATS leads.
+    recommendedTools: [TOOL.ats, TOOL.mock, TOOL.qgen, TOOL.star],
   },
   {
     id: 'blog-english-confidence',
@@ -546,7 +556,8 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'STAR Method Guide', href: CONCEPT.star.href, description: 'Behavioral answer structure' },
       { label: 'AI Mock Interview', href: '/signup', description: 'Campus mock practice' },
     ],
-    recommendedTools: [...BLOG_TOOLS],
+    // Question-list post (mostly HR/behavioral) — QG leads, behavioral-topic deep link.
+    recommendedTools: [QGEN_BEHAVIORAL, TOOL.mock, TOOL.star, TOOL.ats],
   },
   {
     id: 'blog-agentic-ai-hub',
@@ -564,7 +575,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     tags: ['agentic-ai', 'ai-coding', 'software-engineer', 'mock-interview'],
     relatedConcepts: [CONCEPT.agentic, CONCEPT.codingRound, CONCEPT.promptEng, CONCEPT.cursor, CONCEPT.dsa, CONCEPT.star],
     learnNext: [...AGENTIC_PATH],
-    recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.ats, TOOL.star],
+    recommendedTools: [QGEN_AGENTIC, TOOL.mock, TOOL.ats, TOOL.star],
   },
   {
     id: 'blog-what-is-agentic-ai',
@@ -580,7 +591,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     tags: ['agentic-ai', 'ai-coding', 'software-engineer'],
     relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.codingRound, CONCEPT.promptEng, CONCEPT.dsa, CONCEPT.behavioral],
     learnNext: AGENTIC_PATH.slice(1),
-    recommendedTools: [TOOL.mock, TOOL.qgen],
+    recommendedTools: [QGEN_AGENTIC, TOOL.mock],
   },
   {
     id: 'blog-agentic-coding-round',
@@ -596,7 +607,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     tags: ['agentic-ai', 'ai-coding', 'mock-interview', 'software-engineer'],
     relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.promptEng, CONCEPT.cursor, CONCEPT.dsa, CONCEPT.star],
     learnNext: AGENTIC_PATH.slice(2),
-    recommendedTools: [TOOL.mock, TOOL.qgen],
+    recommendedTools: [QGEN_AGENTIC, TOOL.mock],
   },
   {
     id: 'blog-ai-prompt-engineering-interview',
@@ -612,7 +623,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     tags: ['agentic-ai', 'ai-coding', 'software-engineer'],
     relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.codingRound, CONCEPT.cursor, CONCEPT.dsa],
     learnNext: AGENTIC_PATH.slice(3),
-    recommendedTools: [TOOL.qgen, TOOL.mock],
+    recommendedTools: [QGEN_AGENTIC, TOOL.mock],
   },
   {
     id: 'blog-cursor-ai-interview',
@@ -628,7 +639,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     tags: ['agentic-ai', 'ai-coding', 'cursor', 'software-engineer'],
     relatedConcepts: [CONCEPT.agenticGuide, CONCEPT.promptEng, CONCEPT.codingRound, CONCEPT.dsa],
     learnNext: [{ label: 'AI Mock Interview', href: '/signup', description: 'Practice Cursor workflows under pressure' }],
-    recommendedTools: [TOOL.mock, TOOL.qgen],
+    recommendedTools: [QGEN_AGENTIC, TOOL.mock],
   },
   {
     id: 'blog-ai-mock',

@@ -14,6 +14,7 @@ import {
   getCompanyBySlug,
   allCompanyParams,
   questionsHubPath,
+  qgDeepLinkPath,
 } from '@/lib/seo/programmatic'
 import {
   companyPageMetadata,
@@ -433,7 +434,7 @@ export default async function CompanyQuestionsPage({ params }: Props) {
               Start free mock interview
             </Link>
             <Link
-              href="/tools/question-generator"
+              href={qgDeepLinkPath('company', { company: company.label })}
               className="inline-flex items-center justify-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
               style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
             >

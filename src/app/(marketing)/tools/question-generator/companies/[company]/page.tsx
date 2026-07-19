@@ -15,7 +15,7 @@ import {
   getCompanyBySlug,
   allToolVariantCompanyParams,
   companyQuestionsPath,
-  toolVariantCompanyPath,
+  qgDeepLinkPath,
 } from '@/lib/seo/programmatic'
 import {
   toolQGenCompanyMetadata,
@@ -152,7 +152,7 @@ export default async function QGenCompanyPage({ params }: Props) {
 
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
-              href={toolVariantCompanyPath(company.slug as CompanySlug)}
+              href={qgDeepLinkPath('company', { company: company.label })}
               className="inline-flex items-center justify-center rounded-full px-6 py-2.5 text-sm font-semibold transition-opacity hover:opacity-90"
               style={{ background: 'var(--accent-primary)', color: '#fff' }}
             >
@@ -281,7 +281,7 @@ export default async function QGenCompanyPage({ params }: Props) {
               Start free mock interview
             </Link>
             <Link
-              href={toolVariantCompanyPath(company.slug as CompanySlug)}
+              href={qgDeepLinkPath('company', { company: company.label })}
               className="inline-flex items-center justify-center rounded-full border px-6 py-2.5 text-sm font-semibold transition-colors hover:border-(--accent-primary)"
               style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
             >

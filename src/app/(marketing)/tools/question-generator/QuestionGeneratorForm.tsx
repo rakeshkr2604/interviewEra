@@ -214,6 +214,42 @@ export function QuestionGeneratorForm() {
     }
   }
 
+  // URL-param prefill for deep links from SEO/blog pages
+  // (?mode=…&role=…&company=…&topic=…). Read via window.location on mount —
+  // the page is statically prerendered, so useSearchParams() would need a
+  // Suspense boundary. This effect runs before the saved-profile load can
+  // finish (it awaits an auth probe), so URL params win for
+  // mode/role/company/topic while the profile still fills the
+  // level/domain/degree gaps afterwards (its role prefill is only-if-empty).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    // queueMicrotask keeps setState out of the synchronous effect body (same
+    // pattern as the profile-prefill effect below). It still resolves long
+    // before the profile's async load completes.
+    queueMicrotask(() => {
+      const rawMode = params.get('mode');
+      if (rawMode === 'role' || rawMode === 'jd' || rawMode === 'topic' || rawMode === 'company') {
+        setMode(rawMode);
+      }
+      // Role max length is 100, matching the input's maxLength below.
+      const urlRole = (params.get('role') ?? '').trim().slice(0, 100);
+      if (urlRole) {
+        setRole((current) => (current === '' ? urlRole : current));
+        // Same domain auto-suggestion as typing the role; the saved profile's
+        // domain (if any) still overwrites this, per the profile effect.
+        setDomain((current) => (domainTouchedRef.current ? current : suggestDomainForRole(urlRole)));
+      }
+      const urlCompany = (params.get('company') ?? '').trim().slice(0, QG_COMPANY_MAX_CHARS);
+      if (urlCompany) {
+        setCompany((current) => (current === '' ? urlCompany : current));
+      }
+      const urlTopic = (params.get('topic') ?? '').trim().slice(0, QG_TOPIC_MAX_CHARS);
+      if (urlTopic) {
+        setTopic((current) => (current === '' ? urlTopic : current));
+      }
+    });
+  }, []);
+
   // Prefill from the saved profile once it's loaded — after mount (never during
   // render) to avoid SSR/hydration mismatch, and never over values the user
   // has already typed or picked.

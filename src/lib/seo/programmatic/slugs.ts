@@ -100,6 +100,38 @@ export function toolStarTopicPath(slug: StarTopicSlug): string {
   return `${PATHS.toolStarTopicBase}/${slug}`
 }
 
+// ─── Question-generator deep links ────────────────────────────────────────────
+
+/** Deep-linkable QG form modes ('jd' has no prefill use case). */
+export type QgDeepLinkMode = 'role' | 'company' | 'topic'
+
+export interface QgDeepLinkFields {
+  readonly role?: string
+  readonly company?: string
+  readonly topic?: string
+}
+
+/**
+ * Prefill deep link into the question-generator form:
+ * `/tools/question-generator?mode=…&company=…&role=…&topic=…`.
+ *
+ * The form reads these params client-side on mount and prefills
+ * mode/role/company/topic; level/domain/degree still come from the visitor's
+ * saved QG profile. Values are display labels (e.g. `company.label`), not
+ * slugs. The QG page self-canonicalizes to its bare path, so parameterized
+ * links carry no duplicate-content risk.
+ *
+ * `PATHS.toolVariantRoleBase` is also the QG tool landing itself — variant
+ * role pages nest directly under it.
+ */
+export function qgDeepLinkPath(mode: QgDeepLinkMode, fields: QgDeepLinkFields = {}): string {
+  const params = new URLSearchParams({ mode })
+  if (fields.company) params.set('company', fields.company)
+  if (fields.role) params.set('role', fields.role)
+  if (fields.topic) params.set('topic', fields.topic)
+  return `${PATHS.toolVariantRoleBase}?${params.toString()}`
+}
+
 // ─── Type guards ──────────────────────────────────────────────────────────────
 // Use these at route boundaries (page.tsx, API routes) to safely narrow a
 // string param before calling any typed helper.

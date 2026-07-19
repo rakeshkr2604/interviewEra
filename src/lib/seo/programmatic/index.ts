@@ -101,6 +101,7 @@ export {
   toolVariantCompanyPath,
   toolAtsRolePath,
   toolStarTopicPath,
+  qgDeepLinkPath,
   isRoleSlug,
   isCompanySlug,
   isSkillSlug,
@@ -121,6 +122,7 @@ export {
   slugToTitleCase,
   toSlug,
 } from './slugs'
+export type { QgDeepLinkMode, QgDeepLinkFields } from './slugs'
 
 // ── Indexing gate (content-sufficiency) ────────────────────────────────────────
 export {
