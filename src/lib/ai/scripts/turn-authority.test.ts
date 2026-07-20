@@ -8,6 +8,7 @@ import {
   countFollowUpsSinceLastCoreQuestion,
   countSelfIntroQuestions,
   displayQuestionNumberAfterTurn,
+  existingNextTurnIndexAfterAnswer,
   isNoQuestionsAnswer,
   recentAcknowledgments,
   resolvePromptPhase,
@@ -416,5 +417,55 @@ describe('turn-authority overrides', () => {
     expect(resolveTurnCap('easy')).toBe(15)
     expect(resolveTurnCap('hard')).toBe(25)
     expect(resolveTurnCap('unknown')).toBe(20)
+  })
+})
+
+describe('existingNextTurnIndexAfterAnswer', () => {
+  it('returns null for boot [NONE] / missing prevTurnIndex', () => {
+    expect(
+      existingNextTurnIndexAfterAnswer({
+        prevTurnIndex: undefined,
+        lastAnswer: '[NONE]',
+        currentTurnIndex: 0,
+      }),
+    ).toBeNull()
+    expect(
+      existingNextTurnIndexAfterAnswer({
+        prevTurnIndex: 3,
+        lastAnswer: '[NONE]',
+        currentTurnIndex: 4,
+      }),
+    ).toBeNull()
+  })
+
+  it('returns null when the next turn was not yet persisted', () => {
+    expect(
+      existingNextTurnIndexAfterAnswer({
+        prevTurnIndex: 5,
+        lastAnswer: 'My answer',
+        currentTurnIndex: 5,
+      }),
+    ).toBeNull()
+  })
+
+  it('returns the expected next index when a prior /turn already advanced the interview', () => {
+    // Prefetch inserted turn 6 and updated current_turn_index → 6; client lost the response.
+    expect(
+      existingNextTurnIndexAfterAnswer({
+        prevTurnIndex: 5,
+        lastAnswer: 'My answer',
+        currentTurnIndex: 6,
+      }),
+    ).toBe(6)
+  })
+
+  it('still returns expectedNext even if current_turn_index drifted ahead (orphan already created)', () => {
+    expect(
+      existingNextTurnIndexAfterAnswer({
+        prevTurnIndex: 5,
+        lastAnswer: 'My answer',
+        currentTurnIndex: 7,
+      }),
+    ).toBe(6)
   })
 })

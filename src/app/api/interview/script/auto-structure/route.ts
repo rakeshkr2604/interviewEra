@@ -287,10 +287,26 @@ export async function POST(request: Request): Promise<NextResponse> {
       llmContent = completion.content;
     } catch (llmError) {
       if (isTimeoutError(llmError)) {
-        console.error(`[interview/script/auto-structure] LLM timeout (interviewId=${interviewId}):`, llmError);
+        console.error(
+          JSON.stringify({
+            event: 'auto_structure_failed',
+            reason: 'llm_timeout',
+            interviewId,
+            turnIndex,
+          }),
+          llmError,
+        );
         return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
       }
-      console.error(`[interview/script/auto-structure] LLM error (interviewId=${interviewId}):`, llmError);
+      console.error(
+        JSON.stringify({
+          event: 'auto_structure_failed',
+          reason: 'llm_error',
+          interviewId,
+          turnIndex,
+        }),
+        llmError,
+      );
       return NextResponse.json(
         { error: 'llm_error', message: 'Answer structuring is temporarily unavailable.' },
         { status: 502 },
@@ -302,7 +318,12 @@ export async function POST(request: Request): Promise<NextResponse> {
       parsedOutput = parseLlmJson(llmContent);
     } catch {
       console.error(
-        `[interview/script/auto-structure] LLM output not parseable as JSON (interviewId=${interviewId}). Raw output:`,
+        JSON.stringify({
+          event: 'auto_structure_failed',
+          reason: 'invalid_json',
+          interviewId,
+          turnIndex,
+        }),
         llmContent,
       );
       return NextResponse.json(
@@ -335,7 +356,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       .eq('turn_index', turnIndex);
 
     if (updateError) {
-      console.error(`[interview/script/auto-structure] structured_answer update failed (interviewId=${interviewId}, turnIndex=${turnIndex}):`, updateError);
+      console.error(
+        JSON.stringify({
+          event: 'auto_structure_failed',
+          reason: 'db_update',
+          interviewId,
+          turnIndex,
+        }),
+        updateError,
+      );
       return NextResponse.json({ error: 'Failed to save structured answer' }, { status: 500 });
     }
 

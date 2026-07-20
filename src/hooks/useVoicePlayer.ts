@@ -21,6 +21,8 @@ export interface UseVoicePlayerReturn {
     text: string,
     tone: InterviewerTone,
     callbacks?: (() => void) | PlaybackCallbacks,
+    /** Prefer session interviewer_id over the hook's closed-over voice (boot race). */
+    voiceOverride?: TTSVoiceKey | InterviewerId,
   ) => Promise<void>;
   stop: () => void;
 }
@@ -366,8 +368,14 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
   );
 
   const speak = useCallback(
-    async (text: string, tone: InterviewerTone, callbacksArg?: (() => void) | PlaybackCallbacks) => {
+    async (
+      text: string,
+      tone: InterviewerTone,
+      callbacksArg?: (() => void) | PlaybackCallbacks,
+      voiceOverride?: TTSVoiceKey | InterviewerId,
+    ) => {
       const callbacks = normalizePlaybackArg(callbacksArg);
+      const resolvedVoice = voiceOverride ?? voice;
       const client = getClient();
       stop();
       const mySeq = ++seqRef.current;
@@ -378,7 +386,12 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
       }
 
       setError(null);
-      lifecycleLog('voice-player', 'speak_start', { seq: mySeq, textLen: text.length, tone });
+      lifecycleLog('voice-player', 'speak_start', {
+        seq: mySeq,
+        textLen: text.length,
+        tone,
+        voice: resolvedVoice,
+      });
 
       const abortController = new AbortController();
       fetchAbortRef.current = abortController;
@@ -387,14 +400,22 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
         const useStreaming = supportsMseAudioStreaming();
 
         if (useStreaming) {
-          const response = await client.speakStream(text, { voice, tone }, abortController.signal);
+          const response = await client.speakStream(
+            text,
+            { voice: resolvedVoice, tone },
+            abortController.signal,
+          );
           if (mySeq !== seqRef.current || !mountedRef.current) {
             lifecycleLog('voice-player', 'speak_superseded_after_fetch', { mySeq, current: seqRef.current });
             return;
           }
           await playStreamed(response, mySeq, callbacks);
         } else {
-          const audioData = await client.speak(text, { voice, tone }, abortController.signal);
+          const audioData = await client.speak(
+            text,
+            { voice: resolvedVoice, tone },
+            abortController.signal,
+          );
           if (mySeq !== seqRef.current || !mountedRef.current) {
             lifecycleLog('voice-player', 'speak_superseded_after_fetch', { mySeq, current: seqRef.current });
             return;

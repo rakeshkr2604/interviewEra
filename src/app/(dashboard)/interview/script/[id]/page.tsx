@@ -22,6 +22,11 @@ import {
 } from '@/lib/theme/component-classes'
 import { SkipForward, Send, X, RotateCcw, Mic, MicOff, Radio } from 'lucide-react'
 import { useVoicePlayer } from '@/hooks/useVoicePlayer'
+import { resolveSpeakVoice } from '@/lib/voice/resolve-speak-voice'
+import {
+  fetchAutoStructureWithRetry,
+  type AutoStructureResult,
+} from '@/lib/interview/fetch-auto-structure'
 import { useMicrophone } from '@/hooks/useMicrophone'
 import { useInterviewAudio } from '@/hooks/useInterviewAudio'
 import { useTimer } from '@/hooks/useTimer'
@@ -42,8 +47,13 @@ import { buildReviewLoadTurnPayload } from '@/lib/interview/build-review-load-tu
 import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation'
 import {
   claimBootTurnApply,
+  clearBootTurnFetch,
   decideBootTurnFetch,
+  getBootTurnPromise,
+  hasBootTurnApplyClaim,
+  registerBootTurnFetch,
   releaseBootTurnApplyClaim,
+  resolveBootTurnSource,
   shouldFallbackLoadFirstTurn,
 } from '@/lib/interview/script-boot-guard'
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
@@ -101,24 +111,9 @@ type UIPhase =
   | 'auto_turn'
   | 'completed'
 
-type StructuredAnswer = {
-  corrected_transcript: string
-  coaching_reference: {
-    feedback: string
-    restructured_example: string[]
-    technical_terms: Array<{ term: string; definition: string; pronunciation?: string }>
-    missing_elements: string[]
-  }
-}
+type StructuredAnswer = AutoStructureResult
 
 const AUTO_ADVANCE_MS = 1_500
-
-/**
- * Dedup parallel boot `[NONE]` turn fetches across React Strict Mode remounts.
- * Keyed by interviewId — second mount awaits the same promise instead of racing
- * another insert of turn_index=1 (unique constraint 23505).
- */
-const inFlightBootTurnByInterview = new Map<string, Promise<TurnApiResponse>>()
 
 type LoadTurnParams = {
   lastAnswer: string
@@ -254,10 +249,14 @@ export default function ScriptInterviewPage() {
   const [editedRaw, setEditedRaw] = useState('')
   const [reviewStructured, setReviewStructured] = useState<StructuredAnswer | null>(null)
   const [reviewStructuredLoading, setReviewStructuredLoading] = useState(false)
+  /** True when auto-structure exhausted retries — distinct from empty coaching content. */
+  const [reviewStructuredFailed, setReviewStructuredFailed] = useState(false)
   // score-v1 per-answer rubric. Fetched for the approved transcript (prefetched
   // on raw during step 1; re-fetched after Approve if the candidate edited).
   const [reviewScore, setReviewScore] = useState<AnswerScore | null>(null)
   const [reviewScoreLoading, setReviewScoreLoading] = useState(false)
+  /** Continue clicked while next-turn prefetch is still in flight (lighter UX than cold load). */
+  const [awaitingPrefetchContinue, setAwaitingPrefetchContinue] = useState(false)
   // Holds the deferred loadTurn callback; cleared when user Continues from step 2.
   const reviewResolveRef = useRef<((chosenAs: 'raw' | 'corrected', editedAnswer?: string) => void) | null>(null)
   const reviewStructuredRef = useRef<StructuredAnswer | null>(null)
@@ -786,12 +785,8 @@ export default function ScriptInterviewPage() {
   const fetchTurnPayload = useCallback(
     async (p: LoadTurnParams): Promise<TurnApiResponse> => {
       const isBoot = p.lastAnswer === '[NONE]'
-      if (isBoot && interviewId) {
-        const existing = inFlightBootTurnByInterview.get(interviewId)
-        if (existing) return existing
-      }
 
-      const run = (async (): Promise<TurnApiResponse> => {
+      const startFetch = async (): Promise<TurnApiResponse> => {
         const res = await fetch('/api/interview/script/turn', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -816,18 +811,15 @@ export default function ScriptInterviewPage() {
         }
 
         return (await res.json()) as TurnApiResponse
-      })()
-
-      if (isBoot && interviewId) {
-        inFlightBootTurnByInterview.set(interviewId, run)
-        try {
-          return await run
-        } finally {
-          inFlightBootTurnByInterview.delete(interviewId)
-        }
       }
 
-      return run
+      // Boot [NONE]: share one promise across Strict Mode remounts; keep it
+      // registered until apply claims (see script-boot-guard registry).
+      if (isBoot && interviewId) {
+        return registerBootTurnFetch(interviewId, startFetch)
+      }
+
+      return startFetch()
     },
     [interviewId],
   )
@@ -837,10 +829,13 @@ export default function ScriptInterviewPage() {
     fetchTurnPayloadRef.current = fetchTurnPayload
   }, [fetchTurnPayload])
 
-  /** Apply a fetched turn: state + TTS + voice kickoff. Requires interviewRef for voice id. */
+  /** Apply a fetched turn: state + TTS + voice kickoff. Voice from interviewRef (not hook closure). */
   const applyTurnPayload = useCallback(
     async (data: TurnApiResponse) => {
       const turn = data.turn
+      // Read session voice synchronously — interviewRef is set before first apply on boot,
+      // while useVoicePlayer may still close over the default 'priya' until re-render.
+      const speakVoice = resolveSpeakVoice(interviewRef.current?.interviewer_id)
       const isBootTurn = data.turnIndex === 1 || turn.phase === 'warmup'
 
       // One-shot: never speak the opening greeting twice for the same interview
@@ -854,6 +849,8 @@ export default function ScriptInterviewPage() {
           })
           return
         }
+        // First successful apply owns the registry entry.
+        clearBootTurnFetch(interviewId)
       }
 
       if (turnFetchStartedAtRef.current != null) {
@@ -918,10 +915,15 @@ export default function ScriptInterviewPage() {
           scheduleAdvance()
         }
 
-        void elSpeakRef.current(turn.speech, tone, {
-          onPlaybackComplete: guardedAdvance,
-          onPlaybackFailed: guardedAdvance,
-        })
+        void elSpeakRef.current(
+          turn.speech,
+          tone,
+          {
+            onPlaybackComplete: guardedAdvance,
+            onPlaybackFailed: guardedAdvance,
+          },
+          speakVoice,
+        )
       } else {
         consecutiveAutoTurnsRef.current = 0
         timerExpiredRef.current = false
@@ -987,16 +989,21 @@ export default function ScriptInterviewPage() {
           kickoffVoiceInput()
         }
 
-        void elSpeakRef.current(turn.speech, tone, {
-          onPlaybackComplete: () => {
-            if (!mountedRef.current) return
-            guardedKickoff()
+        void elSpeakRef.current(
+          turn.speech,
+          tone,
+          {
+            onPlaybackComplete: () => {
+              if (!mountedRef.current) return
+              guardedKickoff()
+            },
+            onPlaybackFailed: () => {
+              if (!mountedRef.current) return
+              guardedKickoff()
+            },
           },
-          onPlaybackFailed: () => {
-            if (!mountedRef.current) return
-            guardedKickoff()
-          },
-        })
+          speakVoice,
+        )
       }
     },
     [completeInterview, interviewId],
@@ -1119,19 +1126,36 @@ export default function ScriptInterviewPage() {
       })
 
       // First turn can start without waiting for session — turn API re-validates.
-      // TTS still waits for the session barrier below (correct interviewer voice).
+      // TTS voice is read from interviewRef at speak time (set before apply below).
+      // Strict Mode remount: join the first mount's registered promise — never
+      // discard a successful /turn and hang on "Crafting your questions".
       let turnPromise: Promise<TurnApiResponse> | null = null
       const bootDecision = decideBootTurnFetch({
         needsUnlock,
         bootAlreadyCalled: bootCalledRef.current,
       })
-      if (bootDecision.action === 'fetch_first_turn') {
+      const turnSource = resolveBootTurnSource({
+        decision: bootDecision,
+        interviewId,
+        hasRegisteredPromise: Boolean(getBootTurnPromise(interviewId)),
+      })
+
+      if (turnSource === 'start_fetch') {
         bootCalledRef.current = true
         prep?.setTrack('turn', 'running')
         turnFetchStartedAtRef.current = Date.now()
         turnPromise = fetchTurnPayloadRef.current({ lastAnswer: '[NONE]' })
+      } else if (turnSource === 'join_existing') {
+        bootCalledRef.current = true
+        prep?.setTrack('turn', 'running')
+        turnPromise = getBootTurnPromise<TurnApiResponse>(interviewId)
+        interviewFlowLog('session', 'boot_reentry_join_inflight', { interviewId })
+      } else if (bootDecision.action === 'skip_already_booted' && hasBootTurnApplyClaim(interviewId)) {
+        // Prior mount already applied — nothing to fetch or apply.
+        prep?.setTrack('turn', 'ready')
+        interviewFlowLog('session', 'boot_reentry_already_applied', { interviewId })
       } else {
-        prep?.setTrack('turn', needsUnlock ? 'idle' : 'idle')
+        prep?.setTrack('turn', 'idle')
       }
 
       try {
@@ -1195,6 +1219,7 @@ export default function ScriptInterviewPage() {
           setErrorMessage(msg)
           setUiPhase('loading')
           bootCalledRef.current = false
+          clearBootTurnFetch(interviewId)
           releaseBootTurnApplyClaim(interviewId)
           retryRef.current = () => {
             bootCalledRef.current = true
@@ -1219,7 +1244,30 @@ export default function ScriptInterviewPage() {
         }
 
         if (!turnSettled.value) {
-          // Boot re-entry with bootCalled already true — do not speak again.
+          // Re-entry with no trackable promise and no prior apply — rare.
+          // Do not hang silently: allow a single recovery fetch.
+          if (bootDecision.action === 'skip_already_booted' && !hasBootTurnApplyClaim(interviewId)) {
+            interviewFlowLog('session', 'boot_reentry_orphan_refetch', { interviewId })
+            bootCalledRef.current = true
+            prep?.setTrack('turn', 'running')
+            turnFetchStartedAtRef.current = Date.now()
+            try {
+              const recovered = await fetchTurnPayloadRef.current({ lastAnswer: '[NONE]' })
+              if (cancelled || !mountedRef.current) return
+              prep?.setTrack('turn', 'ready')
+              setErrorMessage(null)
+              await applyTurnPayloadRef.current(recovered)
+            } catch (err) {
+              if (cancelled || !mountedRef.current) return
+              const msg = err instanceof Error ? err.message : 'Failed to load first turn.'
+              prep?.setTrack('turn', 'failed', { error: msg })
+              setErrorMessage(msg)
+              bootCalledRef.current = false
+              clearBootTurnFetch(interviewId)
+              releaseBootTurnApplyClaim(interviewId)
+            }
+            return
+          }
           interviewFlowLog('session', 'boot_reentry_skipped', { interviewId })
           return
         }
@@ -1279,6 +1327,7 @@ export default function ScriptInterviewPage() {
         setReviewStructured(null)
         reviewStructuredRef.current = null
         setReviewStructuredLoading(true)
+        setReviewStructuredFailed(false)
         setReviewScore(null)
         setReviewScoreLoading(true)
         reviewRawAnswerRef.current = rawAnswer
@@ -1322,36 +1371,29 @@ export default function ScriptInterviewPage() {
         // for step 1, plus coaching + score ready for step 2 when the candidate
         // Approves without editing. If they edit, Approve bumps the gen and
         // re-fires both against the approved text.
-        fetch('/api/interview/script/auto-structure', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({
-            interviewId,
-            turnIndex: currentTurnIndexRef.current,
-            rawTranscript: rawAnswer,
-            displayQuestion: turn.display_question,
-            targetRole: interviewRef.current?.role ?? '',
-            scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
-            ...(turn.question_type ? { questionType: turn.question_type } : {}),
-          }),
-          signal: AbortSignal.timeout(22_000),
+        void fetchAutoStructureWithRetry({
+          interviewId,
+          turnIndex: currentTurnIndexRef.current,
+          rawTranscript: rawAnswer,
+          displayQuestion: turn.display_question ?? '',
+          targetRole: interviewRef.current?.role ?? '',
+          scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
+          ...(turn.question_type ? { questionType: turn.question_type } : {}),
         })
-          .then(async (res) => {
+          .then((sa) => {
             if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
-            if (!res.ok) throw new Error(`auto-structure ${res.status}`)
-            const data = (await res.json()) as { structuredAnswer: StructuredAnswer }
-            const sa = data.structuredAnswer
             reviewStructuredRef.current = sa
             if (reviewResolveRef.current) {
               setReviewStructured(sa)
               setReviewStructuredLoading(false)
+              setReviewStructuredFailed(false)
             }
           })
           .catch(() => {
             // Step 1 can proceed without highlights; do NOT auto-dismiss.
             if (!mountedRef.current || reviewFetchGenRef.current !== prefetchGen) return
             setReviewStructuredLoading(false)
+            setReviewStructuredFailed(true)
           })
 
         fetch('/api/interview/script/answer-score', {
@@ -1460,36 +1502,30 @@ export default function ScriptInterviewPage() {
     setReviewStructured(null)
     reviewStructuredRef.current = null
     setReviewStructuredLoading(true)
+    setReviewStructuredFailed(false)
     setReviewScore(null)
     setReviewScoreLoading(true)
 
-    fetch('/api/interview/script/auto-structure', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({
-        interviewId,
-        turnIndex: ctx.turnIndex,
-        rawTranscript: approvedTranscript,
-        displayQuestion: ctx.displayQuestion,
-        targetRole: interviewRef.current?.role ?? '',
-        scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
-        ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
-      }),
-      signal: AbortSignal.timeout(22_000),
+    void fetchAutoStructureWithRetry({
+      interviewId,
+      turnIndex: ctx.turnIndex,
+      rawTranscript: approvedTranscript,
+      displayQuestion: ctx.displayQuestion,
+      targetRole: interviewRef.current?.role ?? '',
+      scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
+      ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
     })
-      .then(async (res) => {
+      .then((sa) => {
         if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
-        if (!res.ok) throw new Error(`auto-structure ${res.status}`)
-        const data = (await res.json()) as { structuredAnswer: StructuredAnswer }
-        const sa = data.structuredAnswer
         reviewStructuredRef.current = sa
         setReviewStructured(sa)
         setReviewStructuredLoading(false)
+        setReviewStructuredFailed(false)
       })
       .catch(() => {
         if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
         setReviewStructuredLoading(false)
+        setReviewStructuredFailed(true)
       })
 
     // Edited transcript is no longer STT ground truth — omit sttMinConfidence.
@@ -1592,6 +1628,7 @@ export default function ScriptInterviewPage() {
           err instanceof Error ? err.message : 'Something went wrong. Please try again.',
         )
         bootCalledRef.current = false
+        clearBootTurnFetch(interviewId)
         releaseBootTurnApplyClaim(interviewId)
         retryRef.current = () => {
           bootCalledRef.current = true
@@ -1602,8 +1639,12 @@ export default function ScriptInterviewPage() {
   }, [interviewId])
 
   // ── Derived display values ───────────────────────────────────────────────────
-  const interviewerId = (interview?.interviewer_id ?? 'priya') as InterviewerId
-  const interviewer = getInterviewerById(interviewerId)
+  // Never default to Priya before the session row loads — that flash caused
+  // abandoned Technical/Arjun sessions (candidate thought the voice bug returned).
+  const interviewerId: InterviewerId | null = interview?.interviewer_id ?? null
+  const interviewer = interviewerId ? getInterviewerById(interviewerId) : undefined
+  /** Known name only — never invent "Priya" while hydrating. */
+  const interviewerName = interviewer?.name ?? null
   const totalQuestions = interview?.question_count ?? 0
   const isFollowUpTurn = currentTurn?.is_follow_up === true && currentPhase === 'core'
   const displayedQuestionNumber = Math.min(Math.max(questionNumber, 1), Math.max(totalQuestions, 1))
@@ -1628,7 +1669,7 @@ export default function ScriptInterviewPage() {
   // Avatar header label: shows speaking state or question count (unused since
   // the header was simplified — kept for potential future use)
   const _avatarHeaderLabel = elIsPlaying
-    ? `${interviewer?.name ?? 'Priya'} is speaking`
+    ? `${interviewerName ?? 'The interviewer'} is speaking`
     : `Q ${displayedQuestionNumber}/${Math.max(totalQuestions, 1)}`
 
   // Word index for CaptionDisplay — approximated from TTS playback progress.
@@ -1862,23 +1903,34 @@ export default function ScriptInterviewPage() {
                 </span>
                 {elIsPlaying && (
                   <span className="ie-timer-secondary shrink-0 sm:text-[11px]">
-                    {interviewer?.name ?? 'Priya'} is speaking
+                    {interviewerName ?? 'The interviewer'} is speaking
                   </span>
                 )}
               </div>
 
               <div className="relative min-h-0 flex-1">
-                <AvatarPlayer
-                  interviewerId={interviewerId}
-                  isSpeaking={elIsPlaying}
-                  objectFit="responsive"
-                  fillContainer
-                  className="bg-(--bg-secondary)"
-                />
+                {interviewerId ? (
+                  <AvatarPlayer
+                    interviewerId={interviewerId}
+                    isSpeaking={elIsPlaying}
+                    objectFit="responsive"
+                    fillContainer
+                    className="bg-(--bg-secondary)"
+                  />
+                ) : (
+                  <div
+                    className="flex h-full min-h-[120px] items-center justify-center bg-(--bg-secondary)"
+                    aria-hidden
+                  >
+                    <div
+                      className={`h-10 w-10 rounded-full border-2 border-(--accent-primary) border-t-transparent ${IE_SPINNER_LG_CLASS}`}
+                    />
+                  </div>
+                )}
               </div>
 
               <p className="hidden shrink-0 border-t border-(--card-border)/60 px-4 py-2 text-[11px] text-(--text-secondary) lg:block">
-                Interviewer: {interviewer?.name ?? 'Priya'}
+                {interviewerName ? `Interviewer: ${interviewerName}` : 'Interviewer: …'}
               </p>
             </div>
           </div>
@@ -1914,7 +1966,8 @@ export default function ScriptInterviewPage() {
                   <div>
                     <h2 className="text-xl font-bold text-(--text-primary)">Ready to begin?</h2>
                     <p className="mt-2 text-sm text-(--text-muted)">
-                      Tap to unlock audio so {interviewer?.name ?? 'Priya'} can speak your questions.
+                      Tap to unlock audio so{' '}
+                      {interviewerName ?? 'your interviewer'} can speak your questions.
                     </p>
                   </div>
                   <button
@@ -1936,18 +1989,27 @@ export default function ScriptInterviewPage() {
                 <div className="flex h-full min-h-[300px] flex-1 items-center justify-center rounded-xl p-4"
                   style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%)' }}>
                   <div className="w-full max-w-sm rounded-2xl bg-(--card-bg) p-6 shadow-lg">
-                    {/* Avatar + tagline */}
+                    {/* Avatar + tagline — neutral until session interviewer_id is known */}
                     <div className="mb-5 flex flex-col items-center gap-3 text-center">
-                      <Image
-                        src={interviewer?.avatarImage ?? '/avatars/female/female-avatar.png'}
-                        alt={interviewer?.name ?? 'Priya'}
-                        width={64}
-                        height={64}
-                        className="h-16 w-16 rounded-full object-cover ring-2 ring-(--card-border)"
-                      />
+                      {interviewer ? (
+                        <Image
+                          src={interviewer.avatarImage}
+                          alt=""
+                          width={64}
+                          height={64}
+                          className="h-16 w-16 rounded-full object-cover ring-2 ring-(--card-border)"
+                        />
+                      ) : (
+                        <div
+                          className={`h-16 w-16 rounded-full border-2 border-(--accent-primary) border-t-transparent ${IE_SPINNER_LG_CLASS}`}
+                          aria-hidden
+                        />
+                      )}
                       <div>
                         <p className="text-[15px] font-semibold text-(--text-primary)">
-                          {interviewer?.name ?? 'Priya'} is preparing your session
+                          {interviewerName
+                            ? `${interviewerName} is preparing your session`
+                            : 'Preparing your session'}
                         </p>
                         {interview?.role && (
                           <span className="mt-1.5 inline-block rounded-full bg-(--bg-secondary) px-3 py-0.5 text-xs text-(--text-secondary)">
@@ -2044,8 +2106,8 @@ export default function ScriptInterviewPage() {
                     </span>
                     <span className="text-xs font-semibold uppercase tracking-widest text-(--text-secondary)">
                       {elIsPlaying
-                        ? `${interviewer?.name ?? 'Priya'} is speaking`
-                        : `${interviewer?.name ?? 'Priya'} is starting…`}
+                        ? `${interviewerName ?? 'The interviewer'} is speaking`
+                        : `${interviewerName ?? 'The interviewer'} is starting…`}
                     </span>
                   </div>
 
@@ -2117,7 +2179,7 @@ export default function ScriptInterviewPage() {
                   <div className="flex items-center gap-2">
                     <Radio size={14} className="animate-pulse text-(--accent-primary)" />
                     <span className="text-xs font-semibold text-(--accent-primary)">
-                      {interviewer?.name ?? 'Priya'} is responding…
+                      {interviewerName ?? 'The interviewer'} is responding…
                     </span>
                   </div>
                   {currentTurn?.speech && (
@@ -2134,7 +2196,7 @@ export default function ScriptInterviewPage() {
                   <div className="flex shrink-0 items-center gap-2">
                     <Radio size={14} className="animate-pulse text-(--accent-primary)" />
                     <span className="text-xs font-semibold uppercase tracking-widest text-(--accent-primary)">
-                      {interviewer?.name ?? 'Priya'} is speaking
+                      {interviewerName ?? 'The interviewer'} is speaking
                     </span>
                   </div>
                   {currentTurn?.speech && (
@@ -2477,7 +2539,7 @@ export default function ScriptInterviewPage() {
       {/* ── FULL-WINDOW REVIEW: step 1 transcript → step 2 coaching + score ── */}
       {reviewOpen && (() => {
         const wordCount = editedRaw.trim().split(/\s+/).filter(Boolean).length
-        const coachName = interviewer?.name ?? 'Priya'
+        const coachName = interviewerName ?? 'Coach'
         const coaching = reviewStructured?.coaching_reference
         const coachFeedback =
           coaching?.feedback?.trim() ||
@@ -2521,10 +2583,16 @@ export default function ScriptInterviewPage() {
               const prefetch = nextTurnPrefetchRef.current
               let data: TurnApiResponse | null = null
               if (prefetch) {
+                const waitingOnInFlight = !prefetch.result
+                if (waitingOnInFlight && mountedRef.current) {
+                  setAwaitingPrefetchContinue(true)
+                }
                 try {
                   data = prefetch.result ?? (await prefetch.promise)
                 } catch {
                   data = null
+                } finally {
+                  if (mountedRef.current) setAwaitingPrefetchContinue(false)
                 }
                 nextTurnPrefetchRef.current = null
                 setNextTurnPrefetchReady(false)
@@ -2546,6 +2614,8 @@ export default function ScriptInterviewPage() {
               }
 
               // Prefetch missing/failed — fall back to normal loadTurn path.
+              // Server idempotent resume prevents duplicate turns if the failed
+              // prefetch already inserted a row.
               reviewResolveRef.current = null
               setReviewOpen(false)
               setReviewStep('transcript')
@@ -2559,9 +2629,42 @@ export default function ScriptInterviewPage() {
               setNextTurnPrefetchReady(false)
               resolve?.('raw', editedRaw)
             } finally {
-              if (mountedRef.current) setContinuingFromReview(false)
+              if (mountedRef.current) {
+                setContinuingFromReview(false)
+                setAwaitingPrefetchContinue(false)
+              }
             }
           })()
+        }
+
+        const retryCoaching = () => {
+          const ctx = reviewContextRef.current
+          if (!interviewId || !ctx || reviewStructuredLoading) return
+          reviewFetchGenRef.current += 1
+          const gen = reviewFetchGenRef.current
+          setReviewStructuredFailed(false)
+          setReviewStructuredLoading(true)
+          void fetchAutoStructureWithRetry({
+            interviewId,
+            turnIndex: ctx.turnIndex,
+            rawTranscript: editedRaw,
+            displayQuestion: ctx.displayQuestion,
+            targetRole: interviewRef.current?.role ?? '',
+            scriptType: interviewRef.current?.script_type ?? 'SCRIPT_H',
+            ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
+          })
+            .then((sa) => {
+              if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+              reviewStructuredRef.current = sa
+              setReviewStructured(sa)
+              setReviewStructuredLoading(false)
+              setReviewStructuredFailed(false)
+            })
+            .catch(() => {
+              if (!mountedRef.current || reviewFetchGenRef.current !== gen) return
+              setReviewStructuredLoading(false)
+              setReviewStructuredFailed(true)
+            })
         }
 
         return (
@@ -2691,6 +2794,19 @@ export default function ScriptInterviewPage() {
                               )}
                             </div>
                           </div>
+                        ) : reviewStructuredFailed ? (
+                          <div className="space-y-3">
+                            <p className="text-sm text-(--text-muted)">
+                              Coaching couldn&apos;t be generated this time. Your score above is still saved.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={retryCoaching}
+                              className={`inline-flex min-h-[36px] items-center justify-center rounded-lg border border-(--card-border) bg-(--card-bg) px-3 py-1.5 text-xs font-semibold text-(--text-primary) hover:bg-(--bg-tertiary) ${IE_FOCUS_VISIBLE}`}
+                            >
+                              Retry coaching
+                            </button>
+                          </div>
                         ) : (
                           <p className="text-sm text-(--text-muted)">Coaching unavailable for this turn.</p>
                         )}
@@ -2706,13 +2822,23 @@ export default function ScriptInterviewPage() {
                     type="button"
                     onClick={continueAfterFeedback}
                     disabled={continuingFromReview}
-                    className={`flex min-h-[48px] w-full shrink-0 touch-manipulation items-center justify-center rounded-xl bg-(--accent-primary) px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-wait disabled:opacity-80 ${IE_FOCUS_VISIBLE}`}
+                    className={`flex min-h-[48px] w-full shrink-0 touch-manipulation items-center justify-center gap-2 rounded-xl bg-(--accent-primary) px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-wait disabled:opacity-80 ${IE_FOCUS_VISIBLE}`}
                   >
-                    {continuingFromReview
-                      ? 'Opening next question…'
-                      : nextTurnPrefetchReady
-                        ? 'Continue to next question'
-                        : 'Continue · preparing next…'}
+                    {awaitingPrefetchContinue ? (
+                      <>
+                        <span
+                          className="inline-block h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                          aria-hidden
+                        />
+                        Almost ready…
+                      </>
+                    ) : continuingFromReview ? (
+                      'Opening next question…'
+                    ) : nextTurnPrefetchReady ? (
+                      'Continue to next question'
+                    ) : (
+                      'Continue · preparing next…'
+                    )}
                   </button>
                 </div>
               )}

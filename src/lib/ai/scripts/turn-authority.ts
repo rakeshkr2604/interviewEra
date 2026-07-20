@@ -445,3 +445,26 @@ export function shouldForceClosingBeforeLlm(opts: {
   }
   return false
 }
+
+/**
+ * Idempotency for /turn after a lost client response.
+ *
+ * When the client answers turn `prevTurnIndex`, the next interviewer turn is
+ * always at `prevTurnIndex + 1`. If `current_turn_index` already advanced to
+ * that index (or beyond), a prior /turn call already persisted it — return
+ * that index so the route can short-circuit (no second LLM + no orphan insert).
+ *
+ * Boot `[NONE]` has no prevTurnIndex and is excluded (duplicate boot uses the
+ * unique (interview_id, turn_index) path instead).
+ */
+export function existingNextTurnIndexAfterAnswer(opts: {
+  prevTurnIndex: number | undefined
+  lastAnswer: string
+  currentTurnIndex: number
+}): number | null {
+  if (opts.prevTurnIndex == null) return null
+  if (opts.lastAnswer === '[NONE]') return null
+  const expectedNext = opts.prevTurnIndex + 1
+  if (opts.currentTurnIndex >= expectedNext) return expectedNext
+  return null
+}

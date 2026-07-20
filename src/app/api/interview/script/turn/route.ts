@@ -25,6 +25,7 @@ import {
   countWarmupQuestions,
   countWarmupTurns,
   displayQuestionNumberAfterTurn,
+  existingNextTurnIndexAfterAnswer,
   lastTurnWasCandidateQuestionsAnswer,
   lastTurnWasSelfIntroBridge,
   MAX_CANDIDATE_QUESTION_EXCHANGES,
@@ -197,42 +198,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     // follow_up_enabled may be missing on rows created before the migration lands —
     // treat undefined as true (matches column DEFAULT).
     const followUpEnabled = interview.follow_up_enabled !== false;
-
-    const [resumeCtx, { data: allTurnsRaw }, { data: profile }] = await Promise.all([
-      loadResumeContextForInterview(serviceClient, {
-        interviewId,
-        resumeId: interview.resume_id,
-      }),
-      serviceClient
-        .from('script_turns')
-        .select('turn_index, phase, is_question, llm_output')
-        .eq('interview_id', interviewId)
-        .order('turn_index', { ascending: true }),
-      serviceClient
-        .from('users')
-        .select('name')
-        .eq('id', user.id)
-        .maybeSingle(),
-    ]);
-
-    const allTurns: ScriptTurnRow[] = (allTurnsRaw ?? []).map((t) => ({
-      turn_index: t.turn_index as number,
-      phase: t.phase as string,
-      is_question: Boolean(t.is_question),
-      llm_output: t.llm_output,
-    }));
-
-    const coreQuestionsAsked = countCoreQuestions(allTurns);
-    const followUpsThisQuestion = countFollowUpsSinceLastCoreQuestion(allTurns);
-    const candidateQuestionsExchanges = countCandidateQuestionsExchanges(allTurns);
-    const warmupQuestionsAsked = countWarmupQuestions(allTurns);
-    const warmupTurns = countWarmupTurns(allTurns);
-    const selfIntroQuestionsAsked = countSelfIntroQuestions(allTurns);
-    const selfIntroTurnsCount = countSelfIntroTurns(allTurns);
-    const maxFollowUpsPerQuestion = followUpEnabled ? 2 : 0;
-    const acknowledgments = recentAcknowledgments(allTurns, 3);
-    const totalTurns = allTurns.length;
-    const turnCap = resolveTurnCap(interview.difficulty);
     const recipientEmail = user.email?.trim() ?? '';
 
     const recordPreviousAnswer = async () => {
@@ -272,6 +237,111 @@ export async function POST(request: Request): Promise<NextResponse> {
         );
       }
     };
+
+    // Idempotent resume: prefetch (or a prior call) already inserted the next
+    // turn and advanced current_turn_index, but the client lost the response.
+    // Return that row without a second LLM call or orphan insert at index+2.
+    const resumeTurnIndex = existingNextTurnIndexAfterAnswer({
+      prevTurnIndex,
+      lastAnswer,
+      currentTurnIndex: interview.current_turn_index,
+    });
+    if (resumeTurnIndex != null) {
+      const { data: existingResume, error: resumeErr } = await serviceClient
+        .from('script_turns')
+        .select('turn_index, llm_output, phase, is_question')
+        .eq('interview_id', interviewId)
+        .eq('turn_index', resumeTurnIndex)
+        .maybeSingle();
+
+      if (resumeErr) {
+        console.error(
+          `[interview/script/turn] resume existing turn load failed (interviewId=${interviewId}, turnIndex=${resumeTurnIndex}):`,
+          resumeErr,
+        );
+      } else if (existingResume?.llm_output) {
+        console.warn(
+          JSON.stringify({
+            event: 'turn_idempotent_resume',
+            interviewId,
+            prevTurnIndex,
+            resumeTurnIndex,
+            currentTurnIndex: interview.current_turn_index,
+          }),
+        );
+
+        await recordPreviousAnswer();
+
+        let turnForResponse: ScriptTurnOutput;
+        try {
+          turnForResponse = validateTurnOutput(existingResume.llm_output, interview.script_type);
+        } catch {
+          turnForResponse = existingResume.llm_output as ScriptTurnOutput;
+          if (turnForResponse.is_follow_up === undefined) {
+            turnForResponse = { ...turnForResponse, is_follow_up: false };
+          }
+        }
+
+        const { data: turnsForCount } = await serviceClient
+          .from('script_turns')
+          .select('turn_index, phase, is_question, llm_output')
+          .eq('interview_id', interviewId)
+          .order('turn_index', { ascending: true });
+        const rows: ScriptTurnRow[] = (turnsForCount ?? []).map((t) => ({
+          turn_index: t.turn_index as number,
+          phase: t.phase as string,
+          is_question: Boolean(t.is_question),
+          llm_output: t.llm_output,
+        }));
+        const beforeRows = rows.filter((t) => t.turn_index < resumeTurnIndex);
+        const coresBefore = countCoreQuestions(beforeRows);
+        const questionNumber = displayQuestionNumberAfterTurn(coresBefore, turnForResponse);
+
+        return turnResponse(turnForResponse, resumeTurnIndex, interviewId, questionNumber);
+      }
+      // Row missing despite advanced index — fall through to normal generation
+      // (unique constraint still protects concurrent duplicates).
+      console.warn(
+        `[interview/script/turn] idempotent resume index=${resumeTurnIndex} missing row (interviewId=${interviewId}) — generating`,
+      );
+    }
+
+    // STEP 2 — load interview state + resume + prior turns + display name
+    const [resumeCtx, { data: allTurnsRaw }, { data: profile }] = await Promise.all([
+      loadResumeContextForInterview(serviceClient, {
+        interviewId,
+        resumeId: interview.resume_id,
+      }),
+      serviceClient
+        .from('script_turns')
+        .select('turn_index, phase, is_question, llm_output')
+        .eq('interview_id', interviewId)
+        .order('turn_index', { ascending: true }),
+      serviceClient
+        .from('users')
+        .select('name')
+        .eq('id', user.id)
+        .maybeSingle(),
+    ]);
+
+    const allTurns: ScriptTurnRow[] = (allTurnsRaw ?? []).map((t) => ({
+      turn_index: t.turn_index as number,
+      phase: t.phase as string,
+      is_question: Boolean(t.is_question),
+      llm_output: t.llm_output,
+    }));
+
+    const coreQuestionsAsked = countCoreQuestions(allTurns);
+    const followUpsThisQuestion = countFollowUpsSinceLastCoreQuestion(allTurns);
+    const candidateQuestionsExchanges = countCandidateQuestionsExchanges(allTurns);
+    const warmupQuestionsAsked = countWarmupQuestions(allTurns);
+    const warmupTurns = countWarmupTurns(allTurns);
+    const selfIntroQuestionsAsked = countSelfIntroQuestions(allTurns);
+    const selfIntroTurnsCount = countSelfIntroTurns(allTurns);
+    const maxFollowUpsPerQuestion = followUpEnabled ? 2 : 0;
+    const acknowledgments = recentAcknowledgments(allTurns, 3);
+    const totalTurns = allTurns.length;
+    const turnCap = resolveTurnCap(interview.difficulty);
 
     /** Persist a closing turn, mark interview completed, queue email. */
     const emitClosingAndComplete = async (
