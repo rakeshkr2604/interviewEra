@@ -3,6 +3,7 @@ import { EmailLayout } from './components/EmailLayout';
 import { CTAButton } from './components/CTAButton';
 import { Divider } from './components/Divider';
 import { FeatureCard, FeatureGrid, ProductPreview } from './components/FeatureCard';
+import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
 export interface ProductUpdateEmailProps {
   name?: string;
@@ -22,7 +23,7 @@ const defaultProps: Required<Omit<ProductUpdateEmailProps, 'previewImageUrl' | '
   name: 'there',
   creditsAdded: 3,
   dashboardUrl: 'https://interviewera.com/dashboard',
-  interviewUrl: 'https://interviewera.com/interview/new',
+  interviewUrl: getDefaultInterviewStartUrl('https://interviewera.com'),
   feedbackUrl: 'https://interviewera.com/feedback',
   previewImageUrl: 'https://interviewera.com/blog/react-interview-hero.webp',
   showPreviewImage: true,

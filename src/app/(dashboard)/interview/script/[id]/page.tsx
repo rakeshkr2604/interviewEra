@@ -1186,6 +1186,9 @@ export default function ScriptInterviewPage() {
 
         setInterview(row)
         interviewRef.current = row
+        if (typeof row.session_context?.cameraMode === 'boolean') {
+          setCameraEnabled(row.session_context.cameraMode)
+        }
         prep?.setTrack('profile', 'ready')
 
         prep?.setMicDetail(micResult.detail)

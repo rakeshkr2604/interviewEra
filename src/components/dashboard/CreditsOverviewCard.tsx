@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { AlertCircle, Coins, Play, Crown } from 'lucide-react';
 import { formatPlanTierName, isPaidPlanActive } from '@/lib/pricing/plan-status';
 import type { PlanTier } from '@/types/app.types';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 interface CreditsOverviewCardProps {
   creditsRemaining: number;
@@ -97,7 +98,7 @@ export function CreditsOverviewCard({
 
       <div className="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:mt-auto lg:flex lg:max-w-xl lg:gap-3 lg:pt-5">
         <Link
-          href="/onboarding"
+          href={getDefaultInterviewStartPath()}
           className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 lg:flex-1 ${
             isPracticePrimary
               ? 'text-white shadow-sm hover:-translate-y-0.5 hover:shadow-md'

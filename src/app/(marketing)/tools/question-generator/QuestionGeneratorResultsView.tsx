@@ -23,6 +23,7 @@ import {
   trackQgQuestionRated,
 } from './qg-analytics';
 import { cn } from '@/lib/utils';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 function categoryBadgeStyle(category: QgQuestion['category']): CSSProperties {
   const map = {
@@ -110,8 +111,8 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
   const [rating, setRating] = useState<QuestionRating | null>(null);
 
   const practiceHref = meta.role
-    ? `/interview/new?role=${encodeURIComponent(meta.role)}&src=qg`
-    : '/interview/new?src=qg';
+    ? `${getDefaultInterviewStartPath()}?role=${encodeURIComponent(meta.role)}&src=qg`
+    : `${getDefaultInterviewStartPath()}?src=qg`;
 
   async function revealAnswer() {
     if (answerState.status === 'ready') {

@@ -10,6 +10,7 @@ import {
   MessageSquare,
   Zap,
 } from 'lucide-react';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 interface QuickAction {
   label: string;
@@ -44,7 +45,7 @@ function buildQuickActions(resumeCompletionPct: number): QuickAction[] {
     {
       label: 'Mock interview',
       description: 'Start a new session',
-      href: '/onboarding',
+      href: getDefaultInterviewStartPath(),
       icon: CalendarPlus,
     },
     {

@@ -14,9 +14,15 @@ export interface CampaignUrls {
 
 export function buildCampaignUrls(): CampaignUrls {
   const appUrl = getCampaignAppBaseUrl();
+  // Keep in sync with src/lib/interview/default-interview-start-path.ts
+  // (scripts/ is outside the Next path-alias graph).
+  const interviewStart =
+    process.env.NEXT_PUBLIC_INTERVIEW_ENGINE_DEFAULT === 'v1'
+      ? '/onboarding'
+      : '/interview/script/start';
 
   return {
-    primaryCta: `${appUrl}/interview/new`,
+    primaryCta: `${appUrl.replace(/\/$/, '')}${interviewStart}`,
     secondaryCta: `${appUrl}/dashboard`,
     feedback: `${appUrl}/feedback`,
     settings: `${appUrl}/settings`,

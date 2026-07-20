@@ -1,5 +1,6 @@
 import type { DimensionScores } from '@/types/app.types';
 import { REPORT_DIMENSION_LABELS } from '@/lib/utils/report-radar-dimensions';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 import type { CandidateSnapshot, PersonalizedRoadmap } from './types';
 import { weakestDimensions } from './readiness-score';
 
@@ -67,7 +68,7 @@ function interviewRecommendations(
       id: 'mock-weak-dimension',
       title: `${role} mock — ${focusLabel} focus`,
       description: `Targeted session emphasizing ${focusLabel.toLowerCase()}.`,
-      href: `/onboarding?role=${encodeURIComponent(role)}&focus=${primaryWeak}`,
+      href: `${getDefaultInterviewStartPath()}?role=${encodeURIComponent(role)}&focus=${primaryWeak}`,
       difficulty,
       reason: `Lowest dimension: ${focusLabel}`,
     },
@@ -75,7 +76,7 @@ function interviewRecommendations(
       id: 'mock-resume',
       title: 'Resume-deep-dive mock',
       description: 'Probe projects and skills from your uploaded resume.',
-      href: snapshot.latestResume ? `/interview/new` : '/onboarding',
+      href: getDefaultInterviewStartPath(),
       difficulty: tier >= 2 ? 'medium' : 'easy',
       reason: snapshot.latestResume ? 'Resume on file' : 'Upload resume first',
     },
@@ -83,7 +84,7 @@ function interviewRecommendations(
       id: 'mock-behavioral',
       title: 'HR / behavioral round',
       description: 'STAR-format answers for campus and early-career screens.',
-      href: '/onboarding?mode=HR',
+      href: `${getDefaultInterviewStartPath()}?mode=HR`,
       difficulty: 'easy',
       reason: 'Balances technical gaps with placement-ready soft skills',
     },

@@ -2,6 +2,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { DetailedAnalysis, RadarDataPoint } from '@/types/app.types';
 import { getEmailAppUrl } from '@/lib/server/get-base-url';
 import type { InterviewCompletedEmailProps } from '@/emails/InterviewCompletedEmail';
+import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
 function scaleScore(score10: number): number {
   return Math.round(score10 * 10);
@@ -128,7 +129,7 @@ export async function buildInterviewCompletedEmailPayload(
     (typeof user?.name === 'string' && user.name.trim()) || 'there';
 
   const reportUrl = `${baseUrl}/report/${reportId}`;
-  const practiceUrl = `${baseUrl}/interview/new`;
+  const practiceUrl = getDefaultInterviewStartUrl(baseUrl);
 
   const difficultyMap: Record<string, 'Beginner' | 'Intermediate' | 'Advanced'> = {
     easy: 'Beginner',

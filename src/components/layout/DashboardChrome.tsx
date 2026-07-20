@@ -15,10 +15,16 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
   useHeartbeat(true);
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
-  const isOnboarding = pathname.startsWith('/onboarding')
+  const isScriptSetup =
+    pathname === '/interview/script/start' ||
+    pathname === '/interview/script/test' ||
+    pathname.startsWith('/interview/script/start/') ||
+    pathname.startsWith('/interview/script/test/')
+  const isOnboarding = pathname.startsWith('/onboarding') || isScriptSetup
   /** Live interview (v1 or v2.1 script engine) — viewport-fitted shell (no footer scroll, compact chrome). */
   const isInterviewSession =
-    pathname.startsWith('/interview/session/') || pathname.startsWith('/interview/script/')
+    pathname.startsWith('/interview/session/') ||
+    (pathname.startsWith('/interview/script/') && !isScriptSetup)
   const isImmersiveViewport = isOnboarding || isInterviewSession
 
   /*

@@ -18,6 +18,8 @@ export type ScriptInterviewSession = {
     experienceYears: number
     interviewerId: string
     jobDescription?: string
+    /** When true, session boots with candidate camera preview on. */
+    cameraMode?: boolean
   }
   engine: string
   script_type: 'SCRIPT_H' | 'SCRIPT_T' | 'SCRIPT_M'

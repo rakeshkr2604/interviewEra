@@ -11,6 +11,7 @@ import type { DimensionKey } from '@/lib/interview/answer-score/rubric';
 import { DIMENSION_KEYS } from '@/lib/interview/answer-score/rubric';
 import { dimensionLabel } from '@/lib/interview/script-report/aggregate';
 import type { ScriptReportSynthesis } from '@/lib/interview/script-report/synthesis';
+import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
 function scaleScore(score10: number): number {
   return Math.round(Math.max(0, Math.min(10, score10)) * 10);
@@ -141,7 +142,7 @@ export async function buildScriptInterviewCompletedEmailPayload(args: {
     (typeof user?.name === 'string' && user.name.trim()) || 'there';
 
   const reportUrl = `${baseUrl}/report/script/${interviewId}`;
-  const practiceUrl = `${baseUrl}/interview/new`;
+  const practiceUrl = getDefaultInterviewStartUrl(baseUrl);
 
   const difficultyMap: Record<string, 'Beginner' | 'Intermediate' | 'Advanced'> = {
     easy: 'Beginner',

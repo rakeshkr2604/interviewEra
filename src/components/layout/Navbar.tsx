@@ -38,6 +38,7 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { CreditBadge } from '@/components/layout/CreditBadge';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { UserAvatar } from '@/components/profile/UserAvatar';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1143,7 +1144,7 @@ function StudentNav({ user }: { user: NavUser }) {
         </Link>
         <ThemeToggle />
         <Link
-          href="/onboarding"
+          href={getDefaultInterviewStartPath()}
           className={cn(NAV_PRIMARY_CTA_CLASS, 'px-3.5')}
           style={NAV_PRIMARY_CTA_STYLE}
         >
@@ -1248,7 +1249,7 @@ function StudentNav({ user }: { user: NavUser }) {
               style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
             >
               <Link
-                href="/onboarding"
+                href={getDefaultInterviewStartPath()}
                 onClick={() => setMobileOpen(false)}
                 className={cn(NAV_PRIMARY_CTA_CLASS, 'w-full min-h-11 gap-2 py-3 text-base')}
                 style={NAV_PRIMARY_CTA_STYLE}

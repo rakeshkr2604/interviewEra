@@ -7,6 +7,7 @@ import {
   IE_MARKETING_CTA_SECONDARY_STYLE,
 } from '@/lib/theme/component-classes';
 import { cn } from '@/lib/utils';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 export default function NotFound() {
   return (
@@ -90,7 +91,7 @@ export default function NotFound() {
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             {[
-              { href: '/interview/new', label: 'Start Interview' },
+              { href: getDefaultInterviewStartPath(), label: 'Start Interview' },
               { href: '/history', label: 'Interview History' },
               { href: '/analytics', label: 'Analytics' },
               { href: '/pricing', label: 'Pricing' },

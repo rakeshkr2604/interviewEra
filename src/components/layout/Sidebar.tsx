@@ -25,15 +25,17 @@ import type { PlanTier } from '@/types/app.types'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
 import { SidebarCommunityLinks } from '@/components/community/SidebarCommunityLinks'
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 
 const BRAND_MARK = '/brand/logos/icon-only.svg'
 
-const NAV_SECTIONS = [
+function buildNavSections() {
+  return [
   {
     label: 'MAIN',
     items: [
       { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/onboarding', label: 'Start Interview', icon: Play },
+      { href: getDefaultInterviewStartPath(), label: 'Start Interview', icon: Play },
     ],
   },
   {
@@ -61,7 +63,8 @@ const NAV_SECTIONS = [
       { href: '/college/dashboard', label: 'Campus Admin', icon: Shield },
     ],
   },
-]
+  ]
+}
 
 export function Sidebar({
   className,
@@ -126,7 +129,7 @@ export function Sidebar({
 
   const sections = useMemo(
     () =>
-      NAV_SECTIONS.map((section) => ({
+      buildNavSections().map((section) => ({
         ...section,
         items: section.items.filter((item) => item.href !== '/college/dashboard' || canAccessAdmin),
       })),

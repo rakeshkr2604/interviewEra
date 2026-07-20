@@ -46,6 +46,7 @@ import { lifecycleLog, lifecycleWarn, voiceDebug, interviewStartupLog, interview
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log'
 import type { RuntimePhase } from '@/lib/interview/runtime-phase'
 import { isTerminalInterviewStatus } from '@/lib/interview/interview-status'
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 import { InterviewPhaseAnnouncer } from '@/components/interview/InterviewPhaseAnnouncer'
 import { progressRingLabel } from '@/lib/interview/runtime-phase'
 import {
@@ -2950,7 +2951,7 @@ export default function InterviewSessionPage() {
                 : 'It was closed before completion and can no longer be resumed. Start a new practice session to keep practicing.'}
           </p>
           <button
-            onClick={() => router.push('/interview/new')}
+            onClick={() => router.push(getDefaultInterviewStartPath())}
             className="w-full rounded-xl bg-(--accent-primary) px-6 py-2 text-sm font-semibold text-white"
           >
             Start a New Interview

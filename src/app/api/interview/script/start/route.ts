@@ -5,6 +5,8 @@ import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
+import { trackInterviewEvent } from '@/lib/analytics/interview-events';
+import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 
 const scriptStartSchema = z.object({
   resumeId: z.string().uuid(),
@@ -16,6 +18,7 @@ const scriptStartSchema = z.object({
   experienceYears: z.number().min(0).max(60).default(0),
   selfIntroEnabled: z.boolean().default(true),
   followUpEnabled: z.boolean().default(true),
+  cameraMode: z.boolean().default(true),
   jobDescription: z.string().max(12000).optional(),
 });
 
@@ -81,6 +84,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       experienceYears,
       selfIntroEnabled,
       followUpEnabled,
+      cameraMode,
       jobDescription: rawJobDescription,
     } = validation.data;
 
@@ -162,6 +166,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           interviewMode,
           experienceYears,
           interviewerId,
+          cameraMode,
           ...(jobDescription ? { jobDescription } : {}),
         },
         engine: 'v2.1',
@@ -195,7 +200,29 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Step 9 — created
+    // Step 9 — analytics (grep `[product-event]` / durable milestone)
+    trackInterviewEvent('interview_created', {
+      userId: user.id,
+      interviewId: interview.id,
+      engine: 'v2.1',
+      role,
+      difficulty,
+      interviewMode,
+      scriptType,
+      cameraMode,
+      followUpEnabled,
+    });
+    persistMilestoneEventOnce('interview_started', {
+      user_id: user.id,
+      interview_id: interview.id,
+      engine: 'v2.1',
+      role,
+      difficulty,
+      interviewMode,
+      scriptType,
+    });
+
+    // Step 10 — created
     return NextResponse.json(
       {
         interviewId: interview.id,

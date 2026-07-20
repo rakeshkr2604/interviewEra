@@ -33,6 +33,7 @@ import type { PerQuestionInsightData } from '@/lib/report/insight-engine';
 import { radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
 import { sessionQualityFeedbackFromLogRow } from '@/lib/retention/quality-feedback';
 import { SessionQualityNotice } from '@/components/retention/SessionQualityNotice';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 const exportPdfLinkClass =
   'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-[var(--ie-radius-md)] border-2 px-3 text-sm font-semibold whitespace-nowrap transition-[transform,box-shadow,border-color] duration-200 hover:-translate-y-0.5 motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]';
@@ -983,7 +984,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
         </p>
         <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center sm:justify-center">
           <Link
-            href="/interview/new"
+            href={getDefaultInterviewStartPath()}
             className="landing-cta-lift inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)]"
             style={{ background: 'var(--accent-primary)' }}
           >

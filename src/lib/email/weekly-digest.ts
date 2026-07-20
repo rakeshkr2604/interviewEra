@@ -6,6 +6,7 @@ import type { WeeklyProgressEmailProps } from '@/emails/WeeklyProgressEmail';
 import type { WeeklyDimensionScores } from '@/emails/utils/weeklyHelpers';
 import { sendLifecycleTemplate } from '@/lib/email/lifecycle/send-template';
 import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
+import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
 // ─── Unsubscribe token helpers ────────────────────────────────────────────────
 
@@ -363,7 +364,7 @@ async function buildUserDigest(user: DigestUser): Promise<DigestData | null> {
     currentWeekScore,
     dimensions,
     reportUrl: `${baseUrl}/dashboard`,
-    practiceUrl: `${baseUrl}/interview/new`,
+    practiceUrl: getDefaultInterviewStartUrl(baseUrl),
     unsubscribeUrl,
   };
 

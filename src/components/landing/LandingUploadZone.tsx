@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { trackResumeUploadedGa4 } from '@/lib/analytics/funnel-ga4-bridge';
 import { parseResponseJsonSafe } from '@/lib/http/parse-response-json';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 interface LandingUploadZoneProps {
   isLoggedIn: boolean;
@@ -58,7 +59,7 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
     setFileName(file.name);
 
     if (!isLoggedIn) {
-      router.push('/signup?next=/interview/new');
+      router.push(`/signup?next=${encodeURIComponent(getDefaultInterviewStartPath())}`);
       return;
     }
 
@@ -85,7 +86,7 @@ export function LandingUploadZone({ isLoggedIn, embeddedInHero }: LandingUploadZ
         trackResumeUploadedGa4(data.resumeId, { source: 'landing_upload_zone' });
       }
 
-      router.push('/interview/new');
+      router.push(getDefaultInterviewStartPath());
     } catch {
       setError('Upload failed. Please check your connection and try again.');
     } finally {

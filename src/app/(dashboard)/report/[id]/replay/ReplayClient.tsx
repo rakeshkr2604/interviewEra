@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import type { AnswerMode, DimensionScores, QuestionCategory } from '@/types/app.types';
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 export interface ReplayItem {
   questionId: string;
@@ -88,7 +89,7 @@ export function ReplayClient({ reportId, role, difficulty, items }: ReplayClient
           </p>
         </div>
         <Link
-          href="/interview/new"
+          href={getDefaultInterviewStartPath()}
           className={buttonVariants({ variant: 'outline' })}
           style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
         >

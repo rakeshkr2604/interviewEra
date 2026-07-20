@@ -96,6 +96,16 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 - **Category**: Permanent operational debug toggle, deliberately designed this way (explicit in-code rationale).
 - **Planned removal criteria**: N/A.
 
+## `NEXT_PUBLIC_INTERVIEW_ENGINE_DEFAULT`
+
+- **Location**: `src/lib/interview/default-interview-start-path.ts::getInterviewEngineDefault()` / `getDefaultInterviewStartPath()` — `process.env.NEXT_PUBLIC_INTERVIEW_ENGINE_DEFAULT === 'v1'` selects legacy onboarding; any other value (including unset) selects v2.1 script start (`/interview/script/start`).
+- **Default state**: unset → **`v2.1`** (script engine is the primary Start Interview entry).
+- **Purpose**: cutover / instant rollback for which path all primary "Start Interview" / practice-again CTAs resolve to. Does **not** delete or disable v1 — `/onboarding` and `/interview/new` stay fully reachable by direct URL either way.
+- **Owner**: Unknown — not verified (solo founder de facto).
+- **Category**: Permanent operational safety toggle (cutover rollback lever).
+- **Planned removal criteria**: N/A while both engines coexist. Revisit only after v1 routes are intentionally retired in a separate, explicit task.
+- **Rollback**: set `NEXT_PUBLIC_INTERVIEW_ENGINE_DEFAULT=v1` in Vercel → redeploy (or wait for next deploy). Primary CTAs return to `/onboarding`. Confirm with one dashboard "Start Interview" click.
+
 ## `ANALYZE` (build tooling, not a product feature flag)
 
 - **Location**: `next.config.ts` — `process.env.ANALYZE === "true"`, wired to the `npm run analyze` script.
@@ -106,4 +116,4 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 
 ## Summary: what this registry makes visible for the first time
 
-Of 13 product-behavior flags inventoried, **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable), and **one has a real, currently-unmitigated production risk** if misconfigured (`CAMPUS_WORKSPACE_AUTO_APPROVE`, which has no code-level production guard). Neither of these is fixed by this document — this document's job is only to make both facts impossible to miss going forward. Fixing them is out of scope for this task (no runtime changes) and belongs to a future task once the founder decides how to act on this evidence.
+Of 14 product-behavior flags inventoried, **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable), and **one has a real, currently-unmitigated production risk** if misconfigured (`CAMPUS_WORKSPACE_AUTO_APPROVE`, which has no code-level production guard). Neither of these is fixed by this document — this document's job is only to make both facts impossible to miss going forward. Fixing them is out of scope for this task (no runtime changes) and belongs to a future task once the founder decides how to act on this evidence.

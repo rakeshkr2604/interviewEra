@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
@@ -87,7 +88,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
               Start your next mock interview to build your history.
             </p>
             <Link
-              href="/onboarding"
+              href={getDefaultInterviewStartPath()}
               className="landing-cta-lift inline-block rounded-[14px] px-6 py-2.5 text-sm font-semibold text-white"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
