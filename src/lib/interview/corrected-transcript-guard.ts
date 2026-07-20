@@ -23,12 +23,30 @@ export function stripTrailingPunct(token: string): string {
   return token.replace(/^[^A-Za-z0-9#+.]+|[^A-Za-z0-9#+.]+$/g, '')
 }
 
-/** Split on whitespace; keep tokens as spoken. */
+/** Match Big-O notation as a single token (parentheses break naive \\S+ splitting). */
+const COMPLEXITY_TOKEN_RE = /O\([^)]+\)/gi
+
+/** Split on whitespace; keep O(n log n) style notation as one token. */
 export function tokenizeWords(text: string): string[] {
-  return text
-    .trim()
-    .split(/\s+/)
-    .filter((t) => t.length > 0)
+  const trimmed = text.trim()
+  if (!trimmed) return []
+  const tokens: string[] = []
+  const re = new RegExp(COMPLEXITY_TOKEN_RE.source, 'gi')
+  let lastIndex = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(trimmed)) !== null) {
+    const before = trimmed.slice(lastIndex, m.index)
+    if (before.trim()) {
+      tokens.push(...before.trim().split(/\s+/).filter(Boolean))
+    }
+    tokens.push(m[0])
+    lastIndex = m.index + m[0].length
+  }
+  const tail = trimmed.slice(lastIndex)
+  if (tail.trim()) {
+    tokens.push(...tail.trim().split(/\s+/).filter(Boolean))
+  }
+  return tokens
 }
 
 export type TokenSpan = {
@@ -42,21 +60,59 @@ export type TokenSpan = {
 /** Whitespace-separated tokens with source character offsets. */
 export function tokenizeWithOffsets(text: string): TokenSpan[] {
   const tokens: TokenSpan[] = []
-  const re = /\S+/g
+  const trimmed = text.trim()
+  if (!trimmed) return tokens
+
+  const complexityRe = new RegExp(COMPLEXITY_TOKEN_RE.source, 'gi')
+  let lastIndex = 0
   let m: RegExpExecArray | null
-  while ((m = re.exec(text)) !== null) {
-    tokens.push({ text: m[0], start: m.index, end: m.index + m[0].length })
+
+  const pushWhitespaceTokens = (segment: string, baseOffset: number) => {
+    const re = /\S+/g
+    let ws: RegExpExecArray | null
+    while ((ws = re.exec(segment)) !== null) {
+      tokens.push({
+        text: ws[0],
+        start: baseOffset + ws.index,
+        end: baseOffset + ws.index + ws[0].length,
+      })
+    }
   }
+
+  while ((m = complexityRe.exec(trimmed)) !== null) {
+    const before = trimmed.slice(lastIndex, m.index)
+    if (before) pushWhitespaceTokens(before, lastIndex)
+    tokens.push({
+      text: m[0],
+      start: m.index,
+      end: m.index + m[0].length,
+    })
+    lastIndex = m.index + m[0].length
+  }
+  const tail = trimmed.slice(lastIndex)
+  if (tail) pushWhitespaceTokens(tail, lastIndex)
+
   return tokens
 }
 
 /**
  * Heuristic: corrected token looks like a tech term / proper noun the STT
  * might have garbled (capitalized name, dotted npm-style id, ALLCAPS acronym).
+ * Also permits Big-O notation tokens like O(n log n) and common algorithm compounds.
  */
+export function isComplexityNotationToken(token: string): boolean {
+  // Do not use stripTrailingPunct — it strips closing ')' from O(n log n).
+  const trimmed = token.trim().replace(/[.,;:!?]+$/, '')
+  return /^O\([^)]+\)$/i.test(trimmed)
+}
+
+const KNOWN_ALGORITHM_TOKEN = /^(?:quicksort|mergesort|heapsort|hashmap|hashset)$/i
+
 export function isAllowedTechOrProperNoun(token: string): boolean {
   const w = stripTrailingPunct(token)
   if (!w) return false
+  if (isComplexityNotationToken(w)) return true
+  if (KNOWN_ALGORITHM_TOKEN.test(w)) return true
   if (/\./.test(w)) return true // Next.js, Node.js
   if (/^[A-Z]{2,}[0-9]*$/.test(w)) return true // API, SQL, JWT
   if (/^[A-Z][a-zA-Z0-9+#]*$/.test(w) && w.length >= 2) return true // Supabase, React
@@ -262,11 +318,33 @@ export function wordDiffOps(rawWords: string[], correctedWords: string[]): WordD
 
 /**
  * Allowed STT→tech substitution:
- * - corrected side 1–2 tech/proper-noun tokens
- * - raw side 1–4 tokens (phonetic garble span)
+ * - corrected side 1–2 tech/proper-noun tokens (or single Big-O notation token)
+ * - raw side 1–6 tokens when spoken complexity (e.g. "big o n log n")
+ * - raw side 1–4 tokens for ordinary phonetic garble
  * - not a same-lemma inflection (connect→connected)
  */
+function looksLikeSpokenComplexity(rawSpan: string[]): boolean {
+  const rawJoined = rawSpan.join(' ').toLowerCase()
+  if (/\bbig\s*o\b/.test(rawJoined)) return true
+  if (/\bo\s+of\s+n\b/.test(rawJoined)) return true
+  if (/\bo\s+n\s+log\s+n\b/.test(rawJoined)) return true
+  if (/\bo\s+n\s+squared\b/.test(rawJoined)) return true
+  return false
+}
+
+export function isAllowedComplexitySubstitution(
+  rawSpan: string[],
+  correctedSpan: string[],
+): boolean {
+  if (correctedSpan.length !== 1) return false
+  if (!isComplexityNotationToken(correctedSpan[0])) return false
+  if (rawSpan.length < 2 || rawSpan.length > 6) return false
+  return looksLikeSpokenComplexity(rawSpan)
+}
+
 export function isAllowedSubstitution(rawSpan: string[], correctedSpan: string[]): boolean {
+  if (isAllowedComplexitySubstitution(rawSpan, correctedSpan)) return true
+
   if (correctedSpan.length < 1 || correctedSpan.length > 2) return false
   if (rawSpan.length < 1 || rawSpan.length > 4) return false
   if (!correctedSpan.every(isAllowedTechOrProperNoun)) return false

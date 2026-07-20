@@ -672,11 +672,22 @@ export async function loadOrGenerateScriptReport(args: {
   interviewId: string;
   userId: string;
   forceRegenerate?: boolean;
+  /**
+   * When true, do not queue an owed completion email after the report is ready.
+   * Required when the caller is trySendScriptCompletionEmail (avoids recurse).
+   */
+  skipOwedCompletionEmail?: boolean;
 }): Promise<
   | { ok: true; report: ScriptInterviewReportRecord; created: boolean }
   | { ok: false; error: string; status: number }
 > {
-  const { serviceClient, interviewId, userId, forceRegenerate = false } = args;
+  const {
+    serviceClient,
+    interviewId,
+    userId,
+    forceRegenerate = false,
+    skipOwedCompletionEmail = false,
+  } = args;
 
   const { data: interview, error: interviewError } = await serviceClient
     .from('interviews')
@@ -716,10 +727,49 @@ export async function loadOrGenerateScriptReport(args: {
 
   if (!claim.claimed) {
     if (!claim.pending) {
+      // Sticky insufficient_data (or empty terminal) after scores land later —
+      // regenerate once so the owed-completion-email hook can fire.
+      if (
+        !forceRegenerate &&
+        (claim.report.status === 'insufficient_data' ||
+          claim.report.scored_answer_count === 0 ||
+          claim.report.overall == null)
+      ) {
+        const { count: scoredNow, error: scoredErr } = await serviceClient
+          .from('answer_evaluations')
+          .select('id', { count: 'exact', head: true })
+          .eq('interview_id', interviewId)
+          .eq('status', 'scored');
+        if (!scoredErr && (scoredNow ?? 0) > 0) {
+          console.info('[script-report] regenerating sticky report after scores arrived', {
+            interviewId,
+            priorStatus: claim.report.status,
+            scoredNow,
+          });
+          return loadOrGenerateScriptReport({
+            ...args,
+            forceRegenerate: true,
+          });
+        }
+      }
+      maybeQueueOwedCompletionEmail({
+        skipOwedCompletionEmail,
+        serviceClient,
+        interviewId,
+        userId,
+        report: claim.report,
+      });
       return { ok: true, created: false, report: claim.report };
     }
     const waited = await waitForReportReady(serviceClient, interviewId);
     if (waited && TERMINAL_STATUSES.has(waited.status)) {
+      maybeQueueOwedCompletionEmail({
+        skipOwedCompletionEmail,
+        serviceClient,
+        interviewId,
+        userId,
+        report: waited,
+      });
       return { ok: true, created: false, report: waited };
     }
     // Timed out still generating — surface generating so UI can retry.
@@ -755,5 +805,35 @@ export async function loadOrGenerateScriptReport(args: {
     scriptType: interview.script_type,
   });
 
+  maybeQueueOwedCompletionEmail({
+    skipOwedCompletionEmail,
+    serviceClient,
+    interviewId,
+    userId,
+    report,
+  });
+
   return { ok: true, created: true, report };
+}
+
+function maybeQueueOwedCompletionEmail(args: {
+  skipOwedCompletionEmail: boolean;
+  serviceClient: SupabaseClient;
+  interviewId: string;
+  userId: string;
+  report: ScriptInterviewReportRecord;
+}): void {
+  if (args.skipOwedCompletionEmail) return;
+  // Lazy import avoids a circular init cycle:
+  // generate → owed-email → trySend → generate
+  void import('@/lib/email/lifecycle/send-owed-script-completion-email').then(
+    ({ queueOwedScriptCompletionEmailIfReportReady }) => {
+      queueOwedScriptCompletionEmailIfReportReady({
+        serviceClient: args.serviceClient,
+        interviewId: args.interviewId,
+        userId: args.userId,
+        report: args.report,
+      });
+    },
+  );
 }

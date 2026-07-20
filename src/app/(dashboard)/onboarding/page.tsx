@@ -815,6 +815,7 @@ export default function OnboardingPage() {
                   ? Math.trunc(data.experienceYears)
                   : 0,
               questionCount: difficultyQuestionCount(difficulty),
+              followUpEnabled: aiFollowupsEnabled,
               ...(jobDescription ? { jobDescription } : {}),
             }),
           })

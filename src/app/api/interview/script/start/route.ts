@@ -15,6 +15,7 @@ const scriptStartSchema = z.object({
   interviewMode: z.enum(['technical', 'hr_behavioral', 'mixed']),
   experienceYears: z.number().min(0).max(60).default(0),
   selfIntroEnabled: z.boolean().default(true),
+  followUpEnabled: z.boolean().default(true),
   jobDescription: z.string().max(12000).optional(),
 });
 
@@ -79,6 +80,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       interviewMode,
       experienceYears,
       selfIntroEnabled,
+      followUpEnabled,
       jobDescription: rawJobDescription,
     } = validation.data;
 
@@ -165,6 +167,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         engine: 'v2.1',
         script_type: scriptType,
         self_intro_enabled: selfIntroEnabled,
+        follow_up_enabled: followUpEnabled,
         is_returning_user: isReturningUser,
         max_skips: maxSkips,
         skips_used: 0,

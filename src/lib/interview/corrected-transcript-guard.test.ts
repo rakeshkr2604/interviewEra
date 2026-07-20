@@ -44,6 +44,23 @@ describe('corrected-transcript-guard', () => {
     expect(isAllowedSubstitution(['connect'], ['connected'])).toBe(false)
   })
 
+  it('allows Big-O complexity notation substitutions', () => {
+    expect(isAllowedSubstitution(['big', 'o', 'n', 'log', 'n'], ['O(n log n)'])).toBe(true)
+    expect(isAllowedSubstitution(['big', 'o', 'of', 'n'], ['O(n)'])).toBe(true)
+    expect(isAllowedSubstitution(['quick', 'sort'], ['quicksort'])).toBe(true)
+  })
+
+  it('accepts guarded Big-O cleanup without grammar polish', () => {
+    const raw =
+      'With randomized pivot selection, the expected time complex is big O n log n because a random pivot'
+    const corrected =
+      'With randomized pivot selection, the expected time complex is O(n log n) because a random pivot'
+    const result = guardCorrectedTranscript(raw, corrected)
+    expect(result.accepted).toBe(true)
+    expect(result.transcript).toBe(corrected)
+    expect(result.rejectedForGrammarPolish).toBe(false)
+  })
+
   it('rejects previous smoke bleed (tense + sentence polish)', () => {
     const result = guardCorrectedTranscript(SMOKE_RAW, SMOKE_BLEED)
     expect(result.accepted).toBe(false)

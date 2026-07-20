@@ -334,6 +334,7 @@ export default function ScriptInterviewTestPage() {
           interviewMode,
           experienceYears,
           selfIntroEnabled,
+          followUpEnabled: adaptiveFollowUp,
           jobDescription,
         }),
       })
@@ -359,6 +360,7 @@ export default function ScriptInterviewTestPage() {
     experienceYears,
     selfIntroEnabled,
     jobDescription,
+    adaptiveFollowUp,
     router,
   ])
 

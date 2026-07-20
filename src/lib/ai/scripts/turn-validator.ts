@@ -27,6 +27,8 @@ export type ScriptTurnOutput = {
   show_auto_structure: boolean
   phase: (typeof VALID_PHASES)[number]
   is_question: boolean
+  /** true = probe/challenge on the previous question; defaults false when omitted. */
+  is_follow_up: boolean
   question_difficulty: (typeof VALID_DIFFICULTIES)[number] | null
   interviewer_emotion: (typeof VALID_EMOTIONS)[number]
   question_type?: (typeof VALID_QUESTION_TYPES)[number] | null // SCRIPT_M only
@@ -79,6 +81,17 @@ export function validateTurnOutput(raw: unknown, scriptType: ScriptType): Script
   const allow_skip = requireBoolean(obj, 'allow_skip')
   const show_auto_structure = requireBoolean(obj, 'show_auto_structure')
   const is_question = requireBoolean(obj, 'is_question')
+
+  // Default false when omitted — older model outputs / canned overrides may lack it.
+  const rawFollowUp = obj['is_follow_up']
+  let is_follow_up = false
+  if (rawFollowUp === undefined || rawFollowUp === null) {
+    is_follow_up = false
+  } else if (typeof rawFollowUp === 'boolean') {
+    is_follow_up = rawFollowUp
+  } else {
+    fail('is_follow_up', rawFollowUp, 'must be a boolean')
+  }
 
   const phase = obj['phase']
   if (typeof phase !== 'string' || !(VALID_PHASES as readonly string[]).includes(phase)) {
@@ -152,6 +165,7 @@ export function validateTurnOutput(raw: unknown, scriptType: ScriptType): Script
     show_auto_structure,
     phase: phase as ScriptTurnOutput['phase'],
     is_question,
+    is_follow_up,
     question_difficulty: question_difficulty as ScriptTurnOutput['question_difficulty'],
     interviewer_emotion: interviewer_emotion as ScriptTurnOutput['interviewer_emotion'],
   }

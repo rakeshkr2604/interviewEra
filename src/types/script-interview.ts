@@ -23,6 +23,7 @@ export type ScriptInterviewSession = {
   script_type: 'SCRIPT_H' | 'SCRIPT_T' | 'SCRIPT_M'
   current_turn_index: number
   self_intro_enabled: boolean
+  follow_up_enabled: boolean
   last_question_type: 'technical' | 'behavioral' | null
   skips_used: number
   max_skips: number

@@ -6,6 +6,10 @@ import { assertPdfMagic, extractText } from '@/lib/pdf/parser';
 import { PDFCorruptError, PDFScannedNoTextError } from '@/lib/pdf/parser-errors';
 
 describe('getPdfPageCount buffer safety', () => {
+  // pdf.js cold start (dynamic import + canvas globals) can exceed Vitest's 5s default
+  // when the full suite runs parallel workers — not a code bug, just suite contention.
+  const pdfColdStartTimeoutMs = 15_000
+
   it('does not detach caller bytes (pdf.js transfer regression)', async () => {
     const path = join(process.cwd(), 'tests/fixtures/pdf/fixture-latin.pdf');
     const buf = readFileSync(path);
@@ -18,7 +22,7 @@ describe('getPdfPageCount buffer safety', () => {
     // Pre-fix: pdf.js transferred the ArrayBuffer → byteLength became 0
     expect(bytes.byteLength).toBe(before);
     expect(() => assertPdfMagic(bytes)).not.toThrow();
-  });
+  }, pdfColdStartTimeoutMs);
 
   it('page-limit then extractText works on the same buffer (upload pipeline order)', async () => {
     const path = join(process.cwd(), 'tests/fixtures/pdf/fixture-latin.pdf');
@@ -32,7 +36,7 @@ describe('getPdfPageCount buffer safety', () => {
     const text = await extractText(bytes, { source: 'page-count.test' });
     expect(text.trim().length).toBeGreaterThan(20);
     expect(text).toContain('AAAABBBB');
-  });
+  }, pdfColdStartTimeoutMs);
 
   it('Rakesh_Kumar_Resume.pdf (Overleaf/LaTeX) survives page-limit → extract', async () => {
     const path = join(process.cwd(), 'tests/fixtures/pdf/Rakesh_Kumar_Resume.pdf');
@@ -49,7 +53,7 @@ describe('getPdfPageCount buffer safety', () => {
     expect(text.toLowerCase()).toMatch(/rakesh|engineer|react|experience|education|skill/i);
     // Ligature/encoding smoke — must not destroy common words
     expect(text.toLowerCase()).not.toMatch(/\boce\b/);
-  });
+  }, pdfColdStartTimeoutMs);
 
   it('page-limit then extract on latex-like Type1 fixture preserves readable text', async () => {
     const path = join(process.cwd(), 'tests/fixtures/pdf/fixture-latex-type1.pdf');
@@ -63,7 +67,7 @@ describe('getPdfPageCount buffer safety', () => {
     expect(text.toLowerCase()).toContain('nodejs');
     expect(text.toLowerCase()).toContain('office');
     expect(text.toLowerCase()).not.toMatch(/\boce\b/);
-  });
+  }, pdfColdStartTimeoutMs);
 });
 
 describe('extractText still rejects unreadable inputs', () => {

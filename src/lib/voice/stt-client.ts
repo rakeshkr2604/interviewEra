@@ -33,6 +33,33 @@ export interface STTStartOptions {
 
 const DEEPGRAM_LISTEN_URL = 'wss://api.deepgram.com/v1/listen';
 
+/**
+ * Nova-3 keyterm boosting (repeated `keyterm=` query params — Deepgram docs).
+ * Improves recognition odds for CS vocabulary; does not guarantee notation formatting.
+ */
+export const DEEPGRAM_CS_KEYTERMS = [
+  'O(n)',
+  'O(n log n)',
+  'O(log n)',
+  'O(n^2)',
+  'O(1)',
+  'O(2^n)',
+  'QuickSort',
+  'MergeSort',
+  'HashMap',
+  'HashSet',
+  'Big O',
+  'time complexity',
+  'space complexity',
+] as const;
+
+/** Append Nova-3 keyterms as repeated query params (not comma-separated). */
+export function appendDeepgramKeyterms(params: URLSearchParams, terms: readonly string[]): void {
+  for (const term of terms) {
+    params.append('keyterm', term);
+  }
+}
+
 /** Shape of the JSON frames Deepgram's live API sends over the socket. */
 type DeepgramLiveMessage = {
   type?: string;
@@ -115,6 +142,7 @@ export class StreamingSTT {
       sample_rate: '16000',
       channels: '1',
     });
+    appendDeepgramKeyterms(params, DEEPGRAM_CS_KEYTERMS);
 
     let socket: WebSocket;
     try {

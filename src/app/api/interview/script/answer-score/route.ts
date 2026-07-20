@@ -14,6 +14,7 @@ import {
   buildAnswerScoreRepairPrompt,
 } from '@/lib/interview/answer-score/prompt';
 import { resolveQuestionType } from '@/lib/interview/answer-score/question-type';
+import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 
 const LLM_TIMEOUT_MS = 15_000;
@@ -100,12 +101,14 @@ export async function POST(request: Request): Promise<NextResponse> {
     const {
       interviewId,
       turnIndex,
-      transcript,
+      transcript: rawTranscript,
       displayQuestion,
       targetRole,
       questionType,
       sttMinConfidence,
     } = validation.data;
+    /** Scoring input only — raw_transcript on turns stays untouched; this closes the approve-without-tap gap. */
+    const transcript = normalizeComplexityNotationForScoring(rawTranscript);
     interviewIdForLog = interviewId;
 
     const lowSttConfidence =

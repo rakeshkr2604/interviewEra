@@ -62,6 +62,10 @@ async function main() {
     is_returning_user: false,
     self_intro_enabled: false,
     current_turn_index: 3,
+    follow_up_enabled: true,
+    follow_ups_this_question: 0,
+    max_follow_ups_per_question: 2,
+    recent_acknowledgments: [],
   });
 
   const systemPrompt =

@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getScript } from '@/lib/ai/scripts/script-loader';
 import { buildRuntimeContext, experienceYearsToLevel } from '@/lib/ai/scripts/runtime-context';
 import { validateTurnOutput, TurnValidationError } from '@/lib/ai/scripts/turn-validator';
+import type { ScriptTurnOutput } from '@/lib/ai/scripts/turn-validator';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import {
   buildScriptResumeSummary,
@@ -12,6 +13,27 @@ import {
 import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { loadResumeContextForInterview } from '@/lib/resume/interview-snapshot';
+import { completeScriptInterviewFromTurn } from '@/lib/interview/complete-script-interview-from-turn';
+import {
+  applyTurnAuthorityOverrides,
+  cannedClosingTurn,
+  countCandidateQuestionsExchanges,
+  countCoreQuestions,
+  countFollowUpsSinceLastCoreQuestion,
+  countSelfIntroQuestions,
+  countSelfIntroTurns,
+  countWarmupQuestions,
+  countWarmupTurns,
+  displayQuestionNumberAfterTurn,
+  lastTurnWasCandidateQuestionsAnswer,
+  lastTurnWasSelfIntroBridge,
+  MAX_CANDIDATE_QUESTION_EXCHANGES,
+  recentAcknowledgments,
+  resolvePromptPhase,
+  resolveTurnCap,
+  shouldForceClosingBeforeLlm,
+  type ScriptTurnRow,
+} from '@/lib/ai/scripts/turn-authority';
 
 const SPECIAL_VALUES = ['[NONE]', '[SKIPPED]', '[TIMEOUT]'] as const;
 
@@ -21,6 +43,10 @@ const turnRequestSchema = z.object({
   interviewId: z.string().uuid(),
   lastAnswer: z.string(),
   currentPhase: z.enum(['warmup', 'self_intro', 'core', 'candidate_questions', 'closing']),
+  /**
+   * Client-sent counter kept for request-contract compatibility.
+   * IGNORED — server derives question_number from script_turns (authority).
+   */
   questionNumber: z.number(),
   // 'structured' kept for legacy clients; new UI submits 'corrected' (STT cleanup only).
   submittedAs: z.enum(['raw', 'corrected', 'structured', 'auto_submit']).optional(),
@@ -48,6 +74,7 @@ type InterviewRow = {
   } | null;
   current_turn_index: number;
   self_intro_enabled: boolean;
+  follow_up_enabled: boolean;
   last_question_type: 'technical' | 'behavioral' | null;
   skips_used: number;
   max_skips: number;
@@ -75,6 +102,18 @@ function parseLlmJson(content: string): unknown {
     }
     throw new Error('LLM response contained no JSON object');
   }
+}
+
+function turnResponse(
+  turn: ScriptTurnOutput,
+  turnIndex: number,
+  interviewId: string,
+  questionNumber: number,
+): NextResponse {
+  return NextResponse.json(
+    { turn, turnIndex, interviewId, questionNumber },
+    { status: 200 },
+  );
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
@@ -113,12 +152,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       interviewId,
       lastAnswer,
       currentPhase,
-      questionNumber,
+      // questionNumber from client is intentionally unused — see schema comment.
       submittedAs,
       prevTurnIndex,
       sttRawTranscript,
-    } =
-      validation.data;
+    } = validation.data;
     interviewIdForLog = interviewId;
 
     const serviceClient = createServiceClient();
@@ -142,11 +180,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Interview is no longer active' }, { status: 403 });
     }
 
-    // STEP 2 — load interview state + resume + display name
+    // STEP 2 — load interview state + resume + prior turns + display name
     const { data: interview, error: interviewError } = await serviceClient
       .from('interviews')
       .select(
-        'interviewer_id, script_type, difficulty, role, question_count, session_context, current_turn_index, self_intro_enabled, last_question_type, skips_used, max_skips, multilingual_detected, is_returning_user, resume_id',
+        'interviewer_id, script_type, difficulty, role, question_count, session_context, current_turn_index, self_intro_enabled, follow_up_enabled, last_question_type, skips_used, max_skips, multilingual_detected, is_returning_user, resume_id',
       )
       .eq('id', interviewId)
       .single<InterviewRow>();
@@ -156,19 +194,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Failed to load interview' }, { status: 500 });
     }
 
-    const [resumeCtx, { data: priorTurns }, { data: profile }] = await Promise.all([
+    // follow_up_enabled may be missing on rows created before the migration lands —
+    // treat undefined as true (matches column DEFAULT).
+    const followUpEnabled = interview.follow_up_enabled !== false;
+
+    const [resumeCtx, { data: allTurnsRaw }, { data: profile }] = await Promise.all([
       loadResumeContextForInterview(serviceClient, {
         interviewId,
         resumeId: interview.resume_id,
       }),
-      // Fetch previously asked questions so the LLM can avoid repeating them.
-      // Only core + self_intro question turns are relevant (warmup is conversational).
       serviceClient
         .from('script_turns')
-        .select('llm_output, phase')
+        .select('turn_index, phase, is_question, llm_output')
         .eq('interview_id', interviewId)
-        .eq('is_question', true)
-        .in('phase', ['core', 'self_intro'])
         .order('turn_index', { ascending: true }),
       serviceClient
         .from('users')
@@ -176,6 +214,135 @@ export async function POST(request: Request): Promise<NextResponse> {
         .eq('id', user.id)
         .maybeSingle(),
     ]);
+
+    const allTurns: ScriptTurnRow[] = (allTurnsRaw ?? []).map((t) => ({
+      turn_index: t.turn_index as number,
+      phase: t.phase as string,
+      is_question: Boolean(t.is_question),
+      llm_output: t.llm_output,
+    }));
+
+    const coreQuestionsAsked = countCoreQuestions(allTurns);
+    const followUpsThisQuestion = countFollowUpsSinceLastCoreQuestion(allTurns);
+    const candidateQuestionsExchanges = countCandidateQuestionsExchanges(allTurns);
+    const warmupQuestionsAsked = countWarmupQuestions(allTurns);
+    const warmupTurns = countWarmupTurns(allTurns);
+    const selfIntroQuestionsAsked = countSelfIntroQuestions(allTurns);
+    const selfIntroTurnsCount = countSelfIntroTurns(allTurns);
+    const maxFollowUpsPerQuestion = followUpEnabled ? 2 : 0;
+    const acknowledgments = recentAcknowledgments(allTurns, 3);
+    const totalTurns = allTurns.length;
+    const turnCap = resolveTurnCap(interview.difficulty);
+    const recipientEmail = user.email?.trim() ?? '';
+
+    const recordPreviousAnswer = async () => {
+      if (prevTurnIndex == null || lastAnswer === '[NONE]') return;
+      const { data: prevTurn } = await serviceClient
+        .from('script_turns')
+        .select('raw_transcript')
+        .eq('interview_id', interviewId)
+        .eq('turn_index', prevTurnIndex)
+        .maybeSingle();
+
+      const updatePayload: Record<string, unknown> = {
+        submitted_as: submittedAs ?? 'raw',
+        answer_text: lastAnswer,
+      };
+
+      const isSpecial =
+        (SPECIAL_VALUES as readonly string[]).includes(lastAnswer);
+      if (!isSpecial && (prevTurn?.raw_transcript == null || prevTurn.raw_transcript === '')) {
+        const original =
+          typeof sttRawTranscript === 'string' && sttRawTranscript.trim().length > 0
+            ? sttRawTranscript
+            : lastAnswer;
+        updatePayload.raw_transcript = original;
+      }
+
+      const { error: prevUpdateError } = await serviceClient
+        .from('script_turns')
+        .update(updatePayload)
+        .eq('interview_id', interviewId)
+        .eq('turn_index', prevTurnIndex);
+
+      if (prevUpdateError) {
+        console.error(
+          `[interview/script/turn] previous turn update failed (interviewId=${interviewId}, turnIndex=${prevTurnIndex}):`,
+          prevUpdateError,
+        );
+      }
+    };
+
+    /** Persist a closing turn, mark interview completed, queue email. */
+    const emitClosingAndComplete = async (
+      closing: ScriptTurnOutput,
+      extraInterviewUpdate?: Record<string, unknown>,
+    ): Promise<NextResponse> => {
+      const newTurnIndex = interview.current_turn_index + 1;
+      await recordPreviousAnswer();
+
+      const { error: closingInsertError } = await serviceClient.from('script_turns').insert({
+        interview_id: interviewId,
+        turn_index: newTurnIndex,
+        phase: closing.phase,
+        is_question: closing.is_question,
+        llm_output: closing,
+        timer_seconds: closing.timer_seconds,
+        question_type: null,
+      });
+
+      if (closingInsertError) {
+        const isDuplicate =
+          closingInsertError.code === '23505' ||
+          /duplicate key|unique constraint/i.test(closingInsertError.message ?? '');
+        if (!isDuplicate) {
+          console.error(
+            `[interview/script/turn] closing insert failed (interviewId=${interviewId}):`,
+            closingInsertError,
+          );
+          return NextResponse.json({ error: 'Failed to save turn' }, { status: 500 });
+        }
+      }
+
+      const completeResult = await completeScriptInterviewFromTurn({
+        serviceClient,
+        interviewId,
+        userId: user.id,
+        recipientEmail,
+        currentTurnIndex: newTurnIndex,
+        performanceBucket: 'average',
+        extraInterviewUpdate: {
+          ...(extraInterviewUpdate ?? {}),
+          ...(lastAnswer === '[SKIPPED]'
+            ? { skips_used: interview.skips_used + 1 }
+            : {}),
+        },
+      });
+
+      if (!completeResult.ok) {
+        return NextResponse.json({ error: 'Failed to complete interview' }, { status: 500 });
+      }
+
+      return turnResponse(closing, newTurnIndex, interviewId, coreQuestionsAsked);
+    };
+
+    // STEP 2b — hard turn cap (no LLM call)
+    if (totalTurns >= turnCap) {
+      return emitClosingAndComplete(cannedClosingTurn());
+    }
+
+    // STEP 2c — candidate_questions exit (skip / "no" / exchange cap) without LLM
+    if (
+      shouldForceClosingBeforeLlm({
+        requestPhase: currentPhase,
+        lastAnswer,
+        candidateQuestionsExchanges,
+        lastTurnWasCqAnswer: lastTurnWasCandidateQuestionsAnswer(allTurns),
+        maxCandidateQuestionsExchanges: MAX_CANDIDATE_QUESTION_EXCHANGES,
+      })
+    ) {
+      return emitClosingAndComplete(cannedClosingTurn());
+    }
 
     const resumeSummary = resumeCtx.parsed
       ? buildScriptResumeSummary(resumeCtx.parsed, interview.role)
@@ -201,9 +368,25 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
-    // STEP 4 — system prompt = script + runtime context block
+    // STEP 4 — system prompt = script + runtime context (server-derived counts)
     const sessionContext = interview.session_context ?? {};
     const jdClamped = clampJobDescriptionForQuestions(sessionContext.jobDescription);
+    const promptPhase = resolvePromptPhase(
+      currentPhase,
+      coreQuestionsAsked,
+      interview.question_count,
+      {
+        candidateQuestionsExchanges,
+        maxCandidateQuestionsExchanges: MAX_CANDIDATE_QUESTION_EXCHANGES,
+        lastTurnWasCqAnswer: lastTurnWasCandidateQuestionsAnswer(allTurns),
+        warmupQuestionsAsked,
+        warmupTurns,
+        selfIntroEnabled: interview.self_intro_enabled,
+        selfIntroQuestionsAsked,
+        selfIntroTurns: selfIntroTurnsCount,
+        lastTurnWasSelfIntroBridge: lastTurnWasSelfIntroBridge(allTurns),
+      },
+    );
     const runtimeContext = buildRuntimeContext({
       candidate_name: displayName,
       target_role: interview.role,
@@ -215,8 +398,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       resume_summary: resumeSummary,
       job_description: jdClamped ?? 'Not provided',
       question_pool: 'Not available',
-      current_phase: currentPhase,
-      question_number: questionNumber,
+      current_phase: promptPhase,
+      question_number: coreQuestionsAsked,
       total_questions: interview.question_count,
       skips_used: interview.skips_used,
       max_skips: interview.max_skips,
@@ -225,6 +408,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       is_returning_user: interview.is_returning_user,
       self_intro_enabled: interview.self_intro_enabled,
       current_turn_index: interview.current_turn_index + 1,
+      follow_up_enabled: followUpEnabled,
+      follow_ups_this_question: followUpsThisQuestion,
+      max_follow_ups_per_question: maxFollowUpsPerQuestion,
+      recent_acknowledgments: acknowledgments,
       selected_interviewer:
         interview.script_type === 'SCRIPT_M'
           ? interview.interviewer_id === 'priya'
@@ -242,7 +429,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       '\n```';
 
     // STEP 5 — user message (prepend previously asked questions so the LLM avoids repeats)
-    const askedQuestions: string[] = (priorTurns ?? [])
+    const askedQuestions: string[] = allTurns
+      .filter((t) => t.is_question && (t.phase === 'core' || t.phase === 'self_intro'))
       .map((t) => {
         const o = t.llm_output as Record<string, unknown> | null;
         return (o?.display_question as string | null) || (o?.speech as string | null) || '';
@@ -286,7 +474,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     // STEP 7 — parse + validate turn output
-    let validated;
+    let validated: ScriptTurnOutput;
     try {
       const parsed = parseLlmJson(llmContent);
       validated = validateTurnOutput(parsed, interview.script_type);
@@ -311,9 +499,28 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // STEP 7b — server authority overrides (phase budget + follow-up + CQ caps)
+    validated = applyTurnAuthorityOverrides({
+      turn: validated,
+      coreQuestionsAsked,
+      totalQuestions: interview.question_count,
+      followUpsThisQuestion,
+      followUpEnabled,
+      candidateQuestionsExchanges,
+      maxCandidateQuestionsExchanges: MAX_CANDIDATE_QUESTION_EXCHANGES,
+      requestPhase: currentPhase,
+      lastAnswer,
+      warmupQuestionsAsked,
+      warmupTurns,
+      selfIntroEnabled: interview.self_intro_enabled,
+      selfIntroQuestionsAsked,
+      selfIntroTurns: selfIntroTurnsCount,
+    });
+
+    const questionNumberForClient = displayQuestionNumberAfterTurn(coreQuestionsAsked, validated);
     const newTurnIndex = interview.current_turn_index + 1;
 
-    // STEP 8 — persist the new turn
+    // STEP 8 — persist the new turn (is_follow_up lives inside llm_output JSONB)
     const { error: turnInsertError } = await serviceClient.from('script_turns').insert({
       interview_id: interviewId,
       turn_index: newTurnIndex,
@@ -367,71 +574,67 @@ export async function POST(request: Request): Promise<NextResponse> {
       } catch {
         // Stored JSON may be the already-validated shape — trust it for resume.
         turnForResponse = existing.llm_output as typeof validated;
+        if (turnForResponse.is_follow_up === undefined) {
+          turnForResponse = { ...turnForResponse, is_follow_up: false };
+        }
       }
       reusedExistingTurn = true;
     }
 
     // STEP 9 — record the candidate's answer on the previous turn.
-    // raw_transcript: write-once from original STT (sttRawTranscript ?? lastAnswer when first set).
-    // answer_text: whatever they actually submit (raw or corrected) — varies by submitted_as.
-    // TODO: unsafe if a redo-this-answer path is added later — raw_transcript is write-once per turn
-    if (prevTurnIndex != null && lastAnswer !== '[NONE]') {
-      const { data: prevTurn } = await serviceClient
-        .from('script_turns')
-        .select('raw_transcript')
-        .eq('interview_id', interviewId)
-        .eq('turn_index', prevTurnIndex)
-        .maybeSingle();
+    await recordPreviousAnswer();
 
-      const updatePayload: Record<string, unknown> = {
-        submitted_as: submittedAs ?? 'raw',
-        answer_text: lastAnswer,
+    // STEP 10 — advance interview state; if closing, complete + queue email server-side
+    if (turnForResponse.phase === 'closing') {
+      const completeResult = await completeScriptInterviewFromTurn({
+        serviceClient,
+        interviewId,
+        userId: user.id,
+        recipientEmail,
+        currentTurnIndex: newTurnIndex,
+        performanceBucket: 'average',
+        extraInterviewUpdate: {
+          ...(!reusedExistingTurn && validated.question_type != null
+            ? { last_question_type: validated.question_type }
+            : {}),
+          ...(!reusedExistingTurn && lastAnswer === '[SKIPPED]'
+            ? { skips_used: interview.skips_used + 1 }
+            : {}),
+        },
+      });
+      if (!completeResult.ok) {
+        return NextResponse.json({ error: 'Failed to complete interview' }, { status: 500 });
+      }
+    } else {
+      const interviewUpdate: Record<string, unknown> = {
+        current_turn_index: newTurnIndex,
       };
-
-      if (!isSpecialValue && (prevTurn?.raw_transcript == null || prevTurn.raw_transcript === '')) {
-        const original =
-          typeof sttRawTranscript === 'string' && sttRawTranscript.trim().length > 0
-            ? sttRawTranscript
-            : lastAnswer;
-        updatePayload.raw_transcript = original;
+      if (!reusedExistingTurn && validated.question_type != null) {
+        interviewUpdate.last_question_type = validated.question_type;
+      }
+      if (!reusedExistingTurn && lastAnswer === '[SKIPPED]') {
+        interviewUpdate.skips_used = interview.skips_used + 1;
       }
 
-      const { error: prevUpdateError } = await serviceClient
-        .from('script_turns')
-        .update(updatePayload)
-        .eq('interview_id', interviewId)
-        .eq('turn_index', prevTurnIndex);
+      const { error: interviewUpdateError } = await serviceClient
+        .from('interviews')
+        .update(interviewUpdate)
+        .eq('id', interviewId);
 
-      if (prevUpdateError) {
-        console.error(`[interview/script/turn] previous turn update failed (interviewId=${interviewId}, turnIndex=${prevTurnIndex}):`, prevUpdateError);
+      if (interviewUpdateError) {
+        console.error(`[interview/script/turn] interview state update failed (interviewId=${interviewId}):`, interviewUpdateError);
+        return NextResponse.json({ error: 'Failed to update interview state' }, { status: 500 });
       }
     }
 
-    // STEP 10 — advance interview state (always sync cursor even on idempotent reuse)
-    const interviewUpdate: Record<string, unknown> = {
-      current_turn_index: newTurnIndex,
-    };
-    if (!reusedExistingTurn && validated.question_type != null) {
-      interviewUpdate.last_question_type = validated.question_type;
-    }
-    if (!reusedExistingTurn && lastAnswer === '[SKIPPED]') {
-      interviewUpdate.skips_used = interview.skips_used + 1;
-    }
-
-    const { error: interviewUpdateError } = await serviceClient
-      .from('interviews')
-      .update(interviewUpdate)
-      .eq('id', interviewId);
-
-    if (interviewUpdateError) {
-      console.error(`[interview/script/turn] interview state update failed (interviewId=${interviewId}):`, interviewUpdateError);
-      return NextResponse.json({ error: 'Failed to update interview state' }, { status: 500 });
-    }
-
-    // STEP 11 — respond
-    return NextResponse.json(
-      { turn: turnForResponse, turnIndex: newTurnIndex, interviewId },
-      { status: 200 },
+    // STEP 11 — respond (questionNumber is server-derived for client display)
+    return turnResponse(
+      turnForResponse,
+      newTurnIndex,
+      interviewId,
+      reusedExistingTurn
+        ? displayQuestionNumberAfterTurn(coreQuestionsAsked, turnForResponse)
+        : questionNumberForClient,
     );
   } catch (err) {
     console.error(`[interview/script/turn] Unexpected error (interviewId=${interviewIdForLog}):`, err);

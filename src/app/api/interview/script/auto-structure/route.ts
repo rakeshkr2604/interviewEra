@@ -43,6 +43,15 @@ Example B — keep dropped grammar, fix only the garble:
 Example C — multi-word garble only; no sentence split:
   IN:  "we used react jay es query for caching then ship it"
   OUT: "we used React Query for caching then ship it"
+Example D — Big-O notation (keep grammar/tense; fix spoken complexity only):
+  IN:  "expected time complex is big o n log n because a random pivot"
+  OUT: "expected time complex is O(n log n) because a random pivot"
+Example E — spoken O(n):
+  IN:  "full table scan is big o of n"
+  OUT: "full table scan is O(n)"
+Example F — algorithm name garble:
+  IN:  "we sort with quick sort on small arrays"
+  OUT: "we sort with quicksort on small arrays"
 
 2) coaching_reference — Separate coaching only. May restructure into clearer interview form for LEARNING (STAR when behavioral; concept → how → trade-off when technical). feedback is a warm 2–3 sentence coach reaction. missing_elements max 2. technical_terms only for terms the candidate actually used. Put all rewriting / stronger phrasing HERE — never in corrected_transcript.
 

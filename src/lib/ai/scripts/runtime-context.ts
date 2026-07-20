@@ -20,13 +20,21 @@ export type RuntimeContextParams = {
   is_returning_user: boolean
   self_intro_enabled: boolean
   current_turn_index: number
+  /** Session toggle: when false, model must never emit is_follow_up. */
+  follow_up_enabled: boolean
+  /** Follow-ups already asked on the current parent core question. */
+  follow_ups_this_question: number
+  /** Cap for follow-ups on the current question (0 when disabled). */
+  max_follow_ups_per_question: number
+  /** Last acknowledgment speeches (most-recent-first), for rotation. */
+  recent_acknowledgments: string[]
   selected_interviewer?: string // only for SCRIPT_M
   last_question_type?: string | null // only for SCRIPT_M
 }
 
 // Keys are padded so every value starts at the same column, matching the
 // RUNTIME CONTEXT block format in the SCRIPT_*.md prompt files.
-const KEY_COLUMN_WIDTH = 22
+const KEY_COLUMN_WIDTH = 30
 
 function contextLine(key: string, value: string | number | boolean | null): string {
   return `${(key + ':').padEnd(KEY_COLUMN_WIDTH)} ${String(value)}`
@@ -70,6 +78,16 @@ export function buildRuntimeContext(params: RuntimeContextParams): string {
     contextLine('is_returning_user', params.is_returning_user),
     contextLine('self_intro_enabled', params.self_intro_enabled),
     contextLine('current_turn_index', params.current_turn_index),
+    contextLine(
+      'follow_up_enabled',
+      `${params.follow_up_enabled} // true = max 2 follow-ups per question; false = no follow-ups at all`,
+    ),
+    contextLine('follow_ups_this_question', params.follow_ups_this_question),
+    contextLine('max_follow_ups_per_question', params.max_follow_ups_per_question),
+    contextLine(
+      'recent_acknowledgments',
+      JSON.stringify(params.recent_acknowledgments),
+    ),
   ]
 
   if (params.selected_interviewer !== undefined) {

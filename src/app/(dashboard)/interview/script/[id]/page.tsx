@@ -39,6 +39,7 @@ import {
   type ScriptSessionPrepController,
 } from '@/lib/interview/script-session-prep'
 import { buildReviewLoadTurnPayload } from '@/lib/interview/build-review-load-turn-payload'
+import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation'
 import {
   claimBootTurnApply,
   decideBootTurnFetch,
@@ -145,6 +146,8 @@ type TurnApiResponse = {
   turn: ScriptTurnOutput
   turnIndex: number
   interviewId: string
+  /** Server-derived core question count (excludes follow-ups). */
+  questionNumber?: number
 }
 
 export default function ScriptInterviewPage() {
@@ -174,8 +177,8 @@ export default function ScriptInterviewPage() {
   // from a closure captured before the latest setState landed.
   const currentPhaseRef = useRef<string>('warmup')
   const currentTurnIndexRef = useRef<number>(0)
-  // Tracks whether the most recently received turn was a question — drives
-  // getNextPhase's "only advance on an answered question" rule.
+  // Tracks whether the most recently received turn was a question — used for
+  // telemetry / review context. Phase progression is server-authoritative.
   const lastTurnWasQuestionRef = useRef<boolean>(false)
   // True once the first turn has ever been displayed — drives whether
   // turn_loading shows the branded prep screen (first load) or a bare
@@ -439,30 +442,9 @@ export default function ScriptInterviewPage() {
   // LLM's returned `turn.phase` back as the next request's `current_phase`
   // (the previous approach) left the phase permanently stuck on whatever it
   // started at, since nothing ever told the server to move forward.
-  function getNextPhase(
-    completedPhase: string,
-    isQuestion: boolean,
-    questionsAnswered: number,
-    totalQuestions: number,
-    selfIntroEnabled: boolean,
-  ): string {
-    // Non-question turns (auto-submit transitions): stay in same phase
-    if (!isQuestion) return completedPhase
-
-    // Question turns: advance to next phase
-    switch (completedPhase) {
-      case 'warmup':
-        return selfIntroEnabled ? 'self_intro' : 'core'
-      case 'self_intro':
-        return 'core'
-      case 'core':
-        return questionsAnswered >= totalQuestions ? 'candidate_questions' : 'core'
-      case 'candidate_questions':
-        return 'closing'
-      default:
-        return completedPhase
-    }
-  }
+  // Phase progression is server-authoritative (turn route overrides + counts).
+  // The client echoes the last applied turn.phase back as currentPhase — it does
+  // not independently advance warmup→core→candidate_questions.
 
   const clearAutoTimer = useCallback(() => {
     if (autoTimerRef.current) {
@@ -891,11 +873,11 @@ export default function ScriptInterviewPage() {
       setCurrentPhase(turn.phase)
       currentPhaseRef.current = turn.phase
 
-      if (turn.is_question && turn.phase === 'core') {
-        questionNumberRef.current += 1
+      // Prefer server-derived core-question count (excludes follow-ups).
+      if (typeof data.questionNumber === 'number' && Number.isFinite(data.questionNumber)) {
+        questionNumberRef.current = data.questionNumber
+        setQuestionNumber(data.questionNumber)
       }
-      const runningQuestionNumber = questionNumberRef.current
-      setQuestionNumber(runningQuestionNumber)
 
       setFirstTurnShown(true)
       setUiPhase('turn_ready')
@@ -923,14 +905,7 @@ export default function ScriptInterviewPage() {
 
         const scheduleAdvance = () => {
           if (!mountedRef.current) return
-          const stayPhase = getNextPhase(
-            currentPhaseRef.current,
-            false,
-            questionNumberRef.current,
-            interviewRef.current?.question_count ?? 4,
-            interviewRef.current?.self_intro_enabled ?? true,
-          )
-          currentPhaseRef.current = stayPhase
+          // Stay on the acknowledgment's phase; server decides the next phase.
           autoTimerRef.current = setTimeout(() => {
             void loadTurnRef.current({ lastAnswer: turn.speech })
           }, AUTO_ADVANCE_MS)
@@ -1285,17 +1260,8 @@ export default function ScriptInterviewPage() {
       setUiPhase('submitting')
       turnFetchStartedAtRef.current = Date.now()
 
-      // Pre-compute the next phase here so both the popup and the non-popup
-      // paths capture the same value. currentPhaseRef must NOT be mutated
-      // until the candidate confirms (otherwise a dismissed popup would leave
-      // the phase advanced with no matching loadTurn call).
-      const nextPhase = getNextPhase(
-        currentPhaseRef.current,
-        lastTurnWasQuestionRef.current,
-        questionNumberRef.current,
-        interviewRef.current?.question_count ?? 4,
-        interviewRef.current?.self_intro_enabled ?? true,
-      )
+      // Echo the answered turn's phase; server owns progression/count.
+      const requestPhase = currentPhaseRef.current
 
       const isSpecialAnswer = rawAnswer === '[SKIPPED]' || rawAnswer === '[TIMEOUT]'
       const shouldShowReview =
@@ -1316,7 +1282,7 @@ export default function ScriptInterviewPage() {
         setReviewScore(null)
         setReviewScoreLoading(true)
         reviewRawAnswerRef.current = rawAnswer
-        reviewNextPhaseRef.current = nextPhase
+        reviewNextPhaseRef.current = requestPhase
         nextTurnPrefetchRef.current = null
         setNextTurnPrefetchReady(false)
         reviewFetchGenRef.current += 1
@@ -1338,7 +1304,7 @@ export default function ScriptInterviewPage() {
         // Payload wiring (submittedAs / lastAnswer / sttRawTranscript) is pure —
         // see buildReviewLoadTurnPayload (unit-tested).
         reviewResolveRef.current = (chosenAs: 'raw' | 'corrected', editedAnswer?: string) => {
-          currentPhaseRef.current = nextPhase
+          currentPhaseRef.current = requestPhase
           const editedRawForChoice = chosenAs === 'raw' ? (editedAnswer ?? rawAnswer) : rawAnswer
           const editedCorrectedForChoice =
             chosenAs === 'corrected' ? (editedAnswer ?? '') : ''
@@ -1395,7 +1361,7 @@ export default function ScriptInterviewPage() {
           body: JSON.stringify({
             interviewId,
             turnIndex: currentTurnIndexRef.current,
-            transcript: rawAnswer,
+            transcript: normalizeComplexityNotationForScoring(rawAnswer),
             displayQuestion: turn.display_question,
             targetRole: interviewRef.current?.role ?? '',
             ...(turn.question_type ? { questionType: turn.question_type } : {}),
@@ -1418,8 +1384,8 @@ export default function ScriptInterviewPage() {
         return
       }
 
-      // Non-review path: advance phase immediately and fetch next turn.
-      currentPhaseRef.current = nextPhase
+      // Non-review path: echo current phase; server owns progression.
+      currentPhaseRef.current = requestPhase
       const submittedAs: LoadTurnParams['submittedAs'] = turn.auto_submit ? 'auto_submit' : 'raw'
       void loadTurnRef.current({
         lastAnswer: rawAnswer,
@@ -1534,7 +1500,7 @@ export default function ScriptInterviewPage() {
       body: JSON.stringify({
         interviewId,
         turnIndex: ctx.turnIndex,
-        transcript: approvedTranscript,
+        transcript: normalizeComplexityNotationForScoring(approvedTranscript),
         displayQuestion: ctx.displayQuestion,
         targetRole: interviewRef.current?.role ?? '',
         ...(ctx.questionType ? { questionType: ctx.questionType } : {}),
@@ -1639,12 +1605,20 @@ export default function ScriptInterviewPage() {
   const interviewerId = (interview?.interviewer_id ?? 'priya') as InterviewerId
   const interviewer = getInterviewerById(interviewerId)
   const totalQuestions = interview?.question_count ?? 0
+  const isFollowUpTurn = currentTurn?.is_follow_up === true && currentPhase === 'core'
   const displayedQuestionNumber = Math.min(Math.max(questionNumber, 1), Math.max(totalQuestions, 1))
   const progressPct =
     currentPhase === 'core' && totalQuestions > 0
       ? Math.min(100, Math.round((displayedQuestionNumber / totalQuestions) * 100))
       : 0
   const isBusy = uiPhase === 'turn_loading' || uiPhase === 'submitting'
+
+  const coreProgressLabelDesktop = isFollowUpTurn
+    ? `Follow-up (Q${displayedQuestionNumber} of ${totalQuestions})`
+    : `Question ${displayedQuestionNumber} of ${totalQuestions}`
+  const coreProgressLabelMobile = isFollowUpTurn
+    ? `Follow-up`
+    : `Q${displayedQuestionNumber}/${totalQuestions}`
 
   // ── Derived display values for UI (V1 parity) ────────────────────────────────
 
@@ -1731,7 +1705,7 @@ export default function ScriptInterviewPage() {
       <div className="mb-0.5 hidden justify-between gap-2 text-[10px] text-(--text-muted) sm:flex">
         <span className="min-w-0 truncate tabular-nums">
           {currentPhase === 'core'
-            ? `Question ${displayedQuestionNumber} of ${totalQuestions}`
+            ? coreProgressLabelDesktop
             : currentPhase.replace(/_/g, ' ')}
         </span>
         <span className="shrink-0 tabular-nums">{progressPct}%</span>
@@ -1740,7 +1714,7 @@ export default function ScriptInterviewPage() {
       <div className="mb-0.5 flex items-baseline justify-between gap-1 text-[10px] text-(--text-muted) sm:hidden">
         <span className="min-w-0 truncate tabular-nums">
           {currentPhase === 'core'
-            ? `Q${displayedQuestionNumber}/${totalQuestions}`
+            ? coreProgressLabelMobile
             : currentPhase.replace(/_/g, ' ').replace('self intro', 'intro')}
         </span>
         <span className="shrink-0 tabular-nums">{progressPct}%</span>

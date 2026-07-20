@@ -18,7 +18,7 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-function reportHasEmailableScores(report: {
+export function reportHasEmailableScores(report: {
   overall: number | null;
   dimension_averages: unknown;
   scored_answer_count: number;
@@ -86,6 +86,11 @@ export async function trySendScriptCompletionEmail(args: {
   recipientEmail: string;
   /** When true, wait briefly for answer_evaluations to land before generating. */
   waitForScores?: boolean;
+  /**
+   * When true, loadOrGenerateScriptReport will not queue another owed-email
+   * attempt (prevents recurse when this function is the email sender).
+   */
+  skipReportLoadSideEffects?: boolean;
 }): Promise<TrySendScriptCompletionEmailResult> {
   const { serviceClient, interviewId, userId, recipientEmail } = args;
   const idempotencyKey = `script_interview_completed:${interviewId}`;
@@ -109,6 +114,7 @@ export async function trySendScriptCompletionEmail(args: {
     serviceClient,
     interviewId,
     userId,
+    skipOwedCompletionEmail: args.skipReportLoadSideEffects === true,
   });
 
   if (!result.ok) {
@@ -138,6 +144,7 @@ export async function trySendScriptCompletionEmail(args: {
         interviewId,
         userId,
         forceRegenerate: true,
+        skipOwedCompletionEmail: args.skipReportLoadSideEffects === true,
       });
       if (!result.ok) {
         return {
@@ -164,35 +171,54 @@ export async function trySendScriptCompletionEmail(args: {
     };
   }
 
-  try {
-    await sendScriptInterviewCompletedEmail({
-      interviewId,
-      userId,
-      recipientEmail: recipientEmail.trim(),
-      overallScore10: Number(report.overall),
-      dimensionAverages: report.dimension_averages as Record<DimensionKey, number>,
-      scoredAnswerCount: report.scored_answer_count,
-      synthesis: report.synthesis,
-    });
-  } catch (err) {
-    const error = err instanceof Error ? err.message : String(err);
-    console.error(`${LOG_PREFIX} send threw`, { interviewId, error });
-    return { attempted: true, sent: false, error };
-  }
+  let sendError: string | undefined;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await sendScriptInterviewCompletedEmail({
+        interviewId,
+        userId,
+        recipientEmail: recipientEmail.trim(),
+        overallScore10: Number(report.overall),
+        dimensionAverages: report.dimension_averages as Record<DimensionKey, number>,
+        scoredAnswerCount: report.scored_answer_count,
+        synthesis: report.synthesis,
+      });
+      sendError = undefined;
+    } catch (err) {
+      sendError = err instanceof Error ? err.message : String(err);
+      console.error(`${LOG_PREFIX} send threw (attempt ${attempt})`, {
+        interviewId,
+        error: sendError,
+      });
+    }
 
-  // Re-check log for provider id / success (sendScript logs failures without throwing).
-  const sent = await wasLifecycleEmailSent(idempotencyKey);
-  if (sent) {
-    console.info(`${LOG_PREFIX} delivered (lifecycle_email_log=sent)`, { interviewId });
-    return { attempted: true, sent: true };
+    // Re-check log for provider id / success (sendScript logs failures without throwing).
+    const sent = await wasLifecycleEmailSent(idempotencyKey);
+    if (sent) {
+      console.info(`${LOG_PREFIX} delivered (lifecycle_email_log=sent)`, {
+        interviewId,
+        attempt,
+      });
+      return { attempted: true, sent: true };
+    }
+
+    if (attempt === 1) {
+      console.warn(`${LOG_PREFIX} send not confirmed — retrying once`, {
+        interviewId,
+        sendError,
+      });
+      await sleep(1_500);
+    }
   }
 
   console.error(`${LOG_PREFIX} send finished but lifecycle log not marked sent`, {
     interviewId,
+    sendError,
   });
   return {
     attempted: true,
     sent: false,
     skippedReason: 'send_returned_without_log',
+    error: sendError,
   };
 }

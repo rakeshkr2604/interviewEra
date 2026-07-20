@@ -38,10 +38,16 @@ describe('runtime-context personalization fields', () => {
       is_returning_user: false,
       self_intro_enabled: true,
       current_turn_index: 1,
+      follow_up_enabled: true,
+      follow_ups_this_question: 0,
+      max_follow_ups_per_question: 2,
+      recent_acknowledgments: [],
     })
     expect(block).toContain('job_description:')
     expect(block).toContain('Must know React and TypeScript')
     expect(block).toContain('0-1 years (Fresher)')
     expect(block).toMatch(/fresher_placement \(campus/)
+    expect(block).toContain('follow_up_enabled:')
+    expect(block).toContain('recent_acknowledgments:')
   })
 })
