@@ -130,3 +130,9 @@ Thumbs.db
 !DEAD_CODE_REPORT.md
 !docs/RELEASE_STRATEGY.md
 !docs/OBSERVABILITY_EXECUTION_PLAN.md
+
+# One-off DB audit / test-user cleanup artifacts (Jul 2026) — may contain PII
+scripts/_backups/
+scripts/_backup_test_users.ts
+scripts/_phase*
+scripts/_round2_*

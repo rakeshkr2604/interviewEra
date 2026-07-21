@@ -1,12 +1,38 @@
 import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { DashboardChrome } from '@/components/layout/DashboardChrome'
+import {
+  getCachedAuthUser,
+  getCachedDashboardUserRow,
+  getCachedUserProgressRow,
+} from '@/lib/dashboard/request-cache'
+import type { PlanTier } from '@/types/app.types'
 
 /** Private app shell — noindex via layout meta + X-Robots-Tag on /dashboard (not robots.txt disallow). */
 export const metadata: Metadata = {
   robots: { index: false, follow: false },
 }
 
-export default function DashboardLayout({ children }: { children: ReactNode }) {
-  return <DashboardChrome>{children}</DashboardChrome>
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const user = await getCachedAuthUser()
+
+  let initialStreak = 0
+  let canAccessAdmin = false
+
+  if (user) {
+    const [{ data: profile }, { data: progress }] = await Promise.all([
+      getCachedDashboardUserRow(user.id),
+      getCachedUserProgressRow(user.id),
+    ])
+
+    canAccessAdmin = (profile?.plan_tier as PlanTier | undefined) === 'campus_admin'
+    const streak = Number(progress?.current_streak ?? 0)
+    initialStreak = Number.isFinite(streak) ? streak : 0
+  }
+
+  return (
+    <DashboardChrome initialStreak={initialStreak} canAccessAdmin={canAccessAdmin}>
+      {children}
+    </DashboardChrome>
+  )
 }

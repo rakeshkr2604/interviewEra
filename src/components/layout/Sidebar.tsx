@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -19,9 +19,7 @@ import {
   Bell,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
-import { createClient } from '@/lib/supabase/client'
 import { performClientLogout } from '@/lib/supabase/client-logout'
-import type { PlanTier } from '@/types/app.types'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
 import { SidebarCommunityLinks } from '@/components/community/SidebarCommunityLinks'
@@ -69,63 +67,16 @@ function buildNavSections() {
 export function Sidebar({
   className,
   onNavigate,
+  initialStreak,
+  canAccessAdmin,
 }: {
   className?: string
   onNavigate?: () => void
-} = {}) {
+  initialStreak: number
+  canAccessAdmin: boolean
+}) {
   const pathname = usePathname()
-  const [canAccessAdmin, setCanAccessAdmin] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-
-  useEffect(() => {
-    let mounted = true
-    const run = (cb: () => void) => {
-      if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-        const id = window.requestIdleCallback(cb, { timeout: 1200 })
-        return () => window.cancelIdleCallback(id)
-      }
-      const timeout = setTimeout(cb, 350)
-      return () => clearTimeout(timeout)
-    }
-
-    async function loadAdminAccess() {
-      const supabase = createClient()
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
-
-      if (error) {
-        const { signOutIfStaleAuth } = await import('@/lib/supabase/session')
-        await signOutIfStaleAuth(supabase, error)
-      }
-
-      if (!user || !mounted || error) {
-        setCanAccessAdmin(false)
-        return
-      }
-
-      const { data: profile } = await supabase
-        .from('users')
-        .select('plan_tier')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      const tier = profile?.plan_tier as PlanTier | undefined
-      if (mounted) {
-        setCanAccessAdmin(tier === 'campus_admin')
-      }
-    }
-
-    const cancel = run(() => {
-      void loadAdminAccess()
-    })
-
-    return () => {
-      cancel()
-      mounted = false
-    }
-  }, [])
 
   const sections = useMemo(
     () =>
@@ -179,7 +130,11 @@ export function Sidebar({
             Practice studio
           </p>
           <div className="mt-3">
-            <StreakCounter className="w-fit max-w-full" />
+            <StreakCounter
+              key={initialStreak}
+              className="w-fit max-w-full"
+              initialStreak={initialStreak}
+            />
           </div>
         </div>
       </div>

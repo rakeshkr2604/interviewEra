@@ -1,0 +1,2717 @@
+{
+  "filesProcessed": [
+    "001_initial_schema.sql",
+    "002_rpc_functions.sql",
+    "003_email_preferences.sql",
+    "004_domain_packs.sql",
+    "005_campus.sql",
+    "006_indexes.sql",
+    "007_referral_code.sql",
+    "008_add_interviewer_id.sql",
+    "009_add_performance_indexes.sql",
+    "010_interviews_session_context.sql",
+    "011_user_notification_preferences.sql",
+    "012_sanitize_signup_display_name.sql",
+    "013_storage_resumes_bucket.sql",
+    "014_storage_objects_resumes_insert_own.sql",
+    "015_retention_system.sql",
+    "016_update_free_tier_credits.sql",
+    "017_tier_config.sql",
+    "018_college_enrollments_deadlines.sql",
+    "019_campus_org_profile_fields.sql",
+    "020_dual_agent_conversation.sql",
+    "021_dialogue_history.sql",
+    "022_answer_speech_metrics.sql",
+    "023_ai_telemetry.sql",
+    "024_user_presence.sql",
+    "025_platform_role.sql",
+    "026_feedback.sql",
+    "027_feedback_severity.sql",
+    "028_feedback_screenshots.sql",
+    "029_feedback_email_status.sql",
+    "030_feedback_session_context.sql",
+    "031_feedback_triage.sql",
+    "032_feedback_labels.sql",
+    "033_ai_telemetry_grants.sql",
+    "034_user_onboarding_draft.sql",
+    "035_one_time_plan_payments.sql",
+    "036_payments_grants.sql",
+    "037_email_automation_engine.sql",
+    "038_user_profile_photos.sql",
+    "046_lifecycle_email_log.sql",
+    "047_lifecycle_email_log_grants.sql",
+    "048_campus_workspace_completion.sql",
+    "049_candidate_workspace.sql",
+    "050_production_security_hardening.sql",
+    "051_post_launch_growth.sql",
+    "052_milestone_event_dedupe.sql",
+    "053_answer_evaluation_status.sql",
+    "054_user_activity_grants.sql",
+    "20260711000001_v2_1_script_engine.sql",
+    "20260715200001_script_turns_submitted_as_corrected.sql",
+    "20260716000001_answer_evaluations.sql",
+    "20260717000001_interviews_resume_id_no_cascade.sql",
+    "20260717000002_script_interview_reports.sql",
+    "20260717000003_script_interview_reports_harden.sql",
+    "20260717000004_script_interview_reports_synth_prompt_version.sql",
+    "20260718000001_resume_versions_and_snapshots.sql",
+    "20260720000001_tool_usage_events.sql",
+    "20260720000002_interviews_follow_up_enabled.sql",
+    "055_lock_down_anon_callable_functions.sql",
+    "056_fix_resume_snapshot_cascade.sql"
+  ],
+  "totalPolicies": 77,
+  "needingFixCount": 76,
+  "needingFix": [
+    {
+      "schema": "public",
+      "table": "abuse_detection_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON abuse_detection_logs USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON abuse_detection_logs\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "ai_call_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON ai_call_logs USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON ai_call_logs\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "answer_analyses",
+      "policyName": "Users can insert own answer analyses",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )",
+      "normalized": "CREATE POLICY \"Users can insert own answer analyses\" ON answer_analyses FOR INSERT WITH CHECK ( conversation_state_id IN ( SELECT id FROM conversation_states WHERE interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can insert own answer analyses\"\r\n  ON answer_analyses FOR INSERT\r\n  WITH CHECK (\r\n    conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )\r\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n      )\r\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "answer_analyses",
+      "policyName": "Users can view own answer analyses",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"Users can view own answer analyses\" ON answer_analyses FOR SELECT USING ( conversation_state_id IN ( SELECT id FROM conversation_states WHERE interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can view own answer analyses\"\r\n  ON answer_analyses FOR SELECT\r\n  USING (\r\n    conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n      )\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "answer_evaluations",
+      "policyName": "answer_evaluations_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY answer_evaluations_select_own ON answer_evaluations FOR SELECT USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "20260716000001_answer_evaluations.sql",
+      "stmt": "CREATE POLICY answer_evaluations_select_own ON answer_evaluations\r\n  FOR SELECT\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "answer_evaluations",
+      "policyName": "answer_evaluations_service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY answer_evaluations_service_role_full ON answer_evaluations USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "20260716000001_answer_evaluations.sql",
+      "stmt": "CREATE POLICY answer_evaluations_service_role_full ON answer_evaluations\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "answers",
+      "policyName": "answers_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "normalized": "CREATE POLICY \"answers_insert_own\" ON answers FOR INSERT WITH CHECK ( EXISTS ( SELECT 1 FROM questions JOIN interviews ON interviews.id = questions.interview_id WHERE questions.id = answers.question_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"answers_insert_own\" ON answers\n  FOR INSERT WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = (select auth.uid())\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "answers",
+      "policyName": "answers_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"answers_select_own\" ON answers FOR SELECT USING ( EXISTS ( SELECT 1 FROM questions JOIN interviews ON interviews.id = questions.interview_id WHERE questions.id = answers.question_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"answers_select_own\" ON answers\n  FOR SELECT USING (\n    EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "campus_invites",
+      "policyName": "campus_admin manage invites",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "org_id IN (\n      SELECT id FROM public.campus_organizations\n      WHERE admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin manage invites\" ON public.campus_invites FOR ALL USING ( org_id IN ( SELECT id FROM public.campus_organizations WHERE admin_user_id = auth.uid() ) )",
+      "sourceFile": "005_campus.sql",
+      "stmt": "CREATE POLICY \"campus_admin manage invites\"\n  ON public.campus_invites\n  FOR ALL\n  USING (\n    org_id IN (\n      SELECT id FROM public.campus_organizations\n      WHERE admin_user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "org_id IN (\n      SELECT id FROM public.campus_organizations\n      WHERE admin_user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "campus_organizations",
+      "policyName": "campus_admin read own org",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "admin_user_id = auth.uid()",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin read own org\" ON public.campus_organizations FOR SELECT USING (admin_user_id = auth.uid())",
+      "sourceFile": "005_campus.sql",
+      "stmt": "CREATE POLICY \"campus_admin read own org\"\n  ON public.campus_organizations\n  FOR SELECT\n  USING (admin_user_id = auth.uid())",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "admin_user_id = (select auth.uid())",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "college_deadlines",
+      "policyName": "campus_admin_manage_deadlines",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin_manage_deadlines\" ON college_deadlines FOR ALL USING ( college_id IN ( SELECT id FROM campus_organizations WHERE admin_user_id = auth.uid() ) )",
+      "sourceFile": "018_college_enrollments_deadlines.sql",
+      "stmt": "CREATE POLICY \"campus_admin_manage_deadlines\"\nON college_deadlines\nFOR ALL\nUSING (\n  college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = (select auth.uid())\n  )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "college_enrollments",
+      "policyName": "campus_admin_manage_enrollments",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin_manage_enrollments\" ON college_enrollments FOR ALL USING ( college_id IN ( SELECT id FROM campus_organizations WHERE admin_user_id = auth.uid() ) )",
+      "sourceFile": "018_college_enrollments_deadlines.sql",
+      "stmt": "CREATE POLICY \"campus_admin_manage_enrollments\"\nON college_enrollments\nFOR ALL\nUSING (\n  college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = (select auth.uid())\n  )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "college_enrollments",
+      "policyName": "student_read_own_enrollment",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "user_id = auth.uid()",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"student_read_own_enrollment\" ON college_enrollments FOR SELECT USING ( user_id = auth.uid() )",
+      "sourceFile": "018_college_enrollments_deadlines.sql",
+      "stmt": "CREATE POLICY \"student_read_own_enrollment\"\nON college_enrollments\nFOR SELECT\nUSING (\n  user_id = auth.uid()\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "user_id = (select auth.uid())",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can insert own conversation states",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "normalized": "CREATE POLICY \"Users can insert own conversation states\" ON conversation_states FOR INSERT WITH CHECK ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can insert own conversation states\"\r\n  ON conversation_states FOR INSERT\r\n  WITH CHECK (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can update own conversation states",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"Users can update own conversation states\" ON conversation_states FOR UPDATE USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can update own conversation states\"\r\n  ON conversation_states FOR UPDATE\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can view own conversation states",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"Users can view own conversation states\" ON conversation_states FOR SELECT USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can view own conversation states\"\r\n  ON conversation_states FOR SELECT\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "credit_transactions",
+      "policyName": "credit_transactions_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"credit_transactions_select_own\" ON credit_transactions FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"credit_transactions_select_own\" ON credit_transactions\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "evaluations",
+      "policyName": "evaluations_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "normalized": "CREATE POLICY \"evaluations_insert_own\" ON evaluations FOR INSERT WITH CHECK ( EXISTS ( SELECT 1 FROM answers JOIN questions ON questions.id = answers.question_id JOIN interviews ON interviews.id = questions.interview_id WHERE answers.id = evaluations.answer_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"evaluations_insert_own\" ON evaluations\n  FOR INSERT WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = (select auth.uid())\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "evaluations",
+      "policyName": "evaluations_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"evaluations_select_own\" ON evaluations FOR SELECT USING ( EXISTS ( SELECT 1 FROM answers JOIN questions ON questions.id = answers.question_id JOIN interviews ON interviews.id = questions.interview_id WHERE answers.id = evaluations.answer_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"evaluations_select_own\" ON evaluations\n  FOR SELECT USING (\n    EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "experiment_assignments",
+      "policyName": "experiment_assignments_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY experiment_assignments_select_own ON public.experiment_assignments FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "051_post_launch_growth.sql",
+      "stmt": "CREATE POLICY experiment_assignments_select_own ON public.experiment_assignments\r\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "feedbacks",
+      "policyName": "feedbacks_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"feedbacks_select_own\" ON public.feedbacks FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "026_feedback.sql",
+      "stmt": "CREATE POLICY \"feedbacks_select_own\" ON public.feedbacks\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "followup_questions",
+      "policyName": "Users can insert own followup questions",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )",
+      "normalized": "CREATE POLICY \"Users can insert own followup questions\" ON followup_questions FOR INSERT WITH CHECK ( answer_analysis_id IN ( SELECT id FROM answer_analyses WHERE conversation_state_id IN ( SELECT id FROM conversation_states WHERE interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) ) ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can insert own followup questions\"\r\n  ON followup_questions FOR INSERT\r\n  WITH CHECK (\r\n    answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )\r\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n        )\r\n      )\r\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "followup_questions",
+      "policyName": "Users can view own followup questions",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"Users can view own followup questions\" ON followup_questions FOR SELECT USING ( answer_analysis_id IN ( SELECT id FROM answer_analyses WHERE conversation_state_id IN ( SELECT id FROM conversation_states WHERE interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) ) ) )",
+      "sourceFile": "020_dual_agent_conversation.sql",
+      "stmt": "CREATE POLICY \"Users can view own followup questions\"\r\n  ON followup_questions FOR SELECT\r\n  USING (\r\n    answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n        )\r\n      )\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "campus_admin read org interviews",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin read org interviews\" ON public.interviews FOR SELECT USING ( user_id IN ( SELECT u.id FROM public.users u JOIN public.campus_organizations co ON u.campus_org_id = co.id WHERE co.admin_user_id = auth.uid() ) )",
+      "sourceFile": "005_campus.sql",
+      "stmt": "CREATE POLICY \"campus_admin read org interviews\"\n  ON public.interviews\n  FOR SELECT\n  USING (\n    user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_delete_own",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"interviews_delete_own\" ON interviews FOR DELETE USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"interviews_delete_own\" ON interviews\n  FOR DELETE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "normalized": "CREATE POLICY \"interviews_insert_own\" ON interviews FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"interviews_insert_own\" ON interviews\n  FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "(select auth.uid()) = user_id"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"interviews_select_own\" ON interviews FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"interviews_select_own\" ON interviews\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"interviews_update_own\" ON interviews FOR UPDATE USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"interviews_update_own\" ON interviews\n  FOR UPDATE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "policyName": "payments_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY payments_select_own ON public.payments FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "035_one_time_plan_payments.sql",
+      "stmt": "CREATE POLICY payments_select_own ON public.payments\r\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "policyName": "payments_service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY payments_service_role_full ON public.payments FOR ALL USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "036_payments_grants.sql",
+      "stmt": "CREATE POLICY payments_service_role_full ON public.payments\r\n  FOR ALL\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "provider_failover_events",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON provider_failover_events USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON provider_failover_events\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "provider_health_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON provider_health_logs USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON provider_health_logs\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_delete_own",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"questions_delete_own\" ON questions FOR DELETE USING ( EXISTS ( SELECT 1 FROM interviews WHERE interviews.id = questions.interview_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"questions_delete_own\" ON questions\n  FOR DELETE USING (\n    EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "normalized": "CREATE POLICY \"questions_insert_own\" ON questions FOR INSERT WITH CHECK ( EXISTS ( SELECT 1 FROM interviews WHERE interviews.id = questions.interview_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"questions_insert_own\" ON questions\n  FOR INSERT WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = (select auth.uid())\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"questions_select_own\" ON questions FOR SELECT USING ( EXISTS ( SELECT 1 FROM interviews WHERE interviews.id = questions.interview_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"questions_select_own\" ON questions\n  FOR SELECT USING (\n    EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "realtime_session_metrics",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON realtime_session_metrics USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON realtime_session_metrics\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "referrals",
+      "policyName": "referrals_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = referrer_id",
+      "normalized": "CREATE POLICY \"referrals_insert_own\" ON referrals FOR INSERT WITH CHECK (auth.uid() = referrer_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"referrals_insert_own\" ON referrals\n  FOR INSERT WITH CHECK (auth.uid() = referrer_id)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "(select auth.uid()) = referrer_id"
+    },
+    {
+      "schema": "public",
+      "table": "referrals",
+      "policyName": "referrals_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = referrer_id OR auth.uid() = referred_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"referrals_select_own\" ON referrals FOR SELECT USING (auth.uid() = referrer_id OR auth.uid() = referred_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"referrals_select_own\" ON referrals\n  FOR SELECT USING (auth.uid() = referrer_id OR auth.uid() = referred_id)",
+      "usingHits": [
+        "auth.uid()",
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = referrer_id OR (select auth.uid()) = referred_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "campus_admin read org reports",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"campus_admin read org reports\" ON public.reports FOR SELECT USING ( interview_id IN ( SELECT i.id FROM public.interviews i JOIN public.users u ON i.user_id = u.id JOIN public.campus_organizations co ON u.campus_org_id = co.id WHERE co.admin_user_id = auth.uid() ) )",
+      "sourceFile": "005_campus.sql",
+      "stmt": "CREATE POLICY \"campus_admin read org reports\"\n  ON public.reports\n  FOR SELECT\n  USING (\n    interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "reports_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "normalized": "CREATE POLICY \"reports_insert_own\" ON reports FOR INSERT WITH CHECK ( EXISTS ( SELECT 1 FROM interviews WHERE interviews.id = reports.interview_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"reports_insert_own\" ON reports\n  FOR INSERT WITH CHECK (\n    EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = (select auth.uid())\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "reports_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"reports_select_own\" ON reports FOR SELECT USING ( EXISTS ( SELECT 1 FROM interviews WHERE interviews.id = reports.interview_id AND interviews.user_id = auth.uid() ) )",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"reports_select_own\" ON reports\n  FOR SELECT USING (\n    EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = (select auth.uid())\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "resume_interview_snapshots",
+      "policyName": "resume_interview_snapshots_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())",
+      "withCheck": null,
+      "normalized": "CREATE POLICY resume_interview_snapshots_select_own ON public.resume_interview_snapshots FOR SELECT USING ( interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid()) )",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql",
+      "stmt": "CREATE POLICY resume_interview_snapshots_select_own ON public.resume_interview_snapshots\r\n  FOR SELECT\r\n  USING (\r\n    interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = (select auth.uid()))",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "resume_interview_snapshots",
+      "policyName": "resume_interview_snapshots_service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY resume_interview_snapshots_service_role_full ON public.resume_interview_snapshots USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql",
+      "stmt": "CREATE POLICY resume_interview_snapshots_service_role_full ON public.resume_interview_snapshots\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "resume_versions",
+      "policyName": "resume_versions_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())",
+      "withCheck": null,
+      "normalized": "CREATE POLICY resume_versions_select_own ON public.resume_versions FOR SELECT USING ( resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid()) )",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql",
+      "stmt": "CREATE POLICY resume_versions_select_own ON public.resume_versions\r\n  FOR SELECT\r\n  USING (\r\n    resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = (select auth.uid()))",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "resume_versions",
+      "policyName": "resume_versions_service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY resume_versions_service_role_full ON public.resume_versions USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql",
+      "stmt": "CREATE POLICY resume_versions_service_role_full ON public.resume_versions\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_delete_own",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"resumes_delete_own\" ON resumes FOR DELETE USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"resumes_delete_own\" ON resumes\n  FOR DELETE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "normalized": "CREATE POLICY \"resumes_insert_own\" ON resumes FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"resumes_insert_own\" ON resumes\n  FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "(select auth.uid()) = user_id"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"resumes_select_own\" ON resumes FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"resumes_select_own\" ON resumes\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"resumes_update_own\" ON resumes FOR UPDATE USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"resumes_update_own\" ON resumes\n  FOR UPDATE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "roadmap_tasks",
+      "policyName": "roadmap_tasks_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY roadmap_tasks_select_own ON public.roadmap_tasks FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "049_candidate_workspace.sql",
+      "stmt": "CREATE POLICY roadmap_tasks_select_own ON public.roadmap_tasks\r\n    FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "roadmap_tasks",
+      "policyName": "roadmap_tasks_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY roadmap_tasks_update_own ON public.roadmap_tasks FOR UPDATE USING (auth.uid() = user_id)",
+      "sourceFile": "049_candidate_workspace.sql",
+      "stmt": "CREATE POLICY roadmap_tasks_update_own ON public.roadmap_tasks\r\n    FOR UPDATE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "script_interview_reports",
+      "policyName": "script_interview_reports_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY script_interview_reports_select_own ON script_interview_reports FOR SELECT USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "20260717000002_script_interview_reports.sql",
+      "stmt": "CREATE POLICY script_interview_reports_select_own ON script_interview_reports\r\n  FOR SELECT\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "script_interview_reports",
+      "policyName": "script_interview_reports_service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY script_interview_reports_service_role_full ON script_interview_reports USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "20260717000002_script_interview_reports.sql",
+      "stmt": "CREATE POLICY script_interview_reports_service_role_full ON script_interview_reports\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "normalized": "CREATE POLICY script_turns_insert_own ON script_turns FOR INSERT WITH CHECK ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "20260711000001_v2_1_script_engine.sql",
+      "stmt": "CREATE POLICY script_turns_insert_own ON script_turns\r\n  FOR INSERT\r\n  WITH CHECK (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )"
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY script_turns_select_own ON script_turns FOR SELECT USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "20260711000001_v2_1_script_engine.sql",
+      "stmt": "CREATE POLICY script_turns_select_own ON script_turns\r\n  FOR SELECT\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "normalized": "CREATE POLICY script_turns_update_own ON script_turns FOR UPDATE USING ( interview_id IN ( SELECT id FROM interviews WHERE user_id = auth.uid() ) )",
+      "sourceFile": "20260711000001_v2_1_script_engine.sql",
+      "stmt": "CREATE POLICY script_turns_update_own ON script_turns\r\n  FOR UPDATE\r\n  USING (\r\n    interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )\r\n  )",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = (select auth.uid())\r\n    )",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "session_quality_log",
+      "policyName": "session_quality_log_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"session_quality_log_select_own\" ON session_quality_log FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "015_retention_system.sql",
+      "stmt": "CREATE POLICY \"session_quality_log_select_own\" ON session_quality_log\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "normalized": "CREATE POLICY \"subscriptions_insert_own\" ON subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"subscriptions_insert_own\" ON subscriptions\n  FOR INSERT WITH CHECK (auth.uid() = user_id)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "(select auth.uid()) = user_id"
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"subscriptions_select_own\" ON subscriptions FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"subscriptions_select_own\" ON subscriptions\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"subscriptions_update_own\" ON subscriptions FOR UPDATE USING (auth.uid() = user_id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"subscriptions_update_own\" ON subscriptions\n  FOR UPDATE USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "tool_usage_events",
+      "policyName": "tool_usage_events_service_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY tool_usage_events_service_full ON tool_usage_events USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "20260720000001_tool_usage_events.sql",
+      "stmt": "CREATE POLICY tool_usage_events_service_full ON tool_usage_events\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "user_activity",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON user_activity USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "024_user_presence.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON user_activity\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "user_ai_usage_rollups",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON user_ai_usage_rollups USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON user_ai_usage_rollups\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "user_ai_usage_rollups",
+      "policyName": "users_read_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"users_read_own\" ON user_ai_usage_rollups FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"users_read_own\" ON user_ai_usage_rollups\r\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "user_progress",
+      "policyName": "user_progress_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"user_progress_select_own\" ON user_progress FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "015_retention_system.sql",
+      "stmt": "CREATE POLICY \"user_progress_select_own\" ON user_progress\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "user_roadmaps",
+      "policyName": "user_roadmaps_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY user_roadmaps_select_own ON public.user_roadmaps FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "049_candidate_workspace.sql",
+      "stmt": "CREATE POLICY user_roadmaps_select_own ON public.user_roadmaps\r\n    FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "policyName": "users_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"users_select_own\" ON users FOR SELECT USING (auth.uid() = id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"users_select_own\" ON users\n  FOR SELECT USING (auth.uid() = id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "policyName": "users_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"users_update_own\" ON users FOR UPDATE USING (auth.uid() = id)",
+      "sourceFile": "001_initial_schema.sql",
+      "stmt": "CREATE POLICY \"users_update_own\" ON users\n  FOR UPDATE USING (auth.uid() = id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "public",
+      "table": "voice_usage_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "normalized": "CREATE POLICY \"service_role_full\" ON voice_usage_logs USING (auth.role() = 'service_role') WITH CHECK (auth.role() = 'service_role')",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"service_role_full\" ON voice_usage_logs\r\n  USING (auth.role() = 'service_role')\r\n  WITH CHECK (auth.role() = 'service_role')",
+      "usingHits": [
+        "auth.role()"
+      ],
+      "checkHits": [
+        "auth.role()"
+      ],
+      "usingFixed": "(select auth.role()) = 'service_role'",
+      "withCheckFixed": "(select auth.role()) = 'service_role'"
+    },
+    {
+      "schema": "public",
+      "table": "voice_usage_logs",
+      "policyName": "users_read_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"users_read_own\" ON voice_usage_logs FOR SELECT USING (auth.uid() = user_id)",
+      "sourceFile": "023_ai_telemetry.sql",
+      "stmt": "CREATE POLICY \"users_read_own\" ON voice_usage_logs\r\n  FOR SELECT USING (auth.uid() = user_id)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "(select auth.uid()) = user_id",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_feedback_screenshots_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+      "normalized": "CREATE POLICY \"storage_feedback_screenshots_insert_own\" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'feedback-screenshots' AND (storage.foldername(name))[1] = 'feedback' AND (storage.foldername(name))[2] = auth.uid()::text )",
+      "sourceFile": "028_feedback_screenshots.sql",
+      "stmt": "CREATE POLICY \"storage_feedback_screenshots_insert_own\"\nON storage.objects FOR INSERT TO authenticated\nWITH CHECK (\n  bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text\n)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = (select auth.uid())::text"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_feedback_screenshots_select_own",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"storage_feedback_screenshots_select_own\" ON storage.objects FOR SELECT TO authenticated USING ( bucket_id = 'feedback-screenshots' AND (storage.foldername(name))[2] = auth.uid()::text )",
+      "sourceFile": "028_feedback_screenshots.sql",
+      "stmt": "CREATE POLICY \"storage_feedback_screenshots_select_own\"\nON storage.objects FOR SELECT TO authenticated\nUSING (\n  bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[2] = auth.uid()::text\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[2] = (select auth.uid())::text",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_delete_own",
+      "cmd": "DELETE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"storage_profile_photos_delete_own\" ON storage.objects FOR DELETE TO authenticated USING ( bucket_id = 'profile-photos' AND (storage.foldername(name))[1] = auth.uid()::text )",
+      "sourceFile": "038_user_profile_photos.sql",
+      "stmt": "CREATE POLICY \"storage_profile_photos_delete_own\"\r\nON storage.objects FOR DELETE TO authenticated\r\nUSING (\r\n  bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text\r\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [],
+      "usingFixed": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = (select auth.uid())::text",
+      "withCheckFixed": null
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_insert_own",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "normalized": "CREATE POLICY \"storage_profile_photos_insert_own\" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'profile-photos' AND (storage.foldername(name))[1] = auth.uid()::text )",
+      "sourceFile": "038_user_profile_photos.sql",
+      "stmt": "CREATE POLICY \"storage_profile_photos_insert_own\"\r\nON storage.objects FOR INSERT TO authenticated\r\nWITH CHECK (\r\n  bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text\r\n)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = (select auth.uid())::text"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_update_own",
+      "cmd": "UPDATE",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "normalized": "CREATE POLICY \"storage_profile_photos_update_own\" ON storage.objects FOR UPDATE TO authenticated USING ( bucket_id = 'profile-photos' AND (storage.foldername(name))[1] = auth.uid()::text ) WITH CHECK ( bucket_id = 'profile-photos' AND (storage.foldername(name))[1] = auth.uid()::text )",
+      "sourceFile": "038_user_profile_photos.sql",
+      "stmt": "CREATE POLICY \"storage_profile_photos_update_own\"\r\nON storage.objects FOR UPDATE TO authenticated\r\nUSING (\r\n  bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text\r\n)\r\nWITH CHECK (\r\n  bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text\r\n)",
+      "usingHits": [
+        "auth.uid()"
+      ],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = (select auth.uid())::text",
+      "withCheckFixed": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = (select auth.uid())::text"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_resumes_insert_own_uid",
+      "cmd": "INSERT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "normalized": "CREATE POLICY \"storage_resumes_insert_own_uid\" ON storage.objects FOR INSERT TO authenticated WITH CHECK ( bucket_id = 'resumes' AND (storage.foldername(name))[1] = auth.uid()::text )",
+      "sourceFile": "014_storage_objects_resumes_insert_own.sql",
+      "stmt": "CREATE POLICY \"storage_resumes_insert_own_uid\"\r\nON storage.objects FOR INSERT TO authenticated\r\nWITH CHECK (\r\n  bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text\r\n)",
+      "usingHits": [],
+      "checkHits": [
+        "auth.uid()"
+      ],
+      "usingFixed": null,
+      "withCheckFixed": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = (select auth.uid())::text"
+    }
+  ],
+  "alreadyOk": [
+    {
+      "schema": "public",
+      "table": "tier_config",
+      "policyName": "tier_config_select_authenticated",
+      "cmd": "SELECT",
+      "permissive": "PERMISSIVE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "true",
+      "withCheck": null,
+      "normalized": "CREATE POLICY \"tier_config_select_authenticated\" ON tier_config FOR SELECT TO authenticated USING (true)",
+      "sourceFile": "017_tier_config.sql",
+      "stmt": "CREATE POLICY \"tier_config_select_authenticated\"\n  ON tier_config FOR SELECT\n  TO authenticated\n  USING (true)"
+    }
+  ],
+  "overlapping": [
+    {
+      "key": "public.interviews|SELECT|PERMISSIVE",
+      "policies": [
+        {
+          "name": "campus_admin read org interviews",
+          "roles": [
+            "public"
+          ],
+          "using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "005_campus.sql"
+        },
+        {
+          "name": "interviews_select_own",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.uid() = user_id",
+          "withCheck": null,
+          "sourceFile": "001_initial_schema.sql"
+        }
+      ]
+    },
+    {
+      "key": "public.reports|SELECT|PERMISSIVE",
+      "policies": [
+        {
+          "name": "campus_admin read org reports",
+          "roles": [
+            "public"
+          ],
+          "using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "005_campus.sql"
+        },
+        {
+          "name": "reports_select_own",
+          "roles": [
+            "public"
+          ],
+          "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "001_initial_schema.sql"
+        }
+      ]
+    },
+    {
+      "key": "storage.objects|INSERT|PERMISSIVE",
+      "policies": [
+        {
+          "name": "storage_feedback_screenshots_insert_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+          "sourceFile": "028_feedback_screenshots.sql"
+        },
+        {
+          "name": "storage_profile_photos_insert_own",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "sourceFile": "038_user_profile_photos.sql"
+        },
+        {
+          "name": "storage_resumes_insert_own_uid",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "sourceFile": "014_storage_objects_resumes_insert_own.sql"
+        }
+      ]
+    }
+  ],
+  "allPolicies": [
+    {
+      "schema": "public",
+      "table": "abuse_detection_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "ai_call_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answer_analyses",
+      "policyName": "Users can insert own answer analyses",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )",
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answer_analyses",
+      "policyName": "Users can view own answer analyses",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "conversation_state_id IN (\r\n      SELECT id FROM conversation_states\r\n      WHERE interview_id IN (\r\n        SELECT id FROM interviews WHERE user_id = auth.uid()\r\n      )\r\n    )",
+      "withCheck": null,
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answer_evaluations",
+      "policyName": "answer_evaluations_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "20260716000001_answer_evaluations.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answer_evaluations",
+      "policyName": "answer_evaluations_service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "20260716000001_answer_evaluations.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answers",
+      "policyName": "answers_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "answers",
+      "policyName": "answers_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM questions\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE questions.id = answers.question_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "campus_invites",
+      "policyName": "campus_admin manage invites",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "org_id IN (\n      SELECT id FROM public.campus_organizations\n      WHERE admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "005_campus.sql"
+    },
+    {
+      "schema": "public",
+      "table": "campus_organizations",
+      "policyName": "campus_admin read own org",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "admin_user_id = auth.uid()",
+      "withCheck": null,
+      "sourceFile": "005_campus.sql"
+    },
+    {
+      "schema": "public",
+      "table": "college_deadlines",
+      "policyName": "campus_admin_manage_deadlines",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+      "withCheck": null,
+      "sourceFile": "018_college_enrollments_deadlines.sql"
+    },
+    {
+      "schema": "public",
+      "table": "college_enrollments",
+      "policyName": "campus_admin_manage_enrollments",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+      "withCheck": null,
+      "sourceFile": "018_college_enrollments_deadlines.sql"
+    },
+    {
+      "schema": "public",
+      "table": "college_enrollments",
+      "policyName": "student_read_own_enrollment",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "user_id = auth.uid()",
+      "withCheck": null,
+      "sourceFile": "018_college_enrollments_deadlines.sql"
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can insert own conversation states",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can update own conversation states",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "conversation_states",
+      "policyName": "Users can view own conversation states",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "credit_transactions",
+      "policyName": "credit_transactions_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "evaluations",
+      "policyName": "evaluations_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "evaluations",
+      "policyName": "evaluations_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM answers\n      JOIN questions ON questions.id = answers.question_id\n      JOIN interviews ON interviews.id = questions.interview_id\n      WHERE answers.id = evaluations.answer_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "experiment_assignments",
+      "policyName": "experiment_assignments_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "051_post_launch_growth.sql"
+    },
+    {
+      "schema": "public",
+      "table": "feedbacks",
+      "policyName": "feedbacks_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "026_feedback.sql"
+    },
+    {
+      "schema": "public",
+      "table": "followup_questions",
+      "policyName": "Users can insert own followup questions",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )",
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "followup_questions",
+      "policyName": "Users can view own followup questions",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "answer_analysis_id IN (\r\n      SELECT id FROM answer_analyses\r\n      WHERE conversation_state_id IN (\r\n        SELECT id FROM conversation_states\r\n        WHERE interview_id IN (\r\n          SELECT id FROM interviews WHERE user_id = auth.uid()\r\n        )\r\n      )\r\n    )",
+      "withCheck": null,
+      "sourceFile": "020_dual_agent_conversation.sql"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "campus_admin read org interviews",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "005_campus.sql"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_delete_own",
+      "cmd": "DELETE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "interviews",
+      "policyName": "interviews_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "policyName": "payments_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "035_one_time_plan_payments.sql"
+    },
+    {
+      "schema": "public",
+      "table": "payments",
+      "policyName": "payments_service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "036_payments_grants.sql"
+    },
+    {
+      "schema": "public",
+      "table": "provider_failover_events",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "provider_health_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_delete_own",
+      "cmd": "DELETE",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "questions",
+      "policyName": "questions_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = questions.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "realtime_session_metrics",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "referrals",
+      "policyName": "referrals_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = referrer_id",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "referrals",
+      "policyName": "referrals_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = referrer_id OR auth.uid() = referred_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "campus_admin read org reports",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "005_campus.sql"
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "reports_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "reports",
+      "policyName": "reports_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resume_interview_snapshots",
+      "policyName": "resume_interview_snapshots_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())",
+      "withCheck": null,
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resume_interview_snapshots",
+      "policyName": "resume_interview_snapshots_service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resume_versions",
+      "policyName": "resume_versions_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())",
+      "withCheck": null,
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resume_versions",
+      "policyName": "resume_versions_service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_delete_own",
+      "cmd": "DELETE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "resumes",
+      "policyName": "resumes_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "roadmap_tasks",
+      "policyName": "roadmap_tasks_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "049_candidate_workspace.sql"
+    },
+    {
+      "schema": "public",
+      "table": "roadmap_tasks",
+      "policyName": "roadmap_tasks_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "049_candidate_workspace.sql"
+    },
+    {
+      "schema": "public",
+      "table": "script_interview_reports",
+      "policyName": "script_interview_reports_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "20260717000002_script_interview_reports.sql"
+    },
+    {
+      "schema": "public",
+      "table": "script_interview_reports",
+      "policyName": "script_interview_reports_service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "20260717000002_script_interview_reports.sql"
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "sourceFile": "20260711000001_v2_1_script_engine.sql"
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "20260711000001_v2_1_script_engine.sql"
+    },
+    {
+      "schema": "public",
+      "table": "script_turns",
+      "policyName": "script_turns_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+      "withCheck": null,
+      "sourceFile": "20260711000001_v2_1_script_engine.sql"
+    },
+    {
+      "schema": "public",
+      "table": "session_quality_log",
+      "policyName": "session_quality_log_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "015_retention_system.sql"
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "public"
+      ],
+      "using": null,
+      "withCheck": "auth.uid() = user_id",
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "subscriptions",
+      "policyName": "subscriptions_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "tier_config",
+      "policyName": "tier_config_select_authenticated",
+      "cmd": "SELECT",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "true",
+      "withCheck": null,
+      "sourceFile": "017_tier_config.sql"
+    },
+    {
+      "schema": "public",
+      "table": "tool_usage_events",
+      "policyName": "tool_usage_events_service_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "20260720000001_tool_usage_events.sql"
+    },
+    {
+      "schema": "public",
+      "table": "user_activity",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "024_user_presence.sql"
+    },
+    {
+      "schema": "public",
+      "table": "user_ai_usage_rollups",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "user_ai_usage_rollups",
+      "policyName": "users_read_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "user_progress",
+      "policyName": "user_progress_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "015_retention_system.sql"
+    },
+    {
+      "schema": "public",
+      "table": "user_roadmaps",
+      "policyName": "user_roadmaps_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "049_candidate_workspace.sql"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "policyName": "users_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "users",
+      "policyName": "users_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = id",
+      "withCheck": null,
+      "sourceFile": "001_initial_schema.sql"
+    },
+    {
+      "schema": "public",
+      "table": "voice_usage_logs",
+      "policyName": "service_role_full",
+      "cmd": "ALL",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.role() = 'service_role'",
+      "withCheck": "auth.role() = 'service_role'",
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "public",
+      "table": "voice_usage_logs",
+      "policyName": "users_read_own",
+      "cmd": "SELECT",
+      "roles": [
+        "public"
+      ],
+      "using": "auth.uid() = user_id",
+      "withCheck": null,
+      "sourceFile": "023_ai_telemetry.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_feedback_screenshots_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+      "sourceFile": "028_feedback_screenshots.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_feedback_screenshots_select_own",
+      "cmd": "SELECT",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+      "withCheck": null,
+      "sourceFile": "028_feedback_screenshots.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_delete_own",
+      "cmd": "DELETE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "withCheck": null,
+      "sourceFile": "038_user_profile_photos.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_insert_own",
+      "cmd": "INSERT",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "sourceFile": "038_user_profile_photos.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_profile_photos_update_own",
+      "cmd": "UPDATE",
+      "roles": [
+        "authenticated"
+      ],
+      "using": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "sourceFile": "038_user_profile_photos.sql"
+    },
+    {
+      "schema": "storage",
+      "table": "objects",
+      "policyName": "storage_resumes_insert_own_uid",
+      "cmd": "INSERT",
+      "roles": [
+        "authenticated"
+      ],
+      "using": null,
+      "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+      "sourceFile": "014_storage_objects_resumes_insert_own.sql"
+    }
+  ]
+}

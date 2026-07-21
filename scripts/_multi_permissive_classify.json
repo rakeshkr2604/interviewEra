@@ -1,0 +1,812 @@
+{
+  "note": "Live pg_policies unavailable (token 401). Built from migration-reconstructed final policy set AFTER 057 initplan wrap names (expressions shown as in recon, may still show unwrapped auth.uid() from pre-057 source text). Advisor reported 93 warnings — each table|action with 2+ policies typically emits one warning per role affected; our groups are table|action.",
+  "groupCount": 11,
+  "groups": [
+    {
+      "key": "public.answer_evaluations|SELECT",
+      "table": "public.answer_evaluations",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "answer_evaluations_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+          "withCheck": null,
+          "sourceFile": "20260716000001_answer_evaluations.sql"
+        },
+        {
+          "name": "answer_evaluations_service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "20260716000001_answer_evaluations.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "answer_evaluations_select_own",
+          "b": "answer_evaluations_service_role_full",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+          "a_check": null,
+          "b_using": "auth.role() = 'service_role'",
+          "b_check": "auth.role() = 'service_role'",
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "ALL"
+        }
+      ]
+    },
+    {
+      "key": "public.college_enrollments|SELECT",
+      "table": "public.college_enrollments",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "campus_admin_manage_enrollments",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+          "withCheck": null,
+          "sourceFile": "018_college_enrollments_deadlines.sql"
+        },
+        {
+          "name": "student_read_own_enrollment",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "user_id = auth.uid()",
+          "withCheck": null,
+          "sourceFile": "018_college_enrollments_deadlines.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "campus_admin_manage_enrollments",
+          "b": "student_read_own_enrollment",
+          "bucket": "B",
+          "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+          "a_using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+          "a_check": null,
+          "b_using": "user_id = auth.uid()",
+          "b_check": null,
+          "a_sourceCmd": "ALL",
+          "b_sourceCmd": "SELECT"
+        }
+      ]
+    },
+    {
+      "key": "public.interviews|SELECT",
+      "table": "public.interviews",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "campus_admin read org interviews",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "005_campus.sql"
+        },
+        {
+          "name": "interviews_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.uid() = user_id",
+          "withCheck": null,
+          "sourceFile": "001_initial_schema.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "campus_admin read org interviews",
+          "b": "interviews_select_own",
+          "bucket": "B",
+          "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+          "a_using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "a_check": null,
+          "b_using": "auth.uid() = user_id",
+          "b_check": null,
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "SELECT"
+        }
+      ]
+    },
+    {
+      "key": "public.payments|SELECT",
+      "table": "public.payments",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "payments_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.uid() = user_id",
+          "withCheck": null,
+          "sourceFile": "035_one_time_plan_payments.sql"
+        },
+        {
+          "name": "payments_service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "036_payments_grants.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "payments_select_own",
+          "b": "payments_service_role_full",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "auth.uid() = user_id",
+          "a_check": null,
+          "b_using": "auth.role() = 'service_role'",
+          "b_check": "auth.role() = 'service_role'",
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "ALL"
+        }
+      ]
+    },
+    {
+      "key": "public.reports|SELECT",
+      "table": "public.reports",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "campus_admin read org reports",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "005_campus.sql"
+        },
+        {
+          "name": "reports_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+          "withCheck": null,
+          "sourceFile": "001_initial_schema.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "campus_admin read org reports",
+          "b": "reports_select_own",
+          "bucket": "B",
+          "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+          "a_using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+          "a_check": null,
+          "b_using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+          "b_check": null,
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "SELECT"
+        }
+      ]
+    },
+    {
+      "key": "public.resume_interview_snapshots|SELECT",
+      "table": "public.resume_interview_snapshots",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "resume_interview_snapshots_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())",
+          "withCheck": null,
+          "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+        },
+        {
+          "name": "resume_interview_snapshots_service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "resume_interview_snapshots_select_own",
+          "b": "resume_interview_snapshots_service_role_full",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())",
+          "a_check": null,
+          "b_using": "auth.role() = 'service_role'",
+          "b_check": "auth.role() = 'service_role'",
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "ALL"
+        }
+      ]
+    },
+    {
+      "key": "public.resume_versions|SELECT",
+      "table": "public.resume_versions",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "resume_versions_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())",
+          "withCheck": null,
+          "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+        },
+        {
+          "name": "resume_versions_service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "20260718000001_resume_versions_and_snapshots.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "resume_versions_select_own",
+          "b": "resume_versions_service_role_full",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())",
+          "a_check": null,
+          "b_using": "auth.role() = 'service_role'",
+          "b_check": "auth.role() = 'service_role'",
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "ALL"
+        }
+      ]
+    },
+    {
+      "key": "public.script_interview_reports|SELECT",
+      "table": "public.script_interview_reports",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "script_interview_reports_select_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+          "withCheck": null,
+          "sourceFile": "20260717000002_script_interview_reports.sql"
+        },
+        {
+          "name": "script_interview_reports_service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "20260717000002_script_interview_reports.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "script_interview_reports_select_own",
+          "b": "script_interview_reports_service_role_full",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+          "a_check": null,
+          "b_using": "auth.role() = 'service_role'",
+          "b_check": "auth.role() = 'service_role'",
+          "a_sourceCmd": "SELECT",
+          "b_sourceCmd": "ALL"
+        }
+      ]
+    },
+    {
+      "key": "public.user_ai_usage_rollups|SELECT",
+      "table": "public.user_ai_usage_rollups",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "023_ai_telemetry.sql"
+        },
+        {
+          "name": "users_read_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.uid() = user_id",
+          "withCheck": null,
+          "sourceFile": "023_ai_telemetry.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "service_role_full",
+          "b": "users_read_own",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "auth.role() = 'service_role'",
+          "a_check": "auth.role() = 'service_role'",
+          "b_using": "auth.uid() = user_id",
+          "b_check": null,
+          "a_sourceCmd": "ALL",
+          "b_sourceCmd": "SELECT"
+        }
+      ]
+    },
+    {
+      "key": "public.voice_usage_logs|SELECT",
+      "table": "public.voice_usage_logs",
+      "overlapCmd": "SELECT",
+      "policyCount": 2,
+      "policies": [
+        {
+          "name": "service_role_full",
+          "declaredAs": "ALL",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.role() = 'service_role'",
+          "withCheck": "auth.role() = 'service_role'",
+          "sourceFile": "023_ai_telemetry.sql"
+        },
+        {
+          "name": "users_read_own",
+          "declaredAs": "SELECT",
+          "roles": [
+            "public"
+          ],
+          "using": "auth.uid() = user_id",
+          "withCheck": null,
+          "sourceFile": "023_ai_telemetry.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "service_role_full",
+          "b": "users_read_own",
+          "bucket": "B",
+          "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+          "a_using": "auth.role() = 'service_role'",
+          "a_check": "auth.role() = 'service_role'",
+          "b_using": "auth.uid() = user_id",
+          "b_check": null,
+          "a_sourceCmd": "ALL",
+          "b_sourceCmd": "SELECT"
+        }
+      ]
+    },
+    {
+      "key": "storage.objects|INSERT",
+      "table": "storage.objects",
+      "overlapCmd": "INSERT",
+      "policyCount": 3,
+      "policies": [
+        {
+          "name": "storage_feedback_screenshots_insert_own",
+          "declaredAs": "INSERT",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+          "sourceFile": "028_feedback_screenshots.sql"
+        },
+        {
+          "name": "storage_profile_photos_insert_own",
+          "declaredAs": "INSERT",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "sourceFile": "038_user_profile_photos.sql"
+        },
+        {
+          "name": "storage_resumes_insert_own_uid",
+          "declaredAs": "INSERT",
+          "roles": [
+            "authenticated"
+          ],
+          "using": null,
+          "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "sourceFile": "014_storage_objects_resumes_insert_own.sql"
+        }
+      ],
+      "pairs": [
+        {
+          "a": "storage_feedback_screenshots_insert_own",
+          "b": "storage_profile_photos_insert_own",
+          "bucket": "B",
+          "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+          "a_using": null,
+          "a_check": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+          "b_using": null,
+          "b_check": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "a_sourceCmd": "INSERT",
+          "b_sourceCmd": "INSERT"
+        },
+        {
+          "a": "storage_feedback_screenshots_insert_own",
+          "b": "storage_resumes_insert_own_uid",
+          "bucket": "B",
+          "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+          "a_using": null,
+          "a_check": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+          "b_using": null,
+          "b_check": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "a_sourceCmd": "INSERT",
+          "b_sourceCmd": "INSERT"
+        },
+        {
+          "a": "storage_profile_photos_insert_own",
+          "b": "storage_resumes_insert_own_uid",
+          "bucket": "B",
+          "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+          "a_using": null,
+          "a_check": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "b_using": null,
+          "b_check": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+          "a_sourceCmd": "INSERT",
+          "b_sourceCmd": "INSERT"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "A_identical": [],
+    "B_intentional": [
+      {
+        "table": "public.answer_evaluations",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "answer_evaluations_select_own",
+          "answer_evaluations_service_role_full"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "answer_evaluations_select_own": {
+            "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "answer_evaluations_service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          }
+        }
+      },
+      {
+        "table": "public.college_enrollments",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "campus_admin_manage_enrollments",
+          "student_read_own_enrollment"
+        ],
+        "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+        "expressions": {
+          "campus_admin_manage_enrollments": {
+            "using": "college_id IN (\n    SELECT id\n    FROM campus_organizations\n    WHERE admin_user_id = auth.uid()\n  )",
+            "withCheck": null,
+            "cmd": "ALL"
+          },
+          "student_read_own_enrollment": {
+            "using": "user_id = auth.uid()",
+            "withCheck": null,
+            "cmd": "SELECT"
+          }
+        }
+      },
+      {
+        "table": "public.interviews",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "campus_admin read org interviews",
+          "interviews_select_own"
+        ],
+        "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+        "expressions": {
+          "campus_admin read org interviews": {
+            "using": "user_id IN (\n      SELECT u.id\n      FROM   public.users u\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "interviews_select_own": {
+            "using": "auth.uid() = user_id",
+            "withCheck": null,
+            "cmd": "SELECT"
+          }
+        }
+      },
+      {
+        "table": "public.payments",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "payments_select_own",
+          "payments_service_role_full"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "payments_select_own": {
+            "using": "auth.uid() = user_id",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "payments_service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          }
+        }
+      },
+      {
+        "table": "public.reports",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "campus_admin read org reports",
+          "reports_select_own"
+        ],
+        "reason": "Own-row access OR campus-admin org-scoped access — different predicates; intentional OR.",
+        "expressions": {
+          "campus_admin read org reports": {
+            "using": "interview_id IN (\n      SELECT i.id\n      FROM   public.interviews i\n      JOIN   public.users u ON i.user_id = u.id\n      JOIN   public.campus_organizations co ON u.campus_org_id = co.id\n      WHERE  co.admin_user_id = auth.uid()\n    )",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "reports_select_own": {
+            "using": "EXISTS (\n      SELECT 1 FROM interviews\n      WHERE interviews.id = reports.interview_id\n        AND interviews.user_id = auth.uid()\n    )",
+            "withCheck": null,
+            "cmd": "SELECT"
+          }
+        }
+      },
+      {
+        "table": "public.resume_interview_snapshots",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "resume_interview_snapshots_select_own",
+          "resume_interview_snapshots_service_role_full"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "resume_interview_snapshots_select_own": {
+            "using": "interview_id IN (SELECT id FROM public.interviews WHERE user_id = auth.uid())",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "resume_interview_snapshots_service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          }
+        }
+      },
+      {
+        "table": "public.resume_versions",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "resume_versions_select_own",
+          "resume_versions_service_role_full"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "resume_versions_select_own": {
+            "using": "resume_id IN (SELECT id FROM public.resumes WHERE user_id = auth.uid())",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "resume_versions_service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          }
+        }
+      },
+      {
+        "table": "public.script_interview_reports",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "script_interview_reports_select_own",
+          "script_interview_reports_service_role_full"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "script_interview_reports_select_own": {
+            "using": "interview_id IN (\r\n      SELECT id FROM interviews WHERE user_id = auth.uid()\r\n    )",
+            "withCheck": null,
+            "cmd": "SELECT"
+          },
+          "script_interview_reports_service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          }
+        }
+      },
+      {
+        "table": "public.user_ai_usage_rollups",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "service_role_full",
+          "users_read_own"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          },
+          "users_read_own": {
+            "using": "auth.uid() = user_id",
+            "withCheck": null,
+            "cmd": "SELECT"
+          }
+        }
+      },
+      {
+        "table": "public.voice_usage_logs",
+        "overlapCmds": [
+          "SELECT"
+        ],
+        "policies": [
+          "service_role_full",
+          "users_read_own"
+        ],
+        "reason": "Own-row (or other) policy OR service_role_full — different predicates; intentional multi-policy pattern. Note: service_role client bypasses RLS anyway; policy still evaluated for other roles as FALSE (Advisor noise / minor cost).",
+        "expressions": {
+          "service_role_full": {
+            "using": "auth.role() = 'service_role'",
+            "withCheck": "auth.role() = 'service_role'",
+            "cmd": "ALL"
+          },
+          "users_read_own": {
+            "using": "auth.uid() = user_id",
+            "withCheck": null,
+            "cmd": "SELECT"
+          }
+        }
+      },
+      {
+        "table": "storage.objects",
+        "overlapCmds": [
+          "INSERT"
+        ],
+        "policies": [
+          "storage_feedback_screenshots_insert_own",
+          "storage_profile_photos_insert_own"
+        ],
+        "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+        "expressions": {
+          "storage_feedback_screenshots_insert_own": {
+            "using": null,
+            "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+            "cmd": "INSERT"
+          },
+          "storage_profile_photos_insert_own": {
+            "using": null,
+            "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+            "cmd": "INSERT"
+          }
+        }
+      },
+      {
+        "table": "storage.objects",
+        "overlapCmds": [
+          "INSERT"
+        ],
+        "policies": [
+          "storage_feedback_screenshots_insert_own",
+          "storage_resumes_insert_own_uid"
+        ],
+        "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+        "expressions": {
+          "storage_feedback_screenshots_insert_own": {
+            "using": null,
+            "withCheck": "bucket_id = 'feedback-screenshots'\n  AND (storage.foldername(name))[1] = 'feedback'\n  AND (storage.foldername(name))[2] = auth.uid()::text",
+            "cmd": "INSERT"
+          },
+          "storage_resumes_insert_own_uid": {
+            "using": null,
+            "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+            "cmd": "INSERT"
+          }
+        }
+      },
+      {
+        "table": "storage.objects",
+        "overlapCmds": [
+          "INSERT"
+        ],
+        "policies": [
+          "storage_profile_photos_insert_own",
+          "storage_resumes_insert_own_uid"
+        ],
+        "reason": "Same storage.objects action/role but different bucket_id predicates — not redundant; each gates a different bucket.",
+        "expressions": {
+          "storage_profile_photos_insert_own": {
+            "using": null,
+            "withCheck": "bucket_id = 'profile-photos'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+            "cmd": "INSERT"
+          },
+          "storage_resumes_insert_own_uid": {
+            "using": null,
+            "withCheck": "bucket_id = 'resumes'\r\n  AND (storage.foldername(name))[1] = auth.uid()::text",
+            "cmd": "INSERT"
+          }
+        }
+      }
+    ],
+    "C_ambiguous": [],
+    "counts": {
+      "A": 0,
+      "B": 13,
+      "C": 0
+    }
+  }
+}

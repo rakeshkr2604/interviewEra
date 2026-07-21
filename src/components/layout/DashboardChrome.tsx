@@ -11,7 +11,15 @@ import { NAV_SHELL_HEIGHT_CLASS } from '@/lib/theme/nav-classes'
 import { cn } from '@/lib/utils'
 import { useHeartbeat } from '@/hooks/useHeartbeat'
 
-export function DashboardChrome({ children }: { children: React.ReactNode }) {
+export function DashboardChrome({
+  children,
+  initialStreak,
+  canAccessAdmin,
+}: {
+  children: React.ReactNode
+  initialStreak: number
+  canAccessAdmin: boolean
+}) {
   useHeartbeat(true);
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname() ?? ''
@@ -85,7 +93,11 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           boxShadow: '4px 0 48px color-mix(in srgb, var(--accent-primary) 6%, transparent)',
         }}
       >
-        <Sidebar onNavigate={() => setMobileOpen(false)} />
+        <Sidebar
+          onNavigate={() => setMobileOpen(false)}
+          initialStreak={initialStreak}
+          canAccessAdmin={canAccessAdmin}
+        />
       </div>
 
       <div
@@ -164,7 +176,7 @@ export function DashboardChrome({ children }: { children: React.ReactNode }) {
           <span className="min-w-0 flex-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
             <BrandWordmarkSplit />
           </span>
-          <StreakCounter />
+          <StreakCounter key={initialStreak} initialStreak={initialStreak} />
         </header>
 
         {/*

@@ -1,7 +1,12 @@
 import { redirect } from 'next/navigation'
 import { Suspense } from 'react'
 import { PaymentSuccessBanner } from '@/components/dashboard/PaymentSuccessBanner'
-import { createClient } from '@/lib/supabase/server'
+import {
+  getCachedAuthUser,
+  getCachedDashboardUserRow,
+  getCachedSupabase,
+  getCachedUserProgressRow,
+} from '@/lib/dashboard/request-cache'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { DashboardHeaderActions } from '@/components/dashboard/DashboardHeaderActions'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
@@ -15,7 +20,7 @@ import { RetentionProgressRefreshListener } from '@/components/dashboard/Retenti
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker'
 import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
-import { loadCandidateSnapshot, CANDIDATE_DASHBOARD_INTERVIEWS_SELECT, fetchDashboardUserRow } from '@/lib/candidate/load-snapshot'
+import { loadCandidateSnapshot, CANDIDATE_DASHBOARD_INTERVIEWS_SELECT } from '@/lib/candidate/load-snapshot'
 import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { computeReadinessScore } from '@/lib/candidate/readiness-score'
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
@@ -33,12 +38,10 @@ export const metadata = PAGE_SEO.dashboard
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedAuthUser()
   if (!user) redirect('/login')
 
+  const supabase = await getCachedSupabase()
   const interviewsSelect = CANDIDATE_DASHBOARD_INTERVIEWS_SELECT
 
   const [
@@ -47,14 +50,14 @@ export default async function DashboardPage() {
     { data: progressSnap, error: progressErr },
     { count: completedCountTotal },
   ] = await Promise.all([
-    fetchDashboardUserRow(supabase, user.id),
+    getCachedDashboardUserRow(user.id),
     supabase
       .from('interviews')
       .select(interviewsSelect)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
       .limit(20),
-    supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
+    getCachedUserProgressRow(user.id),
     // Lifetime count, independent of the 5-row cap above — the "Completed" stat
     // tile must reflect all-time completions, not just the 5 most recent rows.
     supabase

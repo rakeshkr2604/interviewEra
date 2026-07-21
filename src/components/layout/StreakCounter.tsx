@@ -7,36 +7,48 @@ import { createClient } from '@/lib/supabase/client'
 
 const STREAK_EVENT = 'ie-streak-updated'
 
+let streakFetchInFlight: Promise<number> | null = null
+
 async function fetchStreak(): Promise<number> {
-  const supabase = createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  if (!user) return 0
+  if (streakFetchInFlight) return streakFetchInFlight
 
-  const { data } = await supabase
-    .from('user_progress')
-    .select('current_streak')
-    .eq('user_id', user.id)
-    .maybeSingle()
+  streakFetchInFlight = (async () => {
+    const supabase = createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return 0
 
-  const n = Number(data?.current_streak ?? 0)
-  return Number.isFinite(n) ? n : 0
+    const { data } = await supabase
+      .from('user_progress')
+      .select('current_streak')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    const n = Number(data?.current_streak ?? 0)
+    return Number.isFinite(n) ? n : 0
+  })().finally(() => {
+    streakFetchInFlight = null
+  })
+
+  return streakFetchInFlight
 }
 
-export function StreakCounter({ className }: { className?: string }) {
-  const [streak, setStreak] = useState<number | null>(null)
-  const lastKnown = useRef(0)
+export function StreakCounter({
+  className,
+  initialStreak,
+}: {
+  className?: string
+  /** Server-provided streak — skips the mount fetch when set. */
+  initialStreak: number
+}) {
+  const [streak, setStreak] = useState<number>(initialStreak)
+  const lastKnown = useRef(initialStreak)
   const [pulse, setPulse] = useState(0)
 
   useEffect(() => {
     let cancelled = false
-    void fetchStreak().then((n) => {
-      if (!cancelled) {
-        lastKnown.current = n
-        setStreak(n)
-      }
-    })
+    lastKnown.current = initialStreak
 
     function onRetentionEvent(ev: Event) {
       const e = ev as CustomEvent<{ streak?: number }>
@@ -66,10 +78,10 @@ export function StreakCounter({ className }: { className?: string }) {
       window.removeEventListener(STREAK_EVENT, onRetentionEvent)
       document.removeEventListener('visibilitychange', onVisibility)
     }
-  }, [])
+  }, [initialStreak])
 
-  const n = streak ?? 0
-  const streakLabel = streak === null ? '—' : n === 1 ? '1 day streak' : `${n} days streak`
+  const n = streak
+  const streakLabel = n === 1 ? '1 day streak' : `${n} days streak`
 
   return (
     <Link

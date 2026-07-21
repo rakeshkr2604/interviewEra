@@ -135,10 +135,18 @@ const nextConfig: NextConfig = {
     const razorpayConnect =
       'https://checkout.razorpay.com https://lottie.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
 
-    // Google Analytics 4: gtag.js from googletagmanager.com; beacons to google-analytics.com.
+    // Google Analytics 4 (gtag.js via layout.tsx — not a GTM container tag).
+    // Blocked production request (Network tab): GET …/a?v=3&t=l&pid=…&gtm.load…
+    // on www.google-analytics.com (gtag GTM-load beacon). GA4 also routes collection
+    // to unpredictable regional hosts (region1, region2, … .google-analytics.com) and
+    // analytics.google.com based on user geo — hardcoding individual regionN hosts is
+    // fragile. Google's official GA4 CSP guide explicitly recommends these wildcards:
+    // https://developers.google.com/tag-platform/security/guides/csp#google-analytics-4
+    // img-src was also missing GA/GTM hosts entirely, blocking pixel-style fallbacks.
     const ga4Script = 'https://www.googletagmanager.com';
     const ga4Connect =
-      'https://www.google-analytics.com https://region1.google-analytics.com';
+      'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
+    const ga4Img = 'https://*.google-analytics.com https://*.googletagmanager.com';
 
     // Clarity: tag/collect/img on *.clarity.ms subdomains; session pixels via c.bing.com.
     const clarityHosts = 'https://*.clarity.ms';
@@ -161,7 +169,7 @@ const nextConfig: NextConfig = {
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} blob: ${siteTwin} ${razorpayScript} ${ga4Script} ${clarityScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com https://checkout-static-next.razorpay.com`,
-      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg}`,
+      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg} ${ga4Img}`,
       "media-src 'self' blob:",
       // wss://api.deepgram.com: Deepgram STT WebSocket connection.
       // https://api.elevenlabs.io: ElevenLabs TTS API requests.
