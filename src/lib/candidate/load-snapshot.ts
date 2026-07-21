@@ -15,6 +15,99 @@ import { isResumableInterviewStatus } from '@/lib/interview/interview-status';
 import type { DimensionScores } from '@/types/app.types';
 import { normalizeRadarRowToDimensionKey } from '@/lib/utils/report-radar-dimensions';
 
+export type CandidateSnapshotUserRow = {
+  onboarding_draft?: unknown;
+  candidate_profile?: unknown;
+  campus_org_id?: string | null;
+};
+
+export type CandidateSnapshotInterviewRow = {
+  id: string;
+  role: string;
+  status: string;
+  reports?:
+    | {
+        id: string;
+        radar_data?: { dimension: string; score: number }[];
+        generated_at?: string | null;
+      }[]
+    | null;
+};
+
+export type CandidateSnapshotPrefetch = {
+  userRow?: CandidateSnapshotUserRow | null;
+  progressSnap?: UserProgressRow | null;
+  interviews?: CandidateSnapshotInterviewRow[] | null;
+};
+
+/** Shared select for dashboard + snapshot interview hydration (20-row cap). */
+export const CANDIDATE_DASHBOARD_INTERVIEWS_SELECT = `
+  id,
+  role,
+  difficulty,
+  status,
+  completed_at,
+  started_at,
+  engine,
+  reports (
+    id,
+    overall_score,
+    generated_at,
+    radar_data
+  )
+`;
+
+export async function fetchCandidateSnapshotUserRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<CandidateSnapshotUserRow | null> {
+  const userFull = await supabase
+    .from('users')
+    .select('onboarding_draft, candidate_profile, campus_org_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (!userFull.error && userFull.data) {
+    return userFull.data;
+  }
+  if (
+    userFull.error &&
+    /candidate_profile/i.test(userFull.error.message ?? '')
+  ) {
+    const userFallback = await supabase
+      .from('users')
+      .select('onboarding_draft, campus_org_id')
+      .eq('id', userId)
+      .maybeSingle();
+    return userFallback.data ?? null;
+  }
+  return userFull.data ?? null;
+}
+
+const DASHBOARD_USER_DISPLAY_COLUMNS =
+  'name, plan_tier, credits_remaining, plan_expires_at, plan_status, placement_date, created_at, avatar_path';
+
+/** Single users fetch for dashboard display + candidate snapshot hydration. */
+export async function fetchDashboardUserRow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+) {
+  const fullSelect = `${DASHBOARD_USER_DISPLAY_COLUMNS}, onboarding_draft, candidate_profile, campus_org_id`;
+  const userFull = await supabase.from('users').select(fullSelect).eq('id', userId).single();
+
+  if (!userFull.error) {
+    return userFull;
+  }
+  if (/candidate_profile/i.test(userFull.error.message ?? '')) {
+    return supabase
+      .from('users')
+      .select(`${DASHBOARD_USER_DISPLAY_COLUMNS}, onboarding_draft, campus_org_id`)
+      .eq('id', userId)
+      .single();
+  }
+  return userFull;
+}
+
 function aggregateDimensionAverages(
   radarRows: { dimension: string; score: number }[][],
 ): ReportDimensionAverages {
@@ -60,46 +153,37 @@ function resumeCompletionPct(resume: ResumeSnapshot | null): number {
   return Math.min(100, pct);
 }
 
-export async function loadCandidateSnapshot(userId: string): Promise<CandidateSnapshot> {
+export async function loadCandidateSnapshot(
+  userId: string,
+  prefetch?: CandidateSnapshotPrefetch,
+): Promise<CandidateSnapshot> {
   const supabase = await createClient();
 
-  let userRow:
-    | {
-        onboarding_draft?: unknown;
-        candidate_profile?: unknown;
-        campus_org_id?: string | null;
-      }
-    | null = null;
+  const userRow =
+    prefetch && 'userRow' in prefetch
+      ? (prefetch.userRow ?? null)
+      : await fetchCandidateSnapshotUserRow(supabase, userId);
 
-  const userFull = await supabase
-    .from('users')
-    .select('onboarding_draft, candidate_profile, campus_org_id')
-    .eq('id', userId)
-    .maybeSingle();
-
-  if (!userFull.error && userFull.data) {
-    userRow = userFull.data;
-  } else if (
-    userFull.error &&
-    /candidate_profile/i.test(userFull.error.message ?? '')
-  ) {
-    const userFallback = await supabase
-      .from('users')
-      .select('onboarding_draft, campus_org_id')
-      .eq('id', userId)
-      .maybeSingle();
-    userRow = userFallback.data ?? null;
-  } else {
-    userRow = userFull.data ?? null;
-  }
+  const hasPrefetchedProgress = Boolean(prefetch && 'progressSnap' in prefetch);
+  const hasPrefetchedInterviews = Boolean(prefetch && 'interviews' in prefetch);
 
   const [
     { data: progressSnap },
-    { data: resumes },
     { data: interviews },
+    { data: resumes },
     { data: enrollment },
   ] = await Promise.all([
-    supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+    hasPrefetchedProgress
+      ? Promise.resolve({ data: prefetch!.progressSnap ?? null })
+      : supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+    hasPrefetchedInterviews
+      ? Promise.resolve({ data: prefetch!.interviews ?? null })
+      : supabase
+          .from('interviews')
+          .select('id, role, status, reports(id, radar_data, generated_at)')
+          .eq('user_id', userId)
+          .order('started_at', { ascending: false })
+          .limit(20),
     supabase
       .from('resumes')
       .select('id, status, created_at, file_url, parsed_data, is_primary')
@@ -107,12 +191,6 @@ export async function loadCandidateSnapshot(userId: string): Promise<CandidateSn
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(5),
-    supabase
-      .from('interviews')
-      .select('id, role, status, reports(id, radar_data, generated_at)')
-      .eq('user_id', userId)
-      .order('started_at', { ascending: false })
-      .limit(20),
     supabase
       .from('college_enrollments')
       .select('enrollment_status, college_id')

@@ -71,6 +71,17 @@ const RUNTIME_FUNNEL_EVENTS = new Set<FunnelEventName>([
   'pricing_page_viewed',
 ]);
 
+/** Product-event names allowed for durable client funnel persistence. */
+export const DURABLE_FUNNEL_PRODUCT_EVENT_NAMES = [
+  'signup_completed',
+  'resume_uploaded',
+  'mock_interview_started',
+  'interview_completed',
+  'payment_started',
+  'payment_completed',
+  'pricing_page_viewed',
+] as const satisfies readonly ProductEventName[];
+
 function resolveProductEventName(eventName: FunnelEventName): ProductEventName {
   return FUNNEL_TO_PRODUCT[eventName] ?? (eventName as ProductEventName);
 }
@@ -91,10 +102,26 @@ function buildStandardizedPayload(
   });
 }
 
+/** Best-effort durable store for client-origin funnel steps (mirrors page-view beacon). */
+function persistFunnelEventClient(
+  eventName: ProductEventName,
+  props: Record<string, string | number | boolean | undefined>,
+): void {
+  void fetch('/api/analytics/funnel-event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    keepalive: true,
+    body: JSON.stringify({ event_name: eventName, ...props }),
+  }).catch(() => {
+    /* best-effort */
+  });
+}
+
 /**
  * Track a North Star funnel step.
- * - Browser: GA4 `trackEvent` + `trackProductEventClient`
- * - Server: `trackProductEvent` (Vercel log line)
+ * - Browser: GA4 `trackEvent` + `trackProductEventClient` + durable funnel beacon
+ * - Server: `trackProductEvent` (Vercel log line only — callers that need DB writes use trackProductEventServer)
  */
 export function trackFunnelEvent(
   eventName: FunnelEventName,
@@ -115,6 +142,7 @@ export function trackFunnelEvent(
     const { event_name: _en, ...productProps } = standardized;
     if (isClient) {
       trackProductEventClient(productName, productProps);
+      persistFunnelEventClient(productName, productProps);
     } else {
       trackProductEvent({ event_name: productName, ...productProps });
     }

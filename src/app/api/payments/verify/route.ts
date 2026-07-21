@@ -10,7 +10,7 @@ import { toActivationApiBody, shouldTrackPaymentCompleted } from '@/lib/razorpay
 import { getPaidPlan, isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentVerifySchema } from '@/lib/validations/schemas';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
-import { trackFunnelEvent } from '@/lib/analytics/funnel';
+import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 
 /**
  * Client payment verification — validates Razorpay payload, then delegates
@@ -158,17 +158,14 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   if (shouldTrackPaymentCompleted(result)) {
-    trackFunnelEvent(
-      'payment_completed',
-      {
-        userId: user.id,
-        plan: notesPlan,
-        amount: planConfig.amountPaise,
-        paymentId: razorpay_payment_id,
-        source: 'verify',
-      },
-      { ga4: false },
-    );
+    trackProductEventServer({
+      event_name: 'payment_completed',
+      user_id: user.id,
+      plan: notesPlan,
+      amount: planConfig.amountPaise,
+      payment_id: razorpay_payment_id,
+      source: 'verify',
+    });
   }
 
   paymentLog('verify', 'verify_success', {

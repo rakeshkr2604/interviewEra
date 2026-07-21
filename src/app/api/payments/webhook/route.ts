@@ -5,7 +5,7 @@ import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
 import { shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-response';
 import { isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
-import { trackFunnelEvent } from '@/lib/analytics/funnel';
+import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 
 interface RazorpayPaymentEntity {
   id: string;
@@ -137,17 +137,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
 
       if (shouldTrackPaymentCompleted(result)) {
-        trackFunnelEvent(
-          'payment_completed',
-          {
-            userId: paymentRow.user_id,
-            plan: paymentRow.plan,
-            amount: Number(paymentRow.amount),
-            paymentId,
-            source: 'webhook',
-          },
-          { ga4: false },
-        );
+        trackProductEventServer({
+          event_name: 'payment_completed',
+          user_id: paymentRow.user_id as string,
+          plan: paymentRow.plan as string,
+          amount: Number(paymentRow.amount),
+          payment_id: paymentId,
+          source: 'webhook',
+        });
       }
 
       paymentLog('webhook', 'webhook_success', {

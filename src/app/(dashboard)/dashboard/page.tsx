@@ -15,7 +15,7 @@ import { RetentionProgressRefreshListener } from '@/components/dashboard/Retenti
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker'
 import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
-import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
+import { loadCandidateSnapshot, CANDIDATE_DASHBOARD_INTERVIEWS_SELECT, fetchDashboardUserRow } from '@/lib/candidate/load-snapshot'
 import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { computeReadinessScore } from '@/lib/candidate/readiness-score'
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
@@ -39,20 +39,7 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const interviewsSelect = `
-        id,
-        role,
-        difficulty,
-        status,
-        completed_at,
-        started_at,
-        engine,
-        reports (
-          id,
-          overall_score,
-          generated_at
-        )
-      `
+  const interviewsSelect = CANDIDATE_DASHBOARD_INTERVIEWS_SELECT
 
   const [
     { data: userData, error: userError },
@@ -60,17 +47,13 @@ export default async function DashboardPage() {
     { data: progressSnap, error: progressErr },
     { count: completedCountTotal },
   ] = await Promise.all([
-    supabase
-      .from('users')
-      .select('name, plan_tier, credits_remaining, plan_expires_at, plan_status, placement_date, created_at, avatar_path')
-      .eq('id', user.id)
-      .single(),
+    fetchDashboardUserRow(supabase, user.id),
     supabase
       .from('interviews')
       .select(interviewsSelect)
       .eq('user_id', user.id)
       .order('started_at', { ascending: false })
-      .limit(5),
+      .limit(20),
     supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
     // Lifetime count, independent of the 5-row cap above — the "Completed" stat
     // tile must reflect all-time completions, not just the 5 most recent rows.
@@ -103,7 +86,7 @@ export default async function DashboardPage() {
     console.error('dashboard user_progress fetch', progressErr.message)
   }
 
-  const baseRows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const baseRows = ((interviewsRaw ?? []) as InterviewWithReportsRow[]).slice(0, 5)
   const recentIds = baseRows.map((r) => r.id)
   const { data: scriptReportsRaw } =
     recentIds.length > 0
@@ -162,7 +145,23 @@ export default async function DashboardPage() {
   const inProgressInterview =
     rows.find((row) => isResumableInterviewStatus(row.status)) ?? null
 
-  const candidateSnapshot = await loadCandidateSnapshot(user.id)
+  const candidateSnapshot = await loadCandidateSnapshot(user.id, {
+    userRow: userData
+      ? {
+          onboarding_draft: userData.onboarding_draft,
+          candidate_profile:
+            'candidate_profile' in userData ? userData.candidate_profile : undefined,
+          campus_org_id:
+            'campus_org_id' in userData
+              ? (userData.campus_org_id as string | null | undefined) ?? null
+              : null,
+        }
+      : null,
+    progressSnap: progressTableMissing
+      ? null
+      : ((progressSnap as UserProgressRow | null) ?? null),
+    interviews: (interviewsRaw ?? []) as InterviewWithReportsRow[],
+  })
   const readiness = computeReadinessScore(candidateSnapshot)
   const roadmap = generatePersonalizedRoadmap(candidateSnapshot)
 
