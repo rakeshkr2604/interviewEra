@@ -12,6 +12,12 @@ import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-lim
 import { paymentCreateOrderSchema } from '@/lib/validations/schemas';
 import type { PlanTier } from '@/types/app.types';
 import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
+import {
+  CAMPAIGN_DISCOUNT_USER_MESSAGES,
+  releaseCampaignReservation,
+  reserveCampaignCode,
+  type CampaignDiscountErrorCode,
+} from '@/lib/campaign-codes';
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -75,7 +81,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const { plan } = validation.data;
+  const { plan, code: rawCode } = validation.data;
+  const code = rawCode && rawCode.length > 0 ? rawCode : undefined;
 
   if (plan === 'campus') {
     return NextResponse.json(
@@ -121,28 +128,77 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  const planConfig = getPaidPlan(plan);
+  const listAmountPaise = planConfig.amountPaise;
+  let finalAmountPaise = listAmountPaise;
+  let discountPaise = 0;
+  let campaignCodeId: string | null = null;
+  let redemptionId: string | null = null;
+
+  const service = createServiceClient();
+
+  if (code) {
+    const reserved = await reserveCampaignCode(service, {
+      userId: user.id,
+      code,
+      plan,
+      listAmountPaise,
+    });
+    if (!reserved.ok || !reserved.redemption_id) {
+      const errCode = (reserved.error_code ?? 'CODE_INVALID') as CampaignDiscountErrorCode;
+      return NextResponse.json(
+        {
+          error: CAMPAIGN_DISCOUNT_USER_MESSAGES[errCode] ?? 'Invalid code.',
+          code: errCode,
+        },
+        { status: 400 },
+      );
+    }
+    finalAmountPaise = reserved.final_amount_paise;
+    discountPaise = reserved.discount_paise;
+    campaignCodeId = reserved.campaign_code_id;
+    redemptionId = reserved.redemption_id;
+  }
+
   paymentLog('create-order', 'create_order_start', {
     user_id: user.id,
     plan,
     mode: detectRazorpayMode(process.env.RAZORPAY_KEY_ID),
+    discount_paise: discountPaise,
   });
 
   try {
-    const order = await createPlanOrder({ userId: user.id, plan });
-    const planConfig = getPaidPlan(plan);
+    const order = await createPlanOrder({
+      userId: user.id,
+      plan,
+      amountPaise: finalAmountPaise,
+    });
 
-    const service = createServiceClient();
+    if (redemptionId) {
+      await service
+        .from('campaign_code_redemptions')
+        .update({ order_id: order.order_id, updated_at: new Date().toISOString() })
+        .eq('id', redemptionId);
+    }
+
     const { error: insertErr } = await service.from('payments').insert({
       user_id: user.id,
       order_id: order.order_id,
-      amount: planConfig.amountPaise,
+      amount: finalAmountPaise,
       currency: 'INR',
       status: 'created',
       plan,
       gateway: 'razorpay',
+      campaign_code_id: campaignCodeId,
+      campaign_redemption_id: redemptionId,
+      list_amount_paise: listAmountPaise,
+      discount_paise: discountPaise,
     });
 
     if (insertErr) {
+      if (redemptionId) {
+        await releaseCampaignReservation(service, redemptionId);
+      }
       paymentError('create-order', 'payment_row_insert_failed', {
         user_id: user.id,
         order_id: order.order_id,
@@ -158,6 +214,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       user_id: user.id,
       order_id: order.order_id,
       plan,
+      amount: finalAmountPaise,
     });
 
     return NextResponse.json({
@@ -166,8 +223,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       currency: order.currency,
       key: order.key,
       plan: order.plan,
+      list_amount_paise: listAmountPaise,
+      discount_paise: discountPaise,
     });
   } catch (err) {
+    if (redemptionId) {
+      await releaseCampaignReservation(service, redemptionId);
+    }
     const message = err instanceof Error ? err.message : 'unknown';
     paymentError('create-order', 'api_failed', {
       user_id: user.id,

@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PlatformStats } from '@/app/api/admin/stats/route';
 import type { InterviewStats } from '@/app/api/admin/interviews/route';
 import type { LiveUser } from '@/app/api/admin/live-users/route';
-import type { RecentUser } from '@/app/api/admin/recent-users/route';
+import type { RecentUser, RecentUsersRange } from '@/app/api/admin/recent-users/route';
 
-export type { PlatformStats, InterviewStats, LiveUser, RecentUser };
+export type { PlatformStats, InterviewStats, LiveUser, RecentUser, RecentUsersRange };
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
@@ -103,20 +103,35 @@ export function useLiveUsers() {
 
 // ── Recent users (paginated) ───────────────────────────────────────────────────
 
-export function useRecentUsers(page = 1, limit = 20, refreshKey = 0) {
-  const [users, setUsers]           = useState<RecentUser[]>([]);
-  const [total, setTotal]           = useState(0);
+export type UsersDateFilter =
+  | { kind: 'preset'; range: RecentUsersRange }
+  | { kind: 'custom'; from: string; to: string };
+
+export function useRecentUsers(
+  page = 1,
+  limit = 20,
+  refreshKey = 0,
+  dateFilter: UsersDateFilter = { kind: 'preset', range: 'all' },
+) {
+  const [users, setUsers] = useState<RecentUser[]>([]);
+  const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetch_ = useCallback(async (fresh = false) => {
     setLoading(true);
     setError(null);
     try {
-      const base = `/api/admin/recent-users?page=${page}&limit=${limit}`;
-      const url  = fresh ? `${base}&fresh=1` : base;
-      const res  = await fetch(url);
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+      if (dateFilter.kind === 'custom') {
+        params.set('from', dateFilter.from);
+        params.set('to', dateFilter.to);
+      } else {
+        params.set('range', dateFilter.range);
+      }
+      if (fresh) params.set('fresh', '1');
+      const res = await fetch(`/api/admin/recent-users?${params}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const body = await res.json() as { users: RecentUser[]; total: number; total_pages: number };
       setUsers(body.users);
@@ -127,7 +142,7 @@ export function useRecentUsers(page = 1, limit = 20, refreshKey = 0) {
     } finally {
       setLoading(false);
     }
-  }, [page, limit]);
+  }, [page, limit, dateFilter]);
 
   // refreshKey=0 → initial load (use cache). refreshKey>0 → manual refresh (bypass cache).
   useEffect(() => { void fetch_(refreshKey > 0); }, [fetch_, refreshKey]);

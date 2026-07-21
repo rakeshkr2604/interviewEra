@@ -7,14 +7,18 @@ import {
 } from '@/lib/razorpay/client';
 import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
 import { toActivationApiBody, shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-response';
-import { getPaidPlan, isPaidPlanId } from '@/lib/pricing/plans';
+import { isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentVerifySchema } from '@/lib/validations/schemas';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
+import { resolveExpectedOrderAmount } from '@/lib/razorpay/expected-order-amount';
 
 /**
  * Client payment verification — validates Razorpay payload, then delegates
  * activation to activatePlanAfterPayment() (same path as webhook).
+ *
+ * Expected amount comes from payments.amount (list or discounted at create-order),
+ * never the static plan list price alone.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const supabase = await createClient();
@@ -123,29 +127,66 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ ok: false, error: 'Invalid plan on order.' }, { status: 400 });
   }
 
-  const planConfig = getPaidPlan(notesPlan);
-  if (remoteOrder.amount !== planConfig.amountPaise) {
+  const service = createServiceClient();
+  const expected = await resolveExpectedOrderAmount(service, razorpay_order_id, isPaidPlanId);
+
+  if (!expected.ok) {
+    paymentError('verify', 'expected_amount_resolve_failed', {
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      code: expected.code,
+      error: expected.error,
+    });
+    const status = expected.code === 'not_found' ? 404 : 400;
+    return NextResponse.json({ ok: false, error: expected.error }, { status });
+  }
+
+  if (expected.userId !== user.id) {
+    paymentWarn('verify', 'payment_row_user_mismatch', {
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+    });
+    return NextResponse.json(
+      { ok: false, error: 'Order does not belong to this user.' },
+      { status: 403 },
+    );
+  }
+
+  if (expected.plan !== notesPlan) {
+    paymentError('verify', 'plan_mismatch', {
+      user_id: user.id,
+      order_id: razorpay_order_id,
+      payment_id: razorpay_payment_id,
+      notes_plan: notesPlan,
+      payment_plan: expected.plan,
+    });
+    return NextResponse.json({ ok: false, error: 'Plan mismatch for this order.' }, { status: 400 });
+  }
+
+  // Authoritative: payments.amount (discounted or list) must match Razorpay order.
+  if (remoteOrder.amount !== expected.amountPaise) {
     paymentError('verify', 'amount_mismatch', {
       user_id: user.id,
       order_id: razorpay_order_id,
       payment_id: razorpay_payment_id,
-      expected: planConfig.amountPaise,
+      expected: expected.amountPaise,
       actual: remoteOrder.amount,
     });
     return NextResponse.json({ ok: false, error: 'Order amount mismatch.' }, { status: 400 });
   }
 
-  const service = createServiceClient();
   const result = await activatePlanAfterPayment(service, {
     userId: user.id,
-    plan: notesPlan,
+    plan: expected.plan,
     orderId: razorpay_order_id,
     paymentId: razorpay_payment_id,
-    amountPaise: planConfig.amountPaise,
+    amountPaise: expected.amountPaise,
     source: 'verify',
   });
 
-  const apiBody = toActivationApiBody(result, notesPlan);
+  const apiBody = toActivationApiBody(result, expected.plan);
 
   if (apiBody.activationFailed) {
     paymentError('verify', 'activation_failed', {
@@ -161,8 +202,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     trackProductEventServer({
       event_name: 'payment_completed',
       user_id: user.id,
-      plan: notesPlan,
-      amount: planConfig.amountPaise,
+      plan: expected.plan,
+      amount: expected.amountPaise,
       payment_id: razorpay_payment_id,
       source: 'verify',
     });
@@ -174,7 +215,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     payment_id: razorpay_payment_id,
     activated: apiBody.activated,
     alreadyActivated: apiBody.alreadyActivated,
-    plan: notesPlan,
+    plan: expected.plan,
+    amount: expected.amountPaise,
   });
 
   return NextResponse.json(apiBody);

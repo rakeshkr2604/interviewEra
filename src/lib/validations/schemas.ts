@@ -115,6 +115,20 @@ export const reportGenerateSchema = z.object({
 // userId is obtained from the authenticated session server-side, not from the request body
 export const paymentCreateOrderSchema = z.object({
   plan: z.enum(['starter', 'pro', 'campus']),
+  code: z
+    .string()
+    .max(64)
+    .optional()
+    .transform((s) => (s ? s.trim().toUpperCase() : undefined)),
+});
+
+export const paymentPreviewDiscountSchema = z.object({
+  plan: z.enum(['starter', 'pro']),
+  code: z
+    .string()
+    .min(1)
+    .max(64)
+    .transform((s) => s.trim().toUpperCase()),
 });
 
 export const paymentVerifySchema = z.object({

@@ -7,6 +7,7 @@ const CAMEL_TO_SNAKE: Record<string, string> = {
   interviewId: 'interview_id',
   resumeId: 'resume_id',
   paymentId: 'payment_id',
+  orderId: 'order_id',
   sourcePage: 'source_page',
   sessionScore: 'session_score',
   qualityMet: 'quality_met',

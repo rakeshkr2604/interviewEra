@@ -12,6 +12,7 @@ import {
   Shield,
   TrendingUp,
   Wrench,
+  Gift,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -22,6 +23,7 @@ const BRAND_MARK = '/brand/logos/icon-only.svg';
 const NAV_ITEMS = [
   { href: '/platform/growth', label: 'Growth', icon: TrendingUp, exact: false },
   { href: '/platform/analytics', label: 'Analytics', icon: BarChart3, exact: false },
+  { href: '/platform/rewards', label: 'Rewards', icon: Gift, exact: false },
   { href: '/platform/feedback', label: 'Feedback', icon: MessageSquare, exact: false },
   { href: '/platform/free-tools', label: 'Free Tools', icon: Wrench, exact: false },
 ] as const;

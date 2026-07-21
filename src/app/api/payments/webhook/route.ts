@@ -6,6 +6,8 @@ import { shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-respo
 import { isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
+import { releaseCampaignReservationForOrder } from '@/lib/campaign-codes';
+import { resolveExpectedOrderAmount } from '@/lib/razorpay/expected-order-amount';
 
 interface RazorpayPaymentEntity {
   id: string;
@@ -82,30 +84,15 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ ok: true });
       }
 
-      const { data: paymentRow, error: rowErr } = await supabase
-        .from('payments')
-        .select('user_id, plan, amount')
-        .eq('order_id', orderId)
-        .maybeSingle();
+      const expected = await resolveExpectedOrderAmount(supabase, orderId, isPaidPlanId);
 
-      if (rowErr) {
-        throw new Error(rowErr.message);
-      }
-
-      if (!paymentRow) {
-        paymentWarn('webhook', 'unknown_order', {
+      if (!expected.ok) {
+        paymentWarn('webhook', 'expected_amount_resolve_failed', {
           order_id: orderId,
           payment_id: paymentId,
           eventId,
-        });
-        return NextResponse.json({ ok: true });
-      }
-
-      if (!isPaidPlanId(paymentRow.plan)) {
-        paymentWarn('webhook', 'invalid_plan_on_row', {
-          order_id: orderId,
-          payment_id: paymentId,
-          plan: paymentRow.plan,
+          code: expected.code,
+          error: expected.error,
         });
         return NextResponse.json({ ok: true });
       }
@@ -114,15 +101,16 @@ export async function POST(request: Request): Promise<NextResponse> {
         event: event.event,
         order_id: orderId,
         payment_id: paymentId,
-        user_id: paymentRow.user_id,
+        user_id: expected.userId,
+        amount: expected.amountPaise,
       });
 
       const result = await activatePlanAfterPayment(supabase, {
-        userId: paymentRow.user_id,
-        plan: paymentRow.plan,
+        userId: expected.userId,
+        plan: expected.plan,
         orderId,
         paymentId,
-        amountPaise: Number(paymentRow.amount),
+        amountPaise: expected.amountPaise,
         source: 'webhook',
       });
 
@@ -130,7 +118,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         paymentError('webhook', 'activation_failed', {
           order_id: orderId,
           payment_id: paymentId,
-          user_id: paymentRow.user_id,
+          user_id: expected.userId,
           error: result.error,
         });
         return NextResponse.json({ error: 'Activation failed' }, { status: 500 });
@@ -139,9 +127,9 @@ export async function POST(request: Request): Promise<NextResponse> {
       if (shouldTrackPaymentCompleted(result)) {
         trackProductEventServer({
           event_name: 'payment_completed',
-          user_id: paymentRow.user_id as string,
-          plan: paymentRow.plan as string,
-          amount: Number(paymentRow.amount),
+          user_id: expected.userId,
+          plan: expected.plan,
+          amount: expected.amountPaise,
           payment_id: paymentId,
           source: 'webhook',
         });
@@ -150,9 +138,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       paymentLog('webhook', 'webhook_success', {
         order_id: orderId,
         payment_id: paymentId,
-        user_id: paymentRow.user_id,
+        user_id: expected.userId,
         activated: result.activated,
         alreadyActivated: result.alreadyActivated,
+        amount: expected.amountPaise,
       });
 
       return NextResponse.json({ ok: true });
@@ -172,9 +161,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
       if (error) throw new Error(error.message);
 
+      const { released, redemptionId } = await releaseCampaignReservationForOrder(
+        supabase,
+        payment.order_id,
+      );
+
       paymentLog('webhook', 'payment_failed', {
         order_id: payment.order_id,
         payment_id: payment.id,
+        campaign_reservation_released: released,
+        redemption_id: redemptionId,
       });
       return NextResponse.json({ ok: true });
     }

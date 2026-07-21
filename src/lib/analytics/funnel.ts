@@ -34,6 +34,9 @@ export type FunnelEventPayload = {
   plan?: string;
   amount?: number;
   paymentId?: string;
+  /** Razorpay order id (payment_started) — prefer snake_case `order_id`. */
+  orderId?: string;
+  order_id?: string;
   authenticated?: boolean;
   score?: number;
   method?: string;

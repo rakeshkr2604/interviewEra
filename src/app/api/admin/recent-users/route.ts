@@ -1,26 +1,41 @@
 /**
- * GET /api/admin/recent-users?page=1&limit=20
+ * GET /api/admin/recent-users?page=1&limit=20&range=all
+ * Optional: &from=YYYY-MM-DD&to=YYYY-MM-DD (custom join-date range)
  *
- * Paginated user table enriched with interview count and last-seen timestamp.
+ * Paginated user table enriched with per-user interview stats and last-seen.
  * Sorted by most recently registered.
  *
- * Secured: platform admin (ADMIN_EMAILS) only.
+ * Secured: platform admin (ADMIN_EMAILS / platform_role) only.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import { parseAdminDateBounds, resolveUsersJoinPreset } from '@/lib/admin/date-range';
+
+export type RecentUsersRange = 'today' | '7d' | 'month' | 'all' | 'custom';
 
 export interface RecentUser {
-  id:               string;
-  email:            string;
-  name:             string | null;
-  plan_tier:        string;
+  id: string;
+  email: string;
+  name: string | null;
+  plan_tier: string;
   credits_remaining: number;
-  created_at:       string;
+  created_at: string;
+  /** All interviews (any status) for this user. */
   interviews_count: number;
-  last_seen_at:     string | null;
-  is_online:        boolean;
+  /** status IN ('pending', 'in_progress') — not yet finished. */
+  pending_interviews: number;
+  /** status = 'completed'. */
+  completed_interviews: number;
+  /** Most recent interview's completed_at ?? started_at. */
+  last_interview_at: string | null;
+  last_seen_at: string | null;
+  is_online: boolean;
+}
+
+function isPendingStatus(status: string): boolean {
+  return status === 'pending' || status === 'in_progress';
 }
 
 export async function GET(request: NextRequest) {
@@ -28,10 +43,16 @@ export async function GET(request: NextRequest) {
   if (error) return error;
   void admin;
 
-  const url   = request.nextUrl;
-  const page  = Math.max(1, parseInt(url.searchParams.get('page')  ?? '1',  10));
+  const url = request.nextUrl;
+  const page = Math.max(1, parseInt(url.searchParams.get('page') ?? '1', 10));
   const limit = Math.min(50, parseInt(url.searchParams.get('limit') ?? '20', 10));
   const offset = (page - 1) * limit;
+
+  const bounds = parseAdminDateBounds(url.searchParams, {
+    defaultPreset: 'all',
+    resolvePreset: resolveUsersJoinPreset,
+  });
+  const range = (bounds.preset ?? 'all') as RecentUsersRange;
 
   const fresh = url.searchParams.get('fresh') === '1';
   void fresh; // no cache on this route — results are page-specific; fresh flag accepted but ignored
@@ -39,60 +60,104 @@ export async function GET(request: NextRequest) {
   try {
     const svc = createServiceClient();
 
-    // Paginated users
-    const { data: users, count } = await svc
+    let usersQuery = svc
       .from('users')
       .select('id, email, name, plan_tier, credits_remaining, created_at', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
+    if (bounds.fromIso) {
+      usersQuery = usersQuery.gte('created_at', bounds.fromIso);
+    }
+    if (bounds.toIso) {
+      usersQuery = usersQuery.lte('created_at', bounds.toIso);
+    }
+
+    const { data: users, count } = await usersQuery;
+
     if (!users || users.length === 0) {
-      return NextResponse.json({ users: [], total: count ?? 0, page, limit, total_pages: 0 });
+      return NextResponse.json({
+        users: [],
+        total: count ?? 0,
+        page,
+        limit,
+        total_pages: 0,
+        range,
+        from: bounds.fromIso,
+        to: bounds.toIso,
+      });
     }
 
     const userIds = users.map((u) => u.id);
     const now = Date.now();
 
-    // Fetch activity + interview counts in parallel
+    // Batched enrich — 2 queries total for the page (not N+1).
     const [{ data: activities }, { data: interviews }] = await Promise.all([
-      svc.from('user_activity')
-        .select('user_id, last_seen_at')
-        .in('user_id', userIds),
-      svc.from('interviews')
-        .select('user_id')
+      svc.from('user_activity').select('user_id, last_seen_at').in('user_id', userIds),
+      svc
+        .from('interviews')
+        .select('user_id, status, started_at, completed_at')
         .in('user_id', userIds),
     ]);
 
     const activityMap = new Map(
       (activities ?? []).map((a) => [a.user_id, a.last_seen_at as string]),
     );
-    const interviewCounts = new Map<string, number>();
+
+    type Agg = {
+      total: number;
+      pending: number;
+      completed: number;
+      lastAt: string | null;
+    };
+    const interviewAgg = new Map<string, Agg>();
+
     for (const iv of interviews ?? []) {
-      interviewCounts.set(iv.user_id, (interviewCounts.get(iv.user_id) ?? 0) + 1);
+      const prev = interviewAgg.get(iv.user_id) ?? {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        lastAt: null,
+      };
+      prev.total += 1;
+      if (isPendingStatus(iv.status)) prev.pending += 1;
+      if (iv.status === 'completed') prev.completed += 1;
+
+      const ts = (iv.completed_at as string | null) ?? (iv.started_at as string | null);
+      if (ts && (!prev.lastAt || ts > prev.lastAt)) prev.lastAt = ts;
+
+      interviewAgg.set(iv.user_id, prev);
     }
 
     const enriched: RecentUser[] = users.map((u) => {
       const lastSeen = activityMap.get(u.id) ?? null;
-      const diffMs   = lastSeen ? now - new Date(lastSeen).getTime() : null;
+      const diffMs = lastSeen ? now - new Date(lastSeen).getTime() : null;
+      const agg = interviewAgg.get(u.id);
       return {
-        id:               u.id,
-        email:            u.email,
-        name:             u.name,
-        plan_tier:        u.plan_tier,
+        id: u.id,
+        email: u.email,
+        name: u.name,
+        plan_tier: u.plan_tier,
         credits_remaining: u.credits_remaining,
-        created_at:       u.created_at,
-        interviews_count: interviewCounts.get(u.id) ?? 0,
-        last_seen_at:     lastSeen,
-        is_online:        diffMs !== null && diffMs < 5 * 60_000,
+        created_at: u.created_at,
+        interviews_count: agg?.total ?? 0,
+        pending_interviews: agg?.pending ?? 0,
+        completed_interviews: agg?.completed ?? 0,
+        last_interview_at: agg?.lastAt ?? null,
+        last_seen_at: lastSeen,
+        is_online: diffMs !== null && diffMs < 5 * 60_000,
       };
     });
 
     return NextResponse.json({
-      users:       enriched,
-      total:       count ?? 0,
+      users: enriched,
+      total: count ?? 0,
       page,
       limit,
       total_pages: Math.ceil((count ?? 0) / limit),
+      range,
+      from: bounds.fromIso,
+      to: bounds.toIso,
     });
   } catch (err) {
     console.error('[admin/recent-users] Error:', err);

@@ -261,8 +261,10 @@ async function countVerificationCompleted(svc: SupabaseClient, sinceIso: string)
 export async function computeFunnelMetrics(
   svc: SupabaseClient,
   rangeDays: number,
+  options?: { sinceIso?: string },
 ): Promise<FunnelMetricsResult> {
-  const since = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+  const since =
+    options?.sinceIso ?? new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
 
   const [
     cohortSignups,

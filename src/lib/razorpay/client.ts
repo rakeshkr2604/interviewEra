@@ -34,6 +34,8 @@ export const MIN_ORDER_PAISE = 100;
 export async function createPlanOrder(params: {
   userId: string;
   plan: PaidPlanId;
+  /** Server-computed amount (list or discounted). Defaults to plan list price. */
+  amountPaise?: number;
 }): Promise<{
   order_id: string;
   amount: number;
@@ -44,6 +46,11 @@ export async function createPlanOrder(params: {
   assertRazorpayProductionReady();
 
   const planConfig = getPaidPlan(params.plan);
+  const amountPaise = params.amountPaise ?? planConfig.amountPaise;
+  if (!Number.isFinite(amountPaise) || amountPaise < MIN_ORDER_PAISE) {
+    throw new Error(`Invalid order amount: ${amountPaise}`);
+  }
+
   const keyId = process.env.RAZORPAY_KEY_ID;
   if (!keyId) {
     throw new Error('RAZORPAY_KEY_ID is not configured');
@@ -57,7 +64,7 @@ export async function createPlanOrder(params: {
   paymentLog('create-order', 'request', {
     userId: params.userId,
     plan: params.plan,
-    amountPaise: planConfig.amountPaise,
+    amountPaise,
     mode: detectRazorpayMode(keyId),
     keyIdMasked: maskRazorpayKeyId(keyId),
   });
@@ -65,7 +72,7 @@ export async function createPlanOrder(params: {
   let order: { id: string; amount: number | string; currency: string };
   try {
     order = await getRazorpayClient().orders.create({
-      amount: planConfig.amountPaise,
+      amount: amountPaise,
       currency: 'INR',
       receipt: receiptId,
       notes: { user_id: params.userId, plan: params.plan },
@@ -83,7 +90,7 @@ export async function createPlanOrder(params: {
     userId: params.userId,
     plan: params.plan,
     orderId: order.id,
-    amountPaise: planConfig.amountPaise,
+    amountPaise,
   });
 
   return {

@@ -90,6 +90,44 @@ describe('trackFunnelEvent', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('persists order_id on payment_started durable beacon (not only as dedupe key)', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 204 });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    vi.stubGlobal('document', { cookie: '' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    trackFunnelEvent('payment_started', {
+      userId: 'user-1',
+      plan: 'starter',
+      amount: 14900,
+      source: 'upgrade',
+      order_id: 'order_TGBnRqXqsQCisy',
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.event_name).toBe('payment_started');
+    expect(body.order_id).toBe('order_TGBnRqXqsQCisy');
+    expect(body.plan).toBe('starter');
+  });
+
+  it('maps camelCase orderId to snake_case order_id on the beacon', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 204 });
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    vi.stubGlobal('document', { cookie: '' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    trackFunnelEvent('payment_started', {
+      plan: 'pro',
+      amount: 49900,
+      source: 'pricing',
+      orderId: 'order_camelCaseTest',
+    });
+
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body.order_id).toBe('order_camelCaseTest');
+    expect(body.orderId).toBeUndefined();
+  });
+
   it('logs product event on server without client beacon', () => {
     trackFunnelEvent(
       'payment_completed',

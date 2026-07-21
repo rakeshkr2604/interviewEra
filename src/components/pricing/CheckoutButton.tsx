@@ -58,6 +58,8 @@ interface CheckoutButtonProps {
   label: string;
   /** Analytics source for payment_started / payment_completed (e.g. upgrade, pricing). */
   source?: string;
+  /** Optional campaign / promo code (server validates; never trust client amount). */
+  promoCode?: string;
   /** True when extending an active paid plan (shows confirm modal). */
   isRenewal?: boolean;
   planExpiresAt?: string | null;
@@ -127,6 +129,7 @@ export function CheckoutButton({
   plan,
   label,
   source = 'upgrade',
+  promoCode,
   isRenewal = false,
   planExpiresAt,
   className,
@@ -167,10 +170,13 @@ export function CheckoutButton({
     try {
       let res: Response;
       try {
+        const body: { plan: string; code?: string } = { plan };
+        const trimmed = promoCode?.trim();
+        if (trimmed) body.code = trimmed.toUpperCase();
         res = await fetch('/api/payments/create-order', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan }),
+          body: JSON.stringify(body),
         });
       } catch {
         toast.error(PAYMENT_NETWORK_ERROR_MESSAGE);
@@ -191,6 +197,17 @@ export function CheckoutButton({
         currency: string;
         key: string;
         plan: 'starter' | 'pro';
+      };
+
+      const releaseReservationBestEffort = () => {
+        void fetch('/api/payments/release-campaign-reservation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_id: data.order_id }),
+          keepalive: true,
+        }).catch(() => {
+          /* webhook + reserve-retry are backups */
+        });
       };
 
       let userId: string | undefined;
@@ -235,6 +252,8 @@ export function CheckoutButton({
           });
 
           if (!verify.ok) {
+            // Verify failed after Razorpay success is rare; do not release —
+            // webhook/activate may still consume. User support path if stuck.
             toast.error(verify.error ?? PAYMENT_VERIFY_FAILED_USER_MESSAGE);
             setLoading(false);
             return;
@@ -263,6 +282,7 @@ export function CheckoutButton({
         modal: {
           ondismiss: () => {
             dismissed = true;
+            releaseReservationBestEffort();
             setLoading(false);
             toast.message(PAYMENT_CANCELLED_MESSAGE);
           },
@@ -272,6 +292,7 @@ export function CheckoutButton({
       rzp.on('payment.failed', (failResponse) => {
         const msg = failResponse.error?.description ?? PAYMENT_FAILED_USER_MESSAGE;
         console.error('[payment:checkout] payment.failed', msg);
+        releaseReservationBestEffort();
         toast.error(msg);
         setLoading(false);
       });
@@ -285,7 +306,7 @@ export function CheckoutButton({
       toast.error(PAYMENT_ORDER_FAILED_MESSAGE);
       setLoading(false);
     }
-  }, [scriptReady, loading, label, plan, userEmail, source, router]);
+  }, [scriptReady, loading, label, plan, userEmail, source, promoCode, router]);
 
   function handleClick() {
     if (isRenewal && planExpiresAt) {

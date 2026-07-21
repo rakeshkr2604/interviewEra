@@ -108,10 +108,16 @@ async function computeRetention(
 export async function computeGrowthMetrics(
   svc: SupabaseClient,
   rangeDays: number,
+  options?: { sinceIso?: string; untilIso?: string },
 ): Promise<GrowthMetricsResult> {
-  const sinceIso = new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+  const sinceIso =
+    options?.sinceIso ?? new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
+  const untilIso = options?.untilIso;
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+  const withUntil = <T extends { lte: (col: string, val: string) => T }>(q: T): T =>
+    untilIso ? q.lte('created_at', untilIso) : q;
 
   const [
     wau,
@@ -135,30 +141,40 @@ export async function computeGrowthMetrics(
     computeRetention(svc, 30),
     svc.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'credited'),
     svc.from('referrals').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    svc
-      .from('product_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_name', 'pricing_page_viewed')
-      .gte('created_at', sinceIso),
-    svc
-      .from('product_events')
-      .select('id', { count: 'exact', head: true })
-      .eq('event_name', 'payment_started')
-      .gte('created_at', sinceIso),
-    svc
-      .from('payments')
-      .select('id', { count: 'exact', head: true })
-      .eq('status', 'paid')
-      .gte('created_at', sinceIso),
-    svc
-      .from('payments')
-      .select('amount')
-      .eq('status', 'paid')
-      .gte('created_at', sinceIso),
-    svc
-      .from('feedbacks')
-      .select('rating, nps_score')
-      .gte('created_at', sinceIso),
+    withUntil(
+      svc
+        .from('product_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_name', 'pricing_page_viewed')
+        .gte('created_at', sinceIso),
+    ),
+    withUntil(
+      svc
+        .from('product_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('event_name', 'payment_started')
+        .gte('created_at', sinceIso),
+    ),
+    withUntil(
+      svc
+        .from('payments')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'paid')
+        .gte('created_at', sinceIso),
+    ),
+    withUntil(
+      svc
+        .from('payments')
+        .select('amount')
+        .eq('status', 'paid')
+        .gte('created_at', sinceIso),
+    ),
+    withUntil(
+      svc
+        .from('feedbacks')
+        .select('rating, nps_score')
+        .gte('created_at', sinceIso),
+    ),
     svc
       .from('feedbacks')
       .select('id', { count: 'exact', head: true })
@@ -181,6 +197,22 @@ export async function computeGrowthMetrics(
 
   const credited = creditedReferrals.count ?? 0;
 
+  let referrerCredits = 1;
+  let referredCredits = 1;
+  try {
+    const { data: settings } = await svc
+      .from('platform_reward_settings')
+      .select('referrer_credits, referred_credits')
+      .eq('id', 1)
+      .maybeSingle();
+    if (settings) {
+      referrerCredits = Number(settings.referrer_credits) || 1;
+      referredCredits = Number(settings.referred_credits) || 1;
+    }
+  } catch {
+    /* table may not exist pre-migration — keep 1+1 */
+  }
+
   return {
     range_days: rangeDays,
     wau,
@@ -189,7 +221,7 @@ export async function computeGrowthMetrics(
     referrals: {
       total_credited: credited,
       pending: pendingReferrals.count ?? 0,
-      credits_issued: credited * 2,
+      credits_issued: credited * (referrerCredits + referredCredits),
     },
     revenue: {
       pricing_page_views: pricing,

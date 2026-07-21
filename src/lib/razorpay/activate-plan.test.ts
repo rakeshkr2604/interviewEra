@@ -27,6 +27,7 @@ type PaymentRow = {
   plan: 'starter' | 'pro';
   amount: number;
   status: 'created' | 'paid' | 'failed';
+  campaign_redemption_id?: string | null;
 };
 
 type UserRow = {
@@ -42,16 +43,44 @@ type UserRow = {
 
 type CreditTx = { user_id: string; amount: number; reason: string };
 
-function createPaymentStore(initial: { user: UserRow; payments: PaymentRow[] }) {
+type RedemptionRow = {
+  id: string;
+  status: 'reserved' | 'consumed' | 'released';
+  order_id: string | null;
+  payment_id: string | null;
+};
+
+function createPaymentStore(initial: {
+  user: UserRow;
+  payments: PaymentRow[];
+  redemptions?: RedemptionRow[];
+}) {
   const state = {
     user: { ...initial.user },
     payments: initial.payments.map((p) => ({ ...p })),
     ledger: [] as CreditTx[],
+    redemptions: (initial.redemptions ?? []).map((r) => ({ ...r })),
     paymentUpdates: 0,
     userUpdates: 0,
+    consumeCalls: 0,
   };
 
   const supabase = {
+    rpc: async (fn: string, args: Record<string, unknown>) => {
+      if (fn === 'consume_campaign_redemption') {
+        state.consumeCalls++;
+        const id = args.p_redemption_id as string;
+        const row = state.redemptions.find((r) => r.id === id);
+        if (!row || (row.status !== 'reserved' && row.status !== 'consumed')) {
+          return { data: false, error: null };
+        }
+        row.status = 'consumed';
+        row.order_id = (args.p_order_id as string) ?? row.order_id;
+        row.payment_id = (args.p_payment_id as string) ?? row.payment_id;
+        return { data: true, error: null };
+      }
+      return { data: null, error: { message: `unexpected rpc ${fn}` } };
+    },
     from(table: string) {
       if (table === 'payments') {
         return {
@@ -210,6 +239,7 @@ function createStaleReadStore() {
   state.user.credits_remaining = 10;
 
   const supabase = {
+    rpc: async () => ({ data: true, error: null }),
     from(table: string) {
       if (table === 'payments') {
         return {
@@ -515,5 +545,112 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
 
     expect(state.user.credits_remaining).toBe(15);
     assertSingleActivation(state);
+  });
+
+  it('discounted payment activation consumes campaign redemption (not left reserved)', async () => {
+    const redemptionId = 'red-disc-001';
+    const orderId = 'order_discounted_001';
+    const paymentId = 'pay_discounted_001';
+
+    const { supabase, state } = createPaymentStore({
+      user: baseUser(),
+      payments: [
+        {
+          id: 'row-disc',
+          user_id: USER_ID,
+          order_id: orderId,
+          payment_id: null,
+          plan: 'starter',
+          amount: 13410,
+          status: 'created',
+          campaign_redemption_id: redemptionId,
+        },
+      ],
+      redemptions: [
+        {
+          id: redemptionId,
+          status: 'reserved',
+          order_id: orderId,
+          payment_id: null,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, {
+      userId: USER_ID,
+      plan: 'starter',
+      orderId,
+      paymentId,
+      amountPaise: 13410,
+      source: 'webhook',
+    });
+
+    expect(activationWasFresh(result)).toBe(true);
+    expect(state.user.last_payment_id).toBe(paymentId);
+    expect(state.consumeCalls).toBeGreaterThanOrEqual(1);
+    expect(state.redemptions[0].status).toBe('consumed');
+    expect(state.redemptions[0].payment_id).toBe(paymentId);
+  });
+
+  it('already_activated replay heals a stuck reserved redemption', async () => {
+    const redemptionId = 'red-stuck-001';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        credits_remaining: 11,
+      }),
+      payments: [
+        {
+          ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+          campaign_redemption_id: redemptionId,
+        },
+      ],
+      redemptions: [
+        {
+          id: redemptionId,
+          status: 'reserved',
+          order_id: ORDER_STARTER,
+          payment_id: null,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect(result.alreadyActivated).toBe(true);
+    expect(state.redemptions[0].status).toBe('consumed');
+    expect(state.redemptions[0].payment_id).toBe(PAY_STARTER);
+    expect(state.consumeCalls).toBeGreaterThanOrEqual(1);
+  });
+
+  it('emits ALERT error when consume keeps failing after retries', async () => {
+    const { activationError } = await import('@/lib/razorpay/payment-log');
+    const redemptionId = 'red-fail-001';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser(),
+      payments: [
+        {
+          ...starterPayment(),
+          amount: 13410,
+          campaign_redemption_id: redemptionId,
+        },
+      ],
+      // No matching redemption → consume RPC returns false every attempt
+      redemptions: [],
+    });
+
+    await activatePlanAfterPayment(supabase, {
+      ...starterParams('webhook'),
+      amountPaise: 13410,
+    });
+
+    expect(state.user.last_payment_id).toBe(PAY_STARTER);
+    expect(activationError).toHaveBeenCalledWith(
+      'campaign_redemption_consume_failed_ALERT',
+      expect.anything(),
+      expect.objectContaining({ redemptionId }),
+    );
   });
 });

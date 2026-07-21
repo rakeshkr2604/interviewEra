@@ -6,6 +6,7 @@ import {
 } from '@/lib/pricing/plans';
 import { activationError, activationLog } from '@/lib/razorpay/payment-log';
 import type { PlanTier } from '@/types/app.types';
+import { consumeCampaignRedemption } from '@/lib/campaign-codes';
 
 export interface ActivatePlanParams {
   userId: string;
@@ -93,9 +94,57 @@ function failedResult(error: string): ActivatePlanFailure {
 
 /** Brief backoff so a concurrent winner's commit is visible before we declare conflict. */
 const CAS_MISS_RETRY_DELAYS_MS = [0, 25, 50, 100, 200] as const;
+const CONSUME_RETRY_DELAYS_MS = [0, 50, 150] as const;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Mark campaign redemption consumed. Retries briefly — a stuck `reserved` row after
+ * paid activation is an abuse vector (stale cron can release and allow re-use).
+ * Failures are error-level / alert-worthy; plan grant is not rolled back.
+ */
+async function ensureCampaignRedemptionConsumed(
+  supabase: SupabaseClient,
+  redemptionId: string | null | undefined,
+  orderId: string,
+  paymentId: string,
+  ids: ReturnType<typeof traceIds>,
+  source: string,
+): Promise<void> {
+  if (!redemptionId) return;
+
+  let lastError: string | undefined;
+  for (let attempt = 0; attempt < CONSUME_RETRY_DELAYS_MS.length; attempt++) {
+    const delay = CONSUME_RETRY_DELAYS_MS[attempt];
+    if (delay > 0) await sleep(delay);
+
+    const result = await consumeCampaignRedemption(supabase, {
+      redemptionId,
+      orderId,
+      paymentId,
+    });
+    if (result.ok) {
+      activationLog('campaign_redemption_consumed', ids, {
+        source,
+        redemptionId,
+        attempt: attempt + 1,
+      });
+      return;
+    }
+    lastError = result.error;
+  }
+
+  // ALERT: paid activation with unconsumed reservation — ops must investigate.
+  activationError('campaign_redemption_consume_failed_ALERT', ids, {
+    source,
+    redemptionId,
+    order_id: orderId,
+    payment_id: paymentId,
+    error: lastError ?? 'unknown',
+    attempts: CONSUME_RETRY_DELAYS_MS.length,
+  });
 }
 
 /**
@@ -110,6 +159,8 @@ async function resolveAfterCasMiss(
   nowIso: string,
   ids: ReturnType<typeof traceIds>,
   source: string,
+  redemptionId: string | null,
+  orderId: string,
 ): Promise<ActivatePlanReplay | null> {
   for (let attempt = 0; attempt < CAS_MISS_RETRY_DELAYS_MS.length; attempt++) {
     const delay = CAS_MISS_RETRY_DELAYS_MS[attempt];
@@ -134,6 +185,15 @@ async function resolveAfterCasMiss(
         concurrent: true,
         cas_attempt: attempt + 1,
       });
+      // Heal: concurrent winner may have skipped/failed consume.
+      await ensureCampaignRedemptionConsumed(
+        supabase,
+        redemptionId,
+        orderId,
+        paymentId,
+        ids,
+        source,
+      );
       return replayResult(plan, (retryUser.plan_expires_at as string | null) ?? nowIso);
     }
   }
@@ -164,7 +224,7 @@ export async function activatePlanAfterPayment(
 
   const { data: orderRow, error: orderErr } = await supabase
     .from('payments')
-    .select('id, user_id, plan, amount, status')
+    .select('id, user_id, plan, amount, status, campaign_redemption_id')
     .eq('order_id', orderId)
     .maybeSingle();
 
@@ -209,6 +269,15 @@ export async function activatePlanAfterPayment(
   // ── Idempotent lock: already activated for this payment? ──────────────────
   if (user.last_payment_id === paymentId) {
     activationLog('already_activated', ids, { source, plan });
+    // Heal stuck reserved rows from a prior activate where consume failed/silently skipped.
+    await ensureCampaignRedemptionConsumed(
+      supabase,
+      orderRow.campaign_redemption_id as string | null,
+      orderId,
+      paymentId,
+      ids,
+      source,
+    );
     return replayResult(plan, expiryBefore ?? nowIso);
   }
 
@@ -262,6 +331,8 @@ export async function activatePlanAfterPayment(
       nowIso,
       ids,
       source,
+      (orderRow.campaign_redemption_id as string | null) ?? null,
+      orderId,
     );
     if (replay) {
       return replay;
@@ -319,6 +390,15 @@ export async function activatePlanAfterPayment(
   }
 
   activationLog('ledger_written', ids, { source, creditsAdded: planConfig.credits });
+
+  await ensureCampaignRedemptionConsumed(
+    supabase,
+    orderRow.campaign_redemption_id as string | null,
+    orderId,
+    paymentId,
+    ids,
+    source,
+  );
 
   activationLog('activate_success', ids, {
     source,

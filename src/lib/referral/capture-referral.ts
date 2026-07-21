@@ -3,6 +3,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { normalizeEmailForReferralCompare } from '@/lib/referral/apply-referral';
 
 export async function captureReferralFromCode(
   serviceClient: SupabaseClient,
@@ -14,12 +15,27 @@ export async function captureReferralFromCode(
 
   const { data: referrer } = await serviceClient
     .from('users')
-    .select('id')
+    .select('id, email')
     .eq('referral_code', code)
     .maybeSingle();
 
   if (!referrer) return { captured: false, reason: 'invalid_code' };
   if (referrer.id === referredUserId) return { captured: false, reason: 'self_referral' };
+
+  const { data: referred } = await serviceClient
+    .from('users')
+    .select('email')
+    .eq('id', referredUserId)
+    .maybeSingle();
+
+  if (
+    referrer.email &&
+    referred?.email &&
+    normalizeEmailForReferralCompare(referrer.email) ===
+      normalizeEmailForReferralCompare(referred.email)
+  ) {
+    return { captured: false, reason: 'self_referral' };
+  }
 
   const { data: existing } = await serviceClient
     .from('referrals')

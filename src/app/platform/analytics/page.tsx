@@ -10,6 +10,7 @@ import {
   Users, Activity, Zap, MessageSquare, RefreshCw,
   TrendingUp, Clock, CheckCircle, AlertCircle,
   Database, Server, Cpu, ChevronLeft, ChevronRight,
+  Copy, Check,
 } from 'lucide-react';
 import {
   useAdminStats,
@@ -20,8 +21,11 @@ import {
   type InterviewStats,
   type LiveUser,
   type RecentUser,
+  type RecentUsersRange,
+  type UsersDateFilter,
   type SystemHealth,
 } from '@/hooks/useAdminStats';
+import { toast } from 'sonner';
 import { formatElevenLabsHealthReason, type ElevenLabsHealthReason } from '@/lib/voice/elevenlabs-health-labels';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -354,42 +358,160 @@ function InterviewsChart({ data, loading }: { data: InterviewStats | null; loadi
   );
 }
 
+// ─── Copy button (matches AccountManagementPanel pattern) ─────────────────────
+
+function CopyTextButton({ text, label }: { text: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      className="inline-flex shrink-0 items-center rounded p-0.5 transition-colors hover:bg-[color:var(--bg-secondary)]"
+      style={{ color: copied ? 'var(--accent-success)' : 'var(--text-muted)' }}
+      onClick={async (e) => {
+        e.stopPropagation();
+        try {
+          await navigator.clipboard.writeText(text);
+          setCopied(true);
+          toast.success('Copied to clipboard');
+          window.setTimeout(() => setCopied(false), 1500);
+        } catch {
+          toast.error('Could not copy');
+        }
+      }}
+    >
+      {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
+
 // ─── Recent Users Table ───────────────────────────────────────────────────────
 
-function RecentUsersTable({ refreshKey }: { refreshKey: number }) {
+function fmtInterviewDate(iso: string | null): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+  });
+}
+
+function todayIsoDate(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function RecentUsersTable({
+  refreshKey,
+  dateFilter,
+  onDateFilterChange,
+}: {
+  refreshKey: number;
+  dateFilter: UsersDateFilter;
+  onDateFilterChange: (f: UsersDateFilter) => void;
+}) {
   const [page, setPage] = useState(1);
-  const { users, total, totalPages, loading, error } = useRecentUsers(page, 20, refreshKey);
+  const [customFrom, setCustomFrom] = useState(
+    dateFilter.kind === 'custom' ? dateFilter.from : todayIsoDate(),
+  );
+  const [customTo, setCustomTo] = useState(
+    dateFilter.kind === 'custom' ? dateFilter.to : todayIsoDate(),
+  );
+  const { users, total, totalPages, loading, error } = useRecentUsers(page, 20, refreshKey, dateFilter);
+
+  const selectValue = dateFilter.kind === 'custom' ? 'custom' : dateFilter.range;
+
+  const handlePresetChange = (value: string) => {
+    setPage(1);
+    if (value === 'custom') {
+      onDateFilterChange({ kind: 'custom', from: customFrom, to: customTo });
+      return;
+    }
+    onDateFilterChange({ kind: 'preset', range: value as RecentUsersRange });
+  };
+
+  const applyCustom = () => {
+    if (!customFrom || !customTo || customTo < customFrom) {
+      toast.error('Pick a valid start and end date');
+      return;
+    }
+    setPage(1);
+    onDateFilterChange({ kind: 'custom', from: customFrom, to: customTo });
+  };
 
   return (
     <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
       <div
-        className="flex items-center justify-between px-5 py-3"
+        className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
         style={{ borderBottom: '2px solid var(--card-border)' }}
       >
         <h2 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           All Users
           <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>{total} total</span>
         </h2>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[color:var(--bg-secondary)] disabled:opacity-30"
-            style={{ color: 'var(--text-secondary)' }}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={selectValue}
+            onChange={(e) => handlePresetChange(e.target.value)}
+            className="rounded-lg border px-2.5 py-1.5 text-xs"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+            aria-label="Filter users by join date"
           >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <span className="min-w-[4rem] text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-            {page} / {totalPages || 1}
-          </span>
-          <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
-            className="rounded-lg p-1.5 transition-colors hover:bg-[color:var(--bg-secondary)] disabled:opacity-30"
-            style={{ color: 'var(--text-secondary)' }}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
+            <option value="today">Joined today</option>
+            <option value="7d">Joined last 7 days</option>
+            <option value="month">Joined this month</option>
+            <option value="all">All time</option>
+            <option value="custom">Custom range</option>
+          </select>
+          {selectValue === 'custom' && (
+            <>
+              <input
+                type="date"
+                value={customFrom}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="rounded-lg border px-2 py-1 text-xs"
+                style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                aria-label="Joined from"
+              />
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>→</span>
+              <input
+                type="date"
+                value={customTo}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="rounded-lg border px-2 py-1 text-xs"
+                style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                aria-label="Joined to"
+              />
+              <button
+                type="button"
+                onClick={applyCustom}
+                className="rounded-lg border px-2.5 py-1 text-xs font-medium"
+                style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+              >
+                Apply
+              </button>
+            </>
+          )}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="rounded-lg p-1.5 transition-colors hover:bg-[color:var(--bg-secondary)] disabled:opacity-30"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <span className="min-w-[4rem] text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+              {page} / {totalPages || 1}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="rounded-lg p-1.5 transition-colors hover:bg-[color:var(--bg-secondary)] disabled:opacity-30"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -411,7 +533,9 @@ function RecentUsersTable({ refreshKey }: { refreshKey: number }) {
               <th className="px-5 py-3">User</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3 text-center">Credits</th>
-              <th className="px-4 py-3 text-center">Interviews</th>
+              <th className="px-4 py-3 text-center">Pending</th>
+              <th className="px-4 py-3 text-center">Completed</th>
+              <th className="px-4 py-3">Last Interview</th>
               <th className="px-4 py-3">Last Active</th>
               <th className="px-4 py-3">Joined</th>
             </tr>
@@ -420,7 +544,7 @@ function RecentUsersTable({ refreshKey }: { refreshKey: number }) {
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} style={{ borderTop: '1px solid var(--card-border)' }}>
-                    {Array.from({ length: 6 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <td key={j} className="px-5 py-3.5">
                         <div className="h-4 w-24 animate-pulse rounded" style={{ background: 'var(--card-border)' }} />
                       </td>
@@ -439,11 +563,12 @@ function RecentUsersTable({ refreshKey }: { refreshKey: number }) {
                       <p className="max-w-[200px] truncate font-medium" style={{ color: 'var(--text-primary)' }}>
                         {u.name ?? u.email}
                       </p>
-                      {u.name && (
-                        <p className="max-w-[200px] truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+                      <div className="mt-0.5 flex max-w-[220px] items-center gap-1">
+                        <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
                           {u.email}
                         </p>
-                      )}
+                        <CopyTextButton text={u.email} label="Copy email" />
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${planBadge(u.plan_tier)}`}>
@@ -453,8 +578,25 @@ function RecentUsersTable({ refreshKey }: { refreshKey: number }) {
                     <td className="px-4 py-3.5 text-center text-sm" style={{ color: 'var(--text-secondary)' }}>
                       {u.credits_remaining}
                     </td>
-                    <td className="px-4 py-3.5 text-center text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      {u.interviews_count}
+                    <td
+                      className="px-4 py-3.5 text-center text-sm font-semibold tabular-nums"
+                      style={{
+                        color: u.pending_interviews > 0
+                          ? 'var(--accent-warning)'
+                          : 'var(--text-muted)',
+                      }}
+                      title={`${u.interviews_count} total interviews`}
+                    >
+                      {u.pending_interviews}
+                    </td>
+                    <td
+                      className="px-4 py-3.5 text-center text-sm font-semibold tabular-nums"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {u.completed_interviews}
+                    </td>
+                    <td className="px-4 py-3.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {fmtInterviewDate(u.last_interview_at)}
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-1.5">
@@ -505,6 +647,10 @@ export default function PlatformAnalyticsPage() {
   const [refreshing, setRefreshing]   = useState(false);
   // Bumped on each manual refresh — useRecentUsers re-fetches when this changes.
   const [tableRefreshKey, setTableRefreshKey] = useState(0);
+  const [usersDateFilter, setUsersDateFilter] = useState<UsersDateFilter>({
+    kind: 'preset',
+    range: 'all',
+  });
 
   const handleRefreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -611,7 +757,11 @@ export default function PlatformAnalyticsPage() {
       {/* Users table */}
       <div>
         <SectionLabel>All Users</SectionLabel>
-        <RecentUsersTable refreshKey={tableRefreshKey} />
+        <RecentUsersTable
+          refreshKey={tableRefreshKey}
+          dateFilter={usersDateFilter}
+          onDateFilterChange={setUsersDateFilter}
+        />
       </div>
 
       <p className="text-center text-[10px]" style={{ color: 'var(--text-muted)' }}>

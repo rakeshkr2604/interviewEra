@@ -61,6 +61,9 @@ export function trackPaymentStartedOnce(options: {
     plan: options.plan,
     amount: options.amount,
     source: options.source,
+    // Persist Razorpay order id into product_events.props (snake_case end-to-end).
+    // Historically this value was only used as the dedupe key above and never stored.
+    order_id: options.subscriptionId,
   });
 }
 

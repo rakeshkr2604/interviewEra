@@ -25,6 +25,14 @@ import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
 import { isPaidPlanActive, isRenewalCheckout } from '@/lib/pricing/plan-status';
 import type { PlanTier } from '@/types/app.types';
 import { CheckoutButton } from '@/components/pricing/CheckoutButton';
+import type { PaidPlanId } from '@/lib/pricing/plans';
+
+export type PromoPlanQuote = {
+  list_amount_paise: number;
+  discount_paise: number;
+  final_amount_paise: number;
+  label: string | null;
+};
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -270,6 +278,53 @@ interface AppPricingGridProps {
   planExpiresAt?: string | null;
   planStatus?: string | null;
   billingCycle: 'monthly' | 'annual';
+  /** Applied campaign / promo code for checkout. */
+  promoCode?: string;
+  /** Per-plan preview quotes for compact price display (presentation only). */
+  promoQuotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
+  /** Slot between plan cards and trust section (e.g. collapsed promo entry). */
+  belowGrid?: ReactNode;
+}
+
+function PaidPlanPrice({
+  plan,
+  quote,
+}: {
+  plan: PaidPlanId;
+  quote?: PromoPlanQuote;
+}) {
+  if (!quote) {
+    return (
+      <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+        {planPriceLine(plan)}
+      </p>
+    );
+  }
+
+  const listInr = Math.round(quote.list_amount_paise / 100);
+  const finalInr = Math.round(quote.final_amount_paise / 100);
+
+  return (
+    <div className="space-y-1">
+      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 tabular-nums">
+        <span
+          className="text-lg font-medium line-through"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          ₹{listInr}
+        </span>
+        <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          ₹{finalInr}
+        </span>
+        <span
+          className="text-[10px] font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--accent-primary)' }}
+        >
+          applied
+        </span>
+      </p>
+    </div>
+  );
 }
 
 /** Logged-in /upgrade — Razorpay one-time 30-day orders */
@@ -278,6 +333,9 @@ export function AppPricingGrid({
   userEmail,
   planExpiresAt = null,
   planStatus = null,
+  promoCode,
+  promoQuotes,
+  belowGrid,
 }: Omit<AppPricingGridProps, 'billingCycle'>) {
   const isCampus = currentPlan === 'campus' || currentPlan === 'campus_admin';
   const isPaidActive = isPaidPlanActive(currentPlan, planStatus, planExpiresAt);
@@ -361,9 +419,7 @@ export function AppPricingGrid({
                 <PlanStatusHeader planExpiresAt={planExpiresAt} isActive={isPaidActive} />
               )}
             </div>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {planPriceLine('starter')}
-            </p>
+            <PaidPlanPrice plan="starter" quote={promoQuotes?.starter} />
             <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
               {planPeriodLine()}
             </p>
@@ -380,6 +436,7 @@ export function AppPricingGrid({
                   userEmail={userEmail}
                   plan="starter"
                   source="upgrade"
+                  promoCode={promoCode}
                   label={starterButtonLabel()}
                   isRenewal={starterIsRenewal}
                   planExpiresAt={starterIsRenewal ? planExpiresAt : null}
@@ -427,9 +484,7 @@ export function AppPricingGrid({
                 />
               )}
             </div>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {planPriceLine('pro')}
-            </p>
+            <PaidPlanPrice plan="pro" quote={promoQuotes?.pro} />
             <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
               {planPeriodLine()}
             </p>
@@ -446,6 +501,7 @@ export function AppPricingGrid({
                   userEmail={userEmail}
                   plan="pro"
                   source="upgrade"
+                  promoCode={promoCode}
                   label={proButtonLabel()}
                   isRenewal={proIsRenewal}
                   planExpiresAt={proIsRenewal ? planExpiresAt : null}
@@ -460,6 +516,7 @@ export function AppPricingGrid({
         </Card>
       </div>
     </div>
+    {belowGrid ? <div className="pt-1">{belowGrid}</div> : null}
     <PaymentTrustSection />
     </div>
   );

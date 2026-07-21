@@ -1,5 +1,6 @@
 /**
  * GET /api/admin/growth — retention, revenue, referrals, feedback aggregates.
+ * Optional: &from=YYYY-MM-DD&to=YYYY-MM-DD (custom range overrides ?range=)
  */
 
 import { NextResponse } from 'next/server';
@@ -7,6 +8,7 @@ import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { computeGrowthMetrics } from '@/lib/admin/growth-metrics';
 import { getCached, setCached } from '@/lib/admin/cache';
+import { parseAdminDateBounds, resolveGrowthPreset } from '@/lib/admin/date-range';
 
 const CACHE_TTL = 120_000;
 
@@ -15,9 +17,13 @@ export async function GET(request: Request) {
   if (error) return error;
 
   const url = new URL(request.url);
-  const rangeDays = Math.min(90, Math.max(1, parseInt(url.searchParams.get('range') ?? '30', 10) || 30));
+  const bounds = parseAdminDateBounds(url.searchParams, {
+    defaultPreset: '30',
+    resolvePreset: resolveGrowthPreset,
+  });
+  const rangeDays = bounds.rangeDays ?? 30;
   const fresh = url.searchParams.get('fresh') === '1';
-  const cacheKey = `admin:growth:${rangeDays}`;
+  const cacheKey = `admin:growth:${bounds.preset}:${bounds.fromIso}:${bounds.toIso}`;
 
   if (!fresh) {
     const cached = getCached<Awaited<ReturnType<typeof computeGrowthMetrics>>>(cacheKey);
@@ -26,7 +32,10 @@ export async function GET(request: Request) {
 
   try {
     const svc = createServiceClient();
-    const metrics = await computeGrowthMetrics(svc, rangeDays);
+    const metrics = await computeGrowthMetrics(svc, rangeDays, {
+      sinceIso: bounds.fromIso ?? undefined,
+      untilIso: bounds.toIso ?? undefined,
+    });
     setCached(cacheKey, metrics, CACHE_TTL);
     return NextResponse.json(metrics);
   } catch (err) {
