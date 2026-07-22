@@ -216,15 +216,17 @@ export const PRICING_FEATURES = [
 export const PRICING_CONTEXT = {
   agencyComparison: 'Training agencies often charge ₹5,000–₹10,000 per student for placement prep packages.',
   roi: 'Improving outcomes for even a small share of the batch typically offsets the per-seat cost.',
-  perStudentPerDay: '≈ ₹2 per student per day',
-  missedOpportunity: 'Less than the cost of one missed placement opportunity',
+  /** ₹799 / 365 ≈ ₹2.19 — keep in sync with FAQ / campus annual seat price */
+  perStudentPerDay: '₹2.19 per student per day',
+  missedOpportunity: '₹2.19 per student per day — built for every batch, not just your toppers',
 } as const;
 
 export const FINAL_CTA = {
-  headline: 'Limited pilot slots for this placement cycle',
-  urgencyLine: 'Most colleges start too late — leaving weak students unprepared for Day 1.',
+  headline: 'Set up your campus workspace before placement season',
+  urgencyLine:
+    'Structured practice compounds. The earlier your batch starts, the more reps every student gets before Day 1.',
   body: 'We cap concurrent pilots so each campus gets proper rollout support. Book 20 minutes: live product walkthrough, batch alignment, and a 20-student pilot so your committee decides on proof — not slides.',
-  closingLine: 'If you wait until crunch week, structured practice will not have time to compound.',
+  closingLine: '',
   timelineTitle: 'Typical onboarding timeline',
   timeline: [
     { phase: 'Week 0', detail: '20-minute call: scope batch slice, roles, pilot start date.' },

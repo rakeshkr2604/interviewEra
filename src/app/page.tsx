@@ -4,9 +4,11 @@ import { AudiencePathSection } from '@/components/landing/AudiencePathSection';
 import LandingHero from '@/components/landing/LandingHero';
 import LandingHomeClient from '@/components/landing/LandingHomeClient';
 import { LandingWhyFail } from '@/components/landing/LandingWhyFail';
+import { LandingPositioningSection } from '@/components/landing/LandingPositioningSection';
 import { LandingInterviewDemo } from '@/components/landing/LandingInterviewDemo';
 import { LandingBeforeAfter } from '@/components/landing/LandingBeforeAfter';
 import { LandingFaq } from '@/components/landing/LandingFaq';
+import { LandingFounderSection } from '@/components/landing/LandingFounderSection';
 import { CommunitySection } from '@/components/community/CommunitySection';
 import { PAGE_SEO } from '@/lib/seo/metadata';
 
@@ -29,10 +31,12 @@ export default function Page() {
         <LandingHero countPill={<HeroBetaPill />} />
         <AudiencePathSection />
         <LandingWhyFail />
+        <LandingPositioningSection />
         <LandingInterviewDemo />
         <LandingBeforeAfter />
         <LandingHomeClient />
         <CommunitySection />
+        <LandingFounderSection />
         <LandingFaq />
         <HomeMoneyPageLinks />
       </main>

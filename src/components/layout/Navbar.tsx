@@ -488,11 +488,16 @@ function NavHoverMenu({
       onNavigate?.();
     };
 
+    // Campus landing is a heavy client island (motion/react) — do not
+    // viewport-prefetch it from marketing chrome.
+    const linkPrefetch = href === '/campus' ? false : undefined;
+
     if (ctaKey) {
       return (
         <TrackedCtaLink
           key={href + itemLabel}
           href={href}
+          prefetch={linkPrefetch}
           role="menuitem"
           ctaKey={ctaKey}
           ctaText={itemLabel}
@@ -509,6 +514,7 @@ function NavHoverMenu({
       <Link
         key={href + itemLabel}
         href={href}
+        prefetch={linkPrefetch}
         role="menuitem"
         onClick={onNavigateClick}
         className={itemClassName}
@@ -1015,6 +1021,7 @@ function AnonymousNav() {
                       <Link
                         key={item.href + item.label}
                         href={item.href}
+                        prefetch={item.href === '/campus' ? false : undefined}
                         onClick={closeMobile}
                         aria-current={subActive ? 'page' : undefined}
                         className={subClassName}
@@ -1453,7 +1460,8 @@ function AdminNav({ user }: { user: NavUser }) {
  * - admin:   Admin nav links + Export CSV + Invite Students CTA + avatar menu
  *
  * Auth resolution is handled by useMarketingNavbarAuth — this component only
- * maps resolved state to the correct nav shell.
+ * maps resolved state to the correct nav shell. While auth is pending (including
+ * SSR), AuthNavPlaceholder is shown so logged-in users never flash AnonymousNav.
  *
  * Use <NavbarSlot /> in the root layout (it suppresses rendering on
  * dashboard/auth routes which have their own chrome).

@@ -54,11 +54,7 @@ const PATHS: {
 export function AudiencePathSection() {
   return (
     <section
-      className={cn(LANDING_HOME_SECTION, 'border-b pt-16 sm:pt-[4.5rem]')}
-      style={{
-        borderColor: 'var(--card-border)',
-        background: 'color-mix(in srgb, var(--card-bg) 35%, transparent)',
-      }}
+      className={cn(LANDING_HOME_SECTION, 'ie-lh-surface-35 border-b pt-16 sm:pt-[4.5rem]')}
       aria-labelledby="audience-path-heading"
     >
       <div className={LANDING_PAGE_CONTAINER}>
@@ -81,35 +77,27 @@ export function AudiencePathSection() {
                   ctaKey={path.ctaKey}
                   ctaText={path.cta}
                   section={path.section}
-                  className="group flex h-full min-h-11 flex-col rounded-2xl border p-5 transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5 motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)] focus-visible:ring-offset-2"
-                  style={{
-                    borderColor: 'var(--card-border)',
-                    background: 'color-mix(in srgb, var(--card-bg) 94%, transparent)',
-                    boxShadow: 'var(--card-shadow)',
-                  }}
+                  // Campus pulls motion/react via CampusLandingClient — avoid
+                  // viewport prefetch thrashing the homepage main thread.
+                  prefetch={path.href === '/campus' ? false : undefined}
+                  className={cn(
+                    'ie-lh-surface-94 group flex h-full min-h-11 flex-col rounded-2xl border p-5',
+                    'transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5',
+                    'motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2',
+                    'focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)] focus-visible:ring-offset-2',
+                  )}
                 >
                   <span
-                    className="mb-4 flex size-11 items-center justify-center rounded-xl"
-                    style={{
-                      background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-                      color: 'var(--accent-primary)',
-                    }}
+                    className="ie-lh-icon-tile mb-4 flex size-11 items-center justify-center rounded-xl"
                     aria-hidden
                   >
                     <Icon className="size-5" />
                   </span>
-                  <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                    {path.title}
-                  </h3>
-                  <p className="mt-2 flex-1 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  <h3 className="ie-lh-text-primary text-lg font-semibold">{path.title}</h3>
+                  <p className="ie-lh-text-secondary mt-2 flex-1 text-sm leading-relaxed">
                     {path.description}
                   </p>
-                  <span
-                    className="mt-4 text-sm font-semibold"
-                    style={{ color: 'var(--accent-link)' }}
-                  >
-                    {path.cta} →
-                  </span>
+                  <span className="ie-lh-text-link mt-4 text-sm font-semibold">{path.cta} →</span>
                 </TrackedCtaLink>
               </li>
             );

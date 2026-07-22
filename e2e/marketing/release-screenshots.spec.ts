@@ -6,7 +6,6 @@ const OUT_DIR = 'screenshots/phase2-release';
 const PAGES: { path: string; heading?: RegExp; name: string }[] = [
   { path: '/', heading: /practice the interview/i, name: 'homepage' },
   { path: '/teams', heading: /choose your path/i, name: 'teams' },
-  { path: '/college', heading: /prepare your entire batch/i, name: 'college' },
   { path: '/campus', heading: /placement outcomes/i, name: 'campus' },
   { path: '/pricing', heading: /simple plans/i, name: 'pricing' },
 ];

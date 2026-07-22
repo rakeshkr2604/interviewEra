@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { AmbientLayer } from '@/components/landing/AmbientLayer';
 import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
-import LandingHeroSimulator from '@/components/landing/LandingHeroSimulator';
+import LandingHeroSimulatorIsland from '@/components/landing/LandingHeroSimulatorIsland';
 import { LANDING_HOME_INNER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
@@ -99,7 +99,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
             </div>
 
             <div className="hero-mockup-col min-w-0">
-              <LandingHeroSimulator />
+              <LandingHeroSimulatorIsland />
             </div>
           </div>
         </div>

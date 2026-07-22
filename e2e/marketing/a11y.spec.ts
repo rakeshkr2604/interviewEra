@@ -5,7 +5,6 @@ import { gotoMarketingPage } from '../helpers/marketing-nav';
 const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
   { path: '/', heading: /practice the interview/i },
   { path: '/teams', heading: /choose your path/i },
-  { path: '/college', heading: /prepare your entire batch/i },
   { path: '/campus', heading: /placement outcomes/i },
   { path: '/pricing', heading: /simple plans/i },
 ];
@@ -23,12 +22,8 @@ async function applyTheme(page: import('@playwright/test').Page, theme: 'dark' |
   }, theme);
 }
 
-function axeForRoute(page: import('@playwright/test').Page, path: string) {
-  let builder = new AxeBuilder({ page });
-  if (path === '/college') {
-    builder = builder.exclude('.college-mock-dashboard');
-  }
-  return builder;
+function axeForRoute(page: import('@playwright/test').Page, _path: string) {
+  return new AxeBuilder({ page });
 }
 
 test.describe('marketing axe audit', () => {

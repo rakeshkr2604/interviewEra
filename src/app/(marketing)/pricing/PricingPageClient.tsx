@@ -249,8 +249,7 @@ export function PricingPageClient() {
           {/* Persuasion copy */}
           <div style={{ textAlign: 'center', marginBottom: 28 }}>
             <p style={{ fontSize: 'clamp(15px, 2vw, 17px)', fontWeight: 700, lineHeight: 1.5, color: T.text, maxWidth: 600, margin: '0 auto 10px' }}>
-              One bad interview can cost you{' '}
-              <span style={{ color: T.acc2 }}>₹5L–₹20L</span> in lost offers.
+              Every interview you practice is one less surprise on the real day.
             </p>
             <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, maxWidth: 520, margin: '0 auto 8px' }}>
               Start <strong style={{ color: T.text }}>free</strong>, no card. Upgrade when you want PDF export, replay, and full analysis on every answer.
@@ -338,8 +337,8 @@ export function PricingPageClient() {
 
           {/* Anchor copy */}
           <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, textAlign: 'center', marginTop: 24, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
-            <strong style={{ color: T.text }}>₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days on Pro</strong>{' '}
-            stacks against a <span style={{ color: T.acc2 }}>₹10L+</span> first job — one serious month of practice vs one rejection email.
+            ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days of full-feedback practice — less than what most spend on a
+            single day of takeout, for a month of getting interview-ready.
           </p>
           <PaymentTrustSection variant="marketing" />
           <UpgradePageFooter variant="marketing" />

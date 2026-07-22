@@ -29,11 +29,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const apply = () => {
       const resolved = resolve()
       queueMicrotask(() => setResolvedTheme(resolved))
-      const tokens = tokensForTheme(resolved)
       const root = document.documentElement
-      Object.entries(tokens).forEach(([key, value]) => {
-        root.style.setProperty(key, value)
-      })
+      // SSR already sets data-theme (+ dark class) via the layout inline
+      // script; globals.css owns the token values. Re-writing ~30 CSS
+      // variables on every mount forces a full RecalcStyle — skip when
+      // nothing actually changed (mount match or no-op toggle).
+      const themeUnchanged =
+        root.getAttribute('data-theme') === resolved &&
+        root.classList.contains('dark') === (resolved === 'dark')
+      if (themeUnchanged) return
+
+      const tokens = tokensForTheme(resolved)
+      for (const [key, value] of Object.entries(tokens)) {
+        if (root.style.getPropertyValue(key) !== value) {
+          root.style.setProperty(key, value)
+        }
+      }
       root.setAttribute('data-theme', resolved)
       root.classList.toggle('dark', resolved === 'dark')
     }

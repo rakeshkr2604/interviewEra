@@ -1,7 +1,5 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
-
 /** Max wait for Supabase signOut before cookie fallback + redirect. */
 const LOGOUT_TIMEOUT_MS = 2500
 
@@ -35,6 +33,10 @@ export type ClientLogoutOptions = {
  * `scope: 'local'` only clears storage — sb-* cookies stay, middleware still
  * sees a session, and /login redirects back to /dashboard. We use full
  * signOut (cookie-aware), race it at 2.5s, then hard-navigate.
+ *
+ * Perf: supabase client is dynamically imported so marketing chrome that
+ * only needs this on logout click does not pull supabase-js into the
+ * initial homepage bundle.
  */
 export async function performClientLogout(
   options: ClientLogoutOptions = {},
@@ -42,6 +44,7 @@ export async function performClientLogout(
   if (typeof window === 'undefined') return
 
   const redirectTo = options.redirectTo ?? '/login'
+  const { createClient } = await import('@/lib/supabase/client')
   const supabase = createClient()
 
   try {

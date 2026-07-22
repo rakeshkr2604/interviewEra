@@ -74,8 +74,7 @@ function FaqAnswer({ question, answer }: { question: string; answer: string }) {
         See the{' '}
         <Link
           href={COMMUNITY_HUB_PATH}
-          className="font-semibold underline-offset-2 hover:underline"
-          style={{ color: 'var(--accent-primary)' }}
+          className="ie-lh-text-accent font-semibold underline-offset-2 hover:underline"
         >
           Community Hub
         </Link>{' '}
@@ -98,46 +97,28 @@ function FaqItem({
   return (
     <details
       className={cn(
-        'group rounded-2xl border px-4 py-3.5 transition-all duration-200 sm:px-5 sm:py-4',
+        'ie-lh-faq-item group rounded-2xl border px-4 py-3.5 transition-all duration-200 sm:px-5 sm:py-4',
         'hover:border-[color-mix(in_srgb,var(--accent-primary)_28%,var(--card-border))]',
         'open:border-[color-mix(in_srgb,var(--accent-primary)_35%,var(--card-border))]',
         'open:bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--card-bg))]',
         'open:shadow-[0_8px_32px_color-mix(in_srgb,var(--accent-primary)_8%,transparent)]',
       )}
-      style={{
-        borderColor: 'var(--card-border)',
-        background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-      }}
       {...(defaultOpen ? { open: true } : {})}
     >
-      <summary
-        className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg text-[15px] font-semibold leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_40%,transparent)] focus-visible:ring-offset-2"
-        style={{ color: 'var(--text-primary)' }}
-      >
+      <summary className="ie-lh-text-primary flex cursor-pointer list-none items-center justify-between gap-4 rounded-lg text-[15px] font-semibold leading-snug focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_40%,transparent)] focus-visible:ring-offset-2">
         <span className="min-w-0 pr-2">{question}</span>
-        <span
-          className="relative flex size-7 shrink-0 items-center justify-center rounded-lg border transition-colors group-open:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))] group-open:bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)]"
-          style={{ borderColor: 'var(--card-border)' }}
-        >
+        <span className="ie-lh-border-card relative flex size-7 shrink-0 items-center justify-center rounded-lg border transition-colors group-open:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))] group-open:bg-[color-mix(in_srgb,var(--accent-primary)_12%,transparent)]">
           <Plus
-            className="size-3.5 transition-all duration-200 group-open:scale-0 group-open:opacity-0"
-            style={{ color: 'var(--accent-primary)' }}
+            className="ie-lh-text-accent size-3.5 transition-all duration-200 group-open:scale-0 group-open:opacity-0"
             aria-hidden
           />
           <Minus
-            className="absolute size-3.5 scale-0 opacity-0 transition-all duration-200 group-open:scale-100 group-open:opacity-100"
-            style={{ color: 'var(--accent-primary)' }}
+            className="ie-lh-text-accent absolute size-3.5 scale-0 opacity-0 transition-all duration-200 group-open:scale-100 group-open:opacity-100"
             aria-hidden
           />
         </span>
       </summary>
-      <p
-        className="mt-3 border-t pt-3 text-sm leading-relaxed sm:text-[15px]"
-        style={{
-          color: 'var(--text-secondary)',
-          borderColor: 'color-mix(in srgb, var(--card-border) 70%, transparent)',
-        }}
-      >
+      <p className="ie-lh-faq-answer-rule mt-3 border-t pt-3 text-sm leading-relaxed sm:text-[15px]">
         <FaqAnswer question={question} answer={answer} />
       </p>
     </details>
@@ -156,18 +137,12 @@ export function LandingFaq() {
 
   return (
     <section
-      className={cn(LANDING_HOME_SECTION, 'border-t')}
-      style={{
-        borderColor: 'color-mix(in srgb, var(--card-border) 80%, transparent)',
-        background: 'color-mix(in srgb, var(--bg-secondary) 40%, transparent)',
-      }}
+      className={cn(LANDING_HOME_SECTION, 'ie-lh-section-faq border-t')}
       aria-labelledby="home-faq-heading"
     >
       <div className={cn(LANDING_PAGE_CONTAINER, 'max-w-3xl')}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
-          <span className={LANDING_HOME_EYEBROW}>
-            Questions
-          </span>
+          <span className={LANDING_HOME_EYEBROW}>Questions</span>
           <h2
             id="home-faq-heading"
             className="mt-3 font-[family-name:var(--font-bricolage)] text-[clamp(1.625rem,3.4vw,2.5rem)] font-extrabold leading-tight tracking-tight text-[var(--text-primary)]"
@@ -186,17 +161,8 @@ export function LandingFaq() {
           ))}
 
           {moreCount > 0 ? (
-            <details
-              className="group/more rounded-2xl border border-dashed transition-colors duration-200 open:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))]"
-              style={{
-                borderColor: 'color-mix(in srgb, var(--card-border) 90%, transparent)',
-                background: 'color-mix(in srgb, var(--card-bg) 50%, transparent)',
-              }}
-            >
-              <summary
-                className="flex cursor-pointer list-none items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_40%,transparent)] focus-visible:ring-offset-2 sm:py-4"
-                style={{ color: 'var(--accent-primary)' }}
-              >
+            <details className="ie-lh-faq-more group/more rounded-2xl border border-dashed transition-colors duration-200 open:border-[color-mix(in_srgb,var(--accent-primary)_30%,var(--card-border))]">
+              <summary className="ie-lh-text-accent flex cursor-pointer list-none items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_40%,transparent)] focus-visible:ring-offset-2 sm:py-4">
                 <span className="group-open/more:hidden">
                   Show {moreCount} more question{moreCount === 1 ? '' : 's'}
                 </span>
@@ -206,7 +172,7 @@ export function LandingFaq() {
                   aria-hidden
                 />
               </summary>
-              <div className="space-y-2.5 border-t px-3 pb-3 pt-2 sm:space-y-3 sm:px-4 sm:pb-4 sm:pt-3" style={{ borderColor: 'var(--card-border)' }}>
+              <div className="ie-lh-border-card space-y-2.5 border-t px-3 pb-3 pt-2 sm:space-y-3 sm:px-4 sm:pb-4 sm:pt-3">
                 {moreFaqs.map((f) => (
                   <FaqItem key={f.q} question={f.q} answer={f.a} />
                 ))}
@@ -215,35 +181,25 @@ export function LandingFaq() {
           ) : null}
         </div>
 
-        <div
-          className="mt-10 rounded-2xl border px-5 py-4 text-center text-sm sm:px-6"
-          style={{
-            borderColor: 'color-mix(in srgb, var(--accent-primary) 18%, var(--card-border))',
-            background: 'color-mix(in srgb, var(--accent-primary) 5%, var(--card-bg))',
-            color: 'var(--text-secondary)',
-          }}
-        >
+        <div className="ie-lh-faq-footer mt-10 rounded-2xl border px-5 py-4 text-center text-sm sm:px-6">
           Still have questions?{' '}
           <Link
             href="/help-center"
-            className="font-semibold underline-offset-2 hover:underline"
-            style={{ color: 'var(--accent-primary)' }}
+            className="ie-lh-text-accent font-semibold underline-offset-2 hover:underline"
           >
             Help Center
           </Link>
           ,{' '}
           <Link
             href="/how-it-works"
-            className="font-semibold underline-offset-2 hover:underline"
-            style={{ color: 'var(--accent-primary)' }}
+            className="ie-lh-text-accent font-semibold underline-offset-2 hover:underline"
           >
             how it works
           </Link>
           , or{' '}
           <Link
             href={COMMUNITY_HUB_PATH}
-            className="font-semibold underline-offset-2 hover:underline"
-            style={{ color: 'var(--accent-primary)' }}
+            className="ie-lh-text-accent font-semibold underline-offset-2 hover:underline"
           >
             community
           </Link>

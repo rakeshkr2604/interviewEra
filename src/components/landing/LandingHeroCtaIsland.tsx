@@ -92,6 +92,7 @@ export default function LandingHeroCtaIsland() {
         </TrackedCtaLink>
         <TrackedCtaLink
           href="/campus"
+          prefetch={false}
           ctaKey={CTA_KEYS.FOR_COLLEGES}
           ctaText="For Colleges"
           section="hero_secondary"

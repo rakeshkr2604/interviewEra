@@ -20,7 +20,7 @@ const PUBLIC_ROUTES = new Set([
   '/interviewera',   // brand entity page (public, crawlable)
   '/how-it-works',   // product explainer page (public, crawlable)
   '/campus',
-  '/college',        // college marketing/landing page
+  '/college',        // legacy marketing URL → 301 /campus (kept public for redirect edge)
   '/college/signup', // T&P officer signup form
   '/join',
   '/privacy',

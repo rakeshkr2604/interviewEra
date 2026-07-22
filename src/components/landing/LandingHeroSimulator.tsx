@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import './LandingHeroSimulator.css';
+import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimulatorPoster';
 
 /**
  * Animated hero interview simulator (React port of the handoff STANDALONE-DEMO).
@@ -14,6 +15,7 @@ import './LandingHeroSimulator.css';
  *   so it never competes with hero LCP and pauses when scrolled away.
  * - Decorative: host carries an aria-label; inner DOM is aria-hidden and the fake
  *   controls are removed from the tab order.
+ * - Loaded via next/dynamic from LandingHeroSimulatorIsland (poster shell first).
  */
 
 type BarColor = '' | 'orange' | 'red';
@@ -620,26 +622,7 @@ export default function LandingHeroSimulator() {
         <div className="sim-stage">
           <div className="sim-left">
             <div className="sim-video-tile">
-              <picture className="sim-poster">
-                <source
-                  type="image/avif"
-                  srcSet="/assets/female-avatar-480.avif 480w, /assets/female-avatar-900.avif 900w"
-                  sizes="(max-width: 560px) 280px, 150px"
-                />
-                <source
-                  type="image/webp"
-                  srcSet="/assets/female-avatar-480.webp 480w, /assets/female-avatar-900.webp 900w"
-                  sizes="(max-width: 560px) 280px, 150px"
-                />
-                <img
-                  src="/assets/female-avatar-900.webp"
-                  alt="InterviewEra AI interviewer avatar"
-                  width={150}
-                  height={200}
-                  decoding="async"
-                  loading="eager"
-                />
-              </picture>
+              <LandingHeroSimulatorPoster />
               <video loop muted playsInline preload="none" tabIndex={-1}>
                 <source src="/assets/female-ai.mp4" type="video/mp4" />
               </video>

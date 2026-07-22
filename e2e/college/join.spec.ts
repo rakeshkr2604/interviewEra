@@ -8,8 +8,14 @@ test.describe('campus join flow', () => {
 });
 
 test.describe('campus marketing entry', () => {
-  test('college page loads workspace CTA', async ({ page }) => {
+  test('campus page loads workspace CTA', async ({ page }) => {
+    await page.goto('/campus');
+    await expect(page.getByRole('link', { name: /set up campus workspace/i }).first()).toBeVisible();
+  });
+
+  test('legacy /college redirects to /campus', async ({ page }) => {
     await page.goto('/college');
+    await expect(page).toHaveURL(/\/campus\/?$/);
     await expect(page.getByRole('link', { name: /set up campus workspace/i }).first()).toBeVisible();
   });
 });

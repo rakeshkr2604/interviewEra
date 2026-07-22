@@ -95,6 +95,7 @@ logs/
 failed-emails.csv
 /screenshots/
 /lighthouse*.json
+.lighthouse-out/
 /audit-phase1*.png
 /phase1-*.png
 scripts/seo-audit-report.json

@@ -26,7 +26,7 @@ export default async function CollegeSignupPage() {
       <div className="w-full max-w-md">
         <div className="mb-4">
           <Link
-            href="/college"
+            href="/campus"
             className="inline-flex items-center gap-1 text-sm font-medium transition-colors hover:opacity-70"
             style={{ color: 'var(--text-secondary)' }}
           >

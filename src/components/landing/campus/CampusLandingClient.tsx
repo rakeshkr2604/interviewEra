@@ -870,7 +870,6 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 </span>
               </p>
               <p className="mt-3 space-y-0.5 text-base font-medium leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                <span className="block">{PRICING_CONTEXT.perStudentPerDay}</span>
                 <span className="block" style={{ color: 'var(--text-primary)' }}>
                   {PRICING_CONTEXT.missedOpportunity}
                 </span>
@@ -995,9 +994,9 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 <ArrowRight className="ml-2 size-4" aria-hidden />
               </TrackedCtaLink>
               <TrackedCtaLink
-                href="/college"
+                href="#campus-final-cta"
                 ctaKey={CTA_KEYS.FOR_COLLEGES}
-                ctaText="Learn about the campus platform"
+                ctaText="See pilot timeline"
                 section="campus_bridge"
                 className={cn(
                   buttonVariants({ variant: 'outline', size: 'lg' }),
@@ -1005,7 +1004,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 )}
                 style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
               >
-                Learn about the campus platform
+                See pilot timeline
               </TrackedCtaLink>
             </div>
           </Reveal>
@@ -1014,6 +1013,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* Final CTA — two columns on lg: copy + CTAs left, timeline right; Calendly full width below */}
       <section
+        id="campus-final-cta"
         className="border-t px-4 py-20 sm:px-5 md:py-28"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
@@ -1029,9 +1029,11 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
               <p className="mt-4 text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
                 {FINAL_CTA.body}
               </p>
-              <p className="mt-3 text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-muted)' }}>
-                {FINAL_CTA.closingLine}
-              </p>
+              {FINAL_CTA.closingLine ? (
+                <p className="mt-3 text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-muted)' }}>
+                  {FINAL_CTA.closingLine}
+                </p>
+              ) : null}
             </Reveal>
 
             <Reveal

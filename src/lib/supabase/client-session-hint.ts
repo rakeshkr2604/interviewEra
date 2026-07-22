@@ -7,6 +7,8 @@
  * Do not use for routing guards, API authorization, or any security decision.
  *
  * Cookie naming follows @supabase/ssr — same family as clearSupabaseCookiesClientSide.
+ * Matches both the single cookie (`sb-*-auth-token`) and chunked forms
+ * (`sb-*-auth-token.0`, `.1`, …).
  */
 export function hasClientSessionStorageHint(cookieHeader?: string): boolean {
   const header =
@@ -18,6 +20,7 @@ export function hasClientSessionStorageHint(cookieHeader?: string): boolean {
     .some((part) => {
       const name = part.split('=')[0]?.trim();
       if (!name?.startsWith('sb-')) return false;
-      return name.endsWith('-auth-token');
+      // Exact token cookie, or chunked `…-auth-token.N`
+      return name.endsWith('-auth-token') || /-auth-token\.\d+$/.test(name);
     });
 }

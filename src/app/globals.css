@@ -195,16 +195,62 @@ code, pre, .font-mono {
   font-family: var(--font-jetbrains), ui-monospace, monospace;
 }
 
-/* ─── Scoped color transitions (not transition-all) ─── */
-*, *::before, *::after {
-  transition-property: color, background-color, border-color, opacity, box-shadow;
-  transition-timing-function: var(--ie-ease-standard);
-  transition-duration: var(--ie-duration-normal);
+/* ─── Color transitions on interactive / themed surfaces only ───
+   Do NOT use a universal `*` selector — it forces RecalcStyle on every
+   DOM node when CSS variables change (theme mount / toggle) and was the
+   dominant Style & Layout cost on the marketing homepage. */
+html {
   -webkit-tap-highlight-color: transparent;
 }
 
+a,
+button,
+[role="button"],
+[role="link"],
+[role="menuitem"],
+[role="tab"],
+[role="switch"],
+[role="option"],
+input,
+select,
+textarea,
+summary,
+label,
+.ie-transition,
+.ie-transition::before,
+.ie-transition::after,
+.ie-focus-visible,
+.dashboard-premium-card,
+.dashboard-hover-lift,
+.dashboard-hover-row,
+.landing-cta-lift {
+  transition-property: color, background-color, border-color, opacity, box-shadow;
+  transition-timing-function: var(--ie-ease-standard);
+  transition-duration: var(--ie-duration-normal);
+}
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  a,
+  button,
+  [role="button"],
+  [role="link"],
+  [role="menuitem"],
+  [role="tab"],
+  [role="switch"],
+  [role="option"],
+  input,
+  select,
+  textarea,
+  summary,
+  label,
+  .ie-transition,
+  .ie-transition::before,
+  .ie-transition::after,
+  .ie-focus-visible,
+  .dashboard-premium-card,
+  .dashboard-hover-lift,
+  .dashboard-hover-row,
+  .landing-cta-lift {
     transition-duration: 0.01ms !important;
   }
 }
@@ -750,6 +796,147 @@ html[data-theme="dark"] .ie-landing-premium ::selection {
 .ie-landing-premium .landing-cta-lift:active {
   transform: translateY(-1px);
 }
+
+/* ─── Landing home surfaces / text tokens (avoid inline color-mix in HTML) ─── */
+.ie-lh-text-primary { color: var(--text-primary); }
+.ie-lh-text-secondary { color: var(--text-secondary); }
+.ie-lh-text-muted { color: var(--text-muted); }
+.ie-lh-text-accent { color: var(--accent-primary); }
+.ie-lh-text-link { color: var(--accent-link); }
+.ie-lh-text-success { color: var(--accent-success); }
+.ie-lh-text-warning { color: var(--accent-warning); }
+.ie-lh-text-on-accent { color: #fff; }
+.ie-lh-bg-accent { background: var(--accent-primary); }
+.ie-lh-border-card { border-color: var(--card-border); }
+.ie-lh-dot-muted { background: var(--text-muted); }
+.ie-lh-bg-success { background: var(--accent-success); }
+.ie-lh-bg-tertiary { background: var(--bg-tertiary); }
+
+.ie-lh-surface-94 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-92 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-90 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 90%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-88 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-70 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-35 {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 35%, transparent);
+}
+.ie-lh-surface-accent {
+  border-color: color-mix(in srgb, var(--accent-primary) 40%, transparent);
+  background: color-mix(in srgb, var(--accent-primary) 7%, transparent);
+  box-shadow: var(--card-shadow);
+}
+.ie-lh-surface-accent-soft {
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+  background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+.ie-lh-surface-accent-band {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 7%, var(--card-bg));
+}
+.ie-lh-icon-tile {
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+}
+.ie-lh-icon-tile-ring {
+  background: color-mix(in srgb, var(--accent-primary) 16%, transparent);
+  color: var(--accent-primary);
+  border: 2px solid color-mix(in srgb, var(--accent-primary) 22%, transparent);
+}
+.ie-lh-icon-tile-primary {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  color: var(--accent-primary);
+}
+.ie-lh-icon-tile-warning {
+  background: color-mix(in srgb, var(--accent-warning) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-warning) 28%, transparent);
+  color: var(--accent-warning);
+}
+.ie-lh-pill-accent {
+  background: color-mix(in srgb, var(--accent-primary) 12%, transparent);
+  color: var(--accent-primary);
+}
+.ie-lh-section-faq {
+  border-color: color-mix(in srgb, var(--card-border) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 40%, transparent);
+}
+.ie-lh-faq-item {
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+}
+.ie-lh-faq-answer-rule {
+  color: var(--text-secondary);
+  border-color: color-mix(in srgb, var(--card-border) 70%, transparent);
+}
+.ie-lh-faq-more {
+  border-color: color-mix(in srgb, var(--card-border) 90%, transparent);
+  background: color-mix(in srgb, var(--card-bg) 50%, transparent);
+}
+.ie-lh-faq-footer {
+  border-color: color-mix(in srgb, var(--accent-primary) 18%, var(--card-border));
+  background: color-mix(in srgb, var(--accent-primary) 5%, var(--card-bg));
+  color: var(--text-secondary);
+}
+.ie-lh-demo-header {
+  border-bottom: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+}
+.ie-lh-signal-band {
+  background: color-mix(in srgb, var(--accent-success) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+.ie-lh-signal-tag {
+  border-color: color-mix(in srgb, var(--accent-success) 35%, transparent);
+  color: var(--accent-success);
+  background: color-mix(in srgb, var(--accent-success) 8%, transparent);
+}
+.ie-lh-bubble-challenge {
+  background: color-mix(in srgb, var(--accent-warning) 12%, transparent);
+  color: var(--text-primary);
+  border: 1px solid color-mix(in srgb, var(--accent-warning) 35%, transparent);
+  border-top-left-radius: 4px;
+}
+.ie-lh-bubble-interviewer {
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--text-primary);
+  border-top-left-radius: 4px;
+}
+.ie-lh-bubble-candidate {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border-top-right-radius: 4px;
+}
+.ie-lh-caption-box {
+  border-color: var(--card-border);
+  background: var(--bg-tertiary);
+  border-left: 2px solid color-mix(in srgb, var(--accent-success) 50%, transparent);
+}
+.ie-lh-score-weak {
+  background: color-mix(in srgb, var(--accent-warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-warning) 25%, transparent);
+}
+.ie-lh-text-accent-hover { color: var(--accent-hover); }
 
 /* ─── Avatar idle breathing (used by AvatarPlayer in the interview UI) ─── */
 /* Calm idle "breathing" for the avatar poster while the interviewer is

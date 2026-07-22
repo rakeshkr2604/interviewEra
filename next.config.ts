@@ -101,6 +101,12 @@ const nextConfig: NextConfig = {
         destination: '/interview-questions/topics/react',
         permanent: true,
       },
+      /** Legacy T&P marketing landing — canonical campus funnel is `/campus`. */
+      {
+        source: '/college',
+        destination: '/campus',
+        permanent: true,
+      },
       {
         source: '/:path*',
         has: [{ type: 'host', value: 'www.interviewera.com' }],

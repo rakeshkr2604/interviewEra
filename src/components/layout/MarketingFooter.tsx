@@ -15,7 +15,7 @@ const PRODUCT_LINKS = [
   { href: '/teams', label: 'For Teams' },
   { href: '/signup', label: 'Start Mock Interview' },
   { href: '/campus', label: 'Campus Placements' },
-  { href: '/college', label: 'Campus Workspace' },
+  { href: '/campus', label: 'Campus Workspace' },
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 
@@ -177,6 +177,7 @@ export function MarketingFooter() {
                     <li key={label}>
                       <Link
                         href={href}
+                        prefetch={href === '/campus' ? false : undefined}
                         className={LINK_CLS}
                         style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
                       >

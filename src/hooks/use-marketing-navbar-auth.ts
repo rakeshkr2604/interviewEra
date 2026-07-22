@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { hasClientSessionStorageHint } from '@/lib/supabase/client-session-hint';
 import { resolveOAuthPictureUrl } from '@/lib/profile/user-display';
 import type { PlanTier } from '@/types/app.types';
 
@@ -21,8 +19,8 @@ export interface MarketingNavbarAuthState {
   /** True until the initial client auth probe finishes. */
   authPending: boolean;
   /**
-   * Progressive hydration: compact placeholder while auth resolves and a
-   * session storage hint suggests a signed-in user may be present.
+   * Neutral skeleton until auth resolves — used for SSR + first paint so
+   * logged-in users never flash AnonymousNav ("Sign in / Sign up").
    */
   showAuthPlaceholder: boolean;
   variant: MarketingNavbarVariant;
@@ -48,16 +46,18 @@ async function withAuthTimeout<T>(promise: Promise<T>, ms: number): Promise<T | 
 /**
  * Resolves marketing navbar auth variant + user profile for Navbar rendering.
  * All Supabase/session probing lives here — not in presentation components.
+ *
+ * Perf: `@/lib/supabase/client` is dynamically imported inside the mount effect
+ * so the marketing homepage initial JS does not pay for supabase-js upfront.
+ *
+ * SSR / first paint always uses a neutral skeleton (`showAuthPlaceholder`) so
+ * logged-in users never see AnonymousNav ("Sign in / Sign up") before the
+ * client auth probe finishes. Homepage stays cookie-free / ISR-cacheable.
  */
 export function useMarketingNavbarAuth(): MarketingNavbarAuthState {
   const [authPending, setAuthPending] = useState(true);
-  const [sessionHint, setSessionHint] = useState(false);
   const [variant, setVariant] = useState<MarketingNavbarVariant>('anon');
   const [user, setUser] = useState<MarketingNavUser | null>(null);
-
-  useEffect(() => {
-    setSessionHint(hasClientSessionStorageHint());
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +65,8 @@ export function useMarketingNavbarAuth(): MarketingNavbarAuthState {
 
     const detect = async () => {
       try {
+        if (cancelled) return;
+        const { createClient } = await import('@/lib/supabase/client');
         if (cancelled) return;
         const supabase = createClient();
 
@@ -147,7 +149,8 @@ export function useMarketingNavbarAuth(): MarketingNavbarAuthState {
 
   return {
     authPending,
-    showAuthPlaceholder: authPending && sessionHint,
+    // Always skeleton until the client probe finishes — never SSR AnonymousNav.
+    showAuthPlaceholder: authPending,
     variant,
     user,
   };

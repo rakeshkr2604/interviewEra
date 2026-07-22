@@ -136,8 +136,7 @@ export function MarketingPricingSection() {
         className="mx-auto max-w-3xl text-center text-xl font-bold leading-snug md:text-2xl md:leading-snug"
         style={{ color: 'var(--text-primary)' }}
       >
-        One bad interview can cost you{' '}
-        <span style={{ color: 'var(--accent-primary)' }}>₹5L–₹20L</span> in lost offers.
+        Every interview you practice is one less surprise on the real day.
       </p>
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
         Start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card — pay once for 30 days of access when you want PDF export, replay, and full analysis.
@@ -151,11 +150,8 @@ export function MarketingPricingSection() {
       </p>
       <BillingCycleToggle value={cycle} onChange={setCycle} id="marketing-billing" variant="default" />
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-          ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days on Pro
-        </span>{' '}
-        stacks against a <span style={{ color: 'var(--accent-primary)' }}>₹10L+</span> first job — one serious month of
-        practice vs one silent rejection email.
+        ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days of full-feedback practice — less than what most spend on a
+        single day of takeout, for a month of getting interview-ready.
       </p>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Free */}

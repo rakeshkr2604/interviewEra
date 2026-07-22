@@ -181,11 +181,9 @@ export const POSITIONING_SUBLINES = [
   'Without structure and scoring, you’re guessing — not improving',
 ] as const;
 
-export const POSITIONING_STAT = {
-  stat: '~2×',
-  rest: 'higher session scores on average',
-  hint: 'Illustrative uplift for students who switch from chat-only prep to structured scored mocks — individual results vary.',
-} as const;
+/** Qualitative bridge under the ChatGPT objection — no numeric claims. */
+export const POSITIONING_BRIDGE =
+  'Candidates who practice with structure and scoring walk in clearer on what to fix than after freeform ChatGPT sessions.';
 
 export const POSITIONING_LEFT = {
   label: 'ChatGPT & generic tools',

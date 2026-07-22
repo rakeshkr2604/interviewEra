@@ -14,6 +14,12 @@ describe('hasClientSessionStorageHint', () => {
     expect(hasClientSessionStorageHint('sb-project-auth-token-code-verifier=xyz')).toBe(false);
   });
 
+  it('returns true for chunked auth-token cookies', () => {
+    expect(hasClientSessionStorageHint('sb-project-auth-token.0=chunk0; sb-project-auth-token.1=chunk1')).toBe(
+      true,
+    );
+  });
+
   it('returns false for an empty header', () => {
     expect(hasClientSessionStorageHint('')).toBe(false);
   });

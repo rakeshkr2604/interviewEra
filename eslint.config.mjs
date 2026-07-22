@@ -22,6 +22,7 @@ const eslintConfig = defineConfig([
     // Local Claude/Cursor worktrees + tooling (gitignored; still walked by `eslint .`)
     ".claude/**",
     ".voice-verify-out/**",
+    ".lighthouse-out/**",
     ".cursor/**",
     // Local brand toolkit / canvas (not part of the Next app)
     "coverage/**",
