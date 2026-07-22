@@ -2,6 +2,16 @@
 
 import dynamic from 'next/dynamic';
 
+const LandingScrollShowcase = dynamic(() => import('@/components/landing/LandingScrollShowcase'), {
+  loading: () => (
+    <div
+      className="mx-auto my-10 min-h-[70vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      style={{ background: 'var(--bg-secondary)' }}
+      aria-hidden
+    />
+  ),
+});
+
 const LandingHomeMidFold = dynamic(() => import('@/components/landing/LandingHomeMidFold'), {
   loading: () => (
     <div
@@ -35,6 +45,7 @@ const LandingHomeBelowFold = dynamic(
 export default function LandingHomeClient() {
   return (
     <>
+      <LandingScrollShowcase />
       <LandingHomeMidFold isLoggedIn={false} />
       <LandingHomeBelowFold isLoggedIn={false} />
     </>

@@ -1,0 +1,218 @@
+/* LandingScrollShowcase — lightweight CSS (no base64 assets) */
+
+.ie-scroll-showcase {
+  --ss-card-radius: 20px;
+}
+
+.ie-ss-step {
+  min-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1.125rem;
+  transition: opacity 0.45s ease;
+}
+
+.ie-ss-step[data-active='false'] {
+  opacity: 0.38;
+}
+
+.ie-ss-step[data-active='true'] {
+  opacity: 1;
+}
+
+.ie-ss-stage {
+  position: relative;
+  height: 560px;
+  perspective: 1200px;
+}
+
+.ie-ss-visual {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(28px) scale(0.96);
+  transition:
+    opacity 0.45s ease,
+    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ie-ss-visual[data-active='true'] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.ie-ss-dot {
+  width: 34px;
+  height: 6px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text-muted) 35%, transparent);
+  transition: background 0.35s ease;
+}
+
+.ie-ss-dot[data-active='true'] {
+  background: linear-gradient(135deg, var(--accent-primary), var(--v3-pur, #a855f7));
+}
+
+/* Resume scan beam */
+@keyframes ie-ss-scan {
+  0% {
+    top: 8%;
+  }
+  55% {
+    top: 72%;
+  }
+  100% {
+    top: 8%;
+  }
+}
+
+@keyframes ie-ss-floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes ie-ss-eq {
+  0%,
+  100% {
+    transform: scaleY(0.28);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes ie-ss-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.ie-ss-scan {
+  animation: ie-ss-scan 4.2s ease-in-out infinite;
+}
+
+.ie-ss-float {
+  animation: ie-ss-floaty 4.4s ease-in-out infinite;
+}
+
+.ie-ss-float-delay {
+  animation: ie-ss-floaty 5.2s ease-in-out 0.8s infinite;
+}
+
+.ie-ss-eq-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent-primary));
+  transform-origin: center;
+  animation: ie-ss-eq var(--ss-eq-dur, 1s) ease-in-out var(--ss-eq-delay, 0s) infinite;
+}
+
+.ie-ss-blink {
+  animation: ie-ss-blink 1.6s ease-in-out infinite;
+}
+
+.ie-ss-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--v3-pur, #a855f7));
+  width: 5%;
+  transition: width 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ie-ss-bar-fill[data-filled='true'] {
+  width: var(--ss-bar-w, 70%);
+}
+
+/* Voice stage — 1:1, no outer chrome, slightly zoomed-out cover */
+.ie-ss-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: none;
+  border-radius: 14px;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, #c9c7d4);
+}
+
+html[data-theme='dark'] .ie-ss-media {
+  background: color-mix(in srgb, var(--bg-secondary) 80%, #2a2740);
+}
+
+.ie-ss-media picture,
+.ie-ss-media img,
+.ie-ss-media video {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+  transform: scale(0.86);
+  transform-origin: center 24%;
+}
+
+.ie-ss-media video {
+  z-index: 1;
+  background: transparent;
+}
+
+.ie-ss-media picture,
+.ie-ss-media img {
+  z-index: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-ss-scan,
+  .ie-ss-float,
+  .ie-ss-float-delay,
+  .ie-ss-eq-bar,
+  .ie-ss-blink {
+    animation: none !important;
+  }
+
+  .ie-ss-visual,
+  .ie-ss-step,
+  .ie-ss-bar-fill {
+    transition: none !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .ie-ss-step {
+    min-height: 0;
+    padding: 1.75rem 0;
+  }
+
+  .ie-ss-stage {
+    height: auto;
+    min-height: 420px;
+  }
+
+  .ie-ss-visual {
+    position: relative;
+    inset: auto;
+    display: none;
+    transform: none;
+  }
+
+  .ie-ss-visual[data-active='true'] {
+    display: flex;
+  }
+}
