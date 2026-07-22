@@ -357,6 +357,10 @@ function NavShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
+  // Defer backdrop-filter until the user has scrolled: blur on the sticky
+  // header forces expensive paint/compositing during the LCP-critical window.
+  // At scrollY≈0 use a near-opaque fill (no filter); once scrolled, restore
+  // the translucent + blur glass look so settled appearance matches before.
   return (
     <header
       role="banner"
@@ -369,9 +373,13 @@ function NavShell({ children }: { children: React.ReactNode }) {
         borderColor: 'var(--card-border)',
         background: scrolled
           ? 'color-mix(in srgb, var(--bg-primary) 82%, transparent)'
-          : 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
-        backdropFilter: 'blur(20px)',
-        WebkitBackdropFilter: 'blur(20px)',
+          : 'color-mix(in srgb, var(--bg-primary) 96%, transparent)',
+        ...(scrolled
+          ? {
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+            }
+          : {}),
       }}
     >
       {/* Skip-to-content for keyboard users */}
