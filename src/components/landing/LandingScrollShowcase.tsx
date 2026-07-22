@@ -308,6 +308,9 @@ function ActiveStageVisual({ active }: { active: number }) {
   return <ResumeVisual />;
 }
 
+/** Dwell before committing a step change — stops Voice/Report boundary flip-flop remounts. */
+const STEP_ACTIVE_DWELL_MS = 180;
+
 export default function LandingScrollShowcase() {
   const [active, setActive] = useState(0);
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -315,6 +318,7 @@ export default function LandingScrollShowcase() {
 
   // P0: gate continuous animations while #how is on-screen (DOM class — no React state churn).
   // P1: drive step-active via IntersectionObserver (no scroll + getBoundingClientRect).
+  // Phase 3h: track ratios across all steps (IO only delivers changed entries) + dwell hysteresis.
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
@@ -337,16 +341,55 @@ export default function LandingScrollShowcase() {
     );
     sectionIo.observe(section);
 
-    // Thin center band: whichever step intersects the mid-viewport becomes active.
+    const ratios = new Map<Element, number>();
+    let committedIdx = 0;
+    let pendingIdx: number | null = null;
+    let dwellTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearDwell = () => {
+      if (dwellTimer !== null) {
+        clearTimeout(dwellTimer);
+        dwellTimer = null;
+      }
+      pendingIdx = null;
+    };
+
+    // Thin center band + dwell: switch only after a new step stays dominant ~180ms.
     const stepIo = new IntersectionObserver(
       (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        const top = visible[0];
-        if (!top?.target) return;
-        const idx = stepRefs.current.findIndex((n) => n === top.target);
-        if (idx >= 0) setActive((prev) => (prev === idx ? prev : idx));
+        for (const entry of entries) {
+          ratios.set(entry.target, entry.isIntersecting ? entry.intersectionRatio : 0);
+        }
+
+        let bestIdx = -1;
+        let bestRatio = 0;
+        for (let i = 0; i < stepRefs.current.length; i++) {
+          const node = stepRefs.current[i];
+          if (!node) continue;
+          const ratio = ratios.get(node) ?? 0;
+          if (ratio > bestRatio) {
+            bestRatio = ratio;
+            bestIdx = i;
+          }
+        }
+        if (bestIdx < 0 || bestRatio <= 0) return;
+
+        if (bestIdx === committedIdx) {
+          clearDwell();
+          return;
+        }
+
+        if (bestIdx === pendingIdx) return;
+
+        clearDwell();
+        pendingIdx = bestIdx;
+        const nextIdx = bestIdx;
+        dwellTimer = setTimeout(() => {
+          dwellTimer = null;
+          pendingIdx = null;
+          committedIdx = nextIdx;
+          setActive(nextIdx);
+        }, STEP_ACTIVE_DWELL_MS);
       },
       { root: null, rootMargin: '-42% 0px -42% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] },
     );
@@ -356,6 +399,7 @@ export default function LandingScrollShowcase() {
     }
 
     return () => {
+      clearDwell();
       sectionIo.disconnect();
       stepIo.disconnect();
     };

@@ -217,9 +217,10 @@ html[data-theme='dark'] .ie-ss-media {
     padding: 1.75rem 0;
   }
 
+  /* Fixed to tallest mobile visual (~507px Voice) so Resume/Voice/Report swaps don't resize the stage. */
   .ie-ss-stage {
-    height: auto;
-    min-height: 420px;
+    height: 508px;
+    min-height: 508px;
   }
 
   .ie-ss-visual {
