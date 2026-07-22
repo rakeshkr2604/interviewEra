@@ -812,7 +812,15 @@ function AvatarMenu({
   );
 }
 
-// ─── Progressive auth placeholder (session cookie hint, no full-nav skeleton) ─
+// ─── Progressive auth placeholder (SSR + first paint until auth resolves) ─────
+// Static skeleton only — no `animate-pulse`. Continuous opacity animation on the
+// sticky header forced style work during the LCP window (hero copy). Keep bars
+// muted/fixed so logged-in users never flash AnonymousNav without the recalc cost.
+
+const AUTH_NAV_SKELETON_STYLE = {
+  background: 'color-mix(in srgb, var(--card-border) 70%, transparent)',
+  opacity: 0.55,
+} as const;
 
 function AuthNavPlaceholder() {
   return (
@@ -822,21 +830,21 @@ function AuthNavPlaceholder() {
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
-            className="h-9 w-[4.5rem] animate-pulse rounded-[var(--ie-radius-sm)]"
-            style={{ background: 'color-mix(in srgb, var(--card-border) 85%, transparent)' }}
+            className="h-9 w-[4.5rem] rounded-[var(--ie-radius-sm)]"
+            style={AUTH_NAV_SKELETON_STYLE}
           />
         ))}
       </div>
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <div
-          className="hidden h-9 w-24 animate-pulse rounded-[var(--ie-radius-sm)] lg:block"
-          style={{ background: 'color-mix(in srgb, var(--card-border) 85%, transparent)' }}
+          className="hidden h-9 w-24 rounded-[var(--ie-radius-sm)] lg:block"
+          style={AUTH_NAV_SKELETON_STYLE}
           aria-hidden
         />
         <div
-          className="hidden size-9 animate-pulse rounded-full lg:block"
-          style={{ background: 'color-mix(in srgb, var(--card-border) 85%, transparent)' }}
+          className="hidden size-9 rounded-full lg:block"
+          style={AUTH_NAV_SKELETON_STYLE}
           aria-hidden
         />
         <Button
