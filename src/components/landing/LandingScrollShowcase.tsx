@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimulatorPoster';
 import { T } from '@/components/landing/landing-home-tokens';
 import {
@@ -12,19 +12,14 @@ import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/containe
 import { cn } from '@/lib/utils';
 import './LandingScrollShowcase.css';
 
+/** P2: 6 bars (was 12) — enough waveform presence without animation churn. */
 const EQ_BARS = [
   { h: 18, dur: 0.9, d: 0 },
   { h: 28, dur: 1.1, d: 0.1 },
-  { h: 14, dur: 0.85, d: 0.2 },
+  { h: 16, dur: 0.85, d: 0.18 },
   { h: 32, dur: 1.05, d: 0.05 },
-  { h: 22, dur: 0.95, d: 0.15 },
-  { h: 36, dur: 1.15, d: 0.08 },
-  { h: 16, dur: 0.88, d: 0.22 },
-  { h: 30, dur: 1.0, d: 0.12 },
-  { h: 20, dur: 0.92, d: 0.18 },
-  { h: 34, dur: 1.08, d: 0.04 },
-  { h: 24, dur: 0.98, d: 0.14 },
-  { h: 12, dur: 0.82, d: 0.24 },
+  { h: 22, dur: 0.95, d: 0.14 },
+  { h: 30, dur: 1.0, d: 0.08 },
 ] as const;
 
 function prefersReducedMotion(): boolean {
@@ -120,23 +115,26 @@ function ResumeVisual() {
   );
 }
 
-function VoiceVisual({ active }: { active: boolean }) {
+function VoiceVisual() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (active && !prefersReducedMotion()) {
-      void v.play().catch(() => {});
-    } else {
+    if (prefersReducedMotion()) {
       v.pause();
+      return;
     }
-  }, [active]);
+    void v.play().catch(() => {});
+    return () => {
+      v.pause();
+    };
+  }, []);
 
   return (
     <div className="ie-ss-voice flex w-[min(100%,300px)] flex-col items-center">
       <div
-        className="ie-ss-live-badge mb-2 self-start inline-flex items-center gap-1.5 rounded-full border px-3 py-1"
+        className="ie-ss-live-badge mb-2 inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1"
         style={{
           background: 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
           borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
@@ -163,7 +161,10 @@ function VoiceVisual({ active }: { active: boolean }) {
         </video>
       </div>
 
-      <p className="ie-ss-avatar-name mt-2 mb-0 text-center text-[13px] font-semibold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+      <p
+        className="ie-ss-avatar-name mb-0 mt-2 text-center text-[13px] font-semibold tracking-tight"
+        style={{ color: 'var(--text-primary)' }}
+      >
         Priya <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· AI Interviewer</span>
       </p>
 
@@ -202,14 +203,11 @@ function VoiceVisual({ active }: { active: boolean }) {
   );
 }
 
-function ReportVisual({ active }: { active: boolean }) {
+function ReportVisual() {
   const [filled, setFilled] = useState(false);
   const [score, setScore] = useState(0);
-  const started = useRef(false);
 
   useEffect(() => {
-    if (!active || started.current) return;
-    started.current = true;
     const reduce = prefersReducedMotion();
     let raf = 0;
     let raf2 = 0;
@@ -233,7 +231,7 @@ function ReportVisual({ active }: { active: boolean }) {
       cancelAnimationFrame(raf);
       cancelAnimationFrame(raf2);
     };
-  }, [active]);
+  }, []);
 
   return (
     <div
@@ -275,7 +273,10 @@ function ReportVisual({ active }: { active: boolean }) {
                 {d.w}%
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded" style={{ background: 'color-mix(in srgb, var(--text-primary) 8%, transparent)' }}>
+            <div
+              className="h-1.5 overflow-hidden rounded"
+              style={{ background: 'color-mix(in srgb, var(--text-primary) 8%, transparent)' }}
+            >
               <div
                 className="ie-ss-bar-fill"
                 data-filled={filled ? 'true' : 'false'}
@@ -301,44 +302,72 @@ function ReportVisual({ active }: { active: boolean }) {
   );
 }
 
+function ActiveStageVisual({ active }: { active: number }) {
+  if (active === 1) return <VoiceVisual />;
+  if (active === 2) return <ReportVisual />;
+  return <ResumeVisual />;
+}
+
 export default function LandingScrollShowcase() {
   const [active, setActive] = useState(0);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const stepRefs = useRef<(HTMLElement | null)[]>([]);
-  const ticking = useRef(false);
 
-  const syncActive = useCallback(() => {
-    const nodes = stepRefs.current.filter(Boolean) as HTMLElement[];
-    if (!nodes.length) return;
-    const mid = window.innerHeight * 0.45;
-    let next = 0;
-    nodes.forEach((node, i) => {
-      const r = node.getBoundingClientRect();
-      if (r.top <= mid) next = i;
-    });
-    setActive((prev) => (prev === next ? prev : next));
+  // P0: gate continuous animations while #how is on-screen (DOM class — no React state churn).
+  // P1: drive step-active via IntersectionObserver (no scroll + getBoundingClientRect).
+  useEffect(() => {
+    const section = sectionRef.current;
+    if (!section) return;
+
+    const setInViewClass = (on: boolean) => {
+      section.classList.toggle('is-in-view', on);
+    };
+
+    if (!('IntersectionObserver' in window)) {
+      setInViewClass(true);
+      return;
+    }
+
+    const sectionIo = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (entry) setInViewClass(entry.isIntersecting);
+      },
+      { root: null, rootMargin: '12% 0px', threshold: 0.05 },
+    );
+    sectionIo.observe(section);
+
+    // Thin center band: whichever step intersects the mid-viewport becomes active.
+    const stepIo = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+        const top = visible[0];
+        if (!top?.target) return;
+        const idx = stepRefs.current.findIndex((n) => n === top.target);
+        if (idx >= 0) setActive((prev) => (prev === idx ? prev : idx));
+      },
+      { root: null, rootMargin: '-42% 0px -42% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] },
+    );
+
+    for (const node of stepRefs.current) {
+      if (node) stepIo.observe(node);
+    }
+
+    return () => {
+      sectionIo.disconnect();
+      stepIo.disconnect();
+    };
   }, []);
 
-  useEffect(() => {
-    const boot = requestAnimationFrame(() => syncActive());
-    const onScroll = () => {
-      if (ticking.current) return;
-      ticking.current = true;
-      requestAnimationFrame(() => {
-        ticking.current = false;
-        syncActive();
-      });
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    return () => {
-      cancelAnimationFrame(boot);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, [syncActive]);
-
   return (
-    <section id="how" className={cn(LANDING_HOME_SECTION, 'ie-scroll-showcase')} aria-labelledby="scroll-showcase-heading">
+    <section
+      ref={sectionRef}
+      id="how"
+      className={cn(LANDING_HOME_SECTION, 'ie-scroll-showcase')}
+      aria-labelledby="scroll-showcase-heading"
+    >
       <div className={LANDING_HOME_INNER}>
         <div className="max-w-[540px]">
           <div
@@ -416,15 +445,10 @@ export default function LandingScrollShowcase() {
           </div>
 
           <div className="lg:sticky lg:top-24">
-            <div className="ie-ss-stage" aria-hidden={false}>
-              <div className="ie-ss-visual" data-active={active === 0 ? 'true' : 'false'} aria-hidden={active !== 0}>
-                <ResumeVisual />
-              </div>
-              <div className="ie-ss-visual" data-active={active === 1 ? 'true' : 'false'} aria-hidden={active !== 1}>
-                <VoiceVisual active={active === 1} />
-              </div>
-              <div className="ie-ss-visual" data-active={active === 2 ? 'true' : 'false'} aria-hidden={active !== 2}>
-                <ReportVisual active={active === 2} />
+            <div className="ie-ss-stage">
+              {/* P0: mount only the active visual — inactive trees are fully unmounted. */}
+              <div key={active} className="ie-ss-visual ie-ss-visual--mounted">
+                <ActiveStageVisual active={active} />
               </div>
             </div>
             <div className="mt-4 flex justify-center gap-2" aria-hidden>

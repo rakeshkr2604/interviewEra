@@ -24,7 +24,7 @@
 .ie-ss-stage {
   position: relative;
   height: 560px;
-  perspective: 1200px;
+  /* perspective removed — no 3D transforms currently; re-add if a rotateY effect returns */
 }
 
 .ie-ss-visual {
@@ -33,18 +33,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(28px) scale(0.96);
-  transition:
-    opacity 0.45s ease,
-    transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.ie-ss-visual[data-active='true'] {
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
+.ie-ss-visual--mounted {
+  animation: ie-ss-fade-in 0.35s ease;
+}
+
+@keyframes ie-ss-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .ie-ss-dot {
@@ -59,7 +62,6 @@
   background: linear-gradient(135deg, var(--accent-primary), var(--v3-pur, #a855f7));
 }
 
-/* Resume scan beam */
 @keyframes ie-ss-scan {
   0% {
     top: 8%;
@@ -102,16 +104,20 @@
   }
 }
 
+/* Animations defined but paused until section is in view (P0) */
 .ie-ss-scan {
   animation: ie-ss-scan 4.2s ease-in-out infinite;
+  animation-play-state: paused;
 }
 
 .ie-ss-float {
   animation: ie-ss-floaty 4.4s ease-in-out infinite;
+  animation-play-state: paused;
 }
 
 .ie-ss-float-delay {
   animation: ie-ss-floaty 5.2s ease-in-out 0.8s infinite;
+  animation-play-state: paused;
 }
 
 .ie-ss-eq-bar {
@@ -120,10 +126,20 @@
   background: linear-gradient(180deg, var(--accent-hover), var(--accent-primary));
   transform-origin: center;
   animation: ie-ss-eq var(--ss-eq-dur, 1s) ease-in-out var(--ss-eq-delay, 0s) infinite;
+  animation-play-state: paused;
 }
 
 .ie-ss-blink {
   animation: ie-ss-blink 1.6s ease-in-out infinite;
+  animation-play-state: paused;
+}
+
+.ie-scroll-showcase.is-in-view .ie-ss-scan,
+.ie-scroll-showcase.is-in-view .ie-ss-float,
+.ie-scroll-showcase.is-in-view .ie-ss-float-delay,
+.ie-scroll-showcase.is-in-view .ie-ss-eq-bar,
+.ie-scroll-showcase.is-in-view .ie-ss-blink {
+  animation-play-state: running;
 }
 
 .ie-ss-bar-fill {
@@ -183,13 +199,14 @@ html[data-theme='dark'] .ie-ss-media {
   .ie-ss-float,
   .ie-ss-float-delay,
   .ie-ss-eq-bar,
-  .ie-ss-blink {
+  .ie-ss-blink,
+  .ie-ss-visual--mounted {
     animation: none !important;
   }
 
-  .ie-ss-visual,
   .ie-ss-step,
-  .ie-ss-bar-fill {
+  .ie-ss-bar-fill,
+  .ie-ss-dot {
     transition: none !important;
   }
 }
@@ -208,11 +225,5 @@ html[data-theme='dark'] .ie-ss-media {
   .ie-ss-visual {
     position: relative;
     inset: auto;
-    display: none;
-    transform: none;
-  }
-
-  .ie-ss-visual[data-active='true'] {
-    display: flex;
   }
 }
