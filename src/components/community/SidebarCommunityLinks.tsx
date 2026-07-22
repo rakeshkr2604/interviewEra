@@ -4,6 +4,12 @@ import Link from 'next/link';
 import { Users } from 'lucide-react';
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
 
+/**
+ * Standalone Community Hub link block.
+ * The candidate dashboard sidebar now renders Community as a collapsible
+ * section in `Sidebar.tsx`; this export remains for other chrome that may
+ * want the same single-link block without the full nav.
+ */
 export function SidebarCommunityLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div className="mt-2 border-t border-[var(--card-border)]/55 pt-3">

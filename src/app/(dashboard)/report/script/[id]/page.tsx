@@ -291,22 +291,7 @@ export default async function ScriptReportPage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {header}
-        <section className="dashboard-premium-card px-6 py-8 text-center sm:px-7">
-          <p
-            className="text-[10px] font-bold uppercase tracking-[0.14em]"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Preparing report
-          </p>
-          <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Your report is still generating
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Another request is building this report. This page refreshes automatically — no score is
-            shown until generation finishes.
-          </p>
-          <ScriptReportGeneratingRefresh />
-        </section>
+        <ScriptReportGeneratingRefresh />
       </div>
     );
   }
@@ -343,13 +328,43 @@ export default async function ScriptReportPage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
         {header}
-        <section className="dashboard-premium-card px-6 py-8 sm:px-7">
-          <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+        <section
+          className="dashboard-premium-card px-6 py-8 sm:px-7"
+          role="alert"
+          data-testid="script-report-failed"
+        >
+          <p
+            className="text-[10px] font-bold uppercase tracking-[0.14em]"
+            style={{ color: 'var(--accent-danger)' }}
+          >
+            Generation failed
+          </p>
+          <h2 className="mt-2 text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
             Report could not be generated
           </h2>
-          <p className="mt-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
-            Something went wrong while assembling your report. Try refreshing this page.
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            Something went wrong while assembling your report. Check{' '}
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Interview History
+            </span>{' '}
+            in a moment, or contact support if this keeps happening.
           </p>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="/history"
+              className="inline-flex h-9 items-center rounded-[var(--ie-radius-md)] px-3 text-sm font-semibold text-white"
+              style={{ background: 'var(--accent-primary)' }}
+            >
+              Interview History
+            </Link>
+            <Link
+              href={`/report/script/${interviewId}`}
+              className="inline-flex h-9 items-center rounded-[var(--ie-radius-md)] border-2 px-3 text-sm font-semibold"
+              style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+            >
+              Try again
+            </Link>
+          </div>
         </section>
       </div>
     );
