@@ -22,32 +22,49 @@ const LandingHomeMidFold = dynamic(() => import('@/components/landing/LandingHom
   ),
 });
 
-const LandingHomeBelowFold = dynamic(
-  () => import('@/components/landing/LandingHomeBelowFold'),
-  {
-    loading: () => (
-      <div
-        className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
-        style={{ background: 'var(--card-bg)' }}
-        aria-hidden
-      />
-    ),
-  },
-);
+const LandingScoringEngine = dynamic(() => import('@/components/landing/LandingScoringEngine'), {
+  loading: () => (
+    <div
+      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      style={{ background: 'var(--card-bg)' }}
+      aria-hidden
+    />
+  ),
+});
+
+const LandingFinalCta = dynamic(() => import('@/components/landing/LandingFinalCta'), {
+  loading: () => (
+    <div
+      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      style={{ background: 'var(--card-bg)' }}
+      aria-hidden
+    />
+  ),
+});
 
 /**
- * Lazy-loads the below-the-fold marketing sections (kept out of the initial bundle).
+ * Lazy-load islands for below-the-fold marketing sections (kept out of the initial bundle).
  *
  * Perf: no client-side Supabase auth probe here — that pulled the large client into
  * the LCP path for a minor CTA swap. CTAs default to /signup; middleware redirects
  * already-authenticated users on to /dashboard, so logged-in users still land right.
+ *
+ * Exported as separate islands so `page.tsx` can interleave them with server sections.
  */
-export default function LandingHomeClient() {
-  return (
-    <>
-      <LandingScrollShowcase />
-      <LandingHomeMidFold isLoggedIn={false} />
-      <LandingHomeBelowFold isLoggedIn={false} />
-    </>
-  );
+
+export function LandingScrollShowcaseLazy() {
+  return <LandingScrollShowcase />;
+}
+
+/** PENDING DECISION (Phase 3d): "Pick your lane" readiness cards — not in target hierarchy. */
+export function LandingHomeMidFoldLazy() {
+  return <LandingHomeMidFold isLoggedIn={false} />;
+}
+
+export function LandingScoringEngineLazy() {
+  return <LandingScoringEngine />;
+}
+
+export function LandingFinalCtaLazy() {
+  return <LandingFinalCta isLoggedIn={false} />;
 }
