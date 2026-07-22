@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { LifeBuoy, Mail } from 'lucide-react';
 import { HelpCenterSearch } from '@/components/help/HelpCenterSearch';
 import { MarketingPageHeader } from '@/components/layout/MarketingPageHeader';
@@ -38,7 +39,7 @@ export default function HelpCenterPage() {
   } as const;
 
   return (
-    <main id="main-content" className="px-5 pb-24 pt-16 sm:pt-20" style={{ color: 'var(--text-primary)' }}>
+    <main id="main-content" className="px-5 pb-24 pt-2.5" style={{ color: 'var(--text-primary)' }}>
       {/* Hero */}
       <div className="mx-auto max-w-2xl text-center">
         <MarketingPageHeader
@@ -63,14 +64,14 @@ export default function HelpCenterPage() {
         <p className="mx-auto mt-1 max-w-md text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
           Our team replies within one business day. More documentation is on the way.
         </p>
-        <a
-          href="mailto:support@interviewera.in"
-          className="mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
+        <Link
+          href="/contact"
+          className="landing-cta-lift mt-5 inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5"
           style={{ background: 'var(--accent-primary)', boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 30%, transparent)' }}
         >
           <Mail className="size-4" aria-hidden />
           Contact Support
-        </a>
+        </Link>
       </div>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(webPageLd) }} />

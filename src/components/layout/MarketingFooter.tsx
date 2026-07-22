@@ -4,15 +4,11 @@ import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import Image from 'next/image';
 import { BrandHomeLink, BRAND_MARK_PATH } from '@/components/brand/BrandHomeLink';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
-import {
-  FOOTER_INTERVIEW_QUESTIONS_LINKS,
-  FOOTER_RESOURCES_LINKS,
-  NAV_TOOLS_LINKS,
-} from '@/lib/seo/content/nav';
+import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
 import { siteConfig } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-// ── Link data ──────────────────────────────────────────────────────────────────
+// ── Link data — brand + 4 link columns (Product, Tools, Resources, Company) ──
 
 const PRODUCT_LINKS = [
   { href: '/how-it-works', label: 'How It Works' },
@@ -23,32 +19,41 @@ const PRODUCT_LINKS = [
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 
+/** Matches top-nav "Tools" dropdown — room to grow as free tools ship. */
 const TOOLS_LINKS = NAV_TOOLS_LINKS;
 
-const QUESTIONS_LINKS = FOOTER_INTERVIEW_QUESTIONS_LINKS;
+/** Prep content — hub links preserve SEO paths for deeper guides. */
+const RESOURCES_LINKS = [
+  { href: '/interview-questions', label: 'Interview Questions' },
+  { href: '/resources', label: 'All Resources' },
+  { href: '/blog', label: 'Blog' },
+  { href: '/community', label: 'Community Hub' },
+  { href: '/blog/top-dsa-interview-questions', label: 'DSA Topic Map' },
+  { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Guide' },
+  { href: '/blog/what-is-star-method-with-examples', label: 'STAR Guide' },
+] as const;
 
-const RESOURCES_LINKS = FOOTER_RESOURCES_LINKS;
-
-/** Company column — rendered separately so the Razorpay trust chip can sit inline under Pricing. */
 const COMPANY_LINKS = [
   { href: '/interviewera', label: 'What is InterviewEra' },
   { href: '/about', label: 'About Us' },
   { href: '/pricing', label: 'Pricing' },
-  { href: 'mailto:support@interviewera.com', label: 'Contact' },
+  { href: '/contact', label: 'Contact' },
 ] as const;
 
 const LEGAL_LINKS = [
   { href: '/privacy', label: 'Privacy Policy' },
-  { href: '/terms', label: 'Terms' },
-  { href: '/refund', label: 'Refund' },
+  { href: '/terms', label: 'Terms & Conditions' },
+  { href: '/refund', label: 'Refund Policy' },
 ] as const;
 
-/** First 4 columns rendered generically — Company is rendered separately. */
 const LINK_SECTIONS = [
-  { heading: 'Mock Interview', links: PRODUCT_LINKS },
-  { heading: 'Free Tools', links: TOOLS_LINKS },
-  { heading: 'Interview Questions', links: QUESTIONS_LINKS },
+  { heading: 'Product', links: PRODUCT_LINKS },
+  { heading: 'Tools', links: TOOLS_LINKS },
   { heading: 'Resources', links: RESOURCES_LINKS },
+  {
+    heading: 'Company',
+    links: [...COMPANY_LINKS, ...LEGAL_LINKS],
+  },
 ] as const;
 
 // ── Social icons ───────────────────────────────────────────────────────────────
@@ -104,12 +109,12 @@ export function MarketingFooter() {
       }}
       aria-label="Site footer"
     >
-      {/* Main grid — brand (3 cols) + 5 link columns (9 cols) */}
+      {/* Main grid — brand block + 4 link columns */}
       <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 py-14 sm:px-5 md:py-16')}>
-        <div className="grid gap-10 md:grid-cols-12 md:gap-8">
+        <div className="grid gap-10 md:grid-cols-12 md:gap-8 lg:gap-8 xl:gap-10">
 
           {/* ── Brand column ───────────────────────────────────────────── */}
-          <div className="md:col-span-3">
+          <div className="md:col-span-4 lg:col-span-3">
             <BrandHomeLink variant="footer" />
             {/* Canonical brand statement — kept in sync via siteConfig.entityDefinition. */}
             <p
@@ -157,10 +162,8 @@ export function MarketingFooter() {
             </div>
           </div>
 
-          {/* ── Link columns — 2×2 on sm/md, 5×1 on lg ────────────────── */}
-          <div className="grid grid-cols-2 gap-8 md:col-span-9 lg:grid-cols-5">
-
-            {/* Generic columns */}
+          {/* ── Link columns — 1 col mobile, 2 col sm/md, 4 col lg+ ─── */}
+          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:col-span-8 lg:col-span-9 lg:grid-cols-4 lg:gap-6 xl:gap-8">
             {LINK_SECTIONS.map(({ heading, links }) => (
               <div key={heading}>
                 <p
@@ -184,44 +187,20 @@ export function MarketingFooter() {
                 </ul>
               </div>
             ))}
-
-            {/* Company column — rendered separately for Razorpay badge */}
-            <div>
-              <p
-                className={COL_HEADING_CLS}
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Company
-              </p>
-              <ul className="mt-4 space-y-2.5" role="list">
-                {COMPANY_LINKS.map(({ href, label }) => (
-                  <li key={label}>
-                    <Link
-                      href={href}
-                      className={LINK_CLS}
-                      style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
-                    >
-                      {label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
           </div>
         </div>
       </div>
 
-      {/* Bottom bar */}
+      {/* Bottom bar — copyright + legal (redundant with Company column, standard SaaS pattern) */}
       <div className="border-t" style={{ borderColor: 'var(--card-border)' }}>
         <div
           className={cn(
             LANDING_PAGE_CONTAINER,
-            'flex flex-col gap-2 px-4 py-5 text-xs sm:flex-row sm:items-center sm:justify-between sm:px-5',
+            'flex flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-5',
           )}
           style={{ color: 'var(--text-muted)' }}
         >
-          <p className="flex items-center gap-2">
+          <p className="flex items-center gap-2 text-xs">
             <Image
               src={BRAND_MARK_PATH}
               width={20}
@@ -232,18 +211,25 @@ export function MarketingFooter() {
             />
             <span>© 2026 InterviewEra. All rights reserved.</span>
           </p>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 opacity-70">
-            {LEGAL_LINKS.map(({ href, label }) => (
-              <Link
-                key={label}
-                href={href}
-                className="transition-opacity hover:opacity-100"
-              >
-                {label}
-              </Link>
+          <nav
+            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+            aria-label="Legal"
+          >
+            {LEGAL_LINKS.map(({ href, label }, i) => (
+              <span key={label} className="inline-flex items-center gap-x-2">
+                {i > 0 && <span aria-hidden className="opacity-40">|</span>}
+                <Link
+                  href={href}
+                  className="font-medium transition-colors hover:text-[var(--accent-primary)]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {label}
+                </Link>
+              </span>
             ))}
+            <span aria-hidden className="opacity-40">|</span>
             <span>Ranchi, Jharkhand, India</span>
-          </div>
+          </nav>
         </div>
       </div>
     </footer>

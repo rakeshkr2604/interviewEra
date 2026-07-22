@@ -174,10 +174,10 @@ const SECTIONS = [
         q: 'My question isn\'t answered here. How do I contact support?',
         a: (
           <span>
-            Email us at{' '}
-            <a href="mailto:support@interviewera.in" className="underline underline-offset-2">
-              support@interviewera.in
-            </a>
+            Visit our{' '}
+            <Link href="/contact" className="underline underline-offset-2">
+              contact page
+            </Link>
             . We aim to reply within one business day.
           </span>
         ),
@@ -190,7 +190,7 @@ const SECTIONS = [
 
 export default function HelpPage() {
   return (
-    <main id="main-content" className={`${LANDING_PAGE_CONTAINER} px-4 py-16 sm:px-5 sm:py-20`}>
+    <main id="main-content" className={`${LANDING_PAGE_CONTAINER} px-4 pb-16 pt-2.5 sm:px-5 sm:pb-20`}>
       {/* Header */}
       <div className="mb-12 max-w-2xl">
         <h1
@@ -205,13 +205,13 @@ export default function HelpPage() {
             Help Center
           </Link>{' '}
           or{' '}
-          <a
-            href="mailto:support@interviewera.in"
-            className="font-medium underline underline-offset-2"
+          <Link
+            href="/contact"
+            className="font-medium underline-offset-2 hover:underline"
             style={{ color: 'var(--accent-primary)' }}
           >
-            email us
-          </a>
+            contact us
+          </Link>
           .
         </p>
       </div>
@@ -284,16 +284,16 @@ export default function HelpPage() {
         <p className="mt-1 text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
           We're one email away.
         </p>
-        <a
-          href="mailto:support@interviewera.in"
-          className="mt-4 inline-flex h-10 items-center rounded-lg px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        <Link
+          href="/contact"
+          className="landing-cta-lift mt-4 inline-flex h-10 items-center rounded-lg px-5 text-sm font-semibold text-white transition-opacity hover:opacity-90"
           style={{
             background: 'var(--accent-primary)',
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.14), 0 4px 14px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
           }}
         >
           Contact Support
-        </a>
+        </Link>
       </div>
     </main>
   );

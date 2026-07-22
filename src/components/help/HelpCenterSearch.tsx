@@ -137,9 +137,9 @@ export function HelpCenterSearch() {
       {filtered.length === 0 && (
         <p className="mt-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
           No topics match &ldquo;{query}&rdquo;. Try a different term, or{' '}
-          <a href="mailto:support@interviewera.in" className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-            email support
-          </a>
+          <Link href="/contact" className="font-semibold underline-offset-2 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+            contact support
+          </Link>
           .
         </p>
       )}
