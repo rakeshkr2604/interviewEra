@@ -10,16 +10,17 @@ export type MeetInterviewer = {
 };
 
 /**
- * Marketing-only persona intros (Phase 4a + 6d TTS).
+ * Marketing-only persona intros (Phase 4a + 6d/6e TTS).
  * Mapping: Rohan = Technical (live `arjun`), Meera = HR (live `priya`).
- * Spoken lines match script/start voice preview copy.
+ * Spoken lines sized so ElevenLabs TTS ≈ 10s video duration.
  */
 export const MEET_INTERVIEWERS: MeetInterviewer[] = [
   {
     id: 'rohan',
     name: 'Rohan',
     roleLine: 'Technical deep-dives',
-    spokenLine: "Hello! I'm Rohan, your technical interviewer. Let's dive into your experience.",
+    spokenLine:
+      "Hello! I'm Rohan — technical interviewer at InterviewEra. Today we'll cover your projects, stack choices, and how you reason under pressure.",
     badge: 'TECH PRACTICE',
     videoSrc: '/assets/rohan-intro.mp4',
     posterSrc: '/assets/rohan-intro-poster.webp',
@@ -28,7 +29,8 @@ export const MEET_INTERVIEWERS: MeetInterviewer[] = [
     id: 'meera',
     name: 'Meera',
     roleLine: 'HR & behavioral rounds',
-    spokenLine: "Hi! I'm Meera, your AI interviewer. I'll guide you through this session.",
+    spokenLine:
+      "Hi! I'm Meera, your AI interviewer. I'll guide you through this session, ask about your experience, and help you practice with clarity.",
     badge: 'HR PRACTICE',
     videoSrc: '/assets/meera-intro.mp4',
     posterSrc: '/assets/meera-intro-poster.webp',

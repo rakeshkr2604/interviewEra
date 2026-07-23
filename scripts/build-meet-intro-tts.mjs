@@ -1,6 +1,6 @@
 /**
  * Build Meet-interviewer intro MP4s: silent video + ElevenLabs TTS mux.
- * Spoken lines match script/start voice preview copy (role-correct).
+ * Spoken lines sized so TTS ≈ 10s video (Phase 6e).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,18 +19,17 @@ if (!KEY) {
   process.exit(1);
 }
 
-/** Exact product preview lines from script/start (cards had no greeting caption). */
 const CLIPS = [
   {
     id: 'rohan',
     voiceId: SAGAR,
-    line: "Hello! I'm Rohan, your technical interviewer. Let's dive into your experience.",
+    line: "Hello! I'm Rohan — technical interviewer at InterviewEra. Today we'll cover your projects, stack choices, and how you reason under pressure.",
     videoIn: 'public/assets/rohan-intro.mp4',
   },
   {
     id: 'meera',
     voiceId: SIA,
-    line: "Hi! I'm Meera, your AI interviewer. I'll guide you through this session.",
+    line: "Hi! I'm Meera, your AI interviewer. I'll guide you through this session, ask about your experience, and help you practice with clarity.",
     videoIn: 'public/assets/meera-intro.mp4',
   },
 ];
@@ -83,18 +82,14 @@ for (const clip of CLIPS) {
   const aac = path.join(TMP, `${clip.id}-tts.m4a`);
   const out = path.join(TMP, `${clip.id}-muxed.mp4`);
 
-  // Ensure video-only (strip any audio if present)
   ff('-i', clip.videoIn, '-map', '0:v:0', '-c:v', 'copy', '-an', silent);
-
   await tts(clip.voiceId, clip.line, mp3);
-  // Convert TTS to AAC for mp4 mux
   ff('-i', mp3, '-c:a', 'aac', '-b:a', '128k', aac);
 
   const vDur = probeDuration(silent);
   const aDur = probeDuration(aac);
   console.log(`${clip.id}: video=${vDur.toFixed(2)}s audio=${aDur.toFixed(2)}s before=${before}B`);
 
-  // If audio longer than video, trim audio to video length; else pad with silence via -shortest off and apad
   if (aDur > vDur + 0.05) {
     ff(
       '-i',
@@ -118,7 +113,6 @@ for (const clip of CLIPS) {
       out,
     );
   } else {
-    // Pad audio with silence to video duration so loops don't click mid-word restart oddly
     ff(
       '-i',
       silent,
