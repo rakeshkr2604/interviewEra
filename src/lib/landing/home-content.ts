@@ -149,7 +149,7 @@ export const FEATURE_PILLARS = [
     title: 'Practice loop',
     subtitle: 'Measure progress between sessions',
     icon: 'target' as const,
-    bullets: ['Progress across sessions', 'Know what to fix before D-Day'],
+    bullets: ['Progress across sessions', 'Know what to fix before it counts'],
   },
 ] as const;
 
@@ -212,7 +212,7 @@ export const POSITIONING_WHY_MATTERS = {
   points: [
     {
       title: 'Without scoring → you don’t know if you improved',
-      body: 'Numbers force iteration before D-Day.',
+      body: 'Numbers force iteration before the real interview.',
     },
     {
       title: 'Without structure → answers stay random',

@@ -28,7 +28,7 @@ export const BEFORE_AFTER = {
     'Students give generic, unstructured answers — nothing forces Situation → Task → Action → Result',
     'Human mocks hit a ceiling; most of the batch never gets a real panel rep',
     'Feedback depends on who ran the mock — no single bar to compare students',
-    'Placement readiness is assumed from attendance and vibes, not evaluated answers',
+    'Placement readiness is assumed from attendance and guesswork, not evaluated answers',
   ],
   after: [
     'Every answer follows a structured, evaluated format before it counts as “done”',
@@ -218,7 +218,7 @@ export const PRICING_CONTEXT = {
   roi: 'Improving outcomes for even a small share of the batch typically offsets the per-seat cost.',
   /** ₹799 / 365 ≈ ₹2.19 — keep in sync with FAQ / campus annual seat price */
   perStudentPerDay: '₹2.19 per student per day',
-  missedOpportunity: '₹2.19 per student per day — built for every batch, not just your toppers',
+  missedOpportunity: '₹2.19 per student per day — built for every batch, not just your top performers',
 } as const;
 
 export const FINAL_CTA = {

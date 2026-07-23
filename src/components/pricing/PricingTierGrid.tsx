@@ -18,6 +18,7 @@ import {
   marketingPaidCtaLabel,
   planPeriodLine,
   planPriceLine,
+  planUsdApproxHint,
   upgradeCheckoutLabel,
 } from '@/lib/pricing/copy';
 import { PlanStatusHeader } from '@/components/pricing/PlanStatusHeader';
@@ -151,7 +152,7 @@ export function MarketingPricingSection() {
       <BillingCycleToggle value={cycle} onChange={setCycle} id="marketing-billing" variant="default" />
       <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
         ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days of full-feedback practice — less than what most spend on a
-        single day of takeout, for a month of getting interview-ready.
+        single day of eating out, for a month of getting interview-ready.
       </p>
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {/* Free */}
@@ -200,7 +201,10 @@ export function MarketingPricingSection() {
               Starter
             </CardTitle>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {planPriceLine('starter')}
+              {planPriceLine('starter')}{' '}
+              <span className="text-sm font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                ({planUsdApproxHint('starter')})
+              </span>
             </p>
             <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
               {planPeriodLine()}
@@ -239,7 +243,10 @@ export function MarketingPricingSection() {
               Pro
             </CardTitle>
             <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent-primary)' }}>
-              {planPriceLine('pro')}
+              {planPriceLine('pro')}{' '}
+              <span className="text-sm font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                ({planUsdApproxHint('pro')})
+              </span>
             </p>
             <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
               {planPeriodLine()}

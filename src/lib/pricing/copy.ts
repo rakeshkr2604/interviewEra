@@ -63,6 +63,21 @@ export function planPriceLine(plan: PaidPlanId): string {
   return `₹${PAID_PLANS[plan].amountInr}`;
 }
 
+/**
+ * Approximate USD hint for marketing pricing cards (international clarity).
+ * Rate used: ~₹83 = US$1 (mid-2026 ballpark). Rounded to whole dollars — not FX-precise.
+ *   Starter ₹149 → ~$1.80 → ~$2
+ *   Pro     ₹399 → ~$4.81 → ~$5
+ */
+export const PLAN_USD_APPROX: Record<PaidPlanId, string> = {
+  starter: '~$2',
+  pro: '~$5',
+} as const;
+
+export function planUsdApproxHint(plan: PaidPlanId): string {
+  return PLAN_USD_APPROX[plan];
+}
+
 export function planPeriodLine(): string {
   return PLAN_ACCESS_PERIOD_LABEL;
 }

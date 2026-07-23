@@ -53,7 +53,7 @@ const CARDS: TeamsAudienceCard[] = [
   },
   {
     title: 'For Colleges',
-    bullets: ['Campus placements', 'Bulk onboarding', 'T&P dashboard', 'Student analytics'],
+    bullets: ['Campus placements', 'Bulk onboarding', 'T&P (Training & Placement) dashboard', 'Student analytics'],
     cta: 'Set up Campus Workspace',
     ctaKey: CTA_KEYS.CAMPUS_WORKSPACE,
     section: 'teams_colleges',

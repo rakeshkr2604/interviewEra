@@ -20,7 +20,7 @@ export const SCROLL_SHOWCASE_STEPS = [
   {
     id: 'report',
     num: '03',
-    title: 'Feedback you can act on — not a vibe.',
+    title: 'Feedback you can act on — not a guess.',
     body: 'Every session ends with a scored report across five dimensions, plus the exact moments to improve. Your next attempt is measurably better.',
     chips: ['5 scored dimensions', 'Moment-level notes'],
   },

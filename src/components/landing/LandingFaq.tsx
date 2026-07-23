@@ -53,7 +53,7 @@ export const LANDING_FAQS = [
   },
   {
     q: 'Can I use this for campus placement and off-campus interviews?',
-    a: 'Yes. The same simulator works for T&P season campus drives, internship loops, and off-campus applications. Your resume and target role shape the question mix either way.',
+    a: 'Yes. The same simulator works for T&P (Training & Placement) season campus drives, internship loops, and off-campus applications. Your resume and target role shape the question mix either way.',
   },
   {
     q: 'Is my interview data private?',

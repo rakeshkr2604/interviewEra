@@ -309,7 +309,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                   }}
                 >
                   <Building2 className="mr-1.5 inline size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                  For T&amp;P and campus leadership
+                  For T&amp;P (Training &amp; Placement) and campus leadership
                 </Badge>
               </motion.div>
 

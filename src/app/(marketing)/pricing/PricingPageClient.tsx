@@ -15,6 +15,7 @@ import {
   marketingPaidCtaLabel,
   planPeriodLine,
   planPriceLine,
+  planUsdApproxHint,
 } from '@/lib/pricing/copy';
 import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
 import { UpgradePageFooter } from '@/components/pricing/UpgradePageFooter';
@@ -292,7 +293,8 @@ export function PricingPageClient() {
               <div style={{ marginBottom: 16 }}>
                 <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Starter</h2>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.text, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
-                  {planPriceLine('starter')}
+                  {planPriceLine('starter')}{' '}
+                  <span style={{ fontSize: 14, fontWeight: 500, color: T.text3 }}>({planUsdApproxHint('starter')})</span>
                 </p>
                 <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{planPeriodLine()}</p>
               </div>
@@ -316,7 +318,8 @@ export function PricingPageClient() {
               <div style={{ marginBottom: 16 }}>
                 <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 8, color: T.text }}>Pro</h2>
                 <p style={{ fontSize: 30, fontWeight: 800, color: T.acc2, fontFamily: "'JetBrains Mono', monospace", margin: 0 }}>
-                  {planPriceLine('pro')}
+                  {planPriceLine('pro')}{' '}
+                  <span style={{ fontSize: 14, fontWeight: 500, color: T.text3 }}>({planUsdApproxHint('pro')})</span>
                 </p>
                 <p style={{ fontSize: 12, color: T.text3, marginTop: 4 }}>{planPeriodLine()}</p>
               </div>
@@ -338,7 +341,7 @@ export function PricingPageClient() {
           {/* Anchor copy */}
           <p style={{ fontSize: 14, lineHeight: 1.8, color: T.text2, textAlign: 'center', marginTop: 24, maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
             ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days of full-feedback practice — less than what most spend on a
-            single day of takeout, for a month of getting interview-ready.
+            single day of eating out, for a month of getting interview-ready.
           </p>
           <PaymentTrustSection variant="marketing" />
           <UpgradePageFooter variant="marketing" />
