@@ -126,7 +126,7 @@ export default function LandingMeetInterviewers() {
     >
       <div className={LANDING_HOME_INNER}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
-          <span className={LANDING_HOME_EYEBROW}>Meet your interviewers</span>
+          <span className={LANDING_HOME_EYEBROW}>Meet the practice personas</span>
           <h2 id="meet-interviewers-heading" className={LANDING_HOME_HEADING}>
             Two practice personas, two round types
           </h2>
