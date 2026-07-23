@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   LANDING_HOME_EYEBROW,
   LANDING_HOME_HEADER_BLOCK,
@@ -22,67 +22,24 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function MuteIcon({ muted }: { muted: boolean }) {
-  if (muted) {
-    return (
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-        <path
-          d="M11 5L6 9H2v6h4l5 4V5z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M23 9l-6 6M17 9l6 6"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-        />
-      </svg>
-    );
-  }
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M11 5L6 9H2v6h4l5 4V5z"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M15.5 8.5a5 5 0 010 7M19 5a9 9 0 010 14"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
 function AvatarIntroCard({
   interviewer,
   videoRef,
-  muted,
-  onToggleMute,
 }: {
   interviewer: MeetInterviewer;
   videoRef: (el: HTMLVideoElement | null) => void;
-  muted: boolean;
-  onToggleMute: () => void;
 }) {
   return (
     <article className="ie-meet-card flex flex-col">
       <div className="ie-meet-media">
         <video
           ref={videoRef}
-          muted={muted}
+          muted
           loop
           playsInline
           preload="none"
           poster={interviewer.posterSrc}
-          // Decorative while muted; when unmuted, expose the spoken line.
-          aria-hidden={muted}
-          aria-label={muted ? undefined : `${interviewer.name}: ${interviewer.spokenLine}`}
+          aria-hidden
         >
           <source src={interviewer.videoSrc} type="video/mp4" />
         </video>
@@ -101,15 +58,6 @@ function AvatarIntroCard({
             {interviewer.badge}
           </span>
         </div>
-        <button
-          type="button"
-          className="ie-meet-mute-btn absolute right-3 top-3"
-          onClick={onToggleMute}
-          aria-pressed={!muted}
-          aria-label={muted ? `Unmute ${interviewer.name}` : `Mute ${interviewer.name}`}
-        >
-          <MuteIcon muted={muted} />
-        </button>
       </div>
       <div className="px-4 py-4 sm:px-5 sm:py-5">
         <h3
@@ -121,12 +69,6 @@ function AvatarIntroCard({
         <p className="m-0 mt-1 text-sm leading-relaxed sm:text-[15px]" style={{ color: 'var(--text-secondary)' }}>
           {interviewer.roleLine}
         </p>
-        <p
-          className="m-0 mt-2 text-[13px] leading-snug sm:text-sm"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          “{interviewer.spokenLine}”
-        </p>
       </div>
     </article>
   );
@@ -135,27 +77,22 @@ function AvatarIntroCard({
 export default function LandingMeetInterviewers() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
-  const [mutedById, setMutedById] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(MEET_INTERVIEWERS.map((p) => [p.id, true])),
-  );
-
-  const syncPlayback = useCallback((shouldPlay: boolean) => {
-    const reduce = prefersReducedMotion();
-    for (const v of videoRefs.current) {
-      if (!v) continue;
-      // Reduced-motion: no autoplay. User unmute is a gesture and may start playback.
-      if (reduce && shouldPlay) {
-        v.pause();
-        continue;
-      }
-      if (shouldPlay) void v.play().catch(() => {});
-      else v.pause();
-    }
-  }, []);
 
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
+
+    const syncPlayback = (shouldPlay: boolean) => {
+      if (prefersReducedMotion()) {
+        for (const v of videoRefs.current) v?.pause();
+        return;
+      }
+      for (const v of videoRefs.current) {
+        if (!v) continue;
+        if (shouldPlay) void v.play().catch(() => {});
+        else v.pause();
+      }
+    };
 
     if (!('IntersectionObserver' in window)) {
       section.classList.add('is-in-view');
@@ -178,29 +115,7 @@ export default function LandingMeetInterviewers() {
       io.disconnect();
       syncPlayback(false);
     };
-  }, [syncPlayback]);
-
-  // Keep DOM muted attribute in sync (React boolean + imperative for safety).
-  useEffect(() => {
-    MEET_INTERVIEWERS.forEach((person, i) => {
-      const el = videoRefs.current[i];
-      if (!el) return;
-      el.muted = mutedById[person.id] ?? true;
-    });
-  }, [mutedById]);
-
-  const toggleMute = (id: string, index: number) => {
-    setMutedById((prev) => {
-      const nextMuted = !(prev[id] ?? true);
-      const el = videoRefs.current[index];
-      if (el) {
-        el.muted = nextMuted;
-        // User gesture: allow play even under reduced-motion when unmuting.
-        if (!nextMuted) void el.play().catch(() => {});
-      }
-      return { ...prev, [id]: nextMuted };
-    });
-  };
+  }, []);
 
   return (
     <section
@@ -226,8 +141,6 @@ export default function LandingMeetInterviewers() {
             <AvatarIntroCard
               key={person.id}
               interviewer={person}
-              muted={mutedById[person.id] ?? true}
-              onToggleMute={() => toggleMute(person.id, i)}
               videoRef={(el) => {
                 videoRefs.current[i] = el;
               }}

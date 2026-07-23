@@ -59,31 +59,3 @@ html[data-theme='dark'] .ie-meet-media {
     animation: none !important;
   }
 }
-
-/* Mute / unmute — always available (including prefers-reduced-motion) */
-.ie-meet-mute-btn {
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
-  background: color-mix(in srgb, var(--bg-primary) 88%, transparent);
-  color: var(--text-primary);
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  transition: background 160ms ease, border-color 160ms ease;
-}
-
-.ie-meet-mute-btn:hover {
-  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--card-border));
-  background: color-mix(in srgb, var(--bg-primary) 96%, transparent);
-}
-
-.ie-meet-mute-btn:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
