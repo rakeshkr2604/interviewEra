@@ -1,0 +1,61 @@
+/* LandingMeetInterviewers — avatar intro clips (no base64) */
+
+.ie-meet-card {
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--bg-secondary));
+  overflow: hidden;
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--accent-primary) 8%, transparent);
+}
+
+.ie-meet-media {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--bg-secondary) 60%, #c9c7d4);
+}
+
+html[data-theme='dark'] .ie-meet-media {
+  background: color-mix(in srgb, var(--bg-secondary) 80%, #2a2740);
+}
+
+.ie-meet-media video,
+.ie-meet-media img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 18%;
+}
+
+.ie-meet-media video {
+  z-index: 1;
+  background: transparent;
+}
+
+.ie-meet-badge {
+  animation-play-state: paused;
+}
+
+.ie-meet-interviewers.is-in-view .ie-meet-badge-dot {
+  animation: ie-meet-pulse 1.6s ease-in-out infinite;
+  animation-play-state: running;
+}
+
+@keyframes ie-meet-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-meet-badge-dot {
+    animation: none !important;
+  }
+}

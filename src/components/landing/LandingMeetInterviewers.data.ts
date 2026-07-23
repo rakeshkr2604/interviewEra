@@ -1,0 +1,28 @@
+export type MeetInterviewer = {
+  id: 'rohan' | 'meera';
+  name: string;
+  roleLine: string;
+  badge: string;
+  videoSrc: string;
+  posterSrc: string;
+};
+
+/** Marketing-only persona intros (Phase 4a). Live session avatars remain Priya/Arjun until a later rename. */
+export const MEET_INTERVIEWERS: MeetInterviewer[] = [
+  {
+    id: 'rohan',
+    name: 'Rohan',
+    roleLine: 'HR & behavioral rounds',
+    badge: 'HR PRACTICE',
+    videoSrc: '/assets/rohan-intro.mp4',
+    posterSrc: '/assets/rohan-intro-poster.webp',
+  },
+  {
+    id: 'meera',
+    name: 'Meera',
+    roleLine: 'Technical deep-dives',
+    badge: 'TECH PRACTICE',
+    videoSrc: '/assets/meera-intro.mp4',
+    posterSrc: '/assets/meera-intro-poster.webp',
+  },
+];

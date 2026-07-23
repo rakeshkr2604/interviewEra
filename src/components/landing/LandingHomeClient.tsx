@@ -2,6 +2,16 @@
 
 import dynamic from 'next/dynamic';
 
+const LandingMeetInterviewers = dynamic(() => import('@/components/landing/LandingMeetInterviewers'), {
+  loading: () => (
+    <div
+      className="mx-auto my-12 min-h-[420px] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      style={{ background: 'var(--bg-secondary)' }}
+      aria-hidden
+    />
+  ),
+});
+
 const LandingScrollShowcase = dynamic(() => import('@/components/landing/LandingScrollShowcase'), {
   loading: () => (
     <div
@@ -54,6 +64,10 @@ const LandingFinalCta = dynamic(() => import('@/components/landing/LandingFinalC
 
 export function LandingScrollShowcaseLazy() {
   return <LandingScrollShowcase />;
+}
+
+export function LandingMeetInterviewersLazy() {
+  return <LandingMeetInterviewers />;
 }
 
 /** Readiness-stage cards — sits after AudiencePath (role) in the Phase 3j hierarchy. */

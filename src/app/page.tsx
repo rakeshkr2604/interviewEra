@@ -5,6 +5,7 @@ import LandingHero from '@/components/landing/LandingHero';
 import {
   LandingFinalCtaLazy,
   LandingHomeMidFoldLazy,
+  LandingMeetInterviewersLazy,
   LandingScoringEngineLazy,
   LandingScrollShowcaseLazy,
 } from '@/components/landing/LandingHomeClient';
@@ -29,9 +30,9 @@ function HeroBetaPill() {
  * Homepage narrative: positioning → trust → conversion (not documentation).
  * Campus/T&P content lives on /campus; deep FAQ/support lives in the Help Center.
  *
- * Section order (Phase 3j): Hero → WhyFail → ScrollShowcase → InterviewDemo →
- * ScoringEngine → BeforeAfter → Positioning → Founder → AudiencePath → MidFold →
- * Community → FAQ → FinalCta → MoneyPageLinks. MarketingFooter stays in MarketingLayout.
+ * Section order (Phase 4a): Hero → WhyFail → ScrollShowcase → InterviewDemo →
+ * ScoringEngine → BeforeAfter → Positioning → Founder → MeetInterviewers →
+ * AudiencePath → MidFold → Community → FAQ → FinalCta → MoneyPageLinks.
  */
 export default function Page() {
   return (
@@ -45,6 +46,7 @@ export default function Page() {
         <LandingBeforeAfter />
         <LandingPositioningSection />
         <LandingFounderSection />
+        <LandingMeetInterviewersLazy />
         <AudiencePathSection />
         <LandingHomeMidFoldLazy />
         <CommunitySection />
