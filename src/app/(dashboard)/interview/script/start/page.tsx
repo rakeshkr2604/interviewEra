@@ -75,8 +75,8 @@ const TECHNICAL_ROLE_KEYWORDS = [
 ]
 
 const VOICE_INFO: Record<InterviewerId, { name: string; title: string; avatar: string }> = {
-  priya: { name: 'Meera', title: 'Senior Recruiter', avatar: '/avatars/female/female-avatar.png' },
-  arjun: { name: 'Rohan', title: 'Technical Lead', avatar: '/avatars/male/male-avatar.png' },
+  priya: { name: 'Meera', title: 'Senior Recruiter', avatar: '/avatars/female/meera-avatar.png' },
+  arjun: { name: 'Rohan', title: 'Technical Lead', avatar: '/avatars/male/rohan-avatar.png' },
 }
 
 const VOICE_PREVIEW_TEXT: Record<InterviewerId, string> = {

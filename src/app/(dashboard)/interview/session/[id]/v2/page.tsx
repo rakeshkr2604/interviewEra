@@ -105,7 +105,7 @@ export default function V2VoiceSessionPage() {
       voice={interviewer?.gender ?? 'female'}
       tone="neutral"
       questions={session.questions}
-      videoSrc={interviewer?.video ?? '/avatars/female/female-ai.mp4'}
+      videoSrc={interviewer?.video ?? '/avatars/female/meera-ai.mp4'}
     />
   )
 }

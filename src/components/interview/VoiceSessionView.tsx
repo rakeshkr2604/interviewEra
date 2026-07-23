@@ -30,7 +30,7 @@ export interface VoiceSessionViewProps {
   voice: TTSOptions['voice']
   tone: TTSOptions['tone']
   questions: StaticQuestion[]
-  /** Avatar loop video (e.g. /avatars/female/female-ai.mp4). */
+  /** Avatar loop video (e.g. /avatars/female/meera-ai.mp4). */
   videoSrc: string
   answerTimeoutMs?: number
 }
