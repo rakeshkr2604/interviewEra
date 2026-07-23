@@ -6,7 +6,7 @@
  * Features:
  *  - Paginated inbox with newest-first default
  *  - Full-text search (name, email, feedback content)
- *  - Filter pills: severity, read/unread, resolved, pinned, archived, rating, date
+ *  - Filter pills: severity, read/unread, resolved, pinned, consented, archived, rating, date
  *  - Per-card actions: mark read, resolve, archive, pin
  *  - Expandable card: full text, screenshot, session context, internal notes
  *  - Global stats bar: total / unread / unresolved / critical+high
@@ -559,6 +559,15 @@ function FeedbackCard({
                   Resolved
                 </span>
               )}
+              {row.consent_public_display === true && (
+                <span
+                  className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ borderColor: '#c4b5fd', background: '#f5f3ff', color: '#6d28d9' }}
+                  title="Submitter opted in to public display (first name only)"
+                >
+                  ✓ Consented
+                </span>
+              )}
             </div>
 
             {/* Row 1b: auto-detected labels */}
@@ -892,6 +901,7 @@ interface Filters {
   is_resolved:  string;
   is_pinned:    string;
   show_archived: string;
+  consent_public: string; // '' | 'true'
   date_range:   string;   // '' | 'today' | 'week' | 'month'
   label:        string;   // '' | one of FeedbackLabel
 }
@@ -920,6 +930,7 @@ export default function PlatformFeedbackPage() {
     is_resolved:   '',
     is_pinned:     '',
     show_archived: '',
+    consent_public: '',
     date_range:    '',
     label:         '',
   });
@@ -968,6 +979,7 @@ export default function PlatformFeedbackPage() {
       if (filters.is_resolved) p.set('is_resolved',   filters.is_resolved);
       if (filters.is_pinned)   p.set('is_pinned',     filters.is_pinned);
       if (filters.show_archived) p.set('show_archived', filters.show_archived);
+      if (filters.consent_public) p.set('consent_public', filters.consent_public);
       if (filters.label)         p.set('label',         filters.label);
       const dr = dateRangeToParams(filters.date_range);
       if (dr.date_from) p.set('date_from', dr.date_from);
@@ -986,7 +998,7 @@ export default function PlatformFeedbackPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, sort, debouncedQ, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.date_range, filters.label]);
+  }, [page, sort, debouncedQ, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.consent_public, filters.date_range, filters.label]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -1030,7 +1042,7 @@ export default function PlatformFeedbackPage() {
 
   // Clear all filters
   function clearFilters() {
-    setFilters({ q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', date_range: '', label: '' });
+    setFilters({ q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', consent_public: '', date_range: '', label: '' });
     setDebouncedQ('');
     setSort('newest');
     setPage(1);
@@ -1038,7 +1050,7 @@ export default function PlatformFeedbackPage() {
 
   const hasActiveFilters = !!(
     filters.severity || filters.rating || filters.is_read || filters.is_resolved ||
-    filters.is_pinned || filters.show_archived || filters.date_range || filters.label || debouncedQ
+    filters.is_pinned || filters.show_archived || filters.consent_public || filters.date_range || filters.label || debouncedQ
   );
 
   return (
@@ -1138,6 +1150,13 @@ export default function PlatformFeedbackPage() {
         </FilterPill>
         <FilterPill active={filters.is_pinned === 'true'} activeColor="var(--accent-primary)" onClick={() => setFilter('is_pinned', filters.is_pinned === 'true' ? '' : 'true')}>
           <Pin className="h-3 w-3" /> Pinned
+        </FilterPill>
+        <FilterPill
+          active={filters.consent_public === 'true'}
+          activeColor="#6d28d9"
+          onClick={() => setFilter('consent_public', filters.consent_public === 'true' ? '' : 'true')}
+        >
+          ✓ Consented
         </FilterPill>
         <FilterPill active={filters.show_archived === 'true'} activeColor="#6b7280" onClick={() => setFilter('show_archived', filters.show_archived === 'true' ? '' : 'true')}>
           <Archive className="h-3 w-3" /> Archived

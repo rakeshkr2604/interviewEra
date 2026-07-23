@@ -177,6 +177,8 @@ export const feedbackSubmitSchema = z.object({
   confusionText: feedbackText(2000),
   bugsText: feedbackText(2000),
   wouldUseAgain: z.boolean().nullable().optional().default(null),
+  /** Opt-in only — never required; default false when omitted. */
+  consentPublicDisplay: z.boolean().optional().default(false),
   npsScore: z.coerce.number().int().min(0).max(10).nullable().optional().default(null),
   feedbackCategory: z
     .enum(['general', 'bug', 'feature', 'interview', 'report', 'ai_quality'])

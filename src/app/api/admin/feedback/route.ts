@@ -18,6 +18,7 @@
  *   date_to     (ISO date string)
  *   label       (one of the FeedbackLabel values, e.g. 'Mobile')
  *   email_status ('pending' | 'sent' | 'failed' | 'retrying' | '')
+ *   consent_public ('true' | '' — when true, only rows with consent_public_display)
  *   sort        ('newest' | 'oldest' | 'rating_asc' | 'rating_desc' | 'severity', default 'newest')
  *
  * Secured: platform admin only (ADMIN_EMAILS env var).
@@ -57,6 +58,8 @@ export interface FeedbackRow {
   assigned_to: string | null;
   // Auto-generated labels (migration 032)
   labels: string[];
+  // Public-display opt-in (migration 064) — false for all pre-consent rows
+  consent_public_display: boolean;
 }
 
 export interface DashboardStats {
@@ -113,6 +116,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   const dateTo        = searchParams.get('date_to') ?? '';
   const labelFilter   = searchParams.get('label') ?? '';
   const emailStatus   = searchParams.get('email_status') ?? '';
+  const consentPublic = searchParams.get('consent_public') ?? '';
   const sort          = searchParams.get('sort') ?? 'newest';
 
   const service = createServiceClient();
@@ -155,6 +159,7 @@ export async function GET(request: Request): Promise<NextResponse> {
   if (dateTo)                 query = query.lte('created_at', dateTo + 'T23:59:59Z');
   if (labelFilter)            query = query.contains('labels', [labelFilter]);
   if (emailStatus)            query = query.eq('email_status', emailStatus);
+  if (consentPublic === 'true') query = query.eq('consent_public_display', true);
 
   // Full-text search across multiple text columns
   if (q) {

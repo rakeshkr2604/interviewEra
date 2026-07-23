@@ -37,7 +37,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const { rating, npsScore, feedbackCategory, message, pageUrl, email } = parsed.data;
+  const { rating, consentPublicDisplay, npsScore, feedbackCategory, message, pageUrl, email } =
+    parsed.data;
   const service = createServiceClient();
   const createdAt = new Date();
   const name = email ? 'Anonymous (with email)' : 'Anonymous';
@@ -76,6 +77,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       confusion_text: '',
       bugs_text: feedbackCategory === 'bug' ? message : '',
       would_use_again: null,
+      consent_public_display: consentPublicDisplay === true,
       page_url: pageUrl,
       browser_info: payload.browserInfo,
       severity,

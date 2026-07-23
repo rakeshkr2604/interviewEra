@@ -92,6 +92,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   const [confusion, setConfusion] = useState('')
   const [bugs, setBugs] = useState('')
   const [wouldUse, setWouldUse] = useState<WouldUse>(null)
+  const [consentPublicDisplay, setConsentPublicDisplay] = useState(false)
   const [npsScore, setNpsScore] = useState<number | null>(null)
   const [feedbackCategory, setFeedbackCategory] = useState<
     'general' | 'bug' | 'feature' | 'interview' | 'report' | 'ai_quality'
@@ -118,6 +119,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     setConfusion('')
     setBugs('')
     setWouldUse(null)
+    setConsentPublicDisplay(false)
     setNpsScore(null)
     setFeedbackCategory('general')
     setScreenshotPath(null)
@@ -154,6 +156,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
           confusionText: confusion,
           bugsText: bugs,
           wouldUseAgain: wouldUse,
+          consentPublicDisplay,
           npsScore,
           feedbackCategory,
           pageUrl: typeof window !== 'undefined' ? window.location.href : '',
@@ -349,6 +352,29 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
               onUploaded={setScreenshotPath}
               onCleared={() => setScreenshotPath(null)}
             />
+
+            {/* Optional public-display consent — unchecked by default; never required */}
+            <label
+              htmlFor="fb-consent-public"
+              className="flex cursor-pointer items-start gap-3 rounded-xl border p-3"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+            >
+              <input
+                id="fb-consent-public"
+                type="checkbox"
+                checked={consentPublicDisplay}
+                disabled={submitting}
+                onChange={(e) => setConsentPublicDisplay(e.target.checked)}
+                className="mt-1 size-4 shrink-0 rounded border accent-[var(--accent-primary)]"
+              />
+              <span className="text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
+                I&apos;m okay with InterviewEra sharing this feedback (with my first name only, never
+                my email) publicly on the website or in marketing materials.
+                <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Optional — you can submit feedback either way.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div
