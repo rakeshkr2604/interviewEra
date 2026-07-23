@@ -417,10 +417,10 @@ export default function LandingHeroSimulator() {
       if (aLabel) aLabel.textContent = 'Your answer · waiting';
       setNext('disabled');
 
-      // Phase 1 — Priya speaks the question
+      // Phase 1 — Meera speaks the question
       setChip('speak');
       setMic('muted');
-      if (footStatus) footStatus.textContent = 'Priya is reading the question…';
+      if (footStatus) footStatus.textContent = 'Meera is reading the question…';
       setProgress(0);
       startTimer();
       await sleep(380);
@@ -454,7 +454,7 @@ export default function LandingHeroSimulator() {
 
       // Phase 4 — adaptive follow-up
       setChip('speak');
-      if (footStatus) footStatus.textContent = 'Follow-up generated · Priya is asking…';
+      if (footStatus) footStatus.textContent = 'Follow-up generated · Meera is asking…';
       blockFu?.classList.add('show');
       await sleep(300);
       if (cancelled) return;
@@ -628,7 +628,7 @@ export default function LandingHeroSimulator() {
               </video>
               <div className="sim-listen-overlay" />
               <div className="sim-tile-name">
-                <span className="name">Priya · AI Interviewer</span>
+                <span className="name">Meera · AI Interviewer</span>
               </div>
             </div>
 

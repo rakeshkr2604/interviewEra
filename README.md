@@ -16,7 +16,7 @@ AI-powered mock interview practice SaaS for Indian students.
 
 ## Interview Flow
 1. Onboarding (goal + role + resume)
-2. Avatar selection (Priya / Arjun)
+2. Avatar selection (Meera / Rohan)
 3. Pre-interview briefing + checklist
 4. Live interview session (avatar video + TTS + real-time transcript + timer)
 5. Score report (radar chart + filler word analysis + AI feedback)

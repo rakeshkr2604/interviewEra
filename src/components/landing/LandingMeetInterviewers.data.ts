@@ -10,7 +10,7 @@ export type MeetInterviewer = {
 /**
  * Marketing-only persona intros (Phase 4a).
  * Mapping: Rohan = Technical (live `arjun`), Meera = HR (live `priya`).
- * Live session avatars remain Priya/Arjun until a later rename.
+ * Live session display names are also Rohan/Meera; internal ids remain priya/arjun.
  */
 export const MEET_INTERVIEWERS: MeetInterviewer[] = [
   {

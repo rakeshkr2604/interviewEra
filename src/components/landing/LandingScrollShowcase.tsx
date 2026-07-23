@@ -165,7 +165,7 @@ function VoiceVisual() {
         className="ie-ss-avatar-name mb-0 mt-2 text-center text-[13px] font-semibold tracking-tight"
         style={{ color: 'var(--text-primary)' }}
       >
-        Priya <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· AI Interviewer</span>
+        Meera <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· AI Interviewer</span>
       </p>
 
       <div className="ie-ss-eq mt-1.5 flex h-8 items-center gap-1" aria-hidden>

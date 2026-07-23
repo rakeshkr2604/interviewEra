@@ -18,14 +18,18 @@ describe('resolveElevenLabsVoiceId', () => {
     vi.restoreAllMocks();
   });
 
-  it('maps priya and female to Sia', () => {
-    expect(resolveElevenLabsVoiceId('priya')).toBe(ELEVENLABS_VOICE_IDS.priya);
-    expect(resolveElevenLabsVoiceId('female')).toBe(ELEVENLABS_VOICE_IDS.priya);
+  it('maps priya/Meera and female to Sia (female voice id)', () => {
+    // Meera (display) = id priya = female = Sia — do not swap with Sagar.
+    expect(ELEVENLABS_VOICE_IDS.priya).toBe('W7iR5kTNHozpIl2Jqq15');
+    expect(resolveElevenLabsVoiceId('priya')).toBe('W7iR5kTNHozpIl2Jqq15');
+    expect(resolveElevenLabsVoiceId('female')).toBe('W7iR5kTNHozpIl2Jqq15');
   });
 
-  it('maps arjun and male to Sagar', () => {
-    expect(resolveElevenLabsVoiceId('arjun')).toBe(ELEVENLABS_VOICE_IDS.arjun);
-    expect(resolveElevenLabsVoiceId('male')).toBe(ELEVENLABS_VOICE_IDS.arjun);
+  it('maps arjun/Rohan and male to Sagar (male voice id)', () => {
+    // Rohan (display) = id arjun = male = Sagar — do not swap with Sia.
+    expect(ELEVENLABS_VOICE_IDS.arjun).toBe('Qc0h5B5Mqs8oaH4sFZ9X');
+    expect(resolveElevenLabsVoiceId('arjun')).toBe('Qc0h5B5Mqs8oaH4sFZ9X');
+    expect(resolveElevenLabsVoiceId('male')).toBe('Qc0h5B5Mqs8oaH4sFZ9X');
   });
 
   it('reads ELEVENLABS_VOICE_ID_FEMALE alias from env', () => {

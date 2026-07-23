@@ -22,7 +22,7 @@ Fallback chain: `pdfjs-dist` primary → `pdf-parse` if pdfjs fails → OCR via 
 
 ## Interview lifecycle — dual-agent conversation
 
-**Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Priya/Arjun) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).
+**Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Meera/Rohan, ids `priya`/`arjun`) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).
 
 Flow: `api/interview/start` creates `interviews`/`questions` rows → `api/interview/process-answer` calls `interview-orchestrator.ts::processAnswer` (load/create `conversation_states` → `analyzeAnswer` → recompute difficulty/rapport → generate follow-up or move on) → `suggestNextQuestion` picks the next bank question scaled to difficulty → `api/interview/complete` backfills any missing evaluations with neutral 5/10 scores before calling `aggregateReport`. State-table failures are explicitly treated as non-fatal — the interview must not break because of dual-agent bookkeeping.
 

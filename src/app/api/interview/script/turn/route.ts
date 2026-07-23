@@ -485,8 +485,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       selected_interviewer:
         interview.script_type === 'SCRIPT_M'
           ? interview.interviewer_id === 'priya'
-            ? 'Priya'
-            : 'Arjun'
+            ? 'Meera'
+            : 'Rohan'
           : undefined,
       last_question_type:
         interview.script_type === 'SCRIPT_M' ? interview.last_question_type : undefined,

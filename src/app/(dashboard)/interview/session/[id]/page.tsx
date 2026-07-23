@@ -3279,7 +3279,7 @@ export default function InterviewSessionPage() {
                         Tap anywhere to hear the question
                       </span>
                       <span className="max-w-[20rem] text-sm text-white/85">
-                        Required on iPhone so {resolvedInterviewer?.name ?? 'Priya'} can speak before you answer.
+                        Required on iPhone so {resolvedInterviewer?.name ?? 'Meera'} can speak before you answer.
                       </span>
                     </button>
                   )}
@@ -3314,7 +3314,7 @@ export default function InterviewSessionPage() {
                 </div>
 
                 <p className="hidden shrink-0 border-t border-(--card-border)/60 px-4 py-2 text-[11px] text-(--text-secondary) lg:block">
-                  Interviewer: {resolvedInterviewer?.name ?? 'Priya'}
+                  Interviewer: {resolvedInterviewer?.name ?? 'Meera'}
                 </p>
               </div>
             </div>

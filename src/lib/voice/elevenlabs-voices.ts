@@ -1,10 +1,14 @@
 import type { InterviewerId } from '@/lib/config/interviewers';
 
-/** ElevenLabs voice library IDs for on-screen interviewers. */
+/**
+ * ElevenLabs voice library IDs for on-screen interviewers.
+ * Keys stay on stable internal ids (`priya` / `arjun`).
+ * Meera (display, female, id priya) → Sia. Rohan (display, male, id arjun) → Sagar.
+ */
 export const ELEVENLABS_VOICE_IDS = {
-  /** Priya — Sia: Sharp, Clear and Confident */
+  /** Meera (id priya) — Sia: Sharp, Clear and Confident */
   priya: 'W7iR5kTNHozpIl2Jqq15',
-  /** Arjun — Sagar: Real, Conversational E-Learning */
+  /** Rohan (id arjun) — Sagar: Real, Conversational E-Learning */
   arjun: 'Qc0h5B5Mqs8oaH4sFZ9X',
 } as const satisfies Record<InterviewerId, string>;
 

@@ -48,7 +48,7 @@ export function LandingHeroSimulatorShell() {
             <div className="sim-video-tile">
               <LandingHeroSimulatorPoster />
               <div className="sim-tile-name">
-                <span className="name">Priya · AI Interviewer</span>
+                <span className="name">Meera · AI Interviewer</span>
               </div>
             </div>
           </div>

@@ -1642,11 +1642,11 @@ export default function ScriptInterviewPage() {
   }, [interviewId])
 
   // ── Derived display values ───────────────────────────────────────────────────
-  // Never default to Priya before the session row loads — that flash caused
-  // abandoned Technical/Arjun sessions (candidate thought the voice bug returned).
+  // Never default to Meera (id priya) before the session row loads — that flash caused
+  // abandoned Technical/Rohan (id arjun) sessions (candidate thought the voice bug returned).
   const interviewerId: InterviewerId | null = interview?.interviewer_id ?? null
   const interviewer = interviewerId ? getInterviewerById(interviewerId) : undefined
-  /** Known name only — never invent "Priya" while hydrating. */
+  /** Known name only — never invent "Meera" while hydrating. */
   const interviewerName = interviewer?.name ?? null
   const totalQuestions = interview?.question_count ?? 0
   const isFollowUpTurn = currentTurn?.is_follow_up === true && currentPhase === 'core'

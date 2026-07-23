@@ -75,13 +75,13 @@ const TECHNICAL_ROLE_KEYWORDS = [
 ]
 
 const VOICE_INFO: Record<InterviewerId, { name: string; title: string; avatar: string }> = {
-  priya: { name: 'Priya', title: 'Senior Recruiter', avatar: '/avatars/female/female-avatar.png' },
-  arjun: { name: 'Arjun', title: 'Technical Lead', avatar: '/avatars/male/male-avatar.png' },
+  priya: { name: 'Meera', title: 'Senior Recruiter', avatar: '/avatars/female/female-avatar.png' },
+  arjun: { name: 'Rohan', title: 'Technical Lead', avatar: '/avatars/male/male-avatar.png' },
 }
 
 const VOICE_PREVIEW_TEXT: Record<InterviewerId, string> = {
-  priya: "Hi! I'm Priya, your AI interviewer. I'll guide you through this session.",
-  arjun: "Hello! I'm Arjun, your technical interviewer. Let's dive into your experience.",
+  priya: "Hi! I'm Meera, your AI interviewer. I'll guide you through this session.",
+  arjun: "Hello! I'm Rohan, your technical interviewer. Let's dive into your experience.",
 }
 
 export default function ScriptInterviewStartPage() {
@@ -467,7 +467,7 @@ export default function ScriptInterviewStartPage() {
               <div className="space-y-3.5">
                 {[
                   { icon: Brain, title: 'AI-calibrated questions', desc: 'Every question adapts to your exact role' },
-                  { icon: Sparkles, title: 'Script-based flow', desc: 'Priya or Arjun guides you turn-by-turn' },
+                  { icon: Sparkles, title: 'Script-based flow', desc: 'Meera or Rohan guides you turn-by-turn' },
                   { icon: Mic2, title: 'Voice + evaluation', desc: 'Real-time speech and structured feedback' },
                 ].map(({ icon: Icon, title, desc }) => (
                   <div key={title} className="flex items-start gap-3">
@@ -667,7 +667,7 @@ export default function ScriptInterviewStartPage() {
                     style={{ background: 'color-mix(in srgb, var(--bg-secondary) 60%, transparent)' }}
                   >
                     <p className="truncate text-[13px] font-medium text-(--text-primary) sm:text-sm">
-                      {interviewerId === 'priya' ? 'Priya' : 'Arjun'}
+                      {interviewerId === 'priya' ? 'Meera' : 'Rohan'}
                       <span className="font-normal text-(--text-muted)"> · Default</span>
                     </p>
                     <button
@@ -1017,7 +1017,7 @@ export default function ScriptInterviewStartPage() {
                     { label: 'Mode', value: MODE_LABEL[interviewMode] },
                     { label: 'Questions', value: `${DIFFICULTY_QUESTIONS[difficulty]} questions` },
                     { label: 'Duration', value: `~${DIFFICULTY_DURATION[difficulty]}` },
-                    { label: 'Voice', value: interviewerId === 'priya' ? 'Priya' : 'Arjun' },
+                    { label: 'Voice', value: interviewerId === 'priya' ? 'Meera' : 'Rohan' },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex items-center justify-between px-4 py-1">
                       <p className="text-sm text-(--text-secondary)">{label}</p>

@@ -13,7 +13,7 @@ export type Interviewer = {
 export const interviewers: Interviewer[] = [
   {
     id: 'priya',
-    name: 'Priya',
+    name: 'Meera',
     role: 'Senior Recruiter',
     avatarImage: '/avatars/female/female-avatar.png',
     video: '/avatars/female/female-ai.mp4',
@@ -22,7 +22,7 @@ export const interviewers: Interviewer[] = [
   },
   {
     id: 'arjun',
-    name: 'Arjun',
+    name: 'Rohan',
     role: 'Technical Lead',
     avatarImage: '/avatars/male/male-avatar.png',
     video: '/avatars/male/male-ai.mp4',
