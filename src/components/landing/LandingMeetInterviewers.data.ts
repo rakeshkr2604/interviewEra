@@ -7,21 +7,25 @@ export type MeetInterviewer = {
   posterSrc: string;
 };
 
-/** Marketing-only persona intros (Phase 4a). Live session avatars remain Priya/Arjun until a later rename. */
+/**
+ * Marketing-only persona intros (Phase 4a).
+ * Mapping: Rohan = Technical (live `arjun`), Meera = HR (live `priya`).
+ * Live session avatars remain Priya/Arjun until a later rename.
+ */
 export const MEET_INTERVIEWERS: MeetInterviewer[] = [
   {
     id: 'rohan',
     name: 'Rohan',
-    roleLine: 'HR & behavioral rounds',
-    badge: 'HR PRACTICE',
+    roleLine: 'Technical deep-dives',
+    badge: 'TECH PRACTICE',
     videoSrc: '/assets/rohan-intro.mp4',
     posterSrc: '/assets/rohan-intro-poster.webp',
   },
   {
     id: 'meera',
     name: 'Meera',
-    roleLine: 'Technical deep-dives',
-    badge: 'TECH PRACTICE',
+    roleLine: 'HR & behavioral rounds',
+    badge: 'HR PRACTICE',
     videoSrc: '/assets/meera-intro.mp4',
     posterSrc: '/assets/meera-intro-poster.webp',
   },

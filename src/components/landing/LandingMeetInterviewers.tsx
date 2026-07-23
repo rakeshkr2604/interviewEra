@@ -131,7 +131,7 @@ export default function LandingMeetInterviewers() {
             Two practice personas, two round types
           </h2>
           <p className={LANDING_HOME_SUBHEAD}>
-            Rohan and Meera introduce how InterviewEra splits HR behavioral practice from technical depth — same
+            Rohan and Meera introduce how InterviewEra splits technical depth from HR behavioral practice — same
             voice-led scored mock, tuned to the kind of panel you are preparing for.
           </p>
         </div>
