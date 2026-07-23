@@ -56,7 +56,7 @@ export function LandingScrollShowcaseLazy() {
   return <LandingScrollShowcase />;
 }
 
-/** PENDING DECISION (Phase 3d): "Pick your lane" readiness cards — not in target hierarchy. */
+/** Readiness-stage cards — sits after AudiencePath (role) in the Phase 3j hierarchy. */
 export function LandingHomeMidFoldLazy() {
   return <LandingHomeMidFold isLoggedIn={false} />;
 }

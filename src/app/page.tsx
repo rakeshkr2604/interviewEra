@@ -29,9 +29,9 @@ function HeroBetaPill() {
  * Homepage narrative: positioning → trust → conversion (not documentation).
  * Campus/T&P content lives on /campus; deep FAQ/support lives in the Help Center.
  *
- * Section order (Phase 3d): Hero → problem → how-it-works → demo → scoring →
- * before/after → positioning → founder → audience → community → FAQ → final CTA → SEO links.
- * MarketingFooter stays in MarketingLayout.
+ * Section order (Phase 3j): Hero → WhyFail → ScrollShowcase → InterviewDemo →
+ * ScoringEngine → BeforeAfter → Positioning → Founder → AudiencePath → MidFold →
+ * Community → FAQ → FinalCta → MoneyPageLinks. MarketingFooter stays in MarketingLayout.
  */
 export default function Page() {
   return (
@@ -40,15 +40,13 @@ export default function Page() {
         <LandingHero countPill={<HeroBetaPill />} />
         <LandingWhyFail />
         <LandingScrollShowcaseLazy />
-        {/* PENDING DECISION (Phase 3d): LandingHomeMidFold — kept after ScrollShowcase
-            (former relative position). Not in the approved hierarchy; decide keep/move/remove. */}
-        <LandingHomeMidFoldLazy />
         <LandingInterviewDemo />
         <LandingScoringEngineLazy />
         <LandingBeforeAfter />
         <LandingPositioningSection />
         <LandingFounderSection />
         <AudiencePathSection />
+        <LandingHomeMidFoldLazy />
         <CommunitySection />
         <LandingFaq />
         <LandingFinalCtaLazy />
