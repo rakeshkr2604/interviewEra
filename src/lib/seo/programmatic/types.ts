@@ -159,6 +159,19 @@ export interface SeoQuestion {
    * 1–2 sentences only.
    */
   readonly tip?: string
+  /** Conversational spoken-style answer used on richer skill pages. */
+  readonly spokenAnswer?: string
+  /** Quick revision bullets shown in expanded skill-page answers. */
+  readonly pointwiseAnswer?: readonly string[]
+  /** Scenario question rendered as a STAR answer instead of spoken/bullets. */
+  readonly isScenario?: boolean
+  /** Structured STAR answer for scenario questions. */
+  readonly starAnswer?: {
+    readonly situation: string
+    readonly task: string
+    readonly action: string
+    readonly result: string
+  }
   /** Model answer for hub pages (50–120 words). Preferred over `tip` in expanded cards and FAQ schema. */
   readonly expertAnswer?: string
   /** Why the panel asks this question (hub pages with expanded answers). */
@@ -188,6 +201,10 @@ export interface SeoQuestion {
  */
 export interface QuestionSet {
   readonly questions: readonly SeoQuestion[]
+  /** Short "commonly asked at" context shown on skill pages. */
+  readonly commonlyAskedAt?: string
+  /** Legal note displayed with company-context copy on skill pages. */
+  readonly legalDisclaimer?: string
   /**
    * ISO 8601 date of last material edit (YYYY-MM-DD).
    * Bump this when questions are added, revised, or pruned.

@@ -4440,6 +4440,31 @@ export function getSkillQuestionsFlat(slug: SkillSlug): readonly SeoQuestion[] {
   return SKILL_QUESTION_REGISTRY[slug]?.questions ?? []
 }
 
+export function getSkillQuestionSet(slug: SkillSlug): QuestionSet | undefined {
+  return SKILL_QUESTION_REGISTRY[slug]
+}
+
+function faqAnswerText(question: SeoQuestion): string {
+  if (question.spokenAnswer) return question.spokenAnswer
+  if (question.pointwiseAnswer && question.pointwiseAnswer.length > 0) {
+    return question.pointwiseAnswer.join('. ') + '.'
+  }
+  if (question.starAnswer) {
+    return [
+      `Situation: ${question.starAnswer.situation}`,
+      `Task: ${question.starAnswer.task}`,
+      `Action: ${question.starAnswer.action}`,
+      `Result: ${question.starAnswer.result}`,
+    ].join(' ')
+  }
+  return question.expertAnswer ?? question.tip ?? (question.keywords ? `Key concepts: ${question.keywords.join(', ')}.` : '')
+}
+
+function faqQuestionText(question: SeoQuestion): string {
+  // Keep schema question names plain-text so search results do not inherit decorative emoji prefixes.
+  return question.question.replace(/^\s*⭐\s*/, '')
+}
+
 /**
  * Filters questions eligible for FAQ schema (`tip` or `keywords` present)
  * and formats them as { question, answer } pairs for `faqPageJsonLd()`.
@@ -4457,14 +4482,16 @@ export function buildFaqPairs(
     .filter(
       (q) =>
         q.expertAnswer !== undefined ||
+        q.spokenAnswer !== undefined ||
+        (q.pointwiseAnswer && q.pointwiseAnswer.length > 0) ||
+        q.starAnswer !== undefined ||
         q.tip !== undefined ||
         (q.keywords && q.keywords.length > 0),
     )
     .slice(0, maxItems)
     .map((q) => ({
-      question: q.question,
-      // Prefer tip as the human-readable answer; fall back to keywords joined.
-      answer: q.expertAnswer ?? q.tip ?? (q.keywords ? `Key concepts: ${q.keywords.join(', ')}.` : ''),
+      question: faqQuestionText(q),
+      answer: faqAnswerText(q),
     }))
 }
 

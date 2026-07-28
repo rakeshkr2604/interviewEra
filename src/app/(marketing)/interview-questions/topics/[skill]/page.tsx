@@ -19,6 +19,7 @@ import {
 } from '@/lib/seo/programmatic/metadata'
 import {
   getSkillQuestionsFlat,
+  getSkillQuestionSet,
   buildFaqPairs,
 } from '@/lib/seo/programmatic/questions'
 import { generateMetadata as baseGenerateMetadata } from '@/lib/seo/metadata'
@@ -107,6 +108,7 @@ export default async function SkillQuestionsPage({ params }: Props) {
   if (!skill) notFound()
 
   const questions = getSkillQuestionsFlat(skill.slug as SkillSlug)
+  const questionSet = getSkillQuestionSet(skill.slug as SkillSlug)
   const linkSections = buildSkillPageLinks(skill)
 
   if (isReactHub(skill.slug)) {
@@ -310,6 +312,20 @@ export default async function SkillQuestionsPage({ params }: Props) {
               </span>
             ) : null}
           </div>
+
+          {questionSet?.commonlyAskedAt ? (
+            <p className="mt-5 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Commonly asked at:{' '}
+              </span>
+              {questionSet.commonlyAskedAt}
+            </p>
+          ) : null}
+          {questionSet?.legalDisclaimer ? (
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              {questionSet.legalDisclaimer}
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -318,6 +334,7 @@ export default async function SkillQuestionsPage({ params }: Props) {
           <QuestionsList
             questions={questions}
             heading={`${skill.label} Interview Questions`}
+            variant="skill-rich"
           />
         </div>
       </section>
