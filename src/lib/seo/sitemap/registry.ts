@@ -70,6 +70,12 @@ export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
   { path: '/teams', changeFrequency: 'monthly', priority: 0.74 },
   { path: '/about', changeFrequency: 'monthly', priority: 0.65 },
   { path: '/community', changeFrequency: 'monthly', priority: 0.58 },
+  {
+    path: '/google-apprenticeship',
+    changeFrequency: 'weekly',
+    priority: 0.9,
+    lastModified: '2026-07-28',
+  },
   { path: '/help-center', changeFrequency: 'monthly', priority: 0.62 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.55 },
   { path: '/resources', changeFrequency: 'weekly', priority: 0.82, lastModified: '2026-06-06' },

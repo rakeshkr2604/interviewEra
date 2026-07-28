@@ -1,4 +1,5 @@
 import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub'
+import { GOOGLE_APPRENTICESHIP_LAST_UPDATED } from '@/lib/seo/content/google-apprenticeship-hub'
 import { AGENTIC_CANONICAL_PATH, AGENTIC_LAST_UPDATED } from '@/lib/seo/blog/agentic-ai-hub'
 import { AGENTIC_CODING_ROUND_PATH } from '@/lib/seo/blog/agentic-spoke-coding-round'
 import { AI_PROMPT_ENGINEERING_PATH } from '@/lib/seo/blog/agentic-spoke-prompt-engineering'
@@ -658,6 +659,27 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
       { label: 'Start Mock Interview', href: '/signup', description: 'Run a scored session now' },
     ],
     recommendedTools: [TOOL.mock, TOOL.qgen, TOOL.star, TOOL.ats],
+  },
+  {
+    id: 'guide-google-apprenticeship-2026',
+    path: '/google-apprenticeship',
+    title: 'Google Apprenticeship 2026: Eligibility, Salary, Last Date & India Guide',
+    description:
+      'Google Apprenticeship applications open in India — eligibility, salary, Aug 3 2026 deadline, and application process for all four tracks.',
+    category: 'Career',
+    cluster: 'Placement Preparation',
+    type: 'blog',
+    readTime: '18 min read',
+    lastModified: GOOGLE_APPRENTICESHIP_LAST_UPDATED,
+    featured: true,
+    popular: true,
+    tags: ['google', 'apprenticeship', 'career', 'internship', 'fresher'],
+    relatedConcepts: [CONCEPT.placement, CONCEPT.mockBlog],
+    learnNext: [
+      { label: 'ATS Resume Checker', href: '/tools/ats-checker', description: 'Polish your resume before applying' },
+      { label: 'AI Mock Interviews', href: '/signup', description: 'Practice behavioral and technical rounds' },
+    ],
+    recommendedTools: [TOOL.ats, TOOL.mock, TOOL.qgen],
   },
   {
     id: 'questions-hub',

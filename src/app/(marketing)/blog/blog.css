@@ -4286,3 +4286,168 @@ html[data-theme='dark'] .ie-landing-premium .ie-blog-ai-mock-soft-panel p {
   }
 }
 
+/* Google Apprenticeship 2026 pillar — original infographic visuals (no third-party logos) */
+.ie-ga-hero-visual,
+.ie-ga-timeline-visual {
+  margin: 1.25rem 0;
+  width: 100%;
+}
+.ie-ga-hero-visual__inner,
+.ie-ga-timeline-visual__inner {
+  padding: 1.25rem 1.15rem 1.1rem;
+  border-radius: 18px;
+  border: 1px solid var(--card-border);
+  background:
+    radial-gradient(ellipse 80% 55% at 10% 0%, color-mix(in srgb, #4285f4 14%, transparent), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 95% 100%, color-mix(in srgb, var(--accent-primary) 18%, transparent), transparent 50%),
+    linear-gradient(155deg, #0f172a 0%, #111827 48%, #0b1220 100%);
+  box-shadow: var(--card-shadow);
+}
+.ie-ga-hero-visual__title,
+.ie-ga-timeline-visual__title {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  font-size: clamp(0.95rem, 2.2vw, 1.15rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+.ie-ga-hero-visual__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #86efac;
+}
+.ie-ga-hero-visual__pulse {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 55%, transparent);
+  animation: ie-ga-pulse 1.8s ease-out infinite;
+}
+@keyframes ie-ga-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 55%, transparent); }
+  70% { box-shadow: 0 0 0 0.55rem transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.ie-ga-hero-visual__grid {
+  margin: 0;
+  display: grid;
+  gap: 0.55rem;
+}
+.ie-ga-hero-visual__row {
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, #fff 6%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
+}
+.ie-ga-hero-visual__row dt {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.ie-ga-hero-visual__row dd {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+.ie-ga-hero-visual__icons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, #fff 10%, transparent);
+}
+.ie-ga-hero-visual__icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  background: color-mix(in srgb, #fff 8%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 12%, transparent);
+}
+.ie-ga-hero-visual__caption,
+.ie-ga-timeline-visual__caption {
+  margin: 0.55rem 0 0;
+  text-align: center;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.ie-ga-deadline-callout strong {
+  color: var(--text-primary);
+}
+.ie-ga-timeline-flow {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+.ie-ga-timeline-flow__item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.55rem 0.75rem;
+  align-items: start;
+  padding: 0.65rem 0.7rem;
+  border-radius: 12px;
+  background: color-mix(in srgb, #fff 6%, transparent);
+  border: 1px solid color-mix(in srgb, #fff 10%, transparent);
+}
+.ie-ga-timeline-flow__num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #fff;
+  background: color-mix(in srgb, #4285f4 75%, #1d4ed8);
+}
+.ie-ga-timeline-flow__body {
+  display: grid;
+  gap: 0.15rem;
+}
+.ie-ga-timeline-flow__body strong {
+  font-size: 0.84rem;
+  color: #f1f5f9;
+}
+.ie-ga-timeline-flow__body span {
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: #94a3b8;
+}
+.ie-ga-timeline-flow__arrow {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 0.85rem;
+  color: #64748b;
+  line-height: 1;
+  padding: 0.1rem 0;
+}
+@media (min-width: 640px) {
+  .ie-ga-hero-visual__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
