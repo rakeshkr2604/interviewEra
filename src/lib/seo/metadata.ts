@@ -170,7 +170,7 @@ export function generateMetadata({
       : titleSegment
   const safeDescription = clampMetaDescription(description)
   const promoTitle = clampSocialTitle(socialTitle ?? brandPageTitle(titleSegment))
-  const url = canonicalUrl(path)
+  const url = canonicalUrl(path) ?? undefined
   const image = ogImage || `${BASE_URL}/og/default.png`
 
   const robotsBlock: Metadata['robots'] = noIndex
@@ -190,12 +190,12 @@ export function generateMetadata({
         : titleSegment,
     description: safeDescription,
     ...(keywords !== undefined ? { keywords } : {}),
-    alternates: { canonical: url },
+    ...(url ? { alternates: { canonical: url } } : {}),
     robots: robotsBlock,
     openGraph: {
       title: promoTitle,
       description: safeDescription,
-      url,
+      ...(url ? { url } : {}),
       siteName: BRAND,
       images: [{ url: image, width: 1200, height: 630, alt: promoTitle }],
       locale: 'en_IN',

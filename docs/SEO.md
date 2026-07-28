@@ -29,6 +29,10 @@ GA4 is treated as a client-side backup, not the source of truth — the Razorpay
 **Common mistakes**: adding a new programmatic/marketing page without registering it in `src/lib/seo/sitemap/registry.ts`, or setting noindex metadata on a page that's still in the sitemap.
 **Verification required**: `npm run audit:noindex` must pass; check `SEO-INFRASTRUCTURE.md`'s indexability policy table for the correct classification of the new route.
 
+### Soft-404 / HTTP status on programmatic dynamics
+
+`(marketing)/loading.tsx` starts streaming before page data resolves. With default `dynamicParams: true`, an unknown slug still matches `[skill]` / `[company]` / `[role]` / tool variants, calls `notFound()`, and Next returns **HTTP 200** with the not-found UI (soft 404 for crawlers). Catalog pages that use `generateStaticParams` therefore export `dynamicParams = false` so unknown params 404 at the router. Guard: `src/lib/seo/programmatic/dynamic-params-guard.test.ts`. After a production build, confirm with `curl -sI` on an intentionally invalid slug (expect `404`).
+
 ## High risk: Analytics / funnel integrity
 
 **Why high risk**: the founder funnel dashboard and payment-completion tracking both depend on `product_events` being durable and non-duplicated.

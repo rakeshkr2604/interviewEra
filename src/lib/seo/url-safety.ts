@@ -8,15 +8,26 @@
  * the sitemap, metadata, or JSON-LD.
  */
 
-/** Segments that indicate an unresolved template param or runtime bug. */
-const INVALID_SEGMENT_RE = /^(\$|undefined|null|\[.*\]|\{.*\}|object\s+Object)$/i;
+/**
+ * Segments that indicate an unresolved template param or runtime bug.
+ * Reject punctuation-only segments (`$`, `&`, `---`) and digit-only
+ * segments (`10`) so malformed single-token paths never become canonicals.
+ *
+ * TRADEOFF — numeric-only segments (`^\d+$`): any future route that uses a
+ * purely numeric path segment (e.g. `/blog/2026`, `/guides/10`) will fail
+ * `isValidSeoPath` / `safeCanonicalUrl`. `canonicalUrl()` returns `null` and
+ * `generateMetadata()` omits the canonical tag; other callers must skip the
+ * `<loc>` / JSON-LD `url` field. Do not "fix" this by loosening the regex
+ * without deciding how numeric routes should opt in.
+ */
+const INVALID_SEGMENT_RE = /^(?:\d+|undefined|null|\[.*\]|\{.*\}|object\s+Object|[^\p{L}\p{N}]+)$/iu;
 
 /**
  * Returns true if `path` is a valid relative SEO path suitable for use in
  * sitemaps, canonical tags, and JSON-LD.
  *
  * Valid: '/', '/blog', '/interview-questions/software-engineer'
- * Invalid: '', '$', 'undefined', '//', '/[role]', '/null'
+ * Invalid: '', '$', '&', '10', 'undefined', '//', '/[role]', '/null'
  */
 export function isValidSeoPath(path: unknown): path is string {
   if (!path || typeof path !== 'string') return false;

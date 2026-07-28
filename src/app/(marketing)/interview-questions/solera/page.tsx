@@ -83,119 +83,125 @@ export default function SoleraInterviewHubPage() {
 
   const FAQ_LD = faqPageJsonLd([...SOLERA_FAQ_ITEMS])
 
-  const ITEM_LIST_LD = {
-    '@context': 'https://schema.org',
-    '@type': 'ItemList',
-    itemListOrder: 'https://schema.org/ItemListOrderAscending',
-    name: `${company.label} interview questions`,
-    url: canonicalUrl(SOLERA_CANONICAL_PATH),
-    numberOfItems: hubQuestions.length,
-    itemListElement: hubQuestions.map((q, idx) => ({
-      '@type': 'ListItem',
-      position: idx + 1,
-      name: q.question,
-    })),
-  }
+  const pageUrl = canonicalUrl(SOLERA_CANONICAL_PATH)
 
-  const SOLERA_PAGE_LD = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'WebSite',
-        '@id': `${ORIGIN}#website`,
-        url: ORIGIN,
-        name: 'InterviewEra',
-        publisher: { '@id': schemaIds.organization },
-        inLanguage: 'en-IN',
-      },
-      {
-        '@type': 'Organization',
-        '@id': schemaIds.organization,
-        name: 'InterviewEra',
-        url: ORIGIN,
-      },
-      {
-        '@type': 'Person',
-        '@id': `${ORIGIN}#solera-author`,
-        name: SOLERA_AUTHOR_NAME,
-        worksFor: { '@id': schemaIds.organization },
-      },
-      {
-        '@type': 'Person',
-        '@id': `${ORIGIN}#solera-reviewer`,
-        name: SOLERA_REVIEWER_NAME,
-        worksFor: { '@id': schemaIds.organization },
-      },
-      {
-        '@type': 'ImageObject',
-        '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image`,
-        url: `${ORIGIN}${SOLERA_HERO_PATH}`,
-        contentUrl: `${ORIGIN}${SOLERA_HERO_PATH}`,
-        caption: SOLERA_HERO_ALT,
-        width: SOLERA_HERO_WIDTH,
-        height: SOLERA_HERO_HEIGHT,
-      },
-      {
-        '@type': 'ImageObject',
-        '@id': `${ORIGIN}${SOLERA_PROCESS_PATH}#image`,
-        url: `${ORIGIN}${SOLERA_PROCESS_PATH}`,
-        contentUrl: `${ORIGIN}${SOLERA_PROCESS_PATH}`,
-        caption: SOLERA_PROCESS_ALT,
-        width: SOLERA_PROCESS_WIDTH,
-        height: SOLERA_PROCESS_HEIGHT,
-      },
-      {
-        '@type': 'WebPage',
-        '@id': canonicalUrl(SOLERA_CANONICAL_PATH),
-        url: canonicalUrl(SOLERA_CANONICAL_PATH),
-        name: SOLERA_META_TITLE,
-        isPartOf: { '@id': `${ORIGIN}#website` },
-        primaryImageOfPage: { '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image` },
-        mainEntity: { '@id': `${canonicalUrl(SOLERA_CANONICAL_PATH)}#article` },
-        inLanguage: 'en-IN',
-      },
-      {
-        '@type': 'CollectionPage',
-        '@id': `${canonicalUrl(SOLERA_CANONICAL_PATH)}#collection`,
-        name: `${company.label} Role Interview Guides`,
-        about: [
-          { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/software-engineer` },
-          { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/java-developer` },
-          { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/frontend-developer` },
-          { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/qa-engineer` },
-          { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/data-analyst` },
+  const ITEM_LIST_LD = pageUrl
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        itemListOrder: 'https://schema.org/ItemListOrderAscending',
+        name: `${company.label} interview questions`,
+        url: pageUrl,
+        numberOfItems: hubQuestions.length,
+        itemListElement: hubQuestions.map((q, idx) => ({
+          '@type': 'ListItem',
+          position: idx + 1,
+          name: q.question,
+        })),
+      }
+    : null
+
+  const SOLERA_PAGE_LD = pageUrl
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#solera-author`,
+            name: SOLERA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#solera-reviewer`,
+            name: SOLERA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image`,
+            url: `${ORIGIN}${SOLERA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${SOLERA_HERO_PATH}`,
+            caption: SOLERA_HERO_ALT,
+            width: SOLERA_HERO_WIDTH,
+            height: SOLERA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${SOLERA_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${SOLERA_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${SOLERA_PROCESS_PATH}`,
+            caption: SOLERA_PROCESS_ALT,
+            width: SOLERA_PROCESS_WIDTH,
+            height: SOLERA_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': pageUrl,
+            url: pageUrl,
+            name: SOLERA_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${pageUrl}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'CollectionPage',
+            '@id': `${pageUrl}#collection`,
+            name: `${company.label} Role Interview Guides`,
+            about: [
+              { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/software-engineer` },
+              { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/java-developer` },
+              { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/frontend-developer` },
+              { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/qa-engineer` },
+              { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/solera/data-analyst` },
+            ],
+          },
+          {
+            '@type': 'Article',
+            '@id': `${pageUrl}#article`,
+            headline: SOLERA_META_TITLE,
+            description: SOLERA_DESCRIPTION,
+            mainEntityOfPage: { '@id': pageUrl },
+            url: pageUrl,
+            datePublished: SOLERA_PUBLISHED_DATE,
+            dateModified: SOLERA_LAST_UPDATED,
+            dateReviewed: SOLERA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#solera-author` },
+            reviewedBy: { '@id': `${ORIGIN}#solera-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: [
+              { '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image` },
+              { '@id': `${ORIGIN}${SOLERA_PROCESS_PATH}#image` },
+            ],
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: [
+                'h1',
+                '#solera-hub-overview',
+                '#solera-hub-recruitment-calendar',
+                '#solera-hub-salary',
+                '#solera-hub-questions',
+              ],
+            },
+          },
         ],
-      },
-      {
-        '@type': 'Article',
-        '@id': `${canonicalUrl(SOLERA_CANONICAL_PATH)}#article`,
-        headline: SOLERA_META_TITLE,
-        description: SOLERA_DESCRIPTION,
-        mainEntityOfPage: { '@id': canonicalUrl(SOLERA_CANONICAL_PATH) },
-        url: canonicalUrl(SOLERA_CANONICAL_PATH),
-        datePublished: SOLERA_PUBLISHED_DATE,
-        dateModified: SOLERA_LAST_UPDATED,
-        dateReviewed: SOLERA_REVIEWED_DATE,
-        author: { '@id': `${ORIGIN}#solera-author` },
-        reviewedBy: { '@id': `${ORIGIN}#solera-reviewer` },
-        publisher: { '@id': schemaIds.organization },
-        image: [
-          { '@id': `${ORIGIN}${SOLERA_HERO_PATH}#image` },
-          { '@id': `${ORIGIN}${SOLERA_PROCESS_PATH}#image` },
-        ],
-        speakable: {
-          '@type': 'SpeakableSpecification',
-          cssSelector: [
-            'h1',
-            '#solera-hub-overview',
-            '#solera-hub-recruitment-calendar',
-            '#solera-hub-salary',
-            '#solera-hub-questions',
-          ],
-        },
-      },
-    ],
-  }
+      }
+    : null
 
   return (
     <>

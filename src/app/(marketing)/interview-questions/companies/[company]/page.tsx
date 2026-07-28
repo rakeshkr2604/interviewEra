@@ -54,6 +54,9 @@ export function generateStaticParams() {
   return allCompanyParams()
 }
 
+/** Unknown slugs must 404 at the router — not soft-404 via streamed notFound() under (marketing)/loading.tsx. */
+export const dynamicParams = false
+
 type Props = { params: Promise<{ company: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -115,119 +118,124 @@ export default async function CompanyQuestionsPage({ params }: Props) {
     )
 
     const FAQ_LD = faqPageJsonLd([...WIPRO_FAQ_ITEMS])
+    const pageUrl = canonicalUrl(WIPRO_CANONICAL_PATH)
 
-    const ITEM_LIST_LD = {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      itemListOrder: 'https://schema.org/ItemListOrderAscending',
-      name: `${company.label} interview questions`,
-      url: canonicalUrl(WIPRO_CANONICAL_PATH),
-      numberOfItems: hubQuestions.length,
-      itemListElement: hubQuestions.map((q, idx) => ({
-        '@type': 'ListItem',
-        position: idx + 1,
-        name: q.question,
-      })),
-    }
+    const ITEM_LIST_LD = pageUrl
+      ? {
+          '@context': 'https://schema.org',
+          '@type': 'ItemList',
+          itemListOrder: 'https://schema.org/ItemListOrderAscending',
+          name: `${company.label} interview questions`,
+          url: pageUrl,
+          numberOfItems: hubQuestions.length,
+          itemListElement: hubQuestions.map((q, idx) => ({
+            '@type': 'ListItem',
+            position: idx + 1,
+            name: q.question,
+          })),
+        }
+      : null
 
-    const WIPRO_PAGE_LD = {
-      '@context': 'https://schema.org',
-      '@graph': [
-        {
-          '@type': 'WebSite',
-          '@id': `${ORIGIN}#website`,
-          url: ORIGIN,
-          name: 'InterviewEra',
-          publisher: { '@id': schemaIds.organization },
-          inLanguage: 'en-IN',
-        },
-        {
-          '@type': 'Organization',
-          '@id': schemaIds.organization,
-          name: 'InterviewEra',
-          url: ORIGIN,
-        },
-        {
-          '@type': 'Person',
-          '@id': `${ORIGIN}#wipro-author`,
-          name: WIPRO_AUTHOR_NAME,
-          worksFor: { '@id': schemaIds.organization },
-        },
-        {
-          '@type': 'Person',
-          '@id': `${ORIGIN}#wipro-reviewer`,
-          name: WIPRO_REVIEWER_NAME,
-          worksFor: { '@id': schemaIds.organization },
-        },
-        {
-          '@type': 'ImageObject',
-          '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image`,
-          url: `${ORIGIN}${WIPRO_HERO_PATH}`,
-          contentUrl: `${ORIGIN}${WIPRO_HERO_PATH}`,
-          caption: WIPRO_HERO_ALT,
-          width: WIPRO_HERO_WIDTH,
-          height: WIPRO_HERO_HEIGHT,
-        },
-        {
-          '@type': 'ImageObject',
-          '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image`,
-          url: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
-          contentUrl: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
-          caption: WIPRO_PROCESS_ALT,
-          width: WIPRO_PROCESS_WIDTH,
-          height: WIPRO_PROCESS_HEIGHT,
-        },
-        {
-          '@type': 'WebPage',
-          '@id': canonicalUrl(WIPRO_CANONICAL_PATH),
-          url: canonicalUrl(WIPRO_CANONICAL_PATH),
-          name: WIPRO_META_TITLE,
-          isPartOf: { '@id': `${ORIGIN}#website` },
-          primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
-          mainEntity: { '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#article` },
-          inLanguage: 'en-IN',
-        },
-        {
-          '@type': 'CollectionPage',
-          '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#collection`,
-          name: `${company.label} Role Interview Guides`,
-          about: [
-            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/software-engineer` },
-            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/java-developer` },
-            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/data-analyst` },
-            { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/qa-engineer` },
+    const WIPRO_PAGE_LD = pageUrl
+      ? {
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebSite',
+              '@id': `${ORIGIN}#website`,
+              url: ORIGIN,
+              name: 'InterviewEra',
+              publisher: { '@id': schemaIds.organization },
+              inLanguage: 'en-IN',
+            },
+            {
+              '@type': 'Organization',
+              '@id': schemaIds.organization,
+              name: 'InterviewEra',
+              url: ORIGIN,
+            },
+            {
+              '@type': 'Person',
+              '@id': `${ORIGIN}#wipro-author`,
+              name: WIPRO_AUTHOR_NAME,
+              worksFor: { '@id': schemaIds.organization },
+            },
+            {
+              '@type': 'Person',
+              '@id': `${ORIGIN}#wipro-reviewer`,
+              name: WIPRO_REVIEWER_NAME,
+              worksFor: { '@id': schemaIds.organization },
+            },
+            {
+              '@type': 'ImageObject',
+              '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image`,
+              url: `${ORIGIN}${WIPRO_HERO_PATH}`,
+              contentUrl: `${ORIGIN}${WIPRO_HERO_PATH}`,
+              caption: WIPRO_HERO_ALT,
+              width: WIPRO_HERO_WIDTH,
+              height: WIPRO_HERO_HEIGHT,
+            },
+            {
+              '@type': 'ImageObject',
+              '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image`,
+              url: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
+              contentUrl: `${ORIGIN}${WIPRO_PROCESS_PATH}`,
+              caption: WIPRO_PROCESS_ALT,
+              width: WIPRO_PROCESS_WIDTH,
+              height: WIPRO_PROCESS_HEIGHT,
+            },
+            {
+              '@type': 'WebPage',
+              '@id': pageUrl,
+              url: pageUrl,
+              name: WIPRO_META_TITLE,
+              isPartOf: { '@id': `${ORIGIN}#website` },
+              primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
+              mainEntity: { '@id': `${pageUrl}#article` },
+              inLanguage: 'en-IN',
+            },
+            {
+              '@type': 'CollectionPage',
+              '@id': `${pageUrl}#collection`,
+              name: `${company.label} Role Interview Guides`,
+              about: [
+                { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/software-engineer` },
+                { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/java-developer` },
+                { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/data-analyst` },
+                { '@type': 'WebPage', url: `${ORIGIN}/interview-questions/companies/wipro/qa-engineer` },
+              ],
+            },
+            {
+              '@type': 'Article',
+              '@id': `${pageUrl}#article`,
+              headline: WIPRO_META_TITLE,
+              description: WIPRO_DESCRIPTION,
+              mainEntityOfPage: { '@id': pageUrl },
+              url: pageUrl,
+              datePublished: WIPRO_PUBLISHED_DATE,
+              dateModified: WIPRO_LAST_UPDATED,
+              dateReviewed: WIPRO_REVIEWED_DATE,
+              author: { '@id': `${ORIGIN}#wipro-author` },
+              reviewedBy: { '@id': `${ORIGIN}#wipro-reviewer` },
+              publisher: { '@id': schemaIds.organization },
+              image: [
+                { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
+                { '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image` },
+              ],
+              speakable: {
+                '@type': 'SpeakableSpecification',
+                cssSelector: [
+                  'h1',
+                  '#wipro-hub-overview',
+                  '#wipro-hub-recruitment-calendar',
+                  '#wipro-hub-salary',
+                  '#wipro-hub-questions',
+                ],
+              },
+            },
           ],
-        },
-        {
-          '@type': 'Article',
-          '@id': `${canonicalUrl(WIPRO_CANONICAL_PATH)}#article`,
-          headline: WIPRO_META_TITLE,
-          description: WIPRO_DESCRIPTION,
-          mainEntityOfPage: { '@id': canonicalUrl(WIPRO_CANONICAL_PATH) },
-          url: canonicalUrl(WIPRO_CANONICAL_PATH),
-          datePublished: WIPRO_PUBLISHED_DATE,
-          dateModified: WIPRO_LAST_UPDATED,
-          dateReviewed: WIPRO_REVIEWED_DATE,
-          author: { '@id': `${ORIGIN}#wipro-author` },
-          reviewedBy: { '@id': `${ORIGIN}#wipro-reviewer` },
-          publisher: { '@id': schemaIds.organization },
-          image: [
-            { '@id': `${ORIGIN}${WIPRO_HERO_PATH}#image` },
-            { '@id': `${ORIGIN}${WIPRO_PROCESS_PATH}#image` },
-          ],
-          speakable: {
-            '@type': 'SpeakableSpecification',
-            cssSelector: [
-              'h1',
-              '#wipro-hub-overview',
-              '#wipro-hub-recruitment-calendar',
-              '#wipro-hub-salary',
-              '#wipro-hub-questions',
-            ],
-          },
-        },
-      ],
-    }
+        }
+      : null
 
     return (
       <>

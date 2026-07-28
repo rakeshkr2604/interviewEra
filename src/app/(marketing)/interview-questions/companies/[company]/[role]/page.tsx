@@ -225,6 +225,9 @@ export function generateStaticParams() {
   return highValueIntersectionParams()
 }
 
+/** Unknown slugs must 404 at the router — not soft-404 via streamed notFound() under (marketing)/loading.tsx. */
+export const dynamicParams = false
+
 type Props = { params: Promise<{ company: string; role: string }> }
 
 function isAmazonSoftwareEngineerHub(companySlug: string, roleSlug: string): boolean {
@@ -495,7 +498,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           ? faqPageJsonLd(faqPairs)
           : null
 
-  const AMAZON_PAGE_LD = isAmazonHub
+  const amazonPageUrl = isAmazonHub ? canonicalUrl(AMAZON_SE_CANONICAL_PATH) : null
+  const AMAZON_PAGE_LD = amazonPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -545,21 +549,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(AMAZON_SE_CANONICAL_PATH),
-            url: canonicalUrl(AMAZON_SE_CANONICAL_PATH),
+            '@id': amazonPageUrl,
+            url: amazonPageUrl,
             name: AMAZON_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${AMAZON_SE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(AMAZON_SE_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${amazonPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(AMAZON_SE_CANONICAL_PATH)}#article`,
+            '@id': `${amazonPageUrl}#article`,
             headline: AMAZON_SE_META_TITLE,
             description: AMAZON_SE_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(AMAZON_SE_CANONICAL_PATH) },
-            url: canonicalUrl(AMAZON_SE_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': amazonPageUrl },
+            url: amazonPageUrl,
             datePublished: AMAZON_SE_PUBLISHED_DATE,
             dateModified: AMAZON_SE_LAST_UPDATED,
             dateReviewed: AMAZON_SE_REVIEWED_DATE,
@@ -572,7 +576,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const MICROSOFT_PAGE_LD = isMicrosoftHub
+  const microsoftPageUrl = isMicrosoftHub ? canonicalUrl(MICROSOFT_SE_CANONICAL_PATH) : null
+  const MICROSOFT_PAGE_LD = microsoftPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -622,21 +627,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
-            url: canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
+            '@id': microsoftPageUrl,
+            url: microsoftPageUrl,
             name: MICROSOFT_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${MICROSOFT_SE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(MICROSOFT_SE_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${microsoftPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(MICROSOFT_SE_CANONICAL_PATH)}#article`,
+            '@id': `${microsoftPageUrl}#article`,
             headline: MICROSOFT_SE_META_TITLE,
             description: MICROSOFT_SE_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(MICROSOFT_SE_CANONICAL_PATH) },
-            url: canonicalUrl(MICROSOFT_SE_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': microsoftPageUrl },
+            url: microsoftPageUrl,
             datePublished: MICROSOFT_SE_PUBLISHED_DATE,
             dateModified: MICROSOFT_SE_LAST_UPDATED,
             dateReviewed: MICROSOFT_SE_REVIEWED_DATE,
@@ -649,7 +654,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const INFOSYS_JAVA_PAGE_LD = isInfosysJavaHub
+  const infosysJavaPageUrl = isInfosysJavaHub ? canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH) : null
+  const INFOSYS_JAVA_PAGE_LD = infosysJavaPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -699,21 +705,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
-            url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
+            '@id': infosysJavaPageUrl,
+            url: infosysJavaPageUrl,
             name: INFOSYS_JAVA_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${INFOSYS_JAVA_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${infosysJavaPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH)}#article`,
+            '@id': `${infosysJavaPageUrl}#article`,
             headline: INFOSYS_JAVA_META_TITLE,
             description: INFOSYS_JAVA_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH) },
-            url: canonicalUrl(INFOSYS_JAVA_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': infosysJavaPageUrl },
+            url: infosysJavaPageUrl,
             datePublished: INFOSYS_JAVA_PUBLISHED_DATE,
             dateModified: INFOSYS_JAVA_LAST_UPDATED,
             dateReviewed: INFOSYS_JAVA_REVIEWED_DATE,
@@ -726,7 +732,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const INFOSYS_SE_PAGE_LD = isInfosysSeHub
+  const infosysSePageUrl = isInfosysSeHub ? canonicalUrl(INFOSYS_SE_CANONICAL_PATH) : null
+  const INFOSYS_SE_PAGE_LD = infosysSePageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -776,21 +783,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
-            url: canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
+            '@id': infosysSePageUrl,
+            url: infosysSePageUrl,
             name: INFOSYS_SE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${INFOSYS_SE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(INFOSYS_SE_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${infosysSePageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(INFOSYS_SE_CANONICAL_PATH)}#article`,
+            '@id': `${infosysSePageUrl}#article`,
             headline: INFOSYS_SE_META_TITLE,
             description: INFOSYS_SE_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(INFOSYS_SE_CANONICAL_PATH) },
-            url: canonicalUrl(INFOSYS_SE_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': infosysSePageUrl },
+            url: infosysSePageUrl,
             datePublished: INFOSYS_SE_PUBLISHED_DATE,
             dateModified: INFOSYS_SE_LAST_UPDATED,
             dateReviewed: INFOSYS_SE_REVIEWED_DATE,
@@ -803,7 +810,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const FRESHWORKS_FE_PAGE_LD = isFreshworksFeHubPage
+  const freshworksFePageUrl = isFreshworksFeHubPage ? canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH) : null
+  const FRESHWORKS_FE_PAGE_LD = freshworksFePageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -853,21 +861,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
-            url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
+            '@id': freshworksFePageUrl,
+            url: freshworksFePageUrl,
             name: FRESHWORKS_FE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${FRESHWORKS_FE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${freshworksFePageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH)}#article`,
+            '@id': `${freshworksFePageUrl}#article`,
             headline: FRESHWORKS_FE_META_TITLE,
             description: FRESHWORKS_FE_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH) },
-            url: canonicalUrl(FRESHWORKS_FE_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': freshworksFePageUrl },
+            url: freshworksFePageUrl,
             datePublished: FRESHWORKS_FE_PUBLISHED_DATE,
             dateModified: FRESHWORKS_FE_LAST_UPDATED,
             dateReviewed: FRESHWORKS_FE_REVIEWED_DATE,
@@ -880,7 +888,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const WIPRO_DA_PAGE_LD = isWiproDaHub
+  const wiproDaPageUrl = isWiproDaHub ? canonicalUrl(WIPRO_DA_CANONICAL_PATH) : null
+  const WIPRO_DA_PAGE_LD = wiproDaPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -930,21 +939,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(WIPRO_DA_CANONICAL_PATH),
-            url: canonicalUrl(WIPRO_DA_CANONICAL_PATH),
+            '@id': wiproDaPageUrl,
+            url: wiproDaPageUrl,
             name: WIPRO_DA_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_DA_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(WIPRO_DA_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${wiproDaPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(WIPRO_DA_CANONICAL_PATH)}#article`,
+            '@id': `${wiproDaPageUrl}#article`,
             headline: WIPRO_DA_META_TITLE,
             description: WIPRO_DA_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_DA_CANONICAL_PATH) },
-            url: canonicalUrl(WIPRO_DA_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': wiproDaPageUrl },
+            url: wiproDaPageUrl,
             datePublished: WIPRO_DA_PUBLISHED_DATE,
             dateModified: WIPRO_DA_LAST_UPDATED,
             dateReviewed: WIPRO_DA_REVIEWED_DATE,
@@ -967,7 +976,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const WIPRO_QA_PAGE_LD = isWiproQaHub
+  const wiproQaPageUrl = isWiproQaHub ? canonicalUrl(WIPRO_QA_CANONICAL_PATH) : null
+  const WIPRO_QA_PAGE_LD = wiproQaPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -1017,21 +1027,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(WIPRO_QA_CANONICAL_PATH),
-            url: canonicalUrl(WIPRO_QA_CANONICAL_PATH),
+            '@id': wiproQaPageUrl,
+            url: wiproQaPageUrl,
             name: WIPRO_QA_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_QA_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(WIPRO_QA_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${wiproQaPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(WIPRO_QA_CANONICAL_PATH)}#article`,
+            '@id': `${wiproQaPageUrl}#article`,
             headline: WIPRO_QA_META_TITLE,
             description: WIPRO_QA_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_QA_CANONICAL_PATH) },
-            url: canonicalUrl(WIPRO_QA_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': wiproQaPageUrl },
+            url: wiproQaPageUrl,
             datePublished: WIPRO_QA_PUBLISHED_DATE,
             dateModified: WIPRO_QA_LAST_UPDATED,
             dateReviewed: WIPRO_QA_REVIEWED_DATE,
@@ -1054,7 +1064,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const WIPRO_SWE_PAGE_LD = isWiproSweHub
+  const wiproSwePageUrl = isWiproSweHub ? canonicalUrl(WIPRO_SWE_CANONICAL_PATH) : null
+  const WIPRO_SWE_PAGE_LD = wiproSwePageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -1104,21 +1115,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
-            url: canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
+            '@id': wiproSwePageUrl,
+            url: wiproSwePageUrl,
             name: WIPRO_SWE_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_SWE_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(WIPRO_SWE_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${wiproSwePageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(WIPRO_SWE_CANONICAL_PATH)}#article`,
+            '@id': `${wiproSwePageUrl}#article`,
             headline: WIPRO_SWE_META_TITLE,
             description: WIPRO_SWE_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_SWE_CANONICAL_PATH) },
-            url: canonicalUrl(WIPRO_SWE_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': wiproSwePageUrl },
+            url: wiproSwePageUrl,
             datePublished: WIPRO_SWE_PUBLISHED_DATE,
             dateModified: WIPRO_SWE_LAST_UPDATED,
             dateReviewed: WIPRO_SWE_REVIEWED_DATE,
@@ -1141,7 +1152,8 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
-  const WIPRO_JAVA_PAGE_LD = isWiproJavaHub
+  const wiproJavaPageUrl = isWiproJavaHub ? canonicalUrl(WIPRO_JAVA_CANONICAL_PATH) : null
+  const WIPRO_JAVA_PAGE_LD = wiproJavaPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -1191,21 +1203,21 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
-            url: canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
+            '@id': wiproJavaPageUrl,
+            url: wiproJavaPageUrl,
             name: WIPRO_JAVA_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${WIPRO_JAVA_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(WIPRO_JAVA_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${wiproJavaPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(WIPRO_JAVA_CANONICAL_PATH)}#article`,
+            '@id': `${wiproJavaPageUrl}#article`,
             headline: WIPRO_JAVA_META_TITLE,
             description: WIPRO_JAVA_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(WIPRO_JAVA_CANONICAL_PATH) },
-            url: canonicalUrl(WIPRO_JAVA_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': wiproJavaPageUrl },
+            url: wiproJavaPageUrl,
             datePublished: WIPRO_JAVA_PUBLISHED_DATE,
             dateModified: WIPRO_JAVA_LAST_UPDATED,
             dateReviewed: WIPRO_JAVA_REVIEWED_DATE,
@@ -1228,8 +1240,9 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
       }
     : null
 
+  const itemListPageUrl = canonicalUrl(intersectionQuestionsPath(company.slug, role.slug))
   const ITEM_LIST_LD =
-    isEditorialHub && questions.length > 0
+    isEditorialHub && questions.length > 0 && itemListPageUrl
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
@@ -1237,7 +1250,7 @@ export default async function IntersectionQuestionsPage({ params }: Props) {
           name: isMicrosoftHub
             ? `Top 10 ${company.label} ${role.label} curated interview questions`
             : `${company.label} ${role.label} interview questions`,
-          url: canonicalUrl(intersectionQuestionsPath(company.slug, role.slug)),
+          url: itemListPageUrl,
           numberOfItems: questions.length,
           itemListElement: questions.map((q, idx) => ({
             '@type': 'ListItem',

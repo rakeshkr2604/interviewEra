@@ -5,6 +5,7 @@ import { canonicalUrl } from '@/lib/seo/site-url';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 
 /** FAQ anchor page — canonical hub is /help-center (no duplicate indexing). */
+const helpCanonical = canonicalUrl('/help-center');
 export const metadata: Metadata = {
   ...generateMetadata({
     title: 'Frequently Asked Questions',
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
     noIndexFollow: true,
     keywords: ['InterviewEra FAQ', 'mock interview FAQ', 'interview credits', 'how it works'],
   }),
-  alternates: { canonical: canonicalUrl('/help-center') },
+  ...(helpCanonical ? { alternates: { canonical: helpCanonical } } : {}),
 };
 
 // ─── FAQ data ──────────────────────────────────────────────────────────────────

@@ -55,7 +55,8 @@ export function faqPageJsonLd(faqs: FaqPairInput[]): Record<string, unknown> {
 export interface ArticleJsonLdInput {
   headline: string;
   description: string;
-  canonicalUrl: string;
+  /** Absolute canonical URL — omit the whole BlogPosting block when null. */
+  canonicalUrl: string | null;
   datePublished: string;
   dateModified?: string;
   authorName: string;
@@ -65,7 +66,8 @@ export interface ArticleJsonLdInput {
   imageUrl?: string;
 }
 
-export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown> {
+export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown> | null {
+  if (!input.canonicalUrl) return null;
   return {
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
@@ -84,7 +86,8 @@ export function articleJsonLd(input: ArticleJsonLdInput): Record<string, unknown
 export interface WebApplicationJsonLdInput {
   name: string;
   description: string;
-  url: string;
+  /** Absolute canonical URL — omit the whole WebApplication block when null. */
+  url: string | null;
   /** e.g. "Free" or price string like "0" */
   price?: string;
   priceCurrency?: string;
@@ -92,7 +95,8 @@ export interface WebApplicationJsonLdInput {
   providerId: string;
 }
 
-export function webApplicationJsonLd(input: WebApplicationJsonLdInput): Record<string, unknown> {
+export function webApplicationJsonLd(input: WebApplicationJsonLdInput): Record<string, unknown> | null {
+  if (!input.url) return null;
   return {
     '@context': 'https://schema.org',
     '@type': 'WebApplication',

@@ -3,6 +3,8 @@
  * Ignores NEXT_PUBLIC_APP_URL / NEXT_PUBLIC_SITE_URL when they point at localhost
  * so local `.env` never pollutes production XML.
  */
+import { safeCanonicalUrl } from './url-safety'
+
 const PRODUCTION_ORIGIN = 'https://interviewera.com' as const;
 
 /** Apex host only (no scheme, no www) — keep in sync with `middleware.ts` + `vercel.json`. */
@@ -51,10 +53,13 @@ export function normalizeSeoPath(path: string): string {
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
-/** Full canonical URL for a path (HTTPS apex origin + normalized path). */
-export function canonicalUrl(path: string): string {
+/**
+ * Full canonical URL for a path (HTTPS apex origin + validated path).
+ * Returns `null` for invalid input — callers must skip emitting canonical /
+ * `<loc>` / JSON-LD `url` fields rather than inventing a fallback URL.
+ */
+export function canonicalUrl(path: string): string | null {
   const origin = getCanonicalSiteOrigin();
   const p = normalizeSeoPath(path);
-  if (p === '/') return origin;
-  return `${origin}${p}`;
+  return safeCanonicalUrl(p, origin);
 }

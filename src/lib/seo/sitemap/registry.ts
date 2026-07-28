@@ -49,14 +49,23 @@ export type SitemapSourceEntry = {
   lastModified?: string | Date;
 };
 
-function toAbsolute(entry: SitemapSourceEntry, fallbackDate: Date): MetadataRoute.Sitemap[number] {
+function toAbsolute(
+  entry: SitemapSourceEntry,
+  fallbackDate: Date,
+): MetadataRoute.Sitemap[number] | null {
   const path = entry.path.startsWith('/') ? entry.path : `/${entry.path}`;
+  const url = canonicalUrl(path);
+  if (url == null) return null;
   return {
-    url: canonicalUrl(path),
+    url,
     lastModified: entry.lastModified ?? fallbackDate,
     changeFrequency: entry.changeFrequency,
     priority: entry.priority,
   };
+}
+
+function notNull<T>(value: T | null): value is T {
+  return value != null;
 }
 
 /** Marketing / legal / campus — indexable HTML. */
@@ -222,12 +231,17 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = []
 
   // Hub index page
-  entries.push({
-    url: canonicalUrl(questionsHubPath()),
-    lastModified: now,
-    changeFrequency: 'weekly',
-    priority: 0.9,
-  })
+  {
+    const url = canonicalUrl(questionsHubPath())
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.9,
+      })
+    }
+  }
 
   // Role pages — only those that clear the content-sufficiency gate (indexing.ts).
   // A sitemap that advertises thin/duplicate URLs degrades the whole domain's
@@ -235,12 +249,15 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
   for (const role of ROLES) {
     if (!isRoleIndexable(role)) continue
     const lastModified = getRoleQuestionsLastUpdated(role.slug as RoleSlug, QUESTIONS_FALLBACK_DATE)
-    entries.push({
-      url: canonicalUrl(roleQuestionsPath(role.slug as RoleSlug)),
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: role.sitemapPriority,
-    })
+    const url = canonicalUrl(roleQuestionsPath(role.slug as RoleSlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified,
+        changeFrequency: 'monthly',
+        priority: role.sitemapPriority,
+      })
+    }
   }
 
   // Company pages
@@ -250,12 +267,15 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
       company.slug as CompanySlug,
       QUESTIONS_FALLBACK_DATE,
     )
-    entries.push({
-      url: canonicalUrl(companyQuestionsPath(company.slug as CompanySlug)),
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: company.sitemapPriority,
-    })
+    const url = canonicalUrl(companyQuestionsPath(company.slug as CompanySlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified,
+        changeFrequency: 'monthly',
+        priority: company.sitemapPriority,
+      })
+    }
   }
 
   // High-value intersection pages — currently held out of the index (soft
@@ -267,14 +287,17 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     const intersectionKey = `${pair.company}:${pair.role}`
     const lastModified =
       EDITORIAL_INTERSECTION_LASTMOD[intersectionKey] ?? QUESTIONS_FALLBACK_DATE
-    entries.push({
-      url: canonicalUrl(
-        intersectionQuestionsPath(pair.company as CompanySlug, pair.role as RoleSlug),
-      ),
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: 0.78,
-    })
+    const url = canonicalUrl(
+      intersectionQuestionsPath(pair.company as CompanySlug, pair.role as RoleSlug),
+    )
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified,
+        changeFrequency: 'monthly',
+        priority: 0.78,
+      })
+    }
   }
 
   // Skill / topic pages — only populated topics (empty ones are noindex).
@@ -284,19 +307,22 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
       skill.slug as SkillSlug,
       QUESTIONS_FALLBACK_DATE,
     )
-    entries.push({
-      url: canonicalUrl(skillQuestionsPath(skill.slug as SkillSlug)),
-      lastModified,
-      changeFrequency: 'monthly',
-      priority: skill.sitemapPriority,
-    })
+    const url = canonicalUrl(skillQuestionsPath(skill.slug as SkillSlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified,
+        changeFrequency: 'monthly',
+        priority: skill.sitemapPriority,
+      })
+    }
   }
 
   return entries
 }
 
 export function buildPagesSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  return STATIC_MARKETING_ROUTES.map((e) => toAbsolute(e, now));
+  return STATIC_MARKETING_ROUTES.map((e) => toAbsolute(e, now)).filter(notNull);
 }
 
 /**
@@ -314,50 +340,64 @@ export function buildAllIndexableUrls(now: Date = new Date()): string[] {
 }
 
 export function buildBlogSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  return BLOG_POST_ROUTES.map((e) => toAbsolute(e, now));
+  return BLOG_POST_ROUTES.map((e) => toAbsolute(e, now)).filter(notNull);
 }
 
 export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  const entries: MetadataRoute.Sitemap = TOOL_LANDING_ROUTES.map((e) => toAbsolute(e, now))
+  const entries: MetadataRoute.Sitemap = TOOL_LANDING_ROUTES.map((e) => toAbsolute(e, now)).filter(
+    notNull,
+  )
 
   // QGen role variants — /tools/question-generator/[role]
   for (const role of ROLES) {
-    entries.push({
-      url: canonicalUrl(toolVariantRolePath(role.slug as RoleSlug)),
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.75,
-    })
+    const url = canonicalUrl(toolVariantRolePath(role.slug as RoleSlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: 0.75,
+      })
+    }
   }
 
   // QGen company variants — /tools/question-generator/companies/[company]
   for (const company of COMPANIES) {
-    entries.push({
-      url: canonicalUrl(toolVariantCompanyPath(company.slug as CompanySlug)),
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.74,
-    })
+    const url = canonicalUrl(toolVariantCompanyPath(company.slug as CompanySlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: 0.74,
+      })
+    }
   }
 
   // ATS role variants — /tools/ats-checker/[role]
   for (const role of ROLES) {
-    entries.push({
-      url: canonicalUrl(toolAtsRolePath(role.slug as RoleSlug)),
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: 0.75,
-    })
+    const url = canonicalUrl(toolAtsRolePath(role.slug as RoleSlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: 0.75,
+      })
+    }
   }
 
   // STAR topic variants — /tools/star-builder/[topic]
   for (const topic of STAR_TOPICS) {
-    entries.push({
-      url: canonicalUrl(toolStarTopicPath(topic.slug as StarTopicSlug)),
-      lastModified: now,
-      changeFrequency: 'monthly',
-      priority: topic.sitemapPriority,
-    })
+    const url = canonicalUrl(toolStarTopicPath(topic.slug as StarTopicSlug))
+    if (url != null) {
+      entries.push({
+        url,
+        lastModified: now,
+        changeFrequency: 'monthly',
+        priority: topic.sitemapPriority,
+      })
+    }
   }
 
   return entries

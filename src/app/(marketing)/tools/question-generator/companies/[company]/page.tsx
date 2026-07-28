@@ -30,6 +30,9 @@ export function generateStaticParams() {
   return allToolVariantCompanyParams()
 }
 
+/** Unknown slugs must 404 at the router — not soft-404 via streamed notFound() under (marketing)/loading.tsx. */
+export const dynamicParams = false
+
 type Props = { params: Promise<{ company: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

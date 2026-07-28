@@ -57,6 +57,9 @@ export function generateStaticParams() {
   return allSkillParams()
 }
 
+/** Unknown slugs must 404 at the router — not soft-404 via streamed notFound() under (marketing)/loading.tsx. */
+export const dynamicParams = false
+
 type Props = { params: Promise<{ skill: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -114,15 +117,16 @@ export default async function SkillQuestionsPage({ params }: Props) {
   if (isReactHub(skill.slug)) {
     const BREADCRUMB_LD = breadcrumbListJsonLd(skillBreadcrumbs(skill), ORIGIN)
     const FAQ_LD = faqPageJsonLd([...REACT_FAQ_ITEMS])
+    const pageUrl = canonicalUrl(REACT_CANONICAL_PATH)
 
     const ITEM_LIST_LD =
-      questions.length > 0
+      questions.length > 0 && pageUrl
         ? {
             '@context': 'https://schema.org',
             '@type': 'ItemList',
             itemListOrder: 'https://schema.org/ItemListOrderAscending',
             name: `${skill.label} interview questions`,
-            url: canonicalUrl(REACT_CANONICAL_PATH),
+            url: pageUrl,
             numberOfItems: questions.length,
             itemListElement: questions.map((q, idx) => ({
               '@type': 'ListItem',
@@ -132,97 +136,99 @@ export default async function SkillQuestionsPage({ params }: Props) {
           }
         : null
 
-    const REACT_PAGE_LD = {
-      '@context': 'https://schema.org',
-      '@graph': [
-        {
-          '@type': 'WebSite',
-          '@id': `${ORIGIN}#website`,
-          url: ORIGIN,
-          name: 'InterviewEra',
-          publisher: { '@id': schemaIds.organization },
-          inLanguage: 'en-IN',
-        },
-        {
-          '@type': 'Organization',
-          '@id': schemaIds.organization,
-          name: 'InterviewEra',
-          url: ORIGIN,
-        },
-        {
-          '@type': 'Person',
-          '@id': `${ORIGIN}#react-author`,
-          name: REACT_AUTHOR_NAME,
-          worksFor: { '@id': schemaIds.organization },
-        },
-        {
-          '@type': 'Person',
-          '@id': `${ORIGIN}#react-reviewer`,
-          name: REACT_REVIEWER_NAME,
-          worksFor: { '@id': schemaIds.organization },
-        },
-        {
-          '@type': 'ImageObject',
-          '@id': `${ORIGIN}${REACT_HERO_PATH}#image`,
-          url: `${ORIGIN}${REACT_HERO_PATH}`,
-          contentUrl: `${ORIGIN}${REACT_HERO_PATH}`,
-          caption: REACT_HERO_ALT,
-          width: REACT_HERO_WIDTH,
-          height: REACT_HERO_HEIGHT,
-        },
-        {
-          '@type': 'ImageObject',
-          '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image`,
-          url: `${ORIGIN}${REACT_ROADMAP_PATH}`,
-          contentUrl: `${ORIGIN}${REACT_ROADMAP_PATH}`,
-          caption: REACT_ROADMAP_ALT,
-          width: REACT_ROADMAP_WIDTH,
-          height: REACT_ROADMAP_HEIGHT,
-        },
-        {
-          '@type': 'ImageObject',
-          '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image`,
-          url: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
-          contentUrl: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
-          caption: REACT_ARCHITECTURE_ALT,
-          width: REACT_ARCHITECTURE_WIDTH,
-          height: REACT_ARCHITECTURE_HEIGHT,
-        },
-        {
-          '@type': 'WebPage',
-          '@id': canonicalUrl(REACT_CANONICAL_PATH),
-          url: canonicalUrl(REACT_CANONICAL_PATH),
-          name: REACT_META_TITLE,
-          isPartOf: { '@id': `${ORIGIN}#website` },
-          primaryImageOfPage: { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
-          mainEntity: { '@id': `${canonicalUrl(REACT_CANONICAL_PATH)}#article` },
-          inLanguage: 'en-IN',
-        },
-        {
-          '@type': 'Article',
-          '@id': `${canonicalUrl(REACT_CANONICAL_PATH)}#article`,
-          headline: REACT_META_TITLE,
-          description: REACT_DESCRIPTION,
-          mainEntityOfPage: { '@id': canonicalUrl(REACT_CANONICAL_PATH) },
-          url: canonicalUrl(REACT_CANONICAL_PATH),
-          datePublished: REACT_PUBLISHED_DATE,
-          dateModified: REACT_LAST_UPDATED,
-          dateReviewed: REACT_REVIEWED_DATE,
-          author: { '@id': `${ORIGIN}#react-author` },
-          reviewedBy: { '@id': `${ORIGIN}#react-reviewer` },
-          publisher: { '@id': schemaIds.organization },
-          image: [
-            { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
-            { '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image` },
-            { '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image` },
+    const REACT_PAGE_LD = pageUrl
+      ? {
+          '@context': 'https://schema.org',
+          '@graph': [
+            {
+              '@type': 'WebSite',
+              '@id': `${ORIGIN}#website`,
+              url: ORIGIN,
+              name: 'InterviewEra',
+              publisher: { '@id': schemaIds.organization },
+              inLanguage: 'en-IN',
+            },
+            {
+              '@type': 'Organization',
+              '@id': schemaIds.organization,
+              name: 'InterviewEra',
+              url: ORIGIN,
+            },
+            {
+              '@type': 'Person',
+              '@id': `${ORIGIN}#react-author`,
+              name: REACT_AUTHOR_NAME,
+              worksFor: { '@id': schemaIds.organization },
+            },
+            {
+              '@type': 'Person',
+              '@id': `${ORIGIN}#react-reviewer`,
+              name: REACT_REVIEWER_NAME,
+              worksFor: { '@id': schemaIds.organization },
+            },
+            {
+              '@type': 'ImageObject',
+              '@id': `${ORIGIN}${REACT_HERO_PATH}#image`,
+              url: `${ORIGIN}${REACT_HERO_PATH}`,
+              contentUrl: `${ORIGIN}${REACT_HERO_PATH}`,
+              caption: REACT_HERO_ALT,
+              width: REACT_HERO_WIDTH,
+              height: REACT_HERO_HEIGHT,
+            },
+            {
+              '@type': 'ImageObject',
+              '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image`,
+              url: `${ORIGIN}${REACT_ROADMAP_PATH}`,
+              contentUrl: `${ORIGIN}${REACT_ROADMAP_PATH}`,
+              caption: REACT_ROADMAP_ALT,
+              width: REACT_ROADMAP_WIDTH,
+              height: REACT_ROADMAP_HEIGHT,
+            },
+            {
+              '@type': 'ImageObject',
+              '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image`,
+              url: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
+              contentUrl: `${ORIGIN}${REACT_ARCHITECTURE_PATH}`,
+              caption: REACT_ARCHITECTURE_ALT,
+              width: REACT_ARCHITECTURE_WIDTH,
+              height: REACT_ARCHITECTURE_HEIGHT,
+            },
+            {
+              '@type': 'WebPage',
+              '@id': pageUrl,
+              url: pageUrl,
+              name: REACT_META_TITLE,
+              isPartOf: { '@id': `${ORIGIN}#website` },
+              primaryImageOfPage: { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
+              mainEntity: { '@id': `${pageUrl}#article` },
+              inLanguage: 'en-IN',
+            },
+            {
+              '@type': 'Article',
+              '@id': `${pageUrl}#article`,
+              headline: REACT_META_TITLE,
+              description: REACT_DESCRIPTION,
+              mainEntityOfPage: { '@id': pageUrl },
+              url: pageUrl,
+              datePublished: REACT_PUBLISHED_DATE,
+              dateModified: REACT_LAST_UPDATED,
+              dateReviewed: REACT_REVIEWED_DATE,
+              author: { '@id': `${ORIGIN}#react-author` },
+              reviewedBy: { '@id': `${ORIGIN}#react-reviewer` },
+              publisher: { '@id': schemaIds.organization },
+              image: [
+                { '@id': `${ORIGIN}${REACT_HERO_PATH}#image` },
+                { '@id': `${ORIGIN}${REACT_ROADMAP_PATH}#image` },
+                { '@id': `${ORIGIN}${REACT_ARCHITECTURE_PATH}#image` },
+              ],
+              speakable: {
+                '@type': 'SpeakableSpecification',
+                cssSelector: ['h1', '#react-roadmap', '#react-topic-importance', '#react-questions'],
+              },
+            },
           ],
-          speakable: {
-            '@type': 'SpeakableSpecification',
-            cssSelector: ['h1', '#react-roadmap', '#react-topic-importance', '#react-questions'],
-          },
-        },
-      ],
-    }
+        }
+      : null
 
     return (
       <>

@@ -86,11 +86,13 @@ export default async function OpenBadgesSharePage({ searchParams }: PageProps) {
         >
           Start free on InterviewEra
         </Link>
-        <CopyBadgeShareLinkButton
-          url={canonicalHref}
-          className="rounded-xl border px-6 py-3 text-sm font-semibold opacity-85"
-          style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
-        />
+        {canonicalHref ? (
+          <CopyBadgeShareLinkButton
+            url={canonicalHref}
+            className="rounded-xl border px-6 py-3 text-sm font-semibold opacity-85"
+            style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+          />
+        ) : null}
       </div>
     </div>
   )

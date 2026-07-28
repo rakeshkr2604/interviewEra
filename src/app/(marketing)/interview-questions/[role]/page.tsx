@@ -114,6 +114,9 @@ export function generateStaticParams() {
   return allRoleParams()
 }
 
+/** Unknown slugs must 404 at the router — not soft-404 via streamed notFound() under (marketing)/loading.tsx. */
+export const dynamicParams = false
+
 type Props = { params: Promise<{ role: string }> }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -300,14 +303,15 @@ export default async function RoleQuestionsPage({ params }: Props) {
           ? faqPageJsonLd(faqPairs)
           : null
 
+  const itemListPageUrl = canonicalUrl(`/interview-questions/${role.slug}`)
   const ITEM_LIST_LD =
-    isEditorialHub && hubQuestions.length > 0
+    isEditorialHub && hubQuestions.length > 0 && itemListPageUrl
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
           itemListOrder: 'https://schema.org/ItemListOrderAscending',
           name: `${role.label} interview questions`,
-          url: canonicalUrl(`/interview-questions/${role.slug}`),
+          url: itemListPageUrl,
           numberOfItems: hubQuestions.length,
           itemListElement: hubQuestions.map((q, idx) => ({
             '@type': 'ListItem',
@@ -317,83 +321,84 @@ export default async function RoleQuestionsPage({ params }: Props) {
         }
       : null
 
-  const BA_PAGE_LD =
-    role.slug === 'business-analyst'
-      ? {
-          '@context': 'https://schema.org',
-          '@graph': [
-            {
-              '@type': 'WebSite',
-              '@id': `${ORIGIN}#website`,
-              url: ORIGIN,
-              name: 'InterviewEra',
-              publisher: { '@id': schemaIds.organization },
-              inLanguage: 'en-IN',
+  const baPageUrl = role.slug === 'business-analyst' ? canonicalUrl(BA_CANONICAL_PATH) : null
+  const BA_PAGE_LD = baPageUrl
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#ba-author`,
+            name: BA_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#ba-reviewer`,
+            name: BA_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${BA_HERO_PATH}#image`,
+            url: `${ORIGIN}${BA_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${BA_HERO_PATH}`,
+            caption: BA_HERO_ALT,
+            width: BA_HERO_WIDTH,
+            height: BA_HERO_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': baPageUrl,
+            url: baPageUrl,
+            name:
+              'Business Analyst Interview Questions and Answers for Freshers & Experienced (2026)',
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${BA_HERO_PATH}#image` },
+            mainEntity: { '@id': `${baPageUrl}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${baPageUrl}#article`,
+            headline:
+              'Business Analyst Interview Questions and Answers for Freshers & Experienced (2026)',
+            description:
+              'Business Analyst interview questions with expert answers for India 2026: BA workflow, SQL, stakeholder scenarios, salary, resume mistakes, and a 90-day plan.',
+            mainEntityOfPage: { '@id': baPageUrl },
+            url: baPageUrl,
+            datePublished: BA_PUBLISHED_DATE,
+            dateModified: BA_LAST_UPDATED,
+            dateReviewed: BA_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#ba-author` },
+            reviewedBy: { '@id': `${ORIGIN}#ba-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: { '@id': `${ORIGIN}${BA_HERO_PATH}#image` },
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: ['h1', '#ba-what-does', '#ba-questions'],
             },
-            {
-              '@type': 'Organization',
-              '@id': schemaIds.organization,
-              name: 'InterviewEra',
-              url: ORIGIN,
-            },
-            {
-              '@type': 'Person',
-              '@id': `${ORIGIN}#ba-author`,
-              name: BA_AUTHOR_NAME,
-              worksFor: { '@id': schemaIds.organization },
-            },
-            {
-              '@type': 'Person',
-              '@id': `${ORIGIN}#ba-reviewer`,
-              name: BA_REVIEWER_NAME,
-              worksFor: { '@id': schemaIds.organization },
-            },
-            {
-              '@type': 'ImageObject',
-              '@id': `${ORIGIN}${BA_HERO_PATH}#image`,
-              url: `${ORIGIN}${BA_HERO_PATH}`,
-              contentUrl: `${ORIGIN}${BA_HERO_PATH}`,
-              caption: BA_HERO_ALT,
-              width: BA_HERO_WIDTH,
-              height: BA_HERO_HEIGHT,
-            },
-            {
-              '@type': 'WebPage',
-              '@id': canonicalUrl(BA_CANONICAL_PATH),
-              url: canonicalUrl(BA_CANONICAL_PATH),
-              name:
-                'Business Analyst Interview Questions and Answers for Freshers & Experienced (2026)',
-              isPartOf: { '@id': `${ORIGIN}#website` },
-              primaryImageOfPage: { '@id': `${ORIGIN}${BA_HERO_PATH}#image` },
-              mainEntity: { '@id': `${canonicalUrl(BA_CANONICAL_PATH)}#article` },
-              inLanguage: 'en-IN',
-            },
-            {
-              '@type': 'Article',
-              '@id': `${canonicalUrl(BA_CANONICAL_PATH)}#article`,
-              headline:
-                'Business Analyst Interview Questions and Answers for Freshers & Experienced (2026)',
-              description:
-                'Business Analyst interview questions with expert answers for India 2026: BA workflow, SQL, stakeholder scenarios, salary, resume mistakes, and a 90-day plan.',
-              mainEntityOfPage: { '@id': canonicalUrl(BA_CANONICAL_PATH) },
-              url: canonicalUrl(BA_CANONICAL_PATH),
-              datePublished: BA_PUBLISHED_DATE,
-              dateModified: BA_LAST_UPDATED,
-              dateReviewed: BA_REVIEWED_DATE,
-              author: { '@id': `${ORIGIN}#ba-author` },
-              reviewedBy: { '@id': `${ORIGIN}#ba-reviewer` },
-              publisher: { '@id': schemaIds.organization },
-              image: { '@id': `${ORIGIN}${BA_HERO_PATH}#image` },
-              speakable: {
-                '@type': 'SpeakableSpecification',
-                cssSelector: ['h1', '#ba-what-does', '#ba-questions'],
-              },
-            },
-          ],
-        }
-      : null
+          },
+        ],
+      }
+    : null
 
-  const ANDROID_PAGE_LD = isAndroidHub
+  const androidPageUrl = isAndroidHub ? canonicalUrl(ANDROID_CANONICAL_PATH) : null
+  const ANDROID_PAGE_LD = androidPageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -461,21 +466,21 @@ export default async function RoleQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(ANDROID_CANONICAL_PATH),
-            url: canonicalUrl(ANDROID_CANONICAL_PATH),
+            '@id': androidPageUrl,
+            url: androidPageUrl,
             name: ANDROID_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${ANDROID_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(ANDROID_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${androidPageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(ANDROID_CANONICAL_PATH)}#article`,
+            '@id': `${androidPageUrl}#article`,
             headline: ANDROID_META_TITLE,
             description: ANDROID_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(ANDROID_CANONICAL_PATH) },
-            url: canonicalUrl(ANDROID_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': androidPageUrl },
+            url: androidPageUrl,
             datePublished: ANDROID_PUBLISHED_DATE,
             dateModified: ANDROID_LAST_UPDATED,
             dateReviewed: ANDROID_REVIEWED_DATE,
@@ -497,7 +502,8 @@ export default async function RoleQuestionsPage({ params }: Props) {
       }
     : null
 
-  const SWE_PAGE_LD = isSweHub
+  const swePageUrl = isSweHub ? canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH) : null
+  const SWE_PAGE_LD = swePageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -556,21 +562,21 @@ export default async function RoleQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
-            url: canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
+            '@id': swePageUrl,
+            url: swePageUrl,
             name: SOFTWARE_ENGINEER_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${SOFTWARE_ENGINEER_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${swePageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH)}#article`,
+            '@id': `${swePageUrl}#article`,
             headline: SOFTWARE_ENGINEER_META_TITLE,
             description: SOFTWARE_ENGINEER_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH) },
-            url: canonicalUrl(SOFTWARE_ENGINEER_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': swePageUrl },
+            url: swePageUrl,
             datePublished: SOFTWARE_ENGINEER_PUBLISHED_DATE,
             dateModified: SOFTWARE_ENGINEER_LAST_UPDATED,
             dateReviewed: SOFTWARE_ENGINEER_REVIEWED_DATE,
@@ -591,7 +597,8 @@ export default async function RoleQuestionsPage({ params }: Props) {
       }
     : null
 
-  const FE_PAGE_LD = isFeHub
+  const fePageUrl = isFeHub ? canonicalUrl(FRONTEND_CANONICAL_PATH) : null
+  const FE_PAGE_LD = fePageUrl
     ? {
         '@context': 'https://schema.org',
         '@graph': [
@@ -650,21 +657,21 @@ export default async function RoleQuestionsPage({ params }: Props) {
           },
           {
             '@type': 'WebPage',
-            '@id': canonicalUrl(FRONTEND_CANONICAL_PATH),
-            url: canonicalUrl(FRONTEND_CANONICAL_PATH),
+            '@id': fePageUrl,
+            url: fePageUrl,
             name: FRONTEND_META_TITLE,
             isPartOf: { '@id': `${ORIGIN}#website` },
             primaryImageOfPage: { '@id': `${ORIGIN}${FRONTEND_HERO_PATH}#image` },
-            mainEntity: { '@id': `${canonicalUrl(FRONTEND_CANONICAL_PATH)}#article` },
+            mainEntity: { '@id': `${fePageUrl}#article` },
             inLanguage: 'en-IN',
           },
           {
             '@type': 'Article',
-            '@id': `${canonicalUrl(FRONTEND_CANONICAL_PATH)}#article`,
+            '@id': `${fePageUrl}#article`,
             headline: FRONTEND_META_TITLE,
             description: FRONTEND_DESCRIPTION,
-            mainEntityOfPage: { '@id': canonicalUrl(FRONTEND_CANONICAL_PATH) },
-            url: canonicalUrl(FRONTEND_CANONICAL_PATH),
+            mainEntityOfPage: { '@id': fePageUrl },
+            url: fePageUrl,
             datePublished: FRONTEND_PUBLISHED_DATE,
             dateModified: FRONTEND_LAST_UPDATED,
             dateReviewed: FRONTEND_REVIEWED_DATE,
