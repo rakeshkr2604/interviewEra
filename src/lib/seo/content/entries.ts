@@ -240,13 +240,14 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
   {
     id: 'hub-tcs',
     path: '/interview-questions/tcs',
-    title: 'TCS Interview Questions (2026)',
-    description: 'TCS NQT pattern, aptitude, coding, CS fundamentals, Digital vs Prime comparison, 30-day roadmap, and mock interview prep.',
+    title: 'TCS Interview Questions & Hiring Guide (2026)',
+    description:
+      'TCS interview questions and hiring guide — eligibility, NQT Foundation/Advanced pattern, Ninja/Digital/Prime salary, selection process, resume tips, and a 30-day prep plan.',
     category: 'Software Engineering',
     cluster: 'Company Interview Guides',
     type: 'company-hub',
-    readTime: '24 min read',
-    lastModified: '2026-06-12',
+    readTime: '32 min read',
+    lastModified: '2026-07-28',
     featured: true,
     popular: true,
     tags: ['tcs', 'nqt', 'aptitude', 'campus-placement'],

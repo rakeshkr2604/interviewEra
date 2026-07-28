@@ -41,10 +41,14 @@ export async function generateMetadata(): Promise<Metadata> {
     ogImage: `${ORIGIN}${TCS_HERO_PATH}`,
     keywords: [
       'TCS interview questions',
+      'TCS Hiring 2026',
       'TCS interview questions 2026',
       'TCS NQT preparation',
+      'TCS NQT exam pattern',
+      'TCS eligibility criteria 2026',
       'TCS campus placement',
-      'TCS Digital vs Prime',
+      'TCS Ninja vs Digital vs Prime',
+      'TCS salary 2026',
       'TCS aptitude questions',
       'TCS technical interview',
       'TCS HR interview questions',
@@ -73,14 +77,16 @@ export default function TcsInterviewHubPage() {
 
   const FAQ_LD = faqPageJsonLd([...TCS_FAQ_ITEMS])
 
+  const pageUrl = canonicalUrl(TCS_CANONICAL_PATH)
+
   const ITEM_LIST_LD =
-    questions.length > 0
+    questions.length > 0 && pageUrl
       ? {
           '@context': 'https://schema.org',
           '@type': 'ItemList',
           itemListOrder: 'https://schema.org/ItemListOrderAscending',
           name: `${company.label} interview questions`,
-          url: canonicalUrl(TCS_CANONICAL_PATH),
+          url: pageUrl,
           numberOfItems: questions.length,
           itemListElement: questions.map((q, idx) => ({
             '@type': 'ListItem',
@@ -90,87 +96,89 @@ export default function TcsInterviewHubPage() {
         }
       : null
 
-  const TCS_PAGE_LD = {
-    '@context': 'https://schema.org',
-    '@graph': [
-      {
-        '@type': 'WebSite',
-        '@id': `${ORIGIN}#website`,
-        url: ORIGIN,
-        name: 'InterviewEra',
-        publisher: { '@id': schemaIds.organization },
-        inLanguage: 'en-IN',
-      },
-      {
-        '@type': 'Organization',
-        '@id': schemaIds.organization,
-        name: 'InterviewEra',
-        url: ORIGIN,
-      },
-      {
-        '@type': 'Person',
-        '@id': `${ORIGIN}#tcs-author`,
-        name: TCS_AUTHOR_NAME,
-        worksFor: { '@id': schemaIds.organization },
-      },
-      {
-        '@type': 'Person',
-        '@id': `${ORIGIN}#tcs-reviewer`,
-        name: TCS_REVIEWER_NAME,
-        worksFor: { '@id': schemaIds.organization },
-      },
-      {
-        '@type': 'ImageObject',
-        '@id': `${ORIGIN}${TCS_HERO_PATH}#image`,
-        url: `${ORIGIN}${TCS_HERO_PATH}`,
-        contentUrl: `${ORIGIN}${TCS_HERO_PATH}`,
-        caption: TCS_HERO_ALT,
-        width: TCS_HERO_WIDTH,
-        height: TCS_HERO_HEIGHT,
-      },
-      {
-        '@type': 'ImageObject',
-        '@id': `${ORIGIN}${TCS_PROCESS_PATH}#image`,
-        url: `${ORIGIN}${TCS_PROCESS_PATH}`,
-        contentUrl: `${ORIGIN}${TCS_PROCESS_PATH}`,
-        caption: TCS_PROCESS_ALT,
-        width: TCS_PROCESS_WIDTH,
-        height: TCS_PROCESS_HEIGHT,
-      },
-      {
-        '@type': 'WebPage',
-        '@id': canonicalUrl(TCS_CANONICAL_PATH),
-        url: canonicalUrl(TCS_CANONICAL_PATH),
-        name: TCS_META_TITLE,
-        isPartOf: { '@id': `${ORIGIN}#website` },
-        primaryImageOfPage: { '@id': `${ORIGIN}${TCS_HERO_PATH}#image` },
-        mainEntity: { '@id': `${canonicalUrl(TCS_CANONICAL_PATH)}#article` },
-        inLanguage: 'en-IN',
-      },
-      {
-        '@type': 'Article',
-        '@id': `${canonicalUrl(TCS_CANONICAL_PATH)}#article`,
-        headline: TCS_META_TITLE,
-        description: TCS_DESCRIPTION,
-        mainEntityOfPage: { '@id': canonicalUrl(TCS_CANONICAL_PATH) },
-        url: canonicalUrl(TCS_CANONICAL_PATH),
-        datePublished: TCS_PUBLISHED_DATE,
-        dateModified: TCS_LAST_UPDATED,
-        dateReviewed: TCS_REVIEWED_DATE,
-        author: { '@id': `${ORIGIN}#tcs-author` },
-        reviewedBy: { '@id': `${ORIGIN}#tcs-reviewer` },
-        publisher: { '@id': schemaIds.organization },
-        image: [
-          { '@id': `${ORIGIN}${TCS_HERO_PATH}#image` },
-          { '@id': `${ORIGIN}${TCS_PROCESS_PATH}#image` },
+  const TCS_PAGE_LD = pageUrl
+    ? {
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': `${ORIGIN}#website`,
+            url: ORIGIN,
+            name: 'InterviewEra',
+            publisher: { '@id': schemaIds.organization },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Organization',
+            '@id': schemaIds.organization,
+            name: 'InterviewEra',
+            url: ORIGIN,
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#tcs-author`,
+            name: TCS_AUTHOR_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'Person',
+            '@id': `${ORIGIN}#tcs-reviewer`,
+            name: TCS_REVIEWER_NAME,
+            worksFor: { '@id': schemaIds.organization },
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${TCS_HERO_PATH}#image`,
+            url: `${ORIGIN}${TCS_HERO_PATH}`,
+            contentUrl: `${ORIGIN}${TCS_HERO_PATH}`,
+            caption: TCS_HERO_ALT,
+            width: TCS_HERO_WIDTH,
+            height: TCS_HERO_HEIGHT,
+          },
+          {
+            '@type': 'ImageObject',
+            '@id': `${ORIGIN}${TCS_PROCESS_PATH}#image`,
+            url: `${ORIGIN}${TCS_PROCESS_PATH}`,
+            contentUrl: `${ORIGIN}${TCS_PROCESS_PATH}`,
+            caption: TCS_PROCESS_ALT,
+            width: TCS_PROCESS_WIDTH,
+            height: TCS_PROCESS_HEIGHT,
+          },
+          {
+            '@type': 'WebPage',
+            '@id': pageUrl,
+            url: pageUrl,
+            name: TCS_META_TITLE,
+            isPartOf: { '@id': `${ORIGIN}#website` },
+            primaryImageOfPage: { '@id': `${ORIGIN}${TCS_HERO_PATH}#image` },
+            mainEntity: { '@id': `${pageUrl}#article` },
+            inLanguage: 'en-IN',
+          },
+          {
+            '@type': 'Article',
+            '@id': `${pageUrl}#article`,
+            headline: TCS_META_TITLE,
+            description: TCS_DESCRIPTION,
+            mainEntityOfPage: { '@id': pageUrl },
+            url: pageUrl,
+            datePublished: TCS_PUBLISHED_DATE,
+            dateModified: TCS_LAST_UPDATED,
+            dateReviewed: TCS_REVIEWED_DATE,
+            author: { '@id': `${ORIGIN}#tcs-author` },
+            reviewedBy: { '@id': `${ORIGIN}#tcs-reviewer` },
+            publisher: { '@id': schemaIds.organization },
+            image: [
+              { '@id': `${ORIGIN}${TCS_HERO_PATH}#image` },
+              { '@id': `${ORIGIN}${TCS_PROCESS_PATH}#image` },
+            ],
+            speakable: {
+              '@type': 'SpeakableSpecification',
+              cssSelector: ['h1', '#tcs-latest-updates', '#tcs-nqt-pattern', '#tcs-eligibility', '#tcs-faq'],
+            },
+          },
         ],
-        speakable: {
-          '@type': 'SpeakableSpecification',
-          cssSelector: ['h1', '#tcs-nqt-pattern', '#tcs-topic-importance', '#tcs-questions'],
-        },
-      },
-    ],
-  }
+      }
+    : null
 
   return (
     <>
