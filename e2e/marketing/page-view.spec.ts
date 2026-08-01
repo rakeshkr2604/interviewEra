@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { HOME_HERO_HEADING } from '../helpers/marketing-home';
 import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 test.describe('page_view analytics', () => {
@@ -19,7 +20,7 @@ test.describe('page_view analytics', () => {
       });
     });
 
-    await gotoMarketingPage(page, '/', { heading: /practice the interview/i });
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
 
     await expect
       .poll(

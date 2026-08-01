@@ -7,6 +7,10 @@ import {
   LANDING_HOME_SUBHEAD,
   LANDING_PAGE_CONTAINER,
 } from '@/lib/landing/container';
+import {
+  LANDING_DEMO_DISCLOSURE,
+  LANDING_SAMPLE_SESSION_LABEL,
+} from '@/lib/landing/demo-disclosure';
 import { cn } from '@/lib/utils';
 
 /**
@@ -55,7 +59,7 @@ const ITEMS: ConversationItem[] = [
   },
   {
     who: 'interviewer',
-    label: 'Adaptive follow-up',
+    label: 'Adaptive Follow-up Questions',
     sublabel: '↳ Challenge · Redis TTL + write-invalidation race',
     text: 'A 5-minute TTL plus write-invalidation can still race. How would you stop a stale price showing right after an update?',
     highlight: true,
@@ -69,25 +73,25 @@ const CAPTION_ACTIVE = 11;
 const WAVEFORM_HEIGHTS = [5, 9, 6, 11, 4, 8, 5, 10, 7] as const;
 
 const SCORES = [
-  { name: 'Structured communication', val: 7.4, pct: 74 },
-  { name: 'Technical depth', val: 8.1, pct: 81 },
-  { name: 'Answer structure', val: 8.6, pct: 86 },
-  { name: 'Delivery composure', val: 6.8, pct: 68 },
-  { name: 'Response relevance', val: 8.2, pct: 82 },
+  { name: 'Communication Clarity', val: 7.4, pct: 74 },
+  { name: 'Content Accuracy', val: 8.1, pct: 81 },
+  { name: 'Answer Structure', val: 8.6, pct: 86 },
+  { name: 'Specificity', val: 6.8, pct: 68 },
+  { name: 'Relevance', val: 8.2, pct: 82 },
 ] as const;
 
 export function LandingInterviewDemo() {
   return (
-    <section className={LANDING_HOME_SECTION}>
+    <section className={LANDING_HOME_SECTION} aria-labelledby="landing-interview-demo-heading">
       <div className={LANDING_PAGE_CONTAINER}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
-          <span className={LANDING_HOME_EYEBROW}>A live session, not a list</span>
-          <h2 className={LANDING_HOME_HEADING}>
-            Weak or vague answers trigger follow-ups — just like a real interviewer
+          <span className={LANDING_HOME_EYEBROW}>Inside a Mock Interview</span>
+          <h2 id="landing-interview-demo-heading" className={LANDING_HOME_HEADING}>
+            What a scored Mock Interview feels like in the room
           </h2>
           <p className={LANDING_HOME_SUBHEAD}>
-            Every question comes from your resume, and every follow-up comes from what you just said.
-            Practise the second question now so you stop freezing when it lands in the room.
+            Speak your answers out loud. Watch your transcript and Answer Feedback update in real time
+            — a Sample Session, not a question list.
           </p>
         </div>
 
@@ -96,7 +100,7 @@ export function LandingInterviewDemo() {
             <div className="flex items-center gap-2.5">
               <span className="ie-lh-text-success inline-flex items-center gap-1.5 text-xs font-semibold">
                 <CircleDot className="size-3.5" aria-hidden />
-                Live
+                {LANDING_SAMPLE_SESSION_LABEL}
               </span>
               <span className="ie-lh-text-muted text-xs font-medium">
                 Backend Engineer · Technical round
@@ -185,7 +189,7 @@ export function LandingInterviewDemo() {
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="ie-lh-text-muted flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider">
                     <Captions className="size-3.5" aria-hidden />
-                    Live transcript
+                    Session transcript
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="ie-lh-text-success text-[10px] font-semibold">● Speaking</span>
@@ -225,7 +229,7 @@ export function LandingInterviewDemo() {
               <div>
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <span className="ie-lh-text-muted text-[10px] font-bold uppercase tracking-wider">
-                    Response analysis
+                    Answer Feedback
                   </span>
                   <div className="flex items-center gap-2">
                     <span className="ie-lh-text-success flex items-center gap-1 text-[10px] font-medium">
@@ -276,7 +280,7 @@ export function LandingInterviewDemo() {
         </div>
 
         <p className="ie-lh-text-muted mx-auto mt-5 max-w-5xl px-1 text-center text-xs">
-          Illustrative exchange · scores shown are example values, not a guarantee of outcomes.
+          {LANDING_DEMO_DISCLOSURE}
         </p>
       </div>
     </section>

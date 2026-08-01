@@ -9,6 +9,10 @@ import {
   SCROLL_SHOWCASE_REPORT_SCORE,
   SCROLL_SHOWCASE_STEPS,
 } from '@/components/landing/LandingScrollShowcase.data';
+import {
+  LANDING_DEMO_DISCLOSURE,
+  LANDING_SAMPLE_SESSION_LABEL,
+} from '@/lib/landing/demo-disclosure';
 import { cn } from '@/lib/utils';
 import './LandingScrollShowcase.css';
 
@@ -152,7 +156,7 @@ function VoiceCard({ followUp }: { followUp: string }) {
           <span className="ie-ss-media__scrub" aria-hidden />
           <div className="ie-ss-live-badge">
             <span className="ie-ss-blink ie-ss-live-badge__dot" aria-hidden />
-            <span className="ie-ss-live-badge__text">LIVE</span>
+            <span className="ie-ss-live-badge__text">{LANDING_SAMPLE_SESSION_LABEL}</span>
           </div>
         </div>
 
@@ -174,7 +178,7 @@ function VoiceCard({ followUp }: { followUp: string }) {
         <div className="ie-ss-followup">
           <div className="ie-ss-followup__head">
             <span className="ie-ss-blink ie-ss-followup__dot" aria-hidden />
-            <span className="ie-ss-eyebrow ie-ss-eyebrow--voice">LIVE FOLLOW-UP</span>
+            <span className="ie-ss-eyebrow ie-ss-eyebrow--voice">Adaptive Follow-up Questions</span>
           </div>
           <p className="ie-ss-quote">{followUp}</p>
         </div>
@@ -734,6 +738,9 @@ export default function LandingScrollShowcase() {
           </div>
         </div>
       )}
+      <p className="ie-lh-text-muted mx-auto max-w-5xl px-4 pb-10 text-center text-xs sm:px-6">
+        {LANDING_DEMO_DISCLOSURE}
+      </p>
     </section>
   );
 }

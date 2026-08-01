@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { HOME_HERO_HEADING } from '../helpers/marketing-home';
 import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
-  { path: '/', heading: /practice the interview/i },
+  { path: '/', heading: HOME_HERO_HEADING },
   { path: '/teams', heading: /choose your path/i },
   { path: '/campus', heading: /placement outcomes/i },
   { path: '/pricing', heading: /simple plans/i },

@@ -1,10 +1,11 @@
 import { test } from '@playwright/test';
+import { HOME_HERO_HEADING } from '../helpers/marketing-home';
 import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 const OUT_DIR = 'screenshots/phase2-release';
 
 const PAGES: { path: string; heading?: RegExp; name: string }[] = [
-  { path: '/', heading: /practice the interview/i, name: 'homepage' },
+  { path: '/', heading: HOME_HERO_HEADING, name: 'homepage' },
   { path: '/teams', heading: /choose your path/i, name: 'teams' },
   { path: '/campus', heading: /placement outcomes/i, name: 'campus' },
   { path: '/pricing', heading: /simple plans/i, name: 'pricing' },

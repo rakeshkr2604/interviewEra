@@ -5,18 +5,22 @@ import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
 import LandingHeroSimulatorIsland from '@/components/landing/LandingHeroSimulatorIsland';
 import LandingHeroCommunityLinks from '@/components/landing/LandingHeroCommunityLinks';
 import { LANDING_HOME_INNER } from '@/lib/landing/container';
+import { LANDING_DEMO_DISCLOSURE } from '@/lib/landing/demo-disclosure';
 import { cn } from '@/lib/utils';
 
 const TRUST_ITEMS = [
   { dot: T.ok, label: 'Free to start' },
-  { dot: T.acc, label: 'Resume-aware' },
-  { dot: T.ok, label: 'Voice-first' },
+  { dot: T.acc, label: 'Answer Feedback on every response' },
+  { dot: T.ok, label: 'Voice-first Mock Interview' },
   { dot: T.acc, label: 'Your resume stays private' },
 ] as const;
 
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
   return (
-    <section className="landing-hero-section relative overflow-hidden pt-[30px] pb-[5.5rem] sm:pb-24">
+    <section
+      className="landing-hero-section relative overflow-hidden pt-[30px] pb-[5.5rem] sm:pb-24"
+      aria-labelledby="landing-hero-heading"
+    >
       <div
         aria-hidden
         className="landing-hero-dot-grid pointer-events-none absolute inset-0"
@@ -53,7 +57,8 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
             </div>
 
             <h1
-              className="mb-4 sm:mb-5"
+              id="landing-hero-heading"
+              className="mb-4 text-balance sm:mb-5"
               style={{
                 fontFamily: "'Bricolage Grotesque', sans-serif",
                 fontSize: 'clamp(36px, 4.4vw, 58px)',
@@ -63,10 +68,10 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                 color: T.text,
               }}
             >
-              Practice the interview
+              Mock Interview practice
               <br />
               <em className="v3-hero-gradient-text" style={{ fontStyle: 'normal' }}>
-                that gets you placement-ready.
+                built for campus placements.
               </em>
             </h1>
 
@@ -75,15 +80,14 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                 className="text-[15px] leading-[1.65] sm:text-base sm:leading-[1.7]"
                 style={{ color: T.text, fontWeight: 500 }}
               >
-                Crack placements with confidence — resume-aware voice practice that pushes back when
-                answers go vague.
+                InterviewEra is voice-first Mock Interview practice for Indian campus placements,
+                internships, and early-career hiring.
               </p>
               <p
                 className="mt-2.5 text-[13.5px] leading-[1.65] sm:text-[14px] sm:leading-[1.7]"
                 style={{ color: T.text2 }}
               >
-                Upload once. Handle adaptive follow-ups. Get consistent scores across five dimensions.
-                Built for Indian campus placements, internships, and early-career hiring.
+                Upload your resume once. Three free Mock Interviews to start — no card required.
               </p>
             </div>
 
@@ -120,6 +124,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               <div className="w-full">
                 <LandingHeroSimulatorIsland />
               </div>
+              <p className="ie-lh-text-muted mt-3 w-full px-1 text-center text-xs">{LANDING_DEMO_DISCLOSURE}</p>
               <LandingHeroCommunityLinks />
             </div>
           </div>

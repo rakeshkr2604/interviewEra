@@ -148,7 +148,7 @@ export const FEATURE_PILLARS = [
     title: 'Structure',
     subtitle: 'Frameworks that hold under pressure',
     icon: 'framework' as const,
-    bullets: ['STAR expectations on every prompt', 'Same rubric — no mood scoring'],
+    bullets: ['STAR expectations on every prompt', 'Same answer feedback — no mood scoring'],
   },
   {
     id: 'outcomes',
@@ -161,18 +161,18 @@ export const FEATURE_PILLARS = [
 
 /** Illustrative scores for landing visual only */
 export const SCORING_VISUAL = [
-  { key: 'communication', label: 'Communication', value: 7.4 },
-  { key: 'technical', label: 'Technical depth', value: 6.9 },
-  { key: 'structure', label: 'Answer structure', value: 7.8 },
-  { key: 'confidence', label: 'Confidence', value: 6.5 },
-  { key: 'relevance', label: 'Relevance', value: 7.6 },
+  { key: 'communication_clarity', label: 'Communication Clarity', value: 7.4 },
+  { key: 'content_accuracy', label: 'Content Accuracy', value: 7.6 },
+  { key: 'answer_structure', label: 'Answer Structure', value: 8.3 },
+  { key: 'specificity', label: 'Specificity', value: 7.4 },
+  { key: 'relevance', label: 'Relevance', value: 7.5 },
 ] as const;
 
 export const EVALUATION_DIMENSIONS = [
-  { name: 'Communication clarity', weight: '20%', detail: 'Concise, professional wording' },
-  { name: 'Technical depth', weight: '25%', detail: 'Accuracy and terminology' },
-  { name: 'Answer structure', weight: '20%', detail: 'STAR-style flow' },
-  { name: 'Confidence', weight: '15%', detail: 'Direct, low-hedging answers' },
+  { name: 'Communication Clarity', weight: '20%', detail: 'Concise, professional wording' },
+  { name: 'Content Accuracy', weight: '25%', detail: 'Accuracy and terminology' },
+  { name: 'Answer Structure', weight: '20%', detail: 'STAR-style flow' },
+  { name: 'Specificity', weight: '15%', detail: 'Concrete examples and detail' },
   { name: 'Relevance', weight: '20%', detail: 'Stays on the question' },
 ] as const;
 
@@ -198,7 +198,7 @@ export const POSITIONING_LEFT = {
     'No structured interview flow',
     'No scoring system',
     'No resume-based question sequencing',
-    'No real interview simulation',
+    'No Mock Interview flow',
   ] as const,
 } as const;
 
@@ -206,10 +206,10 @@ export const POSITIONING_RIGHT = {
   label: 'InterviewEra',
   tone: 'Built for structured placement-style practice',
   items: [
-    'Your resume shapes every question',
-    'Follow-ups when answers go vague',
-    'Five-dimension scores you can act on',
-    'Full multi-question panel simulation',
+    'Resume-aware questions from your CV',
+    'Adaptive Follow-up Questions when answers go vague',
+    'Answer Feedback you can act on',
+    'Full Mock Interview flow',
   ] as const,
 } as const;
 
@@ -222,11 +222,11 @@ export const POSITIONING_WHY_MATTERS = {
     },
     {
       title: 'Without structure → answers stay random',
-      body: 'Chat feels smart; it doesn’t train STAR under pressure.',
+      body: 'Chat has no scoreboard; it doesn’t train STAR under pressure.',
     },
     {
       title: 'Without simulation → real panels feel alien',
-      body: 'One-off prompts ≠ a timed multi-Q session.',
+      body: 'One-off prompts ≠ a timed multi-question Mock Interview.',
     },
   ] as const,
 } as const;
@@ -246,6 +246,6 @@ export const PRICING_FAQ = [
   },
   {
     q: 'How is this different from asking ChatGPT?',
-    a: 'ChatGPT won’t run a scored, multi-question session with a fixed rubric and history. InterviewEra is built as a practice system, not a chat.',
+    a: 'ChatGPT won’t run a scored, multi-question session with the same answer feedback model every time. InterviewEra is built as a practice system, not a chat.',
   },
 ] as const;

@@ -1,4 +1,3 @@
-import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { siteOrganizationStructured } from '@/lib/seo/metadata';
 import {
   LANDING_HOME_EYEBROW,
@@ -22,7 +21,7 @@ export function LandingFounderSection() {
         <div className={LANDING_HOME_HEADER_BLOCK}>
           <span className={LANDING_HOME_EYEBROW}>Built by someone in the same race</span>
           <h2 id="landing-founder-heading" className={LANDING_HOME_HEADING}>
-            Not a faceless tool — a practice system from the placement trenches
+            Why trust the person building your practice system?
           </h2>
         </div>
 
@@ -54,30 +53,20 @@ export function LandingFounderSection() {
               </p>
               <p className="ie-lh-text-secondary text-sm leading-[1.8] sm:text-base">
                 Most prep stays unstructured: long chat threads, vague encouragement, no score band.
-                Panels still have to place you. I built InterviewEra so you can upload a resume, sit a
-                scored mock that references your real work, and leave knowing exactly what to fix next.
+                Panels still have to place you. I built InterviewEra because I needed a repeatable
+                practice loop — not another list of questions to memorise.
               </p>
               <p className="ie-lh-text-secondary text-sm leading-[1.8] sm:text-base">
-                The goal is simple: walk into Day 1 with a practice loop you can repeat — not hope the
-                panel fills in the gaps for you.
+                The goal is simple: walk into Day 1 with structured practice you can repeat — not hope
+                the panel fills in the gaps for you.
               </p>
 
-              <div className="pt-2">
-                <StartFreeCtaLink
-                  section="landing_founder"
-                  ctaText="Start Free"
-                  href="/signup"
-                  className="ie-lh-bg-accent ie-lh-text-on-accent landing-cta-lift inline-flex min-h-[44px] items-center justify-center rounded-xl px-6 py-3 text-sm font-semibold sm:text-base"
-                >
-                  Start Free — run your first mock
-                </StartFreeCtaLink>
-                <p className="ie-lh-text-muted mt-3 text-xs">
-                  More on the product and mission →{' '}
-                  <a href="/about" className="ie-lh-text-link font-medium underline-offset-2 hover:underline">
-                    About InterviewEra
-                  </a>
-                </p>
-              </div>
+              <p className="ie-lh-text-muted pt-2 text-xs">
+                More on the product and mission →{' '}
+                <a href="/about" className="ie-lh-text-link font-medium underline-offset-2 hover:underline">
+                  About InterviewEra
+                </a>
+              </p>
             </div>
           </div>
         </div>

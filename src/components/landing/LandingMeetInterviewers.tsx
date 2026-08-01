@@ -22,11 +22,11 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function AvatarIntroCard({
-  interviewer,
+function InterviewRoundCard({
+  round,
   videoRef,
 }: {
-  interviewer: MeetInterviewer;
+  round: MeetInterviewer;
   videoRef: (el: HTMLVideoElement | null) => void;
 }) {
   return (
@@ -38,10 +38,10 @@ function AvatarIntroCard({
           loop
           playsInline
           preload="none"
-          poster={interviewer.posterSrc}
+          poster={round.posterSrc}
           aria-hidden
         >
-          <source src={interviewer.videoSrc} type="video/mp4" />
+          <source src={round.videoSrc} type="video/mp4" />
         </video>
         <div
           className="ie-meet-badge absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1"
@@ -55,20 +55,44 @@ function AvatarIntroCard({
             aria-hidden
           />
           <span className="text-[9px] font-bold tracking-[0.14em]" style={{ color: 'var(--accent-hover)' }}>
-            {interviewer.badge}
+            {round.badge}
           </span>
         </div>
       </div>
-      <div className="px-4 py-4 sm:px-5 sm:py-5">
+      <div className="min-w-0 px-4 py-4 sm:px-5 sm:py-5">
         <h3
-          className="m-0 font-[family-name:var(--font-bricolage)] text-lg font-bold tracking-tight sm:text-xl"
+          className="m-0 text-balance font-[family-name:var(--font-bricolage)] text-lg font-bold tracking-tight sm:text-xl"
           style={{ color: 'var(--text-primary)' }}
         >
-          {interviewer.name}
+          {round.interviewType}
         </h3>
-        <p className="m-0 mt-1 text-sm leading-relaxed sm:text-[15px]" style={{ color: 'var(--text-secondary)' }}>
-          {interviewer.roleLine}
+        <p className="m-0 mt-1 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+          with {round.name}
         </p>
+        <p className="m-0 mt-2.5 text-sm leading-relaxed sm:text-[15px]" style={{ color: 'var(--text-secondary)' }}>
+          {round.description}
+        </p>
+        <p
+          className="m-0 mt-4 text-[10px] font-bold uppercase tracking-wider"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {round.practiceLabel}
+        </p>
+        <ul className="m-0 mt-2 flex list-none flex-wrap gap-1.5 p-0" aria-label={`${round.interviewType} topics`}>
+          {round.topics.map((topic) => (
+            <li
+              key={topic}
+              className={cn(
+                'rounded-full border px-2.5 py-1 text-[11px] font-medium leading-tight',
+                'border-[color-mix(in_srgb,var(--accent-primary)_22%,var(--card-border))]',
+                'bg-[color-mix(in_srgb,var(--accent-primary)_6%,var(--card-bg))]',
+              )}
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              {topic}
+            </li>
+          ))}
+        </ul>
       </div>
     </article>
   );
@@ -126,21 +150,21 @@ export default function LandingMeetInterviewers() {
     >
       <div className={LANDING_HOME_INNER}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
-          <span className={LANDING_HOME_EYEBROW}>Meet the practice personas</span>
+          <span className={LANDING_HOME_EYEBROW}>Interview rounds</span>
           <h2 id="meet-interviewers-heading" className={LANDING_HOME_HEADING}>
-            Two practice personas, two round types
+            Practice different interview rounds
           </h2>
           <p className={LANDING_HOME_SUBHEAD}>
-            Rohan and Meera introduce how InterviewEra splits technical depth from HR behavioral practice — same
-            voice-led scored mock, tuned to the kind of panel you are preparing for.
+            Prepare for the rounds you&apos;ll face in campus placements and off-campus hiring — each
+            Mock Interview style targets a different panel format.
           </p>
         </div>
 
-        <div className="mt-10 grid gap-5 sm:mt-12 sm:grid-cols-2 sm:gap-6 lg:gap-8">
-          {MEET_INTERVIEWERS.map((person, i) => (
-            <AvatarIntroCard
-              key={person.id}
-              interviewer={person}
+        <div className="mt-8 grid gap-5 sm:mt-10 sm:grid-cols-2 sm:gap-6 lg:gap-8">
+          {MEET_INTERVIEWERS.map((round, i) => (
+            <InterviewRoundCard
+              key={round.id}
+              round={round}
               videoRef={(el) => {
                 videoRefs.current[i] = el;
               }}

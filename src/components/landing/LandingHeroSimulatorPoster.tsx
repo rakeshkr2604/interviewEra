@@ -17,7 +17,7 @@ export function LandingHeroSimulatorPoster() {
       />
       <img
         src="/assets/female-avatar-600.webp"
-        alt="InterviewEra AI interviewer avatar"
+        alt="InterviewEra Mock Interview practice persona"
         width={150}
         height={200}
         decoding="async"

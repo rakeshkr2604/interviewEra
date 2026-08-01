@@ -4,17 +4,17 @@
  */
 
 export const SCROLL_SHOWCASE_INTRO = {
-  badge: 'THE ENGINE',
-  headlineLine1: 'Three reasons',
-  headlineLine2: 'practice sticks.',
-  body: 'From your resume to a scored report — the loop that turns guessing into placement-ready answers.',
+  badge: 'HOW ONE SESSION WORKS',
+  headlineLine1: 'One Mock Interview',
+  headlineLine2: 'from resume to Interview Report.',
+  body: 'Upload your resume, answer by voice, handle Adaptive Follow-up Questions, and finish with an Interview Report — one uninterrupted session.',
 } as const;
 
 export const SCROLL_SHOWCASE_STEPS = [
   {
     id: 'resume',
     num: '01',
-    label: '01 — RESUME-AWARE',
+    label: '01 — Resume-aware',
     title: 'Your interviewer starts with your resume — your practice should too.',
     body: "Questions come from your projects, stack, and level — not a generic bank. You rehearse the stories a real panel will actually ask about.",
     generatedQuestion:
@@ -23,7 +23,7 @@ export const SCROLL_SHOWCASE_STEPS = [
   {
     id: 'voice',
     num: '02',
-    label: '02 — LIVE VOICE',
+    label: '02 — Adaptive Follow-up Questions',
     title: 'Weak or vague answers trigger follow-ups, just like a real interviewer.',
     body: 'Speak out loud. Vague answers get caught. Strong answers get pushed deeper — so you stop freezing when the second question lands.',
     followUp: '“You mentioned caching — how did you handle invalidation?”',
@@ -31,22 +31,22 @@ export const SCROLL_SHOWCASE_STEPS = [
   {
     id: 'report',
     num: '03',
-    label: '03 — SCORED REPORT',
-    title: 'Know exactly why an answer scored well — and what to improve next.',
-    body: 'Five scored dimensions, moment-level notes, and a clear verdict. Walk into the next interview knowing what to tighten.',
-    verdict: 'Strong hire signal',
+    label: '03 — Interview Report',
+    title: 'Your Interview Report lands when the session ends.',
+    body: 'Answer Feedback from each response rolls into one Interview Report — strengths, gaps, and what to practice before your next Mock Interview.',
+    verdict: 'Almost Ready',
   },
 ] as const;
 
 export const SCROLL_SHOWCASE_REPORT_DIMS = [
-  { label: 'Relevance', w: 100 },
-  { label: 'Content Accuracy', w: 70 },
-  { label: 'Communication Clarity', w: 70 },
-  { label: 'Answer Structure', w: 65 },
-  { label: 'Specificity', w: 55 },
+  { label: 'Communication Clarity', w: 74 },
+  { label: 'Content Accuracy', w: 76 },
+  { label: 'Answer Structure', w: 83 },
+  { label: 'Specificity', w: 74 },
+  { label: 'Relevance', w: 75 },
 ] as const;
 
-export const SCROLL_SHOWCASE_REPORT_SCORE = 8.4;
+export const SCROLL_SHOWCASE_REPORT_SCORE = 7.8;
 
 /** Full waveform for desktop; mobile slices to first 8 in the component. */
 export const SCROLL_SHOWCASE_EQ_BARS = [

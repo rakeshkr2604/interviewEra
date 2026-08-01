@@ -1,4 +1,10 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
+import {
+  HOME_CTA_SAMPLE_REPORT,
+  HOME_CTA_SAMPLE_REPORT_HREF,
+  HOME_CTA_START_FREE,
+  HOME_HERO_HEADING,
+} from '../helpers/marketing-home';
 import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 type CtaEvent = { cta_key?: string; section?: string; event_name?: string };
@@ -30,8 +36,8 @@ async function waitForTrackedCtaHydration(page: Page, locator: Locator) {
 
 async function waitForHomeHeroCtas(page: Page) {
   await page.waitForFunction(
-    () => Boolean(document.querySelector('main a[href="/sample-report.pdf"]')),
-    undefined,
+    (href) => Boolean(document.querySelector(`main a[href="${href}"]`)),
+    HOME_CTA_SAMPLE_REPORT_HREF,
     { timeout: 15_000 },
   );
   // LandingHeroCtaIsland hydrates on requestIdleCallback — brief settle.
@@ -51,9 +57,9 @@ async function clickTrackedCta(page: Page, locator: Locator) {
 
 test.describe('Marketing CTA analytics', () => {
   test('homepage Start Free fires once', async ({ page }) => {
-    await gotoMarketingPage(page, '/', { heading: /practice the interview/i });
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
     await installCtaSpy(page);
-    await clickTrackedCta(page, page.getByRole('link', { name: 'Start Free' }).first());
+    await clickTrackedCta(page, page.getByRole('link', { name: HOME_CTA_START_FREE }).first());
     const events = await getCtaEvents(page);
     expect(events).toHaveLength(1);
     expect(events[0]?.cta_key).toBe('start_free_interview');
@@ -78,13 +84,13 @@ test.describe('Marketing CTA analytics', () => {
     expect((await getCtaEvents(page)).some((e) => e.cta_key === 'audience_hiring_teams')).toBe(true);
   });
 
-  test('homepage See a Sample Report hero CTA fires once', async ({ page }) => {
-    await gotoMarketingPage(page, '/', { heading: /practice the interview/i });
+  test('homepage See Sample Interview Report hero CTA fires once', async ({ page }) => {
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
     await waitForHomeHeroCtas(page);
     await installCtaSpy(page);
     const heroSampleReport = page
       .locator('main')
-      .getByRole('link', { name: 'See a Sample Report', exact: true })
+      .getByRole('link', { name: HOME_CTA_SAMPLE_REPORT, exact: true })
       .first();
     await clickTrackedCta(page, heroSampleReport);
     const events = await getCtaEvents(page);

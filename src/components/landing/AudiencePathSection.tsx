@@ -24,16 +24,16 @@ const PATHS: {
 }[] = [
   {
     title: 'Students',
-    description: 'AI mock interviews tailored to your resume — free to start.',
+    description: 'Resume-aware Mock Interviews for campus placements. Free to start.',
     href: '/signup',
-    cta: 'Start Free',
+    cta: 'Start Free Mock Interview',
     ctaKey: CTA_KEYS.AUDIENCE_STUDENTS,
     section: 'audience_students',
     icon: Rocket,
   },
   {
     title: 'Colleges',
-    description: 'Run structured mocks for your entire placement batch.',
+    description: 'Structured Mock Interviews for your entire placement batch.',
     href: '/campus',
     cta: 'For Colleges',
     ctaKey: CTA_KEYS.AUDIENCE_COLLEGES,
@@ -42,7 +42,7 @@ const PATHS: {
   },
   {
     title: 'Hiring Teams',
-    description: 'Evaluate candidates with structured AI interviews.',
+    description: 'Structured Mock Interviews to evaluate candidates consistently.',
     href: '/teams',
     cta: 'For Teams',
     ctaKey: CTA_KEYS.AUDIENCE_HIRING_TEAMS,
@@ -62,12 +62,10 @@ export function AudiencePathSection() {
           <h2 id="audience-path-heading" className={cn(LANDING_HOME_HEADING, 'text-2xl sm:text-3xl')}>
             Who is InterviewEra for?
           </h2>
-          <p className={LANDING_HOME_SUBHEAD}>
-            Pick the path that matches your role — one account, one login, no role dropdowns.
-          </p>
+          <p className={LANDING_HOME_SUBHEAD}>Pick the path that matches your role.</p>
         </div>
 
-        <ul className="mx-auto mt-10 grid max-w-5xl gap-4 sm:grid-cols-3" role="list">
+        <ul className="mx-auto mt-8 grid max-w-5xl gap-4 sm:grid-cols-3" role="list">
           {PATHS.map((path) => {
             const Icon = path.icon;
             return (

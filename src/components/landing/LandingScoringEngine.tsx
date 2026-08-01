@@ -1,102 +1,328 @@
 'use client';
 
+import type { CSSProperties } from 'react';
+import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
-import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/container';
+import {
+  REPORT_DEMO,
+  SCORING_ENGINE_SECTION,
+} from '@/components/landing/LandingScoringEngine.data';
+import { LANDING_DEMO_DISCLOSURE } from '@/lib/landing/demo-disclosure';
+import { cn } from '@/lib/utils';
+
+const blockLabelStyle: CSSProperties = {
+  fontSize: '12px',
+  fontWeight: 600,
+  color: T.text,
+  marginBottom: '8px',
+  letterSpacing: '-0.01em',
+};
+
+const secondaryBlockLabelStyle: CSSProperties = {
+  ...blockLabelStyle,
+  color: T.text2,
+  fontWeight: 500,
+};
+
+type DimensionBar = typeof REPORT_DEMO.evaluationDimensions[number];
+
+function BulletItem({
+  children,
+  variant = 'strength',
+}: {
+  children: string;
+  variant?: 'strength' | 'improvement';
+}) {
+  const isImprovement = variant === 'improvement';
+
+  return (
+    <li
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: '8px',
+        fontSize: '13px',
+        lineHeight: 1.45,
+        color: T.text2,
+      }}
+    >
+      <span
+        style={{
+          color: isImprovement ? T.warn : T.ok,
+          fontWeight: 700,
+          flexShrink: 0,
+          fontSize: '12px',
+        }}
+        aria-hidden
+      >
+        {isImprovement ? '△' : '✓'}
+      </span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function DimensionRow({ bar }: { bar: DimensionBar }) {
+  const isHigh = bar.val >= 7.5;
+  const barColor = isHigh ? T.ok : T.warn;
+
+  return (
+    <div className="ie-scoring-dim-row">
+      <div className="ie-scoring-dim-row__name">{bar.name}</div>
+      <div
+        className="ie-scoring-dim-row__track"
+        role="progressbar"
+        aria-valuenow={bar.pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={`${bar.name}: ${bar.val} out of 10`}
+      >
+        <div
+          className="v3-bar-fill-solid ie-scoring-dim-row__fill"
+          style={{ width: `${bar.pct}%`, background: barColor }}
+        />
+      </div>
+      <p className="ie-scoring-dim-hint">{bar.hint}</p>
+      <div className="ie-scoring-dim-row__score-line">
+        <span className="ie-scoring-dim-row__value">
+          {bar.val} <span className="ie-scoring-dim-row__score-unit">/ 10</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function PerformanceBreakdown() {
+  const { evaluationDimensions, labels, highestImpactImprovement } = REPORT_DEMO;
+
+  return (
+    <div className="ie-scoring-report-dims">
+      <div
+        className="ie-scoring-block-label ie-scoring-dims-label"
+        style={secondaryBlockLabelStyle}
+      >
+        {labels.performanceBreakdown}
+      </div>
+      <div className="ie-scoring-dim-list">
+        {evaluationDimensions.map((bar) => (
+          <DimensionRow key={bar.name} bar={bar} />
+        ))}
+      </div>
+      <div className="ie-scoring-dims-coaching">
+        <p className="ie-scoring-improvement-next-step">
+          <span className="ie-scoring-improvement-next-step-label">Next step: </span>
+          {highestImpactImprovement.nextStep}
+        </p>
+        <div className="ie-scoring-why-score-card">
+          <p className="ie-scoring-why-score-heading">
+            {labels.whyThisScore}
+            <span className="ie-scoring-why-score-dimension">
+              · {highestImpactImprovement.dimension}
+            </span>
+          </p>
+          <p className="ie-scoring-why-score-note">{highestImpactImprovement.whyScoreNote}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function LandingScoringEngine() {
+  const {
+    session,
+    overallOutcome,
+    labels,
+    highestImpactImprovement,
+    strengths,
+    nextImprovements,
+    overallFeedback,
+    cta,
+  } = REPORT_DEMO;
+
   return (
     <section
-      className={LANDING_HOME_SECTION}
+      className={cn(
+        'landing-scoring-engine',
+        'px-4 py-14 sm:px-6 sm:py-20 md:px-10 lg:px-16 xl:px-[100px] lg:py-24',
+      )}
+      id="interview-report"
       style={{ background: 'color-mix(in srgb, var(--bg-secondary) 55%, transparent)' }}
+      aria-labelledby="scoring-engine-heading"
     >
-      <div className={LANDING_HOME_INNER}>
+      <div className="w-full">
         <Reveal>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ display: 'inline-block', fontSize: '11px', fontWeight: 700, letterSpacing: '0.16em', textTransform: 'uppercase', color: T.acc2, marginBottom: '14px' }}>
-              Interview scoring engine
+          <div className="ie-scoring-engine-header mx-auto max-w-3xl text-center">
+            <span
+              style={{
+                display: 'inline-block',
+                fontSize: '11px',
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: T.acc2,
+                marginBottom: '14px',
+              }}
+            >
+              {SCORING_ENGINE_SECTION.eyebrow}
             </span>
-            <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(26px,3.4vw,42px)', fontWeight: 800, marginBottom: '18px', color: T.text, letterSpacing: '-0.028em', lineHeight: 1.06 }}>
-              Know exactly why an answer scored well — and what to fix
+            <h2
+              id="scoring-engine-heading"
+              style={{
+                fontFamily: "'Bricolage Grotesque', sans-serif",
+                fontSize: 'clamp(26px,3.4vw,42px)',
+                fontWeight: 800,
+                marginBottom: '18px',
+                color: T.text,
+                letterSpacing: '-0.028em',
+                lineHeight: 1.06,
+              }}
+            >
+              {SCORING_ENGINE_SECTION.heading}
             </h2>
-            <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto' }}>
-              The same five-dimension rubric runs on every answer, so your score stays consistent and shows you
-              what to improve before your next interview — not a vague “you did fine.”
+            <p
+              style={{
+                fontSize: '16px',
+                lineHeight: 1.75,
+                color: T.text2,
+                maxWidth: '36rem',
+                margin: '0 auto',
+              }}
+            >
+              {SCORING_ENGINE_SECTION.subheading}
             </p>
           </div>
         </Reveal>
 
-        {/* Score engine breakdown */}
         <Reveal delay={0.12}>
-          <div style={{ marginTop: '52px', background: T.card, border: `1px solid ${T.bord2}`, borderRadius: '20px', overflow: 'hidden' }}>
-            <div style={{ padding: '20px 28px', borderBottom: `1px solid ${T.bord}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: 700, color: T.text }}>Interview Scoring Engine — 5 Dimensions</div>
-                <div style={{ fontSize: '12.5px', color: T.text2, marginTop: '3px' }}>Same rubric every session · no mood scoring · consistent across all roles</div>
+          <div
+            className="ie-scoring-report-card"
+            style={{ background: T.card, border: `1px solid ${T.bord2}` }}
+          >
+            <header className="ie-scoring-report-card-header">
+              <div className="ie-scoring-header-line">
+                <div className="ie-scoring-header-session">
+                  <div className="ie-scoring-session-title">{session.title}</div>
+                  <p className="ie-scoring-session-meta">{session.roleLine}</p>
+                </div>
+                <div className="ie-scoring-header-center">
+                  <ul className="ie-scoring-session-stats" aria-label="Session details">
+                    {session.stats.map((stat) => (
+                      <li key={stat.label}>
+                        <span
+                          className={cn(
+                            'ie-scoring-session-stat-dot',
+                            `ie-scoring-session-stat-dot--${stat.kind}`,
+                          )}
+                          aria-hidden
+                        />
+                        {stat.label}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="ie-scoring-overall-score">
+                    <span className="ie-scoring-overall-score-label">
+                      {overallOutcome.scoreLabel}
+                    </span>
+                    <span className="ie-scoring-overall-score-value">
+                      {overallOutcome.score}
+                      <span className="ie-scoring-overall-score-unit"> / 10</span>
+                    </span>
+                  </div>
+                </div>
+                <div className="ie-scoring-header-outcome">
+                  <div className="ie-scoring-status-block">
+                    <span className="ie-scoring-status-label">{overallOutcome.statusLabel}</span>
+                    <span className="ie-scoring-status-pill">
+                      <span className="ie-scoring-status-dot" aria-hidden />
+                      {overallOutcome.label}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div style={{ background: T.accdim, border: `1px solid ${T.accbrd}`, borderRadius: '99px', padding: '4px 12px', fontSize: '11.5px', fontWeight: 600, color: T.acc2 }}>
-                7.0+ = example “strong band” in the rubric UI
+            </header>
+
+            <div className="ie-scoring-report-body">
+              <div className="ie-scoring-report-feedback">
+                <div className="ie-scoring-report-improvement ie-scoring-report-improvement--hero">
+                  <div className="ie-scoring-improvement-label">{labels.biggestImprovement}</div>
+                  <div className="ie-scoring-improvement-dimension">
+                    {highestImpactImprovement.dimension}
+                  </div>
+                  <p className="ie-scoring-improvement-tip">{highestImpactImprovement.tip}</p>
+                  <div className="ie-scoring-improvement-why">
+                    <span className="ie-scoring-improvement-why-label">{labels.why}</span>
+                    {highestImpactImprovement.whyLines.map((line) => (
+                      <p key={line} className="ie-scoring-improvement-why-text">{line}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="ie-scoring-overall-feedback-block">
+                  <div className="ie-scoring-block-label" style={secondaryBlockLabelStyle}>
+                    {labels.overallFeedback}
+                  </div>
+                  <div className="ie-scoring-overall-notes">
+                    {overallFeedback.paragraphs.map((paragraph) => (
+                      <p key={paragraph}>{paragraph}</p>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="ie-scoring-report-feedback-content">
+                  <div className="ie-scoring-strengths-block">
+                    <div className="ie-scoring-block-label" style={secondaryBlockLabelStyle}>
+                      {labels.strengths}
+                    </div>
+                    <ul className="ie-scoring-bullet-list">
+                      {strengths.map((item) => (
+                        <BulletItem key={item}>{item}</BulletItem>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="ie-scoring-improve-block">
+                    <div className="ie-scoring-block-label" style={secondaryBlockLabelStyle}>
+                      {labels.areasToImprove}
+                    </div>
+                    <ul className="ie-scoring-bullet-list">
+                      {nextImprovements.map((item) => (
+                        <BulletItem key={item} variant="improvement">{item}</BulletItem>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ie-scoring-report-dims-wrap">
+                <PerformanceBreakdown />
               </div>
             </div>
 
-            <div className="engine-body-responsive" style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 0 }}>
-              {/* Left: score bars */}
-              <div style={{ padding: '28px', borderRight: `1px solid ${T.bord}` }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: T.text3, marginBottom: '18px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  Example profile (illustrative)
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  {[
-                    { name: 'Communication clarity', val: 7.4, pct: 74 },
-                    { name: 'Technical depth',        val: 6.4, pct: 64 },
-                    { name: 'STAR structure',         val: 8.4, pct: 84 },
-                    { name: 'Confidence',             val: 6.5, pct: 65 },
-                    { name: 'Relevance',              val: 7.6, pct: 76 },
-                  ].map((bar) => {
-                    const isHigh = bar.val >= 7.0;
-                    const barColor = isHigh ? T.ok : T.warn;
-                    return (
-                    <div key={bar.name}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '13.5px', color: T.text }}>{bar.name}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '13px', fontWeight: 600, color: barColor }}>
-                          {bar.val} <span style={{ color: barColor, opacity: 0.8 }}>/ 10</span>
-                        </span>
-                      </div>
-                      <div style={{ height: '6px', background: T.bg3, borderRadius: '99px', overflow: 'hidden' }}>
-                        <div
-                          className="v3-bar-fill-solid"
-                          style={{ height: '100%', width: `${bar.pct}%`, borderRadius: '99px', background: barColor }}
-                        />
-                      </div>
-                    </div>
-                  )})}
-                </div>
-                <div style={{ marginTop: '18px', background: T.okdim, border: `1px solid ${T.okbrd}`, borderRadius: '9px', padding: '9px 14px', fontSize: '13px', fontWeight: 600, color: T.ok, textAlign: 'center' }}>
-                  ↑ Example profile averaging above the 7.0 practice band shown in-product
-                </div>
-              </div>
+            <p className="ie-lh-text-muted mx-auto mt-6 max-w-5xl px-1 text-center text-xs">
+              {LANDING_DEMO_DISCLOSURE}
+            </p>
 
-              {/* Right: dimension list */}
-              <div style={{ padding: '28px' }}>
-                <div style={{ fontSize: '12px', fontWeight: 600, color: T.text3, marginBottom: '18px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                  How each score is calculated
+            <div className="ie-scoring-report-footer">
+              <div className="ie-scoring-cta-panel">
+                <div className="ie-scoring-cta-content">
+                  <p className="ie-scoring-cta-heading">{cta.heading}</p>
+                  <p className="ie-scoring-cta-subheading">{cta.subheading}</p>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {[
-                    { name: 'Communication clarity', weight: '20%', desc: 'Concise, professional wording — no filler or hedging' },
-                    { name: 'Technical depth',       weight: '25%', desc: 'Accuracy, correct terminology, domain knowledge shown' },
-                    { name: 'Answer structure',      weight: '20%', desc: 'STAR-style flow — panels can follow and score it' },
-                    { name: 'Confidence',            weight: '15%', desc: '"I did X" not "we maybe tried…" — direct ownership' },
-                    { name: 'Relevance',             weight: '20%', desc: "Stays on the question — doesn't drift or pivot away" },
-                  ].map((dim, i, arr) => (
-                    <div key={dim.name} style={{ padding: '12px 0', borderBottom: i < arr.length - 1 ? `1px solid ${T.bord}` : 'none' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' }}>
-                        <span style={{ fontSize: '13.5px', fontWeight: 600, color: T.text }}>{dim.name}</span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: '12px', fontWeight: 600, color: T.acc2 }}>{dim.weight}</span>
-                      </div>
-                      <p style={{ fontSize: '12.5px', color: T.text2 }}>{dim.desc}</p>
-                    </div>
-                  ))}
+                <div className="ie-scoring-cta-actions">
+                  <StartFreeCtaLink
+                    href={cta.primaryHref}
+                    section="scoring_engine_report"
+                    ctaText={cta.primaryText}
+                    className="v3-btn-primary ie-scoring-report-cta inline-flex min-h-12 w-full max-w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold no-underline sm:w-auto sm:px-8"
+                    style={{ color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
+                  >
+                    {cta.primaryText} →
+                  </StartFreeCtaLink>
+                  <ul className="ie-scoring-cta-trust" aria-label="Includes">
+                    {cta.trustItems.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
                 </div>
               </div>
             </div>

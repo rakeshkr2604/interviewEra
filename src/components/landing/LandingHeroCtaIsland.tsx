@@ -74,7 +74,7 @@ export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: Reac
     };
   }, []);
 
-  const primaryLabel = isAuthenticated ? 'Dashboard' : 'Start Free';
+  const primaryLabel = isAuthenticated ? 'Dashboard' : 'Start Free Mock Interview';
 
   return (
     <div className="max-w-[32rem]">
@@ -89,28 +89,23 @@ export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: Reac
           style={{
             color: '#fff',
             fontFamily: "'DM Sans', sans-serif",
-            whiteSpace: 'nowrap',
           }}
         >
           {primaryLabel}
         </TrackedCtaLink>
         <TrackedCtaLink
-          href="/sample-report.pdf"
-          prefetch={false}
-          target="_blank"
-          rel="noopener noreferrer"
+          href="/#interview-report"
           ctaKey={CTA_KEYS.SEE_SAMPLE_REPORT}
-          ctaText="See a Sample Report"
+          ctaText="See Sample Interview Report"
           section="hero_secondary"
           authenticated={isAuthenticated}
           className="v3-btn-secondary hero-v3-btn-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-7 py-3.5 text-[15px] font-semibold no-underline"
           style={{
             borderColor: T.bord2,
             fontFamily: "'DM Sans', sans-serif",
-            whiteSpace: 'nowrap',
           }}
         >
-          See a Sample Report
+          See Sample Interview Report
         </TrackedCtaLink>
       </div>
 

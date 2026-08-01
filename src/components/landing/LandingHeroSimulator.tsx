@@ -26,8 +26,8 @@ type Turn = {
   answer: string;
   followup: string;
   answer2: string;
-  scores: { clarity: number; technical: number; structure: number; confidence: number; relevance: number };
-  barColors: { clarity: BarColor; technical: BarColor; structure: BarColor; confidence: BarColor; relevance: BarColor };
+  scores: { clarity: number; content: number; structure: number; specificity: number; relevance: number };
+  barColors: { clarity: BarColor; content: BarColor; structure: BarColor; specificity: BarColor; relevance: BarColor };
   total: number;
 };
 
@@ -43,8 +43,8 @@ const TURNS: Turn[] = [
       '"Joi runs before the controller — but what happens if the same payload reaches a different endpoint that does not run Joi? How is validation enforced at the data layer?"',
     answer2:
       "Yeah, fair point. We also had DB constraints — NOT NULL, unique indexes — and a check in the service layer before the write. So Joi wasn't the only thing.",
-    scores: { clarity: 7.2, technical: 8.1, structure: 6.5, confidence: 6.8, relevance: 7.9 },
-    barColors: { clarity: '', technical: '', structure: 'orange', confidence: 'orange', relevance: '' },
+    scores: { clarity: 7.2, content: 8.1, structure: 6.5, specificity: 6.8, relevance: 7.9 },
+    barColors: { clarity: '', content: '', structure: 'orange', specificity: 'orange', relevance: '' },
     total: 7.3,
   },
   {
@@ -57,8 +57,8 @@ const TURNS: Turn[] = [
       '"5 minutes is a TTL — not invalidation. If a user posts and refreshes 4 seconds later, what do they actually see?"',
     answer2:
       "Hmm, yeah — honestly that's a gap. For those few seconds they'd see the stale feed. We didn't do write-through, so we'd probably push the update or merge it on the client.",
-    scores: { clarity: 6.4, technical: 7.0, structure: 5.2, confidence: 5.6, relevance: 7.5 },
-    barColors: { clarity: '', technical: '', structure: 'red', confidence: 'orange', relevance: '' },
+    scores: { clarity: 6.4, content: 7.0, structure: 5.2, specificity: 5.6, relevance: 7.5 },
+    barColors: { clarity: '', content: '', structure: 'red', specificity: 'orange', relevance: '' },
     total: 6.3,
   },
   {
@@ -71,15 +71,15 @@ const TURNS: Turn[] = [
       '"You said \'we needed joins\' — but joins exist in both. Was that the actual reason, or your teammate\'s framing? Where did you give ground?"',
     answer2:
       'Honestly, the joins line was the easy answer. Underneath it was schema — I wanted it strict, they liked flexibility. They gave ground on schema, I let them own the data layer.',
-    scores: { clarity: 8.0, technical: 6.3, structure: 7.4, confidence: 7.8, relevance: 8.4 },
-    barColors: { clarity: '', technical: 'orange', structure: '', confidence: '', relevance: '' },
+    scores: { clarity: 8.0, content: 6.3, structure: 7.4, specificity: 7.8, relevance: 8.4 },
+    barColors: { clarity: '', content: 'orange', structure: '', specificity: '', relevance: '' },
     total: 7.6,
   },
 ];
 
 const RING_CIRC = 263.894; // 2πr, r = 42
 const QUESTION_SECONDS = 90;
-const SCORE_KEYS = ['clarity', 'technical', 'structure', 'confidence', 'relevance'] as const;
+const SCORE_KEYS = ['clarity', 'content', 'structure', 'specificity', 'relevance'] as const;
 // waveform bar animation-delays (symmetric ripple from the centre)
 const WAVE = Array.from({ length: 16 }, (_, i) => `${(Math.abs(i - 7.5) * 0.05).toFixed(2)}s`);
 
@@ -434,7 +434,7 @@ export default function LandingHeroSimulator() {
       setChip('listen');
       setMic('listen');
       if (aLabel) aLabel.textContent = 'Your answer · listening';
-      if (footStatus) footStatus.textContent = 'You are speaking · transcript live';
+      if (footStatus) footStatus.textContent = 'Sample session · you are speaking';
       blockA?.classList.add('show');
       await sleep(240);
       if (cancelled) return;
@@ -467,7 +467,7 @@ export default function LandingHeroSimulator() {
       // Phase 5 — candidate answers follow-up
       setChip('listen');
       setMic('listen');
-      if (footStatus) footStatus.textContent = 'You are answering the follow-up · transcript live';
+      if (footStatus) footStatus.textContent = 'Sample session · follow-up answer';
       blockA2?.classList.add('show');
       await sleep(240);
       if (cancelled) return;
@@ -475,10 +475,10 @@ export default function LandingHeroSimulator() {
       if (cancelled) return;
       setProgress(85);
 
-      // Phase 6 — 5-dimensional feedback (widths/numbers set once; CSS animates the grow)
+      // Phase 6 — answer feedback (widths/numbers set once; CSS animates the grow)
       setChip('analyze');
       setMic('muted');
-      if (footStatus) footStatus.textContent = 'Scoring across 5 dimensions…';
+      if (footStatus) footStatus.textContent = 'Scoring your answer…';
       paintFbBars(turn);
       blockFb?.classList.add('show');
       pin(blockFb);
@@ -584,14 +584,14 @@ export default function LandingHeroSimulator() {
             <span />
             <span />
           </div>
-          <div className="sim-url">interviewera.com/session/live</div>
+          <div className="sim-url">interviewera.com/session/sample</div>
           <div className="sim-chrome-right">⌘ K</div>
         </div>
 
         {/* header */}
         <div className="sim-header">
           <div>
-            <div className="sim-title">Interview Session</div>
+            <div className="sim-title">Sample Session</div>
             <div className="sim-title-main">
               Focus Mode <span className="mode">· Backend track · L3</span>
             </div>
@@ -628,7 +628,7 @@ export default function LandingHeroSimulator() {
               </video>
               <div className="sim-listen-overlay" />
               <div className="sim-tile-name">
-                <span className="name">Meera · AI Interviewer</span>
+                <span className="name">Meera · HR round</span>
               </div>
             </div>
 
@@ -748,11 +748,11 @@ export default function LandingHeroSimulator() {
                   <div className="block-eyebrow" style={{ margin: 0 }}>
                     <span className="left">
                       <span className="dot" />
-                      5-dimensional feedback · this question
+                      Answer Feedback · this question
                     </span>
                   </div>
                   <div className="fb-title" style={{ marginTop: 6 }}>
-                    Scored across the rubric
+                    Scored on every answer
                   </div>
                 </div>
                 <div className="fb-total" data-sim="fbTotal">
@@ -770,12 +770,12 @@ export default function LandingHeroSimulator() {
                   </div>
                 </div>
                 <div className="fb-bar">
-                  <span className="fb-bar-label">Technical Depth</span>
-                  <span className="fb-bar-val" data-key="technical">
+                  <span className="fb-bar-label">Content Accuracy</span>
+                  <span className="fb-bar-val" data-key="content">
                     —
                   </span>
                   <div className="fb-bar-track">
-                    <div className="fb-bar-fill" data-key="technical" />
+                    <div className="fb-bar-fill" data-key="content" />
                   </div>
                 </div>
                 <div className="fb-bar">
@@ -788,12 +788,12 @@ export default function LandingHeroSimulator() {
                   </div>
                 </div>
                 <div className="fb-bar">
-                  <span className="fb-bar-label">Confidence</span>
-                  <span className="fb-bar-val" data-key="confidence">
+                  <span className="fb-bar-label">Specificity</span>
+                  <span className="fb-bar-val" data-key="specificity">
                     —
                   </span>
                   <div className="fb-bar-track">
-                    <div className="fb-bar-fill" data-key="confidence" />
+                    <div className="fb-bar-fill" data-key="specificity" />
                   </div>
                 </div>
                 <div className="fb-bar" style={{ gridColumn: '1 / -1' }}>

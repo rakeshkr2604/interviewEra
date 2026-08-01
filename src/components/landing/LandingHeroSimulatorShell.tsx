@@ -11,7 +11,7 @@ export function LandingHeroSimulatorShell() {
     <div
       className="sim-host"
       role="img"
-      aria-label="Animated demo of an InterviewEra mock interview session"
+      aria-label="Animated Sample Session Mock Interview demo"
     >
       <div className="sim-card" aria-hidden="true">
         <div className="sim-chrome">
@@ -20,13 +20,13 @@ export function LandingHeroSimulatorShell() {
             <span />
             <span />
           </div>
-          <div className="sim-url">interviewera.com/session/live</div>
+          <div className="sim-url">interviewera.com/session/sample</div>
           <div className="sim-chrome-right">⌘ K</div>
         </div>
 
         <div className="sim-header">
           <div>
-            <div className="sim-title">Interview Session</div>
+            <div className="sim-title">Sample Session</div>
             <div className="sim-title-main">
               Focus Mode <span className="mode">· Backend track · L3</span>
             </div>
@@ -48,7 +48,7 @@ export function LandingHeroSimulatorShell() {
             <div className="sim-video-tile">
               <LandingHeroSimulatorPoster />
               <div className="sim-tile-name">
-                <span className="name">Meera · AI Interviewer</span>
+                <span className="name">Meera · HR round</span>
               </div>
             </div>
           </div>

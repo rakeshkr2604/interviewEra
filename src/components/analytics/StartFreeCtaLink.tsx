@@ -13,10 +13,10 @@ type StartFreeCtaLinkProps = Omit<
   children: ReactNode;
 };
 
-/** Standard "Start Free" CTA — single analytics key everywhere. */
+/** Standard primary homepage CTA — single analytics key everywhere. */
 export function StartFreeCtaLink({
   section,
-  ctaText = 'Start Free',
+  ctaText = 'Start Free Mock Interview',
   href = '/signup',
   children,
   ...linkProps

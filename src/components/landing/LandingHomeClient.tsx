@@ -22,16 +22,6 @@ const LandingScrollShowcase = dynamic(() => import('@/components/landing/Landing
   ),
 });
 
-const LandingHomeMidFold = dynamic(() => import('@/components/landing/LandingHomeMidFold'), {
-  loading: () => (
-    <div
-      className="mx-auto min-h-[560px] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
-      style={{ background: 'var(--bg-secondary)' }}
-      aria-hidden
-    />
-  ),
-});
-
 const LandingScoringEngine = dynamic(() => import('@/components/landing/LandingScoringEngine'), {
   loading: () => (
     <div
@@ -68,11 +58,6 @@ export function LandingScrollShowcaseLazy() {
 
 export function LandingMeetInterviewersLazy() {
   return <LandingMeetInterviewers />;
-}
-
-/** Readiness-stage cards — sits after AudiencePath (role) in the Phase 3j hierarchy. */
-export function LandingHomeMidFoldLazy() {
-  return <LandingHomeMidFold isLoggedIn={false} />;
 }
 
 export function LandingScoringEngineLazy() {
