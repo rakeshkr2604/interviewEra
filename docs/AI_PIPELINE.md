@@ -20,6 +20,10 @@ Retry/timeout (`src/lib/ai/chat-completion-core.ts::completionWithRetries`): 2 a
 
 Fallback chain: `pdfjs-dist` primary → `pdf-parse` if pdfjs fails → OCR via `tesseract.js` (bounded to 3 pages / 12s / 4MB, rate-limited 8/hour) if both yield fewer than `MIN_USEFUL_CHARS` (12, an explicitly-flagged low "security floor"). `runLayeredTextExtraction` never hard-fails — it accepts degraded text rather than rejecting the upload. At parse time, very-low-quality text skips the AI call entirely and falls back to pure regex parsing (`fallback-parse.ts::buildFallbackParsedResume`). Only `.pdf`/`.txt` accepted — no docx support.
 
+### Resume file download (storage privacy Phase 1)
+
+`GET /api/resume/:id/file` is the authenticated download compatibility layer: session required, `resumes.user_id` ownership check, path ownership check on `storage_path`, then a **120s** Supabase `createSignedUrl`. Signed URLs are never written to the database and responses send `Cache-Control: private, no-store`. The `resumes` bucket remains **public** in Phase 1 — existing `file_url` public links continue to work; this endpoint never reads `file_url` for access. Helper: `src/lib/resume/signed-file-url.ts`.
+
 ## Interview lifecycle — dual-agent conversation
 
 **Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Meera/Rohan, ids `priya`/`arjun`) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).
