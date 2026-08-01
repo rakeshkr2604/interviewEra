@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import {
+  resumeFileDownloadPath,
+  resumeHasFile,
+} from '@/lib/resume/resume-file-access';
 
 /**
  * GET /api/resume
@@ -22,7 +26,7 @@ export async function GET(): Promise<NextResponse> {
     const { data: rows, error } = await serviceClient
       .from('resumes')
       .select(
-        'id, status, lifecycle_status, created_at, parsed_data, is_primary, profile_group, current_version_id, latest_upload_id, storage_path, file_url',
+        'id, status, lifecycle_status, created_at, parsed_data, is_primary, profile_group, current_version_id, latest_upload_id, storage_path',
       )
       .eq('user_id', user.id)
       .is('deleted_at', null)
@@ -64,6 +68,7 @@ export async function GET(): Promise<NextResponse> {
       const parsed =
         row.status === 'parsed' && row.parsed_data ? coerceParsedResume(row.parsed_data) : null;
       const meta = versionMeta.get(row.id as string) ?? null;
+      const hasFile = resumeHasFile(row.storage_path as string | null);
       return {
         id: row.id as string,
         status: row.status as string,
@@ -73,7 +78,8 @@ export async function GET(): Promise<NextResponse> {
         profileGroup: (row.profile_group as string | null) ?? null,
         currentVersionId: (row.current_version_id as string | null) ?? null,
         latestUploadId: (row.latest_upload_id as string | null) ?? null,
-        hasFile: Boolean(row.storage_path || row.file_url),
+        hasFile,
+        fileDownloadPath: hasFile ? resumeFileDownloadPath(row.id as string) : null,
         parsed,
         parseQuality: parsed?.parse_quality ?? null,
         parseWarning: parsed?.parse_warning ?? null,

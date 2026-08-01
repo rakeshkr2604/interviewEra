@@ -24,6 +24,16 @@ Fallback chain: `pdfjs-dist` primary → `pdf-parse` if pdfjs fails → OCR via 
 
 `GET /api/resume/:id/file` is the authenticated download compatibility layer: session required, `resumes.user_id` ownership check, path ownership check on `storage_path`, then a **120s** Supabase `createSignedUrl`. Signed URLs are never written to the database and responses send `Cache-Control: private, no-store`. The `resumes` bucket remains **public** in Phase 1 — existing `file_url` public links continue to work; this endpoint never reads `file_url` for access. Helper: `src/lib/resume/signed-file-url.ts`.
 
+### Resume storage_path backfill (Phase 2)
+
+Operator script `scripts/backfill-resume-storage-path.ts` recovers `storage_path` from `file_url` via deterministic parser `parseStoragePathFromFileUrl` (default dry-run; `--apply` writes only rows whose Storage object is listed as present). Does not change bucket permissions, remove `file_url`, or alter API behavior. Rollback SQL is emitted under `tmp-lh/backfill-resume-storage-path/rollback.sql`.
+
+### Phase 2.5 — no runtime dependence on durable public `file_url`
+
+- Canonical presence: `hasFile` ⇔ non-empty `storage_path` (`resumeHasFile`).
+- File bytes: clients call `GET /api/resume/:id/file` (see `fileDownloadPath` on list/version JSON). Signed URLs are minted only on that request (120s), never embedded in list/version payloads.
+- `file_url` / response `fileUrl` remain for backward compatibility and upload dual-write, but are **deprecated** and must not drive product behavior. Bucket stays public until a later Phase 3.
+
 ## Interview lifecycle — dual-agent conversation
 
 **Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Meera/Rohan, ids `priya`/`arjun`) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).

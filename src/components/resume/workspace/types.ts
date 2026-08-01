@@ -31,7 +31,14 @@ export type VersionDetail = {
   uploadId: string | null;
   source: string;
   parserVersion: string | null;
+  /** Canonical: true only when storage_path is set. */
   hasFile: boolean;
+  /** Authenticated download path — GET for a 120s signed URL. Null when !hasFile. */
+  fileDownloadPath?: string | null;
+  /**
+   * @deprecated Durable public Storage URL. Do not open in UI.
+   * Prefer `fileDownloadPath` → GET /api/resume/:id/file.
+   */
   fileUrl: string | null;
   rawText: string | null;
   parsed: ParsedResume;

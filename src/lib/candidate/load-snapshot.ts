@@ -186,7 +186,7 @@ export async function loadCandidateSnapshot(
           .limit(20),
     supabase
       .from('resumes')
-      .select('id, status, created_at, file_url, parsed_data, is_primary')
+      .select('id, status, created_at, storage_path, parsed_data, is_primary')
       .eq('user_id', userId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
@@ -238,7 +238,8 @@ export async function loadCandidateSnapshot(
       id: latestResumeRow.id as string,
       status: latestResumeRow.status as ResumeSnapshot['status'],
       createdAt: latestResumeRow.created_at as string,
-      fileUrl: (latestResumeRow.file_url as string | null) ?? null,
+      // @deprecated — always null; use GET /api/resume/:id/file for downloads.
+      fileUrl: null,
       parsed,
       parseQuality: parsed?.parse_quality ?? null,
       parseWarning: parsed?.parse_warning ?? null,

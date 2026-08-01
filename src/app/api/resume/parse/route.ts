@@ -194,6 +194,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       skillsExtracted,
       rawText,
       storagePath: (resume.storage_path as string | null) ?? null,
+      // Deprecated dual-write onto resume_versions.file_url — not used for access.
       fileUrl: (resume.file_url as string | null) ?? null,
       parserVersion: RESUME_PARSER_VERSION,
     });

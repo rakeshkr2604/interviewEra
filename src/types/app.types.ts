@@ -164,6 +164,10 @@ export interface ParsedJobDescription {
 export interface Resume {
   id: string;
   user_id: string;
+  /**
+   * @deprecated Durable public Storage URL (legacy). Prefer `storage_path` +
+   * GET /api/resume/:id/file. Column retained for backward compatibility.
+   */
   file_url: string | null;
   raw_text: string | null;
   parsed_data: ParsedResume | null;
@@ -172,6 +176,7 @@ export interface Resume {
   /** Exactly one non-deleted resume per user should be primary when any exist. */
   is_primary?: boolean;
   profile_group?: string | null;
+  /** Canonical Storage object key for signed downloads. */
   storage_path?: string | null;
   current_version_id?: string | null;
   latest_upload_id?: string | null;
@@ -188,6 +193,10 @@ export interface ResumeVersion {
   source: 'upload' | 'user_correction' | 'backfill';
   parser_version: string | null;
   storage_path: string | null;
+  /**
+   * @deprecated Durable public Storage URL (legacy). Prefer `storage_path` +
+   * GET /api/resume/:id/file.
+   */
   file_url: string | null;
   raw_text: string | null;
   parsed_data: ParsedResume;

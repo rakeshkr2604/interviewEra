@@ -1,12 +1,19 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import {
+  resumeFileDownloadPath,
+  resumeHasFile,
+} from '@/lib/resume/resume-file-access';
 
 type RouteContext = { params: Promise<{ id: string; versionId: string }> };
 
 /**
  * GET /api/resume/:id/versions/:versionId
  * Immutable version payload for review UI.
+ *
+ * File access: use `fileDownloadPath` → GET that path for a short-lived signed URL.
+ * Do not treat `fileUrl` as an access mechanism (deprecated public URL).
  */
 export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {
@@ -52,6 +59,7 @@ export async function GET(_request: Request, context: RouteContext): Promise<Nex
     }
 
     const parsed = coerceParsedResume(version.parsed_data);
+    const hasFile = resumeHasFile(version.storage_path as string | null);
 
     return NextResponse.json({
       resumeId,
@@ -64,7 +72,13 @@ export async function GET(_request: Request, context: RouteContext): Promise<Nex
         uploadId: version.upload_id,
         source: version.source,
         parserVersion: version.parser_version,
-        hasFile: Boolean(version.storage_path || version.file_url),
+        hasFile,
+        /** Call this path when the client needs bytes — do not mint signed URLs here. */
+        fileDownloadPath: hasFile ? resumeFileDownloadPath(resumeId) : null,
+        /**
+         * @deprecated Durable public Storage URL. Kept for backward compatibility only.
+         * Prefer `fileDownloadPath` → GET /api/resume/:id/file.
+         */
         fileUrl: version.file_url,
         // raw_text available for review but truncated in list UIs — full here for editor
         rawText: version.raw_text,

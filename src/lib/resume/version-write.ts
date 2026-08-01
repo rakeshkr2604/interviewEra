@@ -21,6 +21,7 @@ export type ResumeVersionRow = {
   source: VersionSource;
   parser_version: string | null;
   storage_path: string | null;
+  /** @deprecated Legacy public URL dual-write; access via storage_path + /file. */
   file_url: string | null;
   raw_text: string | null;
   parsed_data: ParsedResume;
@@ -35,6 +36,7 @@ export type ResumeWriteRow = {
   latest_upload_id: string | null;
   current_version_id: string | null;
   storage_path: string | null;
+  /** @deprecated Legacy public URL dual-write; access via storage_path + /file. */
   file_url: string | null;
   raw_text: string | null;
   lifecycle_status: ResumeLifecycleStatus;
@@ -49,6 +51,9 @@ export type CommitParseVersionInput = {
   skillsExtracted: ExtractedSkill[];
   rawText: string | null;
   storagePath: string | null;
+  /**
+   * @deprecated Legacy public URL dual-write only. Runtime access uses storagePath.
+   */
   fileUrl: string | null;
   jdTextHash?: string | null;
   parserVersion?: string;

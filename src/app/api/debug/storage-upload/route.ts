@@ -113,12 +113,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // Debug-only: publicUrl is deprecated for product paths (use path + /file).
     const { data: pub } = client.storage.from('resumes').getPublicUrl(path);
 
     return NextResponse.json({
       ok: true,
       stage: 'storage_upload',
       path,
+      /** @deprecated Prefer `path` + GET /api/resume/:id/file in product code. */
       publicUrl: pub.publicUrl,
       requestId: reqId,
     });

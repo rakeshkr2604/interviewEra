@@ -20,9 +20,9 @@ function jsonNoStore(
 /**
  * GET /api/resume/:id/file
  *
- * Phase 1 compatibility: authenticated, ownership-checked short-lived signed URL
+ * Authenticated file access (Phase 1 + 2.5): ownership-checked short-lived signed URL
  * minted from storage_path (canonical). Does not use or persist file_url.
- * Existing public file_url values remain valid until a later private-bucket phase.
+ * Clients should use this endpoint instead of any durable public fileUrl.
  */
 export async function GET(_request: Request, context: RouteContext): Promise<NextResponse> {
   try {

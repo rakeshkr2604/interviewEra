@@ -98,6 +98,10 @@ export interface ResumeSnapshot {
   id: string;
   status: ResumeStatus;
   createdAt: string;
+  /**
+   * @deprecated Always null in Phase 2.5+. Use GET /api/resume/:id/file for downloads.
+   * Durable public Storage URLs must not drive product behavior.
+   */
   fileUrl: string | null;
   parsed: ParsedResume | null;
   parseQuality: string | null;

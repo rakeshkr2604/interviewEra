@@ -29,7 +29,7 @@ export async function DELETE(_request: Request, context: RouteContext): Promise<
     const serviceClient = createServiceClient();
     const { data: resume, error: fetchError } = await serviceClient
       .from('resumes')
-      .select('id, user_id, file_url, deleted_at, is_primary')
+      .select('id, user_id, deleted_at, is_primary')
       .eq('id', resumeId)
       .eq('user_id', user.id)
       .maybeSingle();

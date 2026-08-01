@@ -584,6 +584,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
+    // Canonical object key for signed download (GET /api/resume/:id/file).
+    // publicUrl / file_url below are deprecated dual-write for DB backward compatibility only.
     const {
       data: { publicUrl },
     } = serviceClient.storage.from(RESUME_BUCKET).getPublicUrl(filePath);
@@ -595,6 +597,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           debugSkipDb: true,
           message: 'Storage upload OK; DB insert skipped (IE_UPLOAD_SKIP_DB=1).',
           storagePath: filePath,
+          /** @deprecated Prefer storagePath + /api/resume/:id/file */
           publicUrl,
         },
         200,
@@ -621,6 +624,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       const { data: updated, error: updErr } = await serviceClient
         .from('resumes')
         .update({
+          // Deprecated public URL — keep dual-writing; runtime access uses storage_path.
           file_url: publicUrl,
           storage_path: filePath,
           raw_text: sanitizedRaw,
@@ -648,6 +652,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         .from('resumes')
         .insert({
           user_id: user.id,
+          // Deprecated public URL — keep dual-writing; runtime access uses storage_path.
           file_url: publicUrl,
           storage_path: filePath,
           raw_text: sanitizedRaw,

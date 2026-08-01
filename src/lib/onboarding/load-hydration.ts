@@ -55,7 +55,7 @@ async function fetchResumeForUser(
   if (resumeId) {
     const { data } = await supabase
       .from('resumes')
-      .select('id, status, parsed_data, file_url')
+      .select('id, status, parsed_data')
       .eq('user_id', userId)
       .eq('id', resumeId)
       .maybeSingle()
@@ -71,7 +71,7 @@ async function fetchResumeForUser(
 
   const { data: parsed } = await supabase
     .from('resumes')
-    .select('id, status, parsed_data, file_url')
+    .select('id, status, parsed_data')
     .eq('user_id', userId)
     .eq('status', 'parsed')
     .order('created_at', { ascending: false })
@@ -89,7 +89,7 @@ async function fetchResumeForUser(
 
   const { data: inFlight } = await supabase
     .from('resumes')
-    .select('id, status, parsed_data, file_url')
+    .select('id, status, parsed_data')
     .eq('user_id', userId)
     .in('status', ['parsing', 'uploading'])
     .order('created_at', { ascending: false })

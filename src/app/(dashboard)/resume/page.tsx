@@ -6,6 +6,7 @@ import {
   type WorkspaceResumeItem,
 } from '@/components/candidate/ResumeWorkspaceClient';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
+import { resumeHasFile } from '@/lib/resume/resume-file-access';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 import type { ResumeLifecycleStatus, ResumeStatus } from '@/types/app.types';
@@ -29,7 +30,7 @@ export default async function ResumeWorkspacePage() {
   const { data: rows } = await serviceClient
     .from('resumes')
     .select(
-      'id, status, lifecycle_status, created_at, parsed_data, is_primary, profile_group, current_version_id, latest_upload_id, storage_path, file_url',
+      'id, status, lifecycle_status, created_at, parsed_data, is_primary, profile_group, current_version_id, latest_upload_id, storage_path',
     )
     .eq('user_id', user.id)
     .is('deleted_at', null)
@@ -74,7 +75,7 @@ export default async function ResumeWorkspacePage() {
       profileGroup: (row.profile_group as string | null) ?? null,
       currentVersionId: (row.current_version_id as string | null) ?? null,
       latestUploadId: (row.latest_upload_id as string | null) ?? null,
-      hasFile: Boolean(row.storage_path || row.file_url),
+      hasFile: resumeHasFile(row.storage_path as string | null),
       parsed,
       parseQuality: parsed?.parse_quality ?? null,
       parseWarning: parsed?.parse_warning ?? null,
