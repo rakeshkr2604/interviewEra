@@ -153,6 +153,8 @@ const nextConfig: NextConfig = {
     const ga4Connect =
       'https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com';
     const ga4Img = 'https://*.google-analytics.com https://*.googletagmanager.com';
+    // Google OAuth profile photos (lh3.googleusercontent.com, etc.) used in Navbar/settings.
+    const googleOauthImg = 'https://*.googleusercontent.com';
 
     // Clarity: tag/collect/img on *.clarity.ms subdomains; session pixels via c.bing.com.
     const clarityHosts = 'https://*.clarity.ms';
@@ -175,7 +177,7 @@ const nextConfig: NextConfig = {
       `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} blob: ${siteTwin} ${razorpayScript} ${ga4Script} ${clarityScript} https://va.vercel-scripts.com`,
       `style-src 'self' 'unsafe-inline' ${siteTwin} https://fonts.googleapis.com`,
       `font-src 'self' data: ${siteTwin} https://fonts.gstatic.com https://checkout-static-next.razorpay.com`,
-      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg} ${ga4Img}`,
+      `img-src 'self' data: blob: ${siteTwin} https://*.supabase.co ${clarityImg} ${ga4Img} ${googleOauthImg}`,
       "media-src 'self' blob:",
       // wss://api.deepgram.com: Deepgram STT WebSocket connection.
       // https://api.elevenlabs.io: ElevenLabs TTS API requests.

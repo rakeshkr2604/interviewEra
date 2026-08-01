@@ -1,5 +1,5 @@
+import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { createClient } from '@/lib/supabase/server';
 import {
   getAttributionFromRequest,
   parseAttributionFromSearchParams,
@@ -16,18 +16,67 @@ import { captureReferralFromCode } from '@/lib/referral/capture-referral';
 import { createServiceClient } from '@/lib/supabase/server';
 import { NextResponse, type NextRequest } from 'next/server';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+type CookieWrite = { name: string; value: string; options: Record<string, unknown> };
+
+/** Copy session cookies onto the redirect response (Next.js does not auto-merge cookies().set → NextResponse.redirect). */
+function applyCookiesToResponse(response: NextResponse, writes: CookieWrite[]): void {
+  for (const { name, value, options } of writes) {
+    response.cookies.set(name, value, options);
+  }
+}
+
+/**
+ * Allow @supabase/supabase-js auth state notifications to flush cookie writes
+ * before the handler returns (deferred via microtask in recent auth-js versions).
+ */
+async function flushAuthCookieWrites(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
   const cookieStore = await cookies();
   const cookieNext = cookieStore.get('oauth_next')?.value;
-  const rawNext = searchParams.get('next') ?? (cookieNext ? decodeURIComponent(cookieNext) : null) ?? '/dashboard';
+  const rawNext =
+    searchParams.get('next') ??
+    (cookieNext ? decodeURIComponent(cookieNext) : null) ??
+    '/dashboard';
   const next = isSafePath(rawNext) ? rawNext : '/dashboard';
 
   if (code) {
-    const supabase = await createClient();
+    const sessionCookieWrites: CookieWrite[] = [];
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              try {
+                cookieStore.set(name, value, options);
+              } catch {
+                // Route handlers may reject duplicate sets; outgoing response is authoritative.
+              }
+              sessionCookieWrites.push({ name, value, options });
+            });
+          },
+        },
+      },
+    );
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    await flushAuthCookieWrites();
+
     if (!error) {
       const userId = data.user?.id;
       const isPasswordReset = next === '/reset-password';
@@ -75,6 +124,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       }
 
       const response = NextResponse.redirect(redirectUrl);
+      applyCookiesToResponse(response, sessionCookieWrites);
       response.cookies.set('oauth_next', '', { path: '/', maxAge: 0 });
       response.cookies.set('auth_intent', '', { path: '/', maxAge: 0 });
       return response;
