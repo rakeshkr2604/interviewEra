@@ -22,6 +22,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ── Change detection (docs-only PRs skip heavy jobs; coverage jobs stay on) ──
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    # paths-filter uses the Pulls API on pull_request; repo default token is read-only.
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.set.outputs.code }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # push events need parent commit for path filter; PRs use the merge API
+          fetch-depth: 2
+
+      # Explicit allowlist for heavy jobs. Prefer listing production paths over
+      # `!**/*.md` denylists — those also exclude bundled `src/**/*.md` prompts.
+      - name: Path filter
+        if: github.event_name != 'workflow_dispatch'
+        uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'e2e/**'
+              - 'public/**'
+              - 'scripts/**'
+              - 'supabase/**'
+              - 'tests/**'
+              - 'packages/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'next.config.*'
+              - 'next-sitemap.config.js'
+              - 'next-env.d.ts'
+              - 'tsconfig*.json'
+              - 'middleware.ts'
+              - 'vercel.json'
+              - 'components.json'
+              - '.browserslistrc'
+              - '.nvmrc'
+              - 'eslint.config.*'
+              - 'postcss.config.*'
+              - 'playwright.config.*'
+              - 'vitest.config.*'
+              - '.github/workflows/*.yml'
+              - '.github/workflows/*.yaml'
+              - '.gitleaks.toml'
+              - '.gitleaksignore'
+
+      - name: Set code output
+        id: set
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=${{ steps.filter.outputs.code }}" >> "$GITHUB_OUTPUT"
+          fi
+
   # ── Job 1: Lint + Type Check ─────────────────────────────────────────────────
   quality:
     name: Lint & Type Check
@@ -49,56 +111,12 @@ jobs:
       - name: Unit tests
         run: npm test
 
-  # ── Job 1b: E2E auth (Playwright) ───────────────────────────────────────────
-  e2e_auth:
-    name: E2E Auth
-    runs-on: ubuntu-latest
-    needs: [quality]
-    env:
-      # JWT-shaped placeholders pass createServiceClient() format checks at runtime;
-      # real auth stays skipped (global-setup fails against fake host).
-      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
-      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
-      OPENAI_API_KEY: sk-placeholder
-      RESEND_API_KEY: re_placeholder
-      UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
-      UPSTASH_REDIS_REST_TOKEN: placeholder_token
-      RAZORPAY_KEY_ID: rzp_test_placeholder
-      RAZORPAY_KEY_SECRET: placeholder_secret
-      RAZORPAY_WEBHOOK_SECRET: placeholder_webhook
-      NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_placeholder
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '22'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright browsers
-        run: npx playwright install chromium --with-deps
-
-      - name: Build
-        run: npm run build
-
-      - name: E2E tests
-        run: npm run test:e2e
-        env:
-          CI: true
-          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
-
   # ── Pdf extract regression (pdfjs-dist + fallback) ───────────────────────────
   pdf_extract:
     name: PDF extract regression
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
 
     steps:
       - name: Checkout
@@ -116,29 +134,29 @@ jobs:
       - name: Extract fixtures
         run: npm run verify:pdf
 
-  # ── Job 2: Production Build ───────────────────────────────────────────────────
-  # Runs after quality passes. Uses placeholder values for all env vars so the
-  # build can complete without real credentials.
+  # ── Job 2: Production Build (single build; shared with E2E via artifact) ─────
+  # Uses e2e-compatible NEXT_PUBLIC_* values so the same .next artifact can be
+  # served by Playwright (`npm start`). Remaining placeholders mirror the old
+  # build job so SDKs that validate at import time still see non-empty strings.
   # Real values live in Vercel — Vercel handles the actual deployment.
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [quality, pdf_extract, e2e_auth]
+    needs: [changes, quality]
+    if: needs.changes.outputs.code == 'true'
 
     env:
-      # Public vars
       NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder_anon_key
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
       NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_placeholder
-      NEXT_PUBLIC_APP_URL: https://interviewera.com
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
       NEXT_PUBLIC_CALENDLY_URL: https://calendly.com/placeholder
-      # Server vars — SDKs that validate keys at import time need these to be non-empty
-      SUPABASE_SERVICE_ROLE_KEY: placeholder_service_role
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
       OPENAI_API_KEY: sk-placeholder
       MISTRAL_API_KEY: placeholder_mistral
       OPENROUTER_API_KEY: placeholder_openrouter
       RESEND_API_KEY: re_placeholder
-      RAZORPAY_KEY_ID: rzp_placeholder
+      RAZORPAY_KEY_ID: rzp_test_placeholder
       RAZORPAY_KEY_SECRET: placeholder_secret
       RAZORPAY_WEBHOOK_SECRET: placeholder_webhook
       UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
@@ -170,6 +188,91 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Tar avoids upload/download quirks with hidden `.next/` directory trees.
+      - name: Pack Next.js build
+        run: tar -czf next-build.tar.gz --exclude='.next/cache' .next
+
+      - name: Upload Next.js build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: next-build-${{ github.sha }}
+          if-no-files-found: error
+          path: next-build.tar.gz
+          retention-days: 1
+
+  # ── Job 1b: E2E auth (Playwright) — reuses Build artifact ───────────────────
+  e2e_auth:
+    name: E2E Auth
+    runs-on: ubuntu-latest
+    needs: [changes, quality, build]
+    if: needs.changes.outputs.code == 'true'
+    env:
+      # Must match Build job NEXT_PUBLIC_* (inlined at build time into the artifact).
+      NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
+      NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
+      OPENAI_API_KEY: sk-placeholder
+      RESEND_API_KEY: re_placeholder
+      UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
+      UPSTASH_REDIS_REST_TOKEN: placeholder_token
+      RAZORPAY_KEY_ID: rzp_test_placeholder
+      RAZORPAY_KEY_SECRET: placeholder_secret
+      RAZORPAY_WEBHOOK_SECRET: placeholder_webhook
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: rzp_test_placeholder
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download Next.js build artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: next-build-${{ github.sha }}
+          path: .
+
+      - name: Unpack Next.js build
+        run: |
+          test -f next-build.tar.gz
+          tar -xzf next-build.tar.gz
+          test -f .next/BUILD_ID
+          test -d .next/server
+          test -d .next/static
+          test -d public
+          echo "BUILD_ID=$(cat .next/BUILD_ID)"
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install chromium --with-deps
+
+      - name: Install Playwright OS deps
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps chromium
+
+      - name: E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
 
   # ── Job 3: Security Audit ────────────────────────────────────────────────────
   # Fails on critical vulnerabilities. High-severity issues in transitive
@@ -231,7 +334,7 @@ jobs:
     name: Merge Readiness Summary
     runs-on: ubuntu-latest
     if: always() && github.event_name == 'pull_request'
-    needs: [quality, e2e_auth, pdf_extract, build, audit, secrets_scan]
+    needs: [changes, quality, e2e_auth, pdf_extract, build, audit, secrets_scan]
     permissions:
       pull-requests: write
 
@@ -240,7 +343,10 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            const code = '${{ needs.changes.outputs.code }}';
+            const changesResult = '${{ needs.changes.result }}';
             const results = {
+              'Detect changes': changesResult,
               'Lint & Type Check': '${{ needs.quality.result }}',
               'E2E Auth': '${{ needs.e2e_auth.result }}',
               'PDF extract regression': '${{ needs.pdf_extract.result }}',
@@ -248,9 +354,22 @@ jobs:
               'Security Audit': '${{ needs.audit.result }}',
               'Secret Scan': '${{ needs.secrets_scan.result }}',
             };
+            // When code changed, skipped heavy jobs are failures (e.g. changes job crashed).
+            if (code === 'true') {
+              for (const name of ['E2E Auth', 'PDF extract regression', 'Build']) {
+                if (results[name] === 'skipped') results[name] = 'failure';
+              }
+            }
             const icon = (r) => (r === 'success' ? '✅' : r === 'skipped' ? '⏭️' : '❌');
-            const allGood = Object.values(results).every((r) => r === 'success' || r === 'skipped');
+            const allGood =
+              changesResult === 'success' &&
+              Object.entries(results)
+                .filter(([name]) => name !== 'Detect changes')
+                .every(([, r]) => r === 'success' || r === 'skipped');
             const lines = Object.entries(results).map(([name, r]) => `${icon(r)} **${name}** — ${r}`);
+            if (code === 'true' || code === 'false') {
+              lines.push('', `_Path filter \`code=${code}\` (${code === 'true' ? 'full' : 'docs-only / light'} pipeline)._`);
+            }
             const marker = '<!-- ci-merge-readiness -->';
             const body = [
               marker,

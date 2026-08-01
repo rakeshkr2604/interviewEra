@@ -21,7 +21,7 @@ import { getCanonicalSiteOrigin, CANONICAL_HOST } from '@/lib/seo/site-url';
  * Default key — also written to `public/<key>.txt` (no trailing newline). Override in prod via
  * `INDEXNOW_KEY` (and update the public key file to match) if you ever rotate it.
  */
-export const INDEXNOW_DEFAULT_KEY = 'eddf0c2eacf1c5ea6c17d3ce9fd045f307c3a8e0744dd616d1ec20911df55041' as const;
+export const INDEXNOW_DEFAULT_KEY = 'eddf0c2eacf1c5ea6c17d3ce9fd045f307c3a8e0744dd616d1ec20911df55041' as const; // gitleaks:allow — public IndexNow ownership key (also in public/<key>.txt)
 
 /** Shared endpoint that distributes to all IndexNow-participating engines. */
 const INDEXNOW_ENDPOINT = 'https://api.indexnow.org/indexnow';

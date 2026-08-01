@@ -1,8 +1,21 @@
 # Fingerprint-level gitleaks ignores (commit:file:rule:line — narrowest possible scope).
+# Prefer renaming fakes or inline `gitleaks:allow` on HEAD; fingerprints cover history only.
+
 # QUESTIONS_RESULT_STORAGE_KEY is a sessionStorage key name ('ie-questions-result-v2'),
 # not a credential; generic-api-key flagged it on string shape/entropy alone.
-# Going forward the line carries an inline `gitleaks:allow` comment (survives
-# squash/rebase); these fingerprints cover the historical commits that predate it.
+# HEAD carries an inline `gitleaks:allow`; these fingerprints cover pre-allow commits.
 9e52370036f87dd6f35b5e8e30681d3e9b6b4db9:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:10
 # PR #63 squash-merge re-created the same line under a new commit hash.
 4f9ffbee5bc6da0aa3d05c39d837a76b98b9563b:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:10
+# Earlier introduction (line 3) before the key moved / comment was added — still in history.
+65479cd828679312cf87b533c61c0a42375ad94f:src/app/(marketing)/tools/question-generator/question-generator-result-storage.ts:generic-api-key:3
+
+# Fake ElevenLabs test keys used sk_test_* and matched stripe-access-token (not Stripe secrets).
+# HEAD renamed to el_ci_fake_key_*; fingerprints cover the historical sk_test_* commit only.
+f40091d994aa727683b2cdfdca7cc28a1fb2c112:src/lib/voice/elevenlabs-health.test.ts:stripe-access-token:60
+f40091d994aa727683b2cdfdca7cc28a1fb2c112:src/lib/voice/elevenlabs-health.test.ts:stripe-access-token:61
+f40091d994aa727683b2cdfdca7cc28a1fb2c112:src/lib/voice/elevenlabs-health.test.ts:stripe-access-token:70
+
+# INDEXNOW_DEFAULT_KEY is the intentional public IndexNow ownership key (also in public/<key>.txt).
+# HEAD has gitleaks:allow; fingerprint covers the introducing commit before the comment.
+243a61c07d6ec1f204965d091ec5e7d6a7fdddea:src/lib/seo/indexnow.ts:generic-api-key:20

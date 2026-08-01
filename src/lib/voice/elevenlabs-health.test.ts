@@ -57,8 +57,9 @@ describe('resolveElevenLabsApiKey', () => {
   });
 
   it('returns trimmed key when valid', () => {
-    process.env.ELEVENLABS_API_KEY = '  sk_test_123456789012345678901234567890  ';
-    expect(resolveElevenLabsApiKey()).toBe('sk_test_123456789012345678901234567890');
+    // Intentionally not sk_* — Stripe's gitleaks rule matches that prefix on fakes.
+    process.env.ELEVENLABS_API_KEY = '  el_ci_fake_key_0123456789abcdef  ';
+    expect(resolveElevenLabsApiKey()).toBe('el_ci_fake_key_0123456789abcdef');
   });
 });
 
@@ -67,7 +68,7 @@ describe('checkElevenLabsHealth', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    process.env.ELEVENLABS_API_KEY = 'sk_test_123456789012345678901234567890';
+    process.env.ELEVENLABS_API_KEY = 'el_ci_fake_key_0123456789abcdef';
     fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     mockTelemetryRows([]);
