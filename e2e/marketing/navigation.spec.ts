@@ -7,8 +7,11 @@ test.describe('Phase 1 marketing navigation', () => {
   test('homepage hero and audience paths', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Start Free' }).first()).toBeVisible();
-    await expect(page.getByRole('link', { name: 'For Colleges' }).first()).toBeVisible();
-    await expect(page.getByText('Students start free • Colleges run campus placements • Hiring teams coming soon.')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'See a Sample Report' }).first()).toBeVisible();
+    await expect(page.getByRole('list', { name: 'Who InterviewEra is for' })).toBeVisible();
+    await expect(page.getByText('Students: 3 free interviews')).toBeVisible();
+    await expect(page.getByText('Colleges run campus placements')).toBeVisible();
+    await expect(page.getByText('First 3 interviews free — try it once.')).toBeVisible();
     await expect(page.getByRole('heading', { name: /who is interviewera for/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /students/i })).toBeVisible();
   });

@@ -9,6 +9,7 @@ import {
   LandingScoringEngineLazy,
   LandingScrollShowcaseLazy,
 } from '@/components/landing/LandingHomeClient';
+import { LandingHowItWorks } from '@/components/landing/LandingHowItWorks';
 import { LandingWhyFail } from '@/components/landing/LandingWhyFail';
 import { LandingPositioningSection } from '@/components/landing/LandingPositioningSection';
 import { LandingInterviewDemo } from '@/components/landing/LandingInterviewDemo';
@@ -23,14 +24,14 @@ export const metadata = PAGE_SEO.home;
 export const revalidate = 3600;
 
 function HeroBetaPill() {
-  return <>Resume-aware adaptive interview simulation</>;
+  return <>Resume-aware · placement-ready practice</>;
 }
 
 /**
  * Homepage narrative: positioning → trust → conversion (not documentation).
  * Campus/T&P content lives on /campus; deep FAQ/support lives in the Help Center.
  *
- * Section order (Phase 4a): Hero → WhyFail → ScrollShowcase → InterviewDemo →
+ * Section order: Hero → HowItWorks → WhyFail → ScrollShowcase → InterviewDemo →
  * ScoringEngine → BeforeAfter → Positioning → Founder → MeetInterviewers →
  * AudiencePath → MidFold → Community → FAQ → FinalCta → MoneyPageLinks.
  */
@@ -39,6 +40,7 @@ export default function Page() {
     <MarketingLayout>
       <main id="main-content">
         <LandingHero countPill={<HeroBetaPill />} />
+        <LandingHowItWorks />
         <LandingWhyFail />
         <LandingScrollShowcaseLazy />
         <LandingInterviewDemo />

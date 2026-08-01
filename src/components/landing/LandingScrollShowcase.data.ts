@@ -6,8 +6,8 @@
 export const SCROLL_SHOWCASE_INTRO = {
   badge: 'THE ENGINE',
   headlineLine1: 'Three reasons',
-  headlineLine2: 'it feels real.',
-  body: 'Scroll through the interview engine — from your resume to your report.',
+  headlineLine2: 'practice sticks.',
+  body: 'From your resume to a scored report — the loop that turns guessing into placement-ready answers.',
 } as const;
 
 export const SCROLL_SHOWCASE_STEPS = [
@@ -15,8 +15,8 @@ export const SCROLL_SHOWCASE_STEPS = [
     id: 'resume',
     num: '01',
     label: '01 — RESUME-AWARE',
-    title: 'It reads your resume before it asks a thing.',
-    body: "Your projects, your stack, your level — the question plan is built from what you've actually shipped. No generic question banks.",
+    title: 'Your interviewer starts with your resume — your practice should too.',
+    body: "Questions come from your projects, stack, and level — not a generic bank. You rehearse the stories a real panel will actually ask about.",
     generatedQuestion:
       '“Walk me through the Kafka pipeline on your resume — why not a managed queue?”',
   },
@@ -24,16 +24,16 @@ export const SCROLL_SHOWCASE_STEPS = [
     id: 'voice',
     num: '02',
     label: '02 — LIVE VOICE',
-    title: 'A voice interviewer that actually listens.',
-    body: 'Answer out loud, in real time. Vague answers get caught. Good answers get pushed deeper — with follow-ups, like a sharp human interviewer.',
+    title: 'Weak or vague answers trigger follow-ups, just like a real interviewer.',
+    body: 'Speak out loud. Vague answers get caught. Strong answers get pushed deeper — so you stop freezing when the second question lands.',
     followUp: '“You mentioned caching — how did you handle invalidation?”',
   },
   {
     id: 'report',
     num: '03',
     label: '03 — SCORED REPORT',
-    title: 'Feedback you can act on — not a vibe.',
-    body: 'Five scored dimensions, moment-level notes, and a clear verdict. Your next attempt is measurably better.',
+    title: 'Know exactly why an answer scored well — and what to improve next.',
+    body: 'Five scored dimensions, moment-level notes, and a clear verdict. Walk into the next interview knowing what to tighten.',
     verdict: 'Strong hire signal',
   },
 ] as const;

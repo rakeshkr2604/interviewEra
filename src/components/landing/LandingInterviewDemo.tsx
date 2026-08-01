@@ -83,11 +83,11 @@ export function LandingInterviewDemo() {
         <div className={LANDING_HOME_HEADER_BLOCK}>
           <span className={LANDING_HOME_EYEBROW}>A live session, not a list</span>
           <h2 className={LANDING_HOME_HEADING}>
-            It reads your answer, then asks the harder question
+            Weak or vague answers trigger follow-ups — just like a real interviewer
           </h2>
           <p className={LANDING_HOME_SUBHEAD}>
             Every question comes from your resume, and every follow-up comes from what you just said.
-            This is one real exchange — the kind a static question bank can never run.
+            Practise the second question now so you stop freezing when it lands in the room.
           </p>
         </div>
 

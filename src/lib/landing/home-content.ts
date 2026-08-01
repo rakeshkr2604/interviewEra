@@ -41,7 +41,7 @@ export const RESULTS_PROOF = {
 } as const;
 
 export const RESUME_WOW = {
-  title: 'Your resume becomes your interview',
+  title: 'Your interviewer starts with your resume',
   subtitle: 'Four beats — from file to score. This pipeline is the product.',
   topics: ['Payment APIs', 'React + TS', 'Team of 4', 'SQL / perf'] as const,
   questions: [
@@ -92,18 +92,18 @@ export const PROBLEM_POINTS = [
 
 export const SOLUTION_POINTS = [
   {
-    title: 'Resume-native questions',
-    body: 'Parsed once — every mock pulls skills, projects, and role context you actually wrote.',
+    title: 'Your resume drives the session',
+    body: 'Your interviewer starts with your resume — so every mock probes the work you actually wrote.',
     icon: 'file' as const,
   },
   {
-    title: 'STAR-ready flow',
-    body: 'Nudges and rubrics aligned to how Indian campus and tech panels evaluate answers.',
+    title: 'Follow-ups that feel real',
+    body: 'Weak or vague answers trigger follow-up questions, just like a real interviewer.',
     icon: 'layout' as const,
   },
   {
-    title: 'AI scores + next steps',
-    body: 'Five weighted dimensions with clear gaps so each session surfaces what to improve next.',
+    title: 'Scores you can act on',
+    body: 'Know exactly why an answer scored well — and what to improve before your next interview.',
     icon: 'chart' as const,
   },
 ] as const;
@@ -111,20 +111,26 @@ export const SOLUTION_POINTS = [
 export const HOW_IT_WORKS = [
   {
     step: 1,
-    title: 'Upload resume',
-    description: 'One parse · under a minute. Questions pull from what you wrote.',
+    title: 'Upload Resume',
+    description: 'Your interviewer starts with your resume — practice should too.',
     icon: 'upload' as const,
   },
   {
     step: 2,
-    title: 'Answer AI questions',
-    description: 'Multi-question flow — tech, behavioural, pressure.',
+    title: 'Take Voice Interview',
+    description: 'Answer out loud under realistic pacing — the way a panel hears you.',
     icon: 'mic' as const,
   },
   {
     step: 3,
-    title: 'Get scored & improve',
-    description: 'Five dimensions · see gaps before the next company.',
+    title: 'Handle Follow-ups',
+    description: 'Vague answers trigger follow-ups, just like a real interviewer.',
+    icon: 'probe' as const,
+  },
+  {
+    step: 4,
+    title: 'Get Structured Feedback',
+    description: 'Know why you scored well — and what to fix before the next round.',
     icon: 'trend' as const,
   },
 ] as const;
@@ -133,23 +139,23 @@ export const FEATURE_PILLARS = [
   {
     id: 'intelligence',
     title: 'Intelligence',
-    subtitle: 'AI that reads your CV',
+    subtitle: 'Practice built from your CV',
     icon: 'brain' as const,
-    bullets: ['Resume-native questions & follow-ups', 'Built for Indian campus hiring'],
+    bullets: ['Your resume shapes the question plan', 'Built for Indian campus hiring'],
   },
   {
     id: 'structure',
     title: 'Structure',
-    subtitle: 'Frameworks that convert',
+    subtitle: 'Frameworks that hold under pressure',
     icon: 'framework' as const,
-    bullets: ['STAR expectations every prompt', 'Same rubric — no mood scoring'],
+    bullets: ['STAR expectations on every prompt', 'Same rubric — no mood scoring'],
   },
   {
     id: 'outcomes',
     title: 'Practice loop',
     subtitle: 'Measure progress between sessions',
     icon: 'target' as const,
-    bullets: ['Progress across sessions', 'Know what to fix before it counts'],
+    bullets: ['Scores that show what to fix next', 'Walk in clearer than last week'],
   },
 ] as const;
 
@@ -200,10 +206,10 @@ export const POSITIONING_RIGHT = {
   label: 'InterviewEra',
   tone: 'Built for structured placement-style practice',
   items: [
-    'Resume-personalized sessions',
-    'Structured scoring (5 dimensions)',
-    'Multi-question simulation',
-    'Panel-style progression',
+    'Your resume shapes every question',
+    'Follow-ups when answers go vague',
+    'Five-dimension scores you can act on',
+    'Full multi-question panel simulation',
   ] as const,
 } as const;
 

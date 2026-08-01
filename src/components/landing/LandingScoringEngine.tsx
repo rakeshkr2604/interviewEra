@@ -16,11 +16,11 @@ export default function LandingScoringEngine() {
               Interview scoring engine
             </span>
             <h2 style={{ fontFamily: "'Bricolage Grotesque', sans-serif", fontSize: 'clamp(26px,3.4vw,42px)', fontWeight: 800, marginBottom: '18px', color: T.text, letterSpacing: '-0.028em', lineHeight: 1.06 }}>
-              How your interview is evaluated
+              Know exactly why an answer scored well — and what to fix
             </h2>
             <p style={{ fontSize: '16px', lineHeight: 1.8, color: T.text2, maxWidth: '560px', margin: '0 auto' }}>
-              The same five-dimension rubric runs on every answer — a structured framework built on the
-              metrics a panel actually weighs — so your score stays consistent and shows you what to fix.
+              The same five-dimension rubric runs on every answer, so your score stays consistent and shows you
+              what to improve before your next interview — not a vague “you did fine.”
             </p>
           </div>
         </Reveal>

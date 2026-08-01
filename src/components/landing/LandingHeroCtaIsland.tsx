@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useEffect, useState } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
@@ -9,8 +10,11 @@ import { CommunityCTA } from '@/components/community/CommunityCTA';
 /**
  * Minimal client island so the homepage stays static (better bfcache): primary CTA href
  * upgrades from /signup → /dashboard after idle Supabase check.
+ *
+ * Hierarchy: CTAs → trust strip → audience line → optional community link.
+ * Trust sits above conditional community CTA to avoid CLS when community appears.
  */
-export default function LandingHeroCtaIsland() {
+export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: ReactNode }) {
   const [primaryHref, setPrimaryHref] = useState<'/signup' | '/dashboard'>('/signup');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -74,7 +78,7 @@ export default function LandingHeroCtaIsland() {
 
   return (
     <div className="max-w-[32rem]">
-      <div className="mb-5 flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-3">
         <TrackedCtaLink
           href={primaryHref}
           ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
@@ -91,10 +95,12 @@ export default function LandingHeroCtaIsland() {
           {primaryLabel}
         </TrackedCtaLink>
         <TrackedCtaLink
-          href="/campus"
+          href="/sample-report.pdf"
           prefetch={false}
-          ctaKey={CTA_KEYS.FOR_COLLEGES}
-          ctaText="For Colleges"
+          target="_blank"
+          rel="noopener noreferrer"
+          ctaKey={CTA_KEYS.SEE_SAMPLE_REPORT}
+          ctaText="See a Sample Report"
           section="hero_secondary"
           authenticated={isAuthenticated}
           className="v3-btn-secondary hero-v3-btn-secondary inline-flex min-h-12 items-center justify-center gap-2 rounded-xl border-[1.5px] px-7 py-3.5 text-[15px] font-semibold no-underline"
@@ -104,16 +110,40 @@ export default function LandingHeroCtaIsland() {
             whiteSpace: 'nowrap',
           }}
         >
-          For Colleges
+          See a Sample Report
         </TrackedCtaLink>
       </div>
-      <p
-        className="mb-3 text-[13px] leading-relaxed"
+
+      {trustStrip ? <div className="mt-5 sm:mt-6">{trustStrip}</div> : null}
+
+      <ul
+        className="mt-4 flex list-none flex-wrap items-center gap-x-0 gap-y-2 p-0 text-[13.5px] leading-relaxed sm:mt-5 sm:text-[14px]"
         style={{ color: T.text2 }}
+        aria-label="Who InterviewEra is for"
       >
-        Students start free • Colleges run campus placements • Hiring teams coming soon.
-      </p>
-      <CommunityCTA placement="landing_hero" className="mb-0 block" />
+        {(
+          [
+            { label: 'Students: 3 free interviews', sep: T.ok },
+            { label: 'Colleges run campus placements', sep: T.acc },
+          ] as const
+        ).map((item, i) => (
+          <li key={item.label} className="flex items-center">
+            {i > 0 ? (
+              <span
+                aria-hidden
+                className="mx-2.5 inline-block size-[5px] shrink-0 rounded-full sm:mx-3"
+                style={{ background: item.sep }}
+              />
+            ) : null}
+            <span>{item.label}</span>
+          </li>
+        ))}
+      </ul>
+
+      {/* Reserved line height so optional community link does not shove layout */}
+      <div className="mt-2.5 min-h-[1.25rem]">
+        <CommunityCTA placement="landing_hero" className="mb-0 block text-[13px]" />
+      </div>
     </div>
   );
 }

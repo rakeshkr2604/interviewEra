@@ -128,6 +128,23 @@ html[data-theme="dark"] .landing-hero-dot-grid {
   opacity: 0.42;
 }
 
+/* Hero copy column — isolate layout work from ambient layers / simulator */
+.hero-copy-col {
+  contain: layout style;
+}
+
+/* Below-fold How It Works — skip offscreen paint until near viewport */
+.landing-how-it-works {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-how-it-works li {
+    transition: none !important;
+  }
+}
+
 /* ─── Hero → first section: gentle bottom fade, no hard seam ─── */
 .landing-hero-section::after {
   content: "";
@@ -142,6 +159,138 @@ html[data-theme="dark"] .landing-hero-dot-grid {
     transparent,
     color-mix(in srgb, var(--bg-primary) 55%, transparent)
   );
+}
+
+/* Hero free-offer attention line — top-center of right column (no card chrome) */
+.hero-free-offer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 0.85rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  text-align: center;
+  animation: hero-free-offer-float 2.6s ease-in-out infinite;
+}
+.hero-free-offer__dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-success) 55%, transparent);
+  animation: hero-free-offer-dot 2.6s ease-in-out infinite;
+}
+.hero-free-offer__text {
+  background: linear-gradient(
+    105deg,
+    var(--accent-primary) 0%,
+    var(--accent-hover) 45%,
+    #d946ef 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@keyframes hero-free-offer-float {
+  0%,
+  100% {
+    transform: translateY(0);
+    filter: drop-shadow(0 0 0 transparent);
+  }
+  50% {
+    transform: translateY(-2px);
+    filter: drop-shadow(0 4px 10px color-mix(in srgb, var(--accent-primary) 28%, transparent));
+  }
+}
+
+@keyframes hero-free-offer-dot {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-success) 45%, transparent);
+  }
+  50% {
+    transform: scale(1.15);
+    box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent-success) 0%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-free-offer,
+  .hero-free-offer__dot {
+    animation: none !important;
+    filter: none !important;
+  }
+}
+
+/* Hero WhatsApp community links — soft hover without card chrome */
+.hero-wa-link {
+  color: var(--accent-primary);
+  opacity: 0.92;
+  transition:
+    color 180ms ease,
+    background-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 180ms ease;
+}
+.hero-wa-link__icon {
+  opacity: 0.75;
+  transition: opacity 180ms ease, transform 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.hero-wa-link__label {
+  text-underline-offset: 3px;
+  transition: text-decoration-color 180ms ease;
+}
+.hero-wa-link:hover,
+.hero-wa-link:focus-visible {
+  opacity: 1;
+  color: var(--accent-hover);
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  box-shadow: 0 6px 16px -10px color-mix(in srgb, var(--accent-primary) 45%, transparent);
+  transform: translateY(-1px);
+}
+.hero-wa-link:hover .hero-wa-link__icon,
+.hero-wa-link:focus-visible .hero-wa-link__icon {
+  opacity: 1;
+  transform: scale(1.08);
+}
+.hero-wa-link:hover .hero-wa-link__label,
+.hero-wa-link:focus-visible .hero-wa-link__label {
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent-hover) 55%, transparent);
+}
+.hero-wa-link:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-wa-link,
+  .hero-wa-link__icon {
+    transition: none !important;
+  }
+  .hero-wa-link:hover,
+  .hero-wa-link:focus-visible {
+    transform: none;
+  }
+  .hero-wa-link:hover .hero-wa-link__icon,
+  .hero-wa-link:focus-visible .hero-wa-link__icon {
+    transform: none;
+  }
 }
 
 /* ─── Landing v3 responsive overrides ─── */

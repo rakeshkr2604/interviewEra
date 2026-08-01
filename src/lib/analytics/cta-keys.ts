@@ -11,6 +11,7 @@ export const CTA_KEYS = {
   PRICING_CTA: 'pricing_cta',
   UPGRADE_CTA: 'upgrade_cta',
   SEE_HOW_IT_WORKS: 'see_how_it_works',
+  SEE_SAMPLE_REPORT: 'see_sample_report',
   TOOL_CTA: 'tool_cta',
   FOR_COLLEGES: 'for_colleges',
   FOR_TEAMS: 'for_teams',
