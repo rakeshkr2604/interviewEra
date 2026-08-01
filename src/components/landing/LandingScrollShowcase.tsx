@@ -1,26 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimulatorPoster';
-import { T } from '@/components/landing/landing-home-tokens';
 import {
+  SCROLL_SHOWCASE_EQ_BARS,
+  SCROLL_SHOWCASE_INTRO,
   SCROLL_SHOWCASE_REPORT_DIMS,
   SCROLL_SHOWCASE_REPORT_SCORE,
   SCROLL_SHOWCASE_STEPS,
 } from '@/components/landing/LandingScrollShowcase.data';
-import { LANDING_HOME_INNER, LANDING_HOME_SECTION } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 import './LandingScrollShowcase.css';
 
-/** P2: 6 bars (was 12) — enough waveform presence without animation churn. */
-const EQ_BARS = [
-  { h: 18, dur: 0.9, d: 0 },
-  { h: 28, dur: 1.1, d: 0.1 },
-  { h: 16, dur: 0.85, d: 0.18 },
-  { h: 32, dur: 1.05, d: 0.05 },
-  { h: 22, dur: 0.95, d: 0.14 },
-  { h: 30, dur: 1.0, d: 0.08 },
-] as const;
+const SS_INNER = 'ie-ss-panel__inner mx-auto w-full px-4 sm:px-6';
 
 function prefersReducedMotion(): boolean {
   if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
@@ -31,294 +23,272 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function ResumeVisual() {
+/** Desktop-only heavy motion: fine pointer + hover + wide viewport. */
+function canUseParallax(): boolean {
+  if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
+  try {
+    return window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)').matches;
+  } catch {
+    return false;
+  }
+}
+
+function isCoarsePointer(): boolean {
+  if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
+  try {
+    return window.matchMedia('(pointer: coarse), (max-width: 1023px)').matches;
+  } catch {
+    return false;
+  }
+}
+
+function saveDataEnabled(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const conn = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+  return Boolean(conn?.saveData);
+}
+
+function Badge({ children }: { children: ReactNode }) {
   return (
-    <div className="relative w-[min(100%,330px)]">
-      <div
-        className="relative overflow-hidden rounded-[var(--ss-card-radius)] border p-6 shadow-[0_24px_60px_rgba(0,0,0,0.28)]"
-        style={{
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, var(--card-border))',
-          background: `linear-gradient(165deg, color-mix(in srgb, var(--accent-primary) 9%, transparent), color-mix(in srgb, var(--card-bg) 80%, transparent))`,
-        }}
-      >
-        <div className="mb-5 flex items-center gap-3.5">
-          <div
-            className="size-11 shrink-0 rounded-full"
-            style={{ background: 'linear-gradient(135deg, var(--accent-primary), var(--v3-pur, #a855f7))' }}
-            aria-hidden
-          />
-          <div className="flex flex-col gap-1.5">
-            <div className="h-2.5 w-[7.5rem] rounded-full" style={{ background: 'color-mix(in srgb, var(--text-primary) 28%, transparent)' }} />
-            <div className="h-2 w-20 rounded-full" style={{ background: 'color-mix(in srgb, var(--text-primary) 12%, transparent)' }} />
+    <div className="ie-ss-badge">
+      <span className="ie-ss-badge__dot" aria-hidden />
+      <span className="ie-ss-badge__text">{children}</span>
+    </div>
+  );
+}
+
+function ResumeCard({ question }: { question: string }) {
+  return (
+    <div className="ie-ss-card-wrap">
+      <div className="ie-ss-card" data-card="">
+        <div className="ie-ss-resume-head">
+          <div className="ie-ss-resume-avatar" aria-hidden />
+          <div className="ie-ss-resume-skel">
+            <div className="ie-ss-resume-skel__a" />
+            <div className="ie-ss-resume-skel__b" />
           </div>
         </div>
-        <div className="flex flex-col gap-2.5">
-          {[92, 76, 88, 60, 84, 48].map((w, i) => (
+        <div className="ie-ss-resume-lines">
+          {[90, 72, 86, 58, 80].map((w, i) => (
             <div
               key={i}
-              className="h-2 rounded"
+              className={cn('ie-ss-resume-line', (i === 1 || i === 3) && 'ie-ss-resume-line--accent')}
+              style={{ width: `${w}%` }}
+            />
+          ))}
+        </div>
+        <div className="ie-ss-resume-q">
+          <div className="ie-ss-eyebrow">GENERATED QUESTION</div>
+          <p className="ie-ss-quote">{question}</p>
+        </div>
+        <div className="ie-ss-scan" aria-hidden />
+      </div>
+    </div>
+  );
+}
+
+function VoiceCard({ followUp }: { followUp: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const mediaRef = useRef<HTMLDivElement | null>(null);
+  // Start without video (SSR-safe). Mount only after client confirms desktop capability.
+  const [showVideo, setShowVideo] = useState(false);
+
+  useEffect(() => {
+    if (prefersReducedMotion() || saveDataEnabled() || isCoarsePointer()) return;
+    const raf = requestAnimationFrame(() => setShowVideo(true));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    const media = mediaRef.current;
+    if (!v || !media || !showVideo) return;
+
+    if (!('IntersectionObserver' in window)) {
+      void v.play().catch(() => {});
+      return () => {
+        v.pause();
+      };
+    }
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry) return;
+        if (entry.isIntersecting) {
+          void v.play().catch(() => {});
+        } else {
+          v.pause();
+        }
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(media);
+    return () => {
+      io.disconnect();
+      v.pause();
+    };
+  }, [showVideo]);
+
+  return (
+    <div className="ie-ss-card-wrap">
+      <div className="ie-ss-card ie-ss-card--voice" data-card="">
+        <div className="ie-ss-media" ref={mediaRef}>
+          <LandingHeroSimulatorPoster />
+          {showVideo ? (
+            <video
+              ref={videoRef}
+              muted
+              loop
+              playsInline
+              preload="none"
+              poster="/assets/female-avatar-600.webp"
+              aria-hidden
+            >
+              <source src="/assets/female-ai.mp4" type="video/mp4" />
+            </video>
+          ) : null}
+          {/* Soft cover over baked-in Gemini sparkle (right mid of source footage). */}
+          <span className="ie-ss-media__scrub" aria-hidden />
+          <div className="ie-ss-live-badge">
+            <span className="ie-ss-blink ie-ss-live-badge__dot" aria-hidden />
+            <span className="ie-ss-live-badge__text">LIVE</span>
+          </div>
+        </div>
+
+        <div className="ie-ss-eq" aria-hidden>
+          {/* 8 bars everywhere — enough presence, half the animation cost of 16 */}
+          {SCROLL_SHOWCASE_EQ_BARS.slice(0, 8).map((b, i) => (
+            <div
+              key={i}
+              className="ie-ss-eq-bar"
               style={{
-                width: `${w}%`,
-                background:
-                  i === 1 || i === 3
-                    ? 'color-mix(in srgb, var(--accent-primary) 45%, transparent)'
-                    : 'color-mix(in srgb, var(--text-primary) 10%, transparent)',
-                boxShadow: i === 1 || i === 3 ? '0 0 12px color-mix(in srgb, var(--accent-primary) 35%, transparent)' : undefined,
+                height: Math.round(b.h * 1.1),
+                ['--ss-eq-dur' as string]: `${b.dur}s`,
+                ['--ss-eq-delay' as string]: `${b.d}s`,
               }}
             />
           ))}
         </div>
-        <div className="mt-5 flex flex-wrap gap-2">
-          {['React', 'Node.js', 'Kafka'].map((tag) => (
-            <span
-              key={tag}
-              className="rounded-md border px-2.5 py-1 text-[11px] font-semibold"
-              style={{
-                color: 'var(--accent-hover)',
-                borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))',
-              }}
-            >
-              {tag}
-            </span>
+
+        <div className="ie-ss-followup">
+          <div className="ie-ss-followup__head">
+            <span className="ie-ss-blink ie-ss-followup__dot" aria-hidden />
+            <span className="ie-ss-eyebrow ie-ss-eyebrow--voice">LIVE FOLLOW-UP</span>
+          </div>
+          <p className="ie-ss-quote">{followUp}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReportCard({
+  filled,
+  score,
+  verdict,
+}: {
+  filled: boolean;
+  score: number;
+  verdict: string;
+}) {
+  return (
+    <div className="ie-ss-card-wrap">
+      <div className="ie-ss-card" data-card="">
+        <div className="ie-ss-report-head">
+          <div>
+            <div className="ie-ss-eyebrow">INTERVIEW REPORT</div>
+            <div className="ie-ss-report-meta">Backend · Round 2</div>
+          </div>
+          <div className="ie-ss-report-score-wrap">
+            <span className="ie-ss-report-score">{score.toFixed(1)}</span>
+            <span className="ie-ss-report-denom">/10</span>
+          </div>
+        </div>
+        <div className="ie-ss-report-dims">
+          {SCROLL_SHOWCASE_REPORT_DIMS.map((d, i) => (
+            <div key={d.label} className="ie-ss-report-dim">
+              <div className="ie-ss-report-dim__row">
+                <span className="ie-ss-report-dim__label">{d.label}</span>
+                <span className="ie-ss-report-dim__pct">{d.w}%</span>
+              </div>
+              <div className="ie-ss-bar-track">
+                <div
+                  className="ie-ss-bar-fill"
+                  data-filled={filled ? 'true' : 'false'}
+                  style={{
+                    ['--ss-bar-w' as string]: `${d.w}%`,
+                    transitionDelay: filled ? `${0.15 + i * 0.12}s` : '0s',
+                  }}
+                />
+              </div>
+            </div>
           ))}
         </div>
-        <div
-          className="ie-ss-scan pointer-events-none absolute inset-x-2 h-14 rounded-xl"
-          style={{
-            background:
-              'linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent-primary) 18%, transparent), transparent)',
-          }}
-          aria-hidden
-        />
-      </div>
-      <div
-        className="ie-ss-float absolute -right-2 top-6 max-w-[10.5rem] rounded-xl border px-3 py-2.5 text-xs leading-snug shadow-lg sm:-right-10"
-        style={{
-          color: 'var(--text-primary)',
-          background: 'color-mix(in srgb, var(--bg-primary) 92%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
-        }}
-      >
-        Asks about <strong style={{ color: 'var(--accent-hover)' }}>your</strong> Kafka pipeline
-      </div>
-      <div
-        className="ie-ss-float-delay absolute -right-1 bottom-14 max-w-[10.5rem] rounded-xl border px-3 py-2.5 text-xs leading-snug shadow-lg sm:-right-8"
-        style={{
-          color: 'var(--text-primary)',
-          background: 'color-mix(in srgb, var(--bg-primary) 92%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
-        }}
-      >
-        Difficulty tuned to your experience
-      </div>
-    </div>
-  );
-}
-
-function VoiceVisual() {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    if (prefersReducedMotion()) {
-      v.pause();
-      return;
-    }
-    void v.play().catch(() => {});
-    return () => {
-      v.pause();
-    };
-  }, []);
-
-  return (
-    <div className="ie-ss-voice flex w-[min(100%,300px)] flex-col items-center">
-      <div
-        className="ie-ss-live-badge mb-2 inline-flex items-center gap-1.5 self-start rounded-full border px-3 py-1"
-        style={{
-          background: 'color-mix(in srgb, var(--bg-primary) 88%, transparent)',
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
-        }}
-      >
-        <span className="ie-ss-blink size-1.5 rounded-full bg-[var(--accent-danger)]" aria-hidden />
-        <span className="text-[10px] font-bold tracking-[0.16em]" style={{ color: 'var(--text-primary)' }}>
-          LIVE INTERVIEW
-        </span>
-      </div>
-
-      <div className="ie-ss-media relative w-full">
-        <LandingHeroSimulatorPoster />
-        <video
-          ref={videoRef}
-          muted
-          loop
-          playsInline
-          preload="none"
-          poster="/assets/female-avatar-600.webp"
-          aria-hidden
-        >
-          <source src="/assets/female-ai.mp4" type="video/mp4" />
-        </video>
-      </div>
-
-      <p
-        className="ie-ss-avatar-name mb-0 mt-2 text-center text-[13px] font-semibold tracking-tight"
-        style={{ color: 'var(--text-primary)' }}
-      >
-        Meera <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>· AI Interviewer</span>
-      </p>
-
-      <div className="ie-ss-eq mt-1.5 flex h-8 items-center gap-1" aria-hidden>
-        {EQ_BARS.map((b, i) => (
-          <div
-            key={i}
-            className="ie-ss-eq-bar"
-            style={{
-              height: Math.round(b.h * 0.72),
-              ['--ss-eq-dur' as string]: `${b.dur}s`,
-              ['--ss-eq-delay' as string]: `${b.d}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      <div
-        className="mt-3.5 w-full rounded-2xl border px-[18px] py-3.5"
-        style={{
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))',
-          background: 'color-mix(in srgb, var(--bg-primary) 92%, transparent)',
-        }}
-      >
-        <div className="mb-2 flex items-center gap-2">
-          <span className="ie-ss-blink size-1.5 rounded-full" style={{ background: 'var(--v3-pur, #a855f7)' }} aria-hidden />
-          <span className="text-[10px] font-bold tracking-[0.18em]" style={{ color: 'var(--accent-hover)' }}>
-            LIVE FOLLOW-UP
-          </span>
+        <div className="ie-ss-verdict">
+          <span className="ie-ss-verdict__dot" aria-hidden />
+          <span className="ie-ss-verdict__text">{verdict}</span>
         </div>
-        <p className="m-0 text-[15px] font-medium leading-snug" style={{ color: 'var(--text-primary)' }}>
-          “You mentioned caching — how did you handle invalidation?”
-        </p>
       </div>
     </div>
   );
 }
 
-function ReportVisual() {
-  const [filled, setFilled] = useState(false);
-  const [score, setScore] = useState(0);
-
-  useEffect(() => {
-    const reduce = prefersReducedMotion();
-    let raf = 0;
-    let raf2 = 0;
-    raf = requestAnimationFrame(() => {
-      setFilled(true);
-      if (reduce) {
-        setScore(SCROLL_SHOWCASE_REPORT_SCORE);
-        return;
-      }
-      const target = SCROLL_SHOWCASE_REPORT_SCORE;
-      const t0 = performance.now();
-      const duration = 1100;
-      const step = (t: number) => {
-        const p = Math.min(1, (t - t0) / duration);
-        setScore(Number((target * (1 - Math.pow(1 - p, 3))).toFixed(1)));
-        if (p < 1) raf2 = requestAnimationFrame(step);
-      };
-      raf2 = requestAnimationFrame(step);
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      cancelAnimationFrame(raf2);
-    };
-  }, []);
-
+function PanelCopy({
+  label,
+  title,
+  body,
+  fromRight = false,
+  labelClassName,
+}: {
+  label: string;
+  title: string;
+  body: string;
+  fromRight?: boolean;
+  labelClassName?: string;
+}) {
   return (
     <div
-      className="w-[min(100%,350px)] rounded-[var(--ss-card-radius)] border p-7 shadow-[0_24px_60px_rgba(0,0,0,0.28)]"
-      style={{
-        borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, var(--card-border))',
-        background: `linear-gradient(165deg, color-mix(in srgb, var(--accent-primary) 10%, transparent), color-mix(in srgb, var(--card-bg) 85%, transparent))`,
-      }}
+      className={cn('ie-ss-copy ie-ss-reveal', fromRight && 'ie-ss-reveal--from-right')}
+      data-reveal=""
     >
-      <div className="mb-6 flex items-end justify-between gap-3">
-        <div>
-          <div className="mb-1.5 text-[11px] font-bold tracking-[0.18em]" style={{ color: 'var(--accent-hover)' }}>
-            INTERVIEW REPORT
-          </div>
-          <div className="text-[15px] font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Backend · Round 2
-          </div>
-        </div>
-        <div className="flex items-baseline gap-0.5">
-          <span
-            className="bg-clip-text text-[42px] font-extrabold text-transparent"
-            style={{ backgroundImage: 'linear-gradient(120deg, var(--accent-hover), var(--v3-pur, #c084fc))' }}
-          >
-            {score.toFixed(1)}
-          </span>
-          <span className="text-[15px] font-semibold" style={{ color: 'var(--text-muted)' }}>
-            /10
-          </span>
-        </div>
-      </div>
-      <div className="flex flex-col gap-3.5">
-        {SCROLL_SHOWCASE_REPORT_DIMS.map((d) => (
-          <div key={d.label} className="flex flex-col gap-1.5">
-            <div className="flex justify-between gap-2">
-              <span className="text-[13px] font-medium" style={{ color: 'var(--text-secondary)' }}>
-                {d.label}
-              </span>
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-                {d.w}%
-              </span>
-            </div>
-            <div
-              className="h-1.5 overflow-hidden rounded"
-              style={{ background: 'color-mix(in srgb, var(--text-primary) 8%, transparent)' }}
-            >
-              <div
-                className="ie-ss-bar-fill"
-                data-filled={filled ? 'true' : 'false'}
-                style={{ ['--ss-bar-w' as string]: `${d.w}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-      <div
-        className="mt-5 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5"
-        style={{
-          borderColor: 'color-mix(in srgb, var(--accent-primary) 40%, var(--card-border))',
-          background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-        }}
-      >
-        <span className="size-1.5 rounded-full" style={{ background: 'var(--accent-primary)' }} aria-hidden />
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>
-          Strong practice signal
-        </span>
-      </div>
+      <div className={cn('ie-ss-label', labelClassName)}>{label}</div>
+      <h3 className="ie-ss-title">{title}</h3>
+      <p className="ie-ss-body">{body}</p>
     </div>
   );
 }
 
-function ActiveStageVisual({ active }: { active: number }) {
-  if (active === 1) return <VoiceVisual />;
-  if (active === 2) return <ReportVisual />;
-  return <ResumeVisual />;
-}
-
-/** Dwell before committing a step change — stops Voice/Report boundary flip-flop remounts. */
-const STEP_ACTIVE_DWELL_MS = 180;
-
 export default function LandingScrollShowcase() {
-  const [active, setActive] = useState(0);
   const sectionRef = useRef<HTMLElement | null>(null);
-  const stepRefs = useRef<(HTMLElement | null)[]>([]);
+  const panelRefs = useRef<(HTMLElement | null)[]>([]);
+  const [reportFilled, setReportFilled] = useState(false);
+  const [reportScore, setReportScore] = useState(0);
+  const reportStarted = useRef(false);
 
-  // P0: gate continuous animations while #how is on-screen (DOM class — no React state churn).
-  // P1: drive step-active via IntersectionObserver (no scroll + getBoundingClientRect).
-  // Phase 3h: track ratios across all steps (IO only delivers changed entries) + dwell hysteresis.
+  const startReportAnim = useCallback(() => {
+    if (reportStarted.current) return;
+    reportStarted.current = true;
+    const reduce = prefersReducedMotion();
+    setReportFilled(true);
+    if (reduce) {
+      setReportScore(SCROLL_SHOWCASE_REPORT_SCORE);
+      return;
+    }
+    const target = SCROLL_SHOWCASE_REPORT_SCORE;
+    const t0 = performance.now();
+    const duration = isCoarsePointer() ? 700 : 1200;
+    let raf = 0;
+    const step = (t: number) => {
+      const p = Math.min(1, (t - t0) / duration);
+      setReportScore(Number((target * (1 - Math.pow(1 - p, 3))).toFixed(1)));
+      if (p < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  // Gate continuous animations while #how is on-screen.
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
@@ -340,165 +310,265 @@ export default function LandingScrollShowcase() {
       { root: null, rootMargin: '12% 0px', threshold: 0.05 },
     );
     sectionIo.observe(section);
+    return () => sectionIo.disconnect();
+  }, []);
 
-    const ratios = new Map<Element, number>();
-    let committedIdx = 0;
-    let pendingIdx: number | null = null;
-    let dwellTimer: ReturnType<typeof setTimeout> | null = null;
+  // Reveal copy blocks + trigger report fill when panels enter view.
+  useEffect(() => {
+    const reduce = prefersReducedMotion();
+    const nodes = panelRefs.current.filter(Boolean) as HTMLElement[];
+    let raf = 0;
 
-    const clearDwell = () => {
-      if (dwellTimer !== null) {
-        clearTimeout(dwellTimer);
-        dwellTimer = null;
+    const revealAll = () => {
+      for (const panel of nodes) {
+        panel.querySelectorAll('[data-reveal]').forEach((n) => {
+          n.classList.add('is-revealed');
+        });
       }
-      pendingIdx = null;
     };
 
-    // Thin center band + dwell: switch only after a new step stays dominant ~180ms.
-    const stepIo = new IntersectionObserver(
+    const scheduleReport = () => {
+      raf = requestAnimationFrame(() => {
+        startReportAnim();
+      });
+    };
+
+    if (reduce || !('IntersectionObserver' in window)) {
+      revealAll();
+      scheduleReport();
+      return () => cancelAnimationFrame(raf);
+    }
+
+    const io = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          ratios.set(entry.target, entry.isIntersecting ? entry.intersectionRatio : 0);
+          if (!entry.isIntersecting) continue;
+          const t = entry.target as HTMLElement;
+          t.classList.add('is-revealed');
+          io.unobserve(t);
+          if (t.hasAttribute('data-fillgroup')) scheduleReport();
         }
-
-        let bestIdx = -1;
-        let bestRatio = 0;
-        for (let i = 0; i < stepRefs.current.length; i++) {
-          const node = stepRefs.current[i];
-          if (!node) continue;
-          const ratio = ratios.get(node) ?? 0;
-          if (ratio > bestRatio) {
-            bestRatio = ratio;
-            bestIdx = i;
-          }
-        }
-        if (bestIdx < 0 || bestRatio <= 0) return;
-
-        if (bestIdx === committedIdx) {
-          clearDwell();
-          return;
-        }
-
-        if (bestIdx === pendingIdx) return;
-
-        clearDwell();
-        pendingIdx = bestIdx;
-        const nextIdx = bestIdx;
-        dwellTimer = setTimeout(() => {
-          dwellTimer = null;
-          pendingIdx = null;
-          committedIdx = nextIdx;
-          setActive(nextIdx);
-        }, STEP_ACTIVE_DWELL_MS);
       },
-      { root: null, rootMargin: '-42% 0px -42% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] },
+      // Slightly earlier on mobile so copy is readable as user arrives.
+      { threshold: isCoarsePointer() ? 0.12 : 0.25, rootMargin: '0px 0px -8% 0px' },
     );
 
-    for (const node of stepRefs.current) {
-      if (node) stepIo.observe(node);
+    for (const panel of nodes) {
+      panel.querySelectorAll('[data-reveal]').forEach((n) => io.observe(n));
     }
 
     return () => {
-      clearDwell();
-      sectionIo.disconnect();
-      stepIo.disconnect();
+      cancelAnimationFrame(raf);
+      io.disconnect();
     };
+  }, [startReportAnim]);
+
+  // Desktop-only scroll parallax — skipped on touch / narrow / reduced-motion.
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+
+    let tick = false;
+    let attached = false;
+
+    const clearTransforms = () => {
+      for (const panel of panelRefs.current) {
+        if (!panel) continue;
+        const card = panel.querySelector<HTMLElement>('[data-card]');
+        if (card) card.style.transform = '';
+        panel.querySelectorAll<HTMLElement>('[data-blob]').forEach((bl) => {
+          bl.style.transform = '';
+        });
+      }
+    };
+
+    const update = () => {
+      tick = false;
+      if (!canUseParallax()) return;
+      const H = window.innerHeight;
+      for (const panel of panelRefs.current) {
+        if (!panel) continue;
+        const r = panel.getBoundingClientRect();
+        // Skip panels fully off-screen.
+        if (r.bottom < 0 || r.top > H) continue;
+
+        let prog = (H / 2 - (r.top + r.height / 2)) / H + 0.5;
+        prog = Math.min(1, Math.max(0, prog));
+
+        const card = panel.querySelector<HTMLElement>('[data-card]');
+        if (card) {
+          const ry = (prog - 0.5) * 28;
+          const rx = (0.5 - prog) * 6;
+          const sc = 1 - Math.abs(prog - 0.5) * 0.06;
+          card.style.transform = `rotateY(${ry.toFixed(2)}deg) rotateX(${rx.toFixed(2)}deg) scale(${sc.toFixed(3)})`;
+        }
+
+        panel.querySelectorAll<HTMLElement>('[data-blob]').forEach((bl, i) => {
+          bl.style.transform = `translate3d(0, ${((prog - 0.5) * (i % 2 ? -40 : 50)).toFixed(1)}px, 0)`;
+        });
+      }
+    };
+
+    const onScroll = () => {
+      if (tick) return;
+      tick = true;
+      requestAnimationFrame(update);
+    };
+
+    const syncListeners = () => {
+      const enable = canUseParallax();
+      if (enable && !attached) {
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll, { passive: true });
+        attached = true;
+        onScroll();
+      } else if (!enable && attached) {
+        window.removeEventListener('scroll', onScroll);
+        window.removeEventListener('resize', onScroll);
+        attached = false;
+        clearTransforms();
+      } else if (!enable) {
+        clearTransforms();
+      }
+    };
+
+    syncListeners();
+
+    let mql: MediaQueryList | null = null;
+    try {
+      mql = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
+      const onChange = () => syncListeners();
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', onChange);
+        return () => {
+          mql?.removeEventListener('change', onChange);
+          if (attached) {
+            window.removeEventListener('scroll', onScroll);
+            window.removeEventListener('resize', onScroll);
+          }
+          clearTransforms();
+        };
+      }
+      // Safari < 14
+      mql.addListener(onChange);
+      return () => {
+        mql?.removeListener(onChange);
+        if (attached) {
+          window.removeEventListener('scroll', onScroll);
+          window.removeEventListener('resize', onScroll);
+        }
+        clearTransforms();
+      };
+    } catch {
+      syncListeners();
+      return () => {
+        if (attached) {
+          window.removeEventListener('scroll', onScroll);
+          window.removeEventListener('resize', onScroll);
+        }
+        clearTransforms();
+      };
+    }
   }, []);
+
+  const [resume, voice, report] = SCROLL_SHOWCASE_STEPS;
 
   return (
     <section
       ref={sectionRef}
       id="how"
-      className={cn(LANDING_HOME_SECTION, 'ie-scroll-showcase')}
+      className="ie-scroll-showcase"
       aria-labelledby="scroll-showcase-heading"
     >
-      <div className={LANDING_HOME_INNER}>
-        <div className="max-w-[540px]">
-          <div
-            className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))',
-              background: 'var(--v3-accdim)',
-            }}
-          >
-            <span className="size-1.5 rounded-full" style={{ background: 'var(--accent-primary)' }} aria-hidden />
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--accent-hover)' }}>
-              How it works
-            </span>
-          </div>
-          <h2
-            id="scroll-showcase-heading"
-            className="mt-5 text-balance font-[family-name:var(--font-bricolage)] text-[clamp(28px,3.6vw,48px)] font-extrabold leading-[1.08] tracking-tight"
-            style={{ color: T.text }}
-          >
-            Practice like it&apos;s the real thing.
-          </h2>
-          <p className="mt-4 max-w-[34rem] text-base leading-relaxed sm:text-lg" style={{ color: T.text2 }}>
-            One interview loop, three built-in advantages. Scroll through what happens under the hood.
-          </p>
-        </div>
-
-        <div className="mt-12 grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(280px,440px)] lg:gap-16">
-          <div className="min-w-0">
-            {SCROLL_SHOWCASE_STEPS.map((step, i) => (
-              <article
-                key={step.id}
-                ref={(el) => {
-                  stepRefs.current[i] = el;
-                }}
-                className="ie-ss-step"
-                data-active={active === i ? 'true' : 'false'}
-                aria-current={active === i ? 'step' : undefined}
-              >
-                <div className="flex items-center gap-3.5">
-                  <span className="text-[13px] font-bold tracking-[0.14em]" style={{ color: 'var(--accent-primary)' }}>
-                    {step.num}
-                  </span>
-                  <span
-                    className="h-px max-w-[60px] flex-1"
-                    style={{ background: 'color-mix(in srgb, var(--accent-primary) 40%, transparent)' }}
-                    aria-hidden
-                  />
-                </div>
-                <h3
-                  className="m-0 text-balance font-[family-name:var(--font-bricolage)] text-[clamp(22px,2.4vw,32px)] font-bold leading-snug tracking-tight"
-                  style={{ color: T.text }}
-                >
-                  {step.title}
-                </h3>
-                <p className="m-0 max-w-[26rem] text-[17px] leading-[1.65]" style={{ color: T.text2 }}>
-                  {step.body}
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-2.5">
-                  {step.chips.map((chip) => (
-                    <span
-                      key={chip}
-                      className="rounded-full border px-3.5 py-1.5 text-[13px] font-medium"
-                      style={{
-                        color: 'var(--text-secondary)',
-                        borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--card-border))',
-                        background: 'color-mix(in srgb, var(--accent-primary) 7%, transparent)',
-                      }}
-                    >
-                      {chip}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="lg:sticky lg:top-24">
-            <div className="ie-ss-stage">
-              {/* P0: mount only the active visual — inactive trees are fully unmounted. */}
-              <div key={active} className="ie-ss-visual ie-ss-visual--mounted">
-                <ActiveStageVisual active={active} />
-              </div>
+      {/* Intro */}
+      <div
+        className="ie-ss-panel ie-ss-panel--intro"
+        ref={(el) => {
+          panelRefs.current[0] = el;
+        }}
+      >
+        <div className="ie-ss-panel__blob ie-ss-panel__blob--intro-a" data-blob="" aria-hidden />
+        <div className="ie-ss-panel__blob ie-ss-panel__blob--intro-b" data-blob="" aria-hidden />
+        <div className={SS_INNER}>
+          <div className="ie-ss-intro">
+            <Badge>{SCROLL_SHOWCASE_INTRO.badge}</Badge>
+            <h2 id="scroll-showcase-heading" className="ie-ss-intro__headline">
+              <span className="ie-ss-intro__line1">{SCROLL_SHOWCASE_INTRO.headlineLine1}</span>
+              <br />
+              <span className="ie-ss-intro__line2">{SCROLL_SHOWCASE_INTRO.headlineLine2}</span>
+            </h2>
+            <p className="ie-ss-intro__body">{SCROLL_SHOWCASE_INTRO.body}</p>
+            <div className="ie-ss-scroll-hint" aria-hidden>
+              <span className="ie-ss-scroll-hint__label">SCROLL</span>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path
+                  d="M3 6l5 5 5-5"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </div>
-            <div className="mt-4 flex justify-center gap-2" aria-hidden>
-              {SCROLL_SHOWCASE_STEPS.map((step, i) => (
-                <span key={step.id} className="ie-ss-dot" data-active={active === i ? 'true' : 'false'} />
-              ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 01 — Resume-aware */}
+      <div
+        className="ie-ss-panel"
+        ref={(el) => {
+          panelRefs.current[1] = el;
+        }}
+      >
+        <div className="ie-ss-panel__blob ie-ss-panel__blob--resume" data-blob="" aria-hidden />
+        <div className={SS_INNER}>
+          <div className="ie-ss-row">
+            <PanelCopy label={resume.label} title={resume.title} body={resume.body} />
+            <div className="ie-ss-visual-slot">
+              <ResumeCard question={resume.generatedQuestion} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 02 — Live voice */}
+      <div
+        className="ie-ss-panel"
+        ref={(el) => {
+          panelRefs.current[2] = el;
+        }}
+      >
+        <div className="ie-ss-panel__blob ie-ss-panel__blob--voice" data-blob="" aria-hidden />
+        <div className={SS_INNER}>
+          <div className="ie-ss-row ie-ss-row--reverse">
+            <PanelCopy
+              label={voice.label}
+              title={voice.title}
+              body={voice.body}
+              fromRight
+              labelClassName="ie-ss-label--voice"
+            />
+            <div className="ie-ss-visual-slot">
+              <VoiceCard followUp={voice.followUp} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 03 — Scored report */}
+      <div
+        className="ie-ss-panel"
+        ref={(el) => {
+          panelRefs.current[3] = el;
+        }}
+      >
+        <div className="ie-ss-panel__blob ie-ss-panel__blob--report" data-blob="" aria-hidden />
+        <div className={SS_INNER}>
+          <div className="ie-ss-row">
+            <PanelCopy label={report.label} title={report.title} body={report.body} />
+            <div className="ie-ss-visual-slot ie-ss-reveal ie-ss-reveal--up" data-reveal="" data-fillgroup="">
+              <ReportCard filled={reportFilled} score={reportScore} verdict={report.verdict} />
             </div>
           </div>
         </div>
