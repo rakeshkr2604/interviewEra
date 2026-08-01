@@ -30,7 +30,7 @@ async function waitForTrackedCtaHydration(page: Page, locator: Locator) {
 
 async function waitForHomeHeroCtas(page: Page) {
   await page.waitForFunction(
-    () => Boolean(document.querySelector('main a[href="/campus"]')),
+    () => Boolean(document.querySelector('main a[href="/sample-report.pdf"]')),
     undefined,
     { timeout: 15_000 },
   );
@@ -78,15 +78,18 @@ test.describe('Marketing CTA analytics', () => {
     expect((await getCtaEvents(page)).some((e) => e.cta_key === 'audience_hiring_teams')).toBe(true);
   });
 
-  test('homepage For Colleges hero CTA fires once', async ({ page }) => {
+  test('homepage See a Sample Report hero CTA fires once', async ({ page }) => {
     await gotoMarketingPage(page, '/', { heading: /practice the interview/i });
     await waitForHomeHeroCtas(page);
     await installCtaSpy(page);
-    const heroColleges = page.locator('main').getByRole('link', { name: 'For Colleges', exact: true }).first();
-    await clickTrackedCta(page, heroColleges);
+    const heroSampleReport = page
+      .locator('main')
+      .getByRole('link', { name: 'See a Sample Report', exact: true })
+      .first();
+    await clickTrackedCta(page, heroSampleReport);
     const events = await getCtaEvents(page);
     expect(events).toHaveLength(1);
-    expect(events[0]?.cta_key).toBe('for_colleges');
+    expect(events[0]?.cta_key).toBe('see_sample_report');
   });
 
   test('navbar For Teams fires once', async ({ page }) => {
