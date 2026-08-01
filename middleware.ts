@@ -31,6 +31,11 @@ const PUBLIC_ROUTES = new Set([
   '/auth/error',
   '/auth/verify-pending',
   '/teams',
+  // Sitemap marketing pages — must be public for humans AND crawlers (not bots-only).
+  '/community',
+  '/resources',
+  '/contact',
+  '/google-apprenticeship',
 ]);
 const AUTH_ROUTES = new Set(['/login', '/signup', '/auth/verify-pending']);
 
@@ -62,15 +67,31 @@ function forwardedHost(request: NextRequest): string {
   return host ? host.toLowerCase() : '';
 }
 
-/** Vercel preview thumbnails, Lighthouse, crawlers — skip session/auth work (still after www normalize). */
-function shouldBypassMiddlewareForUserAgent(userAgent: string | null): boolean {
+/**
+ * Known crawlers / preview tooling — allowlist only (no generic `bot`/`crawler`).
+ * Spoofing these UAs must NOT skip rate limits; see middleware body.
+ * SEO: Googlebot, Bing, IndexNow, LinkedIn, Facebook, Twitter/X.
+ * Ops: Vercel screenshots + Lighthouse (preview/CI), not SEO.
+ */
+function isTrustedCrawlerUserAgent(userAgent: string | null): boolean {
   const ua = (userAgent ?? '').toLowerCase();
+  if (!ua) return false;
   return (
-    ua.includes('vercel') ||
+    ua.includes('googlebot') ||
+    ua.includes('bingbot') ||
+    ua.includes('bingpreview') ||
+    ua.includes('msnbot') ||
+    ua.includes('linkedinbot') ||
+    ua.includes('facebookexternalhit') ||
+    ua.includes('facebot') ||
+    ua.includes('twitterbot') ||
+    ua.includes('indexnow') ||
     ua.includes('lighthouse') ||
-    ua.includes('crawler') ||
-    /\bbot\b/.test(ua) ||
-    ua.endsWith('bot') // googlebot, bingbot, etc. (avoid naive `includes('bot')` → Roboto-style false positives)
+    ua.includes('chrome-lighthouse') ||
+    ua.includes('vercel-screenshot') ||
+    ua.includes('vercel-favicon') ||
+    // Broader Vercel infra UA (thumbnails); rate limits still apply.
+    ua.includes('vercel')
   );
 }
 
@@ -90,10 +111,6 @@ export async function middleware(request: NextRequest) {
     url.hostname = PRODUCTION_APEX;
     url.protocol = 'https:';
     return NextResponse.redirect(url, 301);
-  }
-
-  if (shouldBypassMiddlewareForUserAgent(request.headers.get('user-agent'))) {
-    return NextResponse.next();
   }
 
   const pathname = request.nextUrl.pathname;
@@ -177,8 +194,8 @@ export async function middleware(request: NextRequest) {
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
 
-  // Rate limiting — checked before auth/DB calls for efficiency.
-  // Uses Redis so limits are enforced consistently across all edge instances.
+  // Rate limiting — always enforced (including for trusted-crawler UAs).
+  // Spoofing Googlebot/etc. must not skip abuse protection on money/auth paths.
   const rateConfig = RATE_LIMITS.find(([prefix]) => pathname.startsWith(prefix));
   if (rateConfig) {
     const [, limit, windowSeconds] = rateConfig;
@@ -202,6 +219,15 @@ export async function middleware(request: NextRequest) {
         headers: { 'Retry-After': String(rl.resetInSeconds) },
       });
     }
+  }
+
+  // Trusted crawlers: skip Supabase session refresh (edge cost) after rate limits.
+  // Marketing/SEO pages are public for humans too — crawlability does not depend on this.
+  if (
+    isTrustedCrawlerUserAgent(request.headers.get('user-agent')) &&
+    !resumeApiNeedsSession
+  ) {
+    return NextResponse.next();
   }
 
   if (!needsAuthResolution) {

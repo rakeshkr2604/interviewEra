@@ -64,10 +64,10 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 
 - **Location**: both in `src/lib/college/org-verification.ts::shouldAutoApproveCampusOrg()`.
 - **Default state**: both unset → every new campus org verification status is `'pending'` (safe default).
-- **Purpose**: `CAMPUS_WORKSPACE_AUTO_APPROVE=true` auto-approves **every** new campus org signup, bypassing manual review entirely. `CAMPUS_ORG_APPROVED_EMAILS` is a comma-separated allowlist for approving specific pilot emails without a blanket auto-approve.
+- **Purpose**: `CAMPUS_WORKSPACE_AUTO_APPROVE=true` auto-approves **every** new campus org signup, bypassing manual review entirely (dev / Vercel Preview / local only). `CAMPUS_ORG_APPROVED_EMAILS` is a comma-separated allowlist for approving specific pilot emails without a blanket auto-approve — **this allowlist still works in production**.
 - **Owner**: Unknown — not verified.
-- **Category**: `CAMPUS_WORKSPACE_AUTO_APPROVE` is a **security-relevant permanent toggle** — `.env.example` explicitly warns "keep UNSET in production," meaning this is a dev/staging convenience with no code-level production guard (no `NODE_ENV`/`VERCEL_ENV` check inside the function itself — verified by reading the file above). If ever set to `true` in a production environment variable by mistake, campus admin self-service escalation (the exact class of privilege escalation this module's own header warns against — "prevents self-service campus_admin escalation") becomes possible with zero additional gate. `CAMPUS_ORG_APPROVED_EMAILS` is an ongoing allowlist, not a flag needing removal.
-- **Planned removal criteria**: N/A for the mechanism, but flagging as a real risk: **this flag has no production safety net beyond operator discipline** — worth a follow-up (out of scope for this task) to add a `NODE_ENV`/`VERCEL_ENV==='production'` guard directly in the function.
+- **Category**: Security-relevant permanent toggle with a **code-level production hard-stop**: when `VERCEL_ENV === 'production'`, `CAMPUS_WORKSPACE_AUTO_APPROVE` is ignored even if set to `true`. Preview (`VERCEL_ENV=preview`) and local (unset `VERCEL_ENV`) keep the previous auto-approve behavior for development. Do not use `NODE_ENV` for this check — it is `production` on previews and `next start`.
+- **Planned removal criteria**: N/A for the mechanism.
 
 ## `BLOCK_SEARCH_INDEXING`
 
@@ -116,4 +116,4 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 
 ## Summary: what this registry makes visible for the first time
 
-Of 14 product-behavior flags inventoried, **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable), and **one has a real, currently-unmitigated production risk** if misconfigured (`CAMPUS_WORKSPACE_AUTO_APPROVE`, which has no code-level production guard). Neither of these is fixed by this document — this document's job is only to make both facts impossible to miss going forward. Fixing them is out of scope for this task (no runtime changes) and belongs to a future task once the founder decides how to act on this evidence.
+Of 14 product-behavior flags inventoried, **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable). `CAMPUS_WORKSPACE_AUTO_APPROVE` now has a Vercel-production hard-stop in `org-verification.ts` (see that flag's section above).

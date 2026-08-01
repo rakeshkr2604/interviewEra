@@ -4,9 +4,22 @@
 
 export type CampusOrgVerificationStatus = 'pending' | 'approved';
 
+/**
+ * True only on Vercel Production (`VERCEL_ENV=production`).
+ * Preview / local / unset VERCEL_ENV are not production — auto-approve may still apply there.
+ * Do not use NODE_ENV: it is `production` for `next start` and Vercel previews too.
+ */
+function isVercelProduction(): boolean {
+  return process.env.VERCEL_ENV === 'production';
+}
+
 /** Dev/staging auto-approve or comma-separated pilot email allowlist. */
 export function shouldAutoApproveCampusOrg(email: string | undefined): boolean {
-  if (process.env.CAMPUS_WORKSPACE_AUTO_APPROVE === 'true') {
+  // Blanket auto-approve is impossible in Vercel Production even if the env var is set.
+  if (
+    !isVercelProduction() &&
+    process.env.CAMPUS_WORKSPACE_AUTO_APPROVE === 'true'
+  ) {
     return true;
   }
 

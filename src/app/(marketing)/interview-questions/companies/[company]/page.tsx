@@ -1,4 +1,4 @@
-import { notFound, redirect } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
@@ -97,12 +97,13 @@ export default async function CompanyQuestionsPage({ params }: Props) {
   const company = getCompanyBySlug(companySlug)
   if (!company) notFound()
 
+  // Hub consolidation — permanent so crawlers transfer equity to the editorial hubs.
   if (company.slug === 'tcs') {
-    redirect('/interview-questions/tcs')
+    permanentRedirect('/interview-questions/tcs')
   }
 
   if (company.slug === 'solera') {
-    redirect('/interview-questions/solera')
+    permanentRedirect('/interview-questions/solera')
   }
 
   if (isWiproCompanyHub(company.slug)) {

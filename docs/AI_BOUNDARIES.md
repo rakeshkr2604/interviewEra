@@ -30,7 +30,7 @@
 |---|---|---|
 | `src/lib/voice/{core,orchestrator,conversation,tts,audio}/**` and the `/interview/session/[id]/v2` route | A **live, parallel second implementation** of the voice pipeline exists alongside the production legacy stack. "A consolidation decision is pending" — do not extend either stack, do not delete the v2 stack, and do not assume the legacy stack is the only one that matters. The decision is scheduled (MASTER_ENGINEERING_ROADMAP.md Phase 3) but not yet made. | `docs/VOICE.md` "Architecture" + "Technical debt" |
 | `NEXT_PUBLIC_AUTH_V2`-gated code (`src/lib/auth/*`, `src/app/auth/callback/route.ts`, `src/app/(auth)/*`) | Two auth logic paths coexist; a partial change or flag-flip mistake can silently break login/signup redirects for a subset of users. No measurable rollout-complete criterion exists yet (`docs/FLAGS.md`). | CLAUDE.md High Risk Systems table; `docs/ARCHITECTURE.md` "High risk: Auth V2 migration" |
-| `CAMPUS_WORKSPACE_AUTO_APPROVE` and `src/lib/college/org-verification.ts` | No code-level production guard exists on this flag — it relies entirely on the operator not setting it in production. Treat any change here as security-relevant. | `docs/FLAGS.md` |
+| `CAMPUS_WORKSPACE_AUTO_APPROVE` and `src/lib/college/org-verification.ts` | Blanket auto-approve is ignored when `VERCEL_ENV=production` (code hard-stop). Allowlist (`CAMPUS_ORG_APPROVED_EMAILS`) still works in production. Treat any change to that guard as security-relevant. | `docs/FLAGS.md` |
 
 ## Safe-to-edit zones (normal review discipline applies — still read the relevant subsystem doc if one exists)
 
