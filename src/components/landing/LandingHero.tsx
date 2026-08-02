@@ -18,7 +18,7 @@ const TRUST_ITEMS = [
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
   return (
     <section
-      className="landing-hero-section relative overflow-hidden pt-[30px] pb-[5.5rem] sm:pb-24"
+      className="landing-hero-section relative overflow-hidden pt-[30px] pb-4 sm:pb-6"
       aria-labelledby="landing-hero-heading"
     >
       <div

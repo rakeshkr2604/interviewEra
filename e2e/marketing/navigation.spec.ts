@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   HOME_CTA_SAMPLE_REPORT,
+  HOME_CTA_SAMPLE_REPORT_HREF,
   HOME_CTA_START_FREE,
+  HOME_HERO_HEADING,
 } from '../helpers/marketing-home';
 import { waitForMainNav } from '../helpers/marketing-nav';
 
@@ -10,8 +12,14 @@ test.describe.configure({ mode: 'serial' });
 test.describe('Phase 1 marketing navigation', () => {
   test('homepage hero and audience paths', async ({ page }) => {
     await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1, name: HOME_HERO_HEADING })).toBeVisible();
     await expect(page.getByRole('link', { name: HOME_CTA_START_FREE }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: HOME_CTA_START_FREE }).first()).toHaveAttribute('href', '/signup');
     await expect(page.getByRole('link', { name: HOME_CTA_SAMPLE_REPORT }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: HOME_CTA_SAMPLE_REPORT }).first()).toHaveAttribute(
+      'href',
+      HOME_CTA_SAMPLE_REPORT_HREF,
+    );
     await expect(page.getByRole('list', { name: 'Who InterviewEra is for' })).toBeVisible();
     await expect(page.getByText('Students: 3 free interviews')).toBeVisible();
     await expect(page.getByText('Colleges run campus placements')).toBeVisible();

@@ -29,6 +29,8 @@ const eslintConfig = defineConfig([
     "test-results/**",
     "playwright-report/**",
     "InterviewEra.com Brand Icons/**",
+    "InterviewEra timeline concept/**",
+    "tmp-lh/**",
   ]),
   {
     files: ["src/emails/**/*.{ts,tsx}"],

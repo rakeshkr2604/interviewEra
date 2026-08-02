@@ -176,61 +176,6 @@ export const EVALUATION_DIMENSIONS = [
   { name: 'Relevance', weight: '20%', detail: 'Stays on the question' },
 ] as const;
 
-/** High-impact positioning: ChatGPT / generic vs InterviewEra (replaces neutral feature table) */
-export const POSITIONING_MICRO_KICKER =
-  'Many candidates already use ChatGPT — but still struggle in live interviews';
-
-export const POSITIONING_HEADLINE = "Why ChatGPT practice isn't enough for placements";
-
-export const POSITIONING_SUBLINES = [
-  'Generating answers ≠ clearing interviews',
-  'Without structure and scoring, you’re guessing — not improving',
-] as const;
-
-/** Qualitative bridge under the ChatGPT objection — no numeric claims. */
-export const POSITIONING_BRIDGE =
-  'Candidates who practice with structure and scoring walk in clearer on what to fix than after freeform ChatGPT sessions.';
-
-export const POSITIONING_LEFT = {
-  label: 'ChatGPT & generic tools',
-  tone: 'Helpful, but not designed for placements',
-  items: [
-    'No structured interview flow',
-    'No scoring system',
-    'No resume-based question sequencing',
-    'No Mock Interview flow',
-  ] as const,
-} as const;
-
-export const POSITIONING_RIGHT = {
-  label: 'InterviewEra',
-  tone: 'Built for structured placement-style practice',
-  items: [
-    'Resume-aware questions from your CV',
-    'Adaptive Follow-up Questions when answers go vague',
-    'Answer Feedback you can act on',
-    'Full Mock Interview flow',
-  ] as const,
-} as const;
-
-export const POSITIONING_WHY_MATTERS = {
-  title: 'Why this difference actually matters',
-  points: [
-    {
-      title: 'Without scoring → you don’t know if you improved',
-      body: 'Numbers force iteration before the real interview.',
-    },
-    {
-      title: 'Without structure → answers stay random',
-      body: 'Chat has no scoreboard; it doesn’t train STAR under pressure.',
-    },
-    {
-      title: 'Without simulation → real panels feel alien',
-      body: 'One-off prompts ≠ a timed multi-question Mock Interview.',
-    },
-  ] as const,
-} as const;
-
 export const PRICING_FAQ = [
   {
     q: 'What is a credit?',

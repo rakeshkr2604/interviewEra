@@ -63,7 +63,7 @@ export function LandingFounderSection() {
 
               <p className="ie-lh-text-muted pt-2 text-xs">
                 More on the product and mission →{' '}
-                <a href="/about" className="ie-lh-text-link font-medium underline-offset-2 hover:underline">
+                <a href="/about" className="ie-lh-text-link ie-lh-inline-link-focus font-medium underline-offset-2 hover:underline">
                   About InterviewEra
                 </a>
               </p>

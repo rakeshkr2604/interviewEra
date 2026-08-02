@@ -70,12 +70,13 @@ export function Reveal({
   return (
     <div
       ref={ref}
-      className={className}
+      className={cn(
+        'ie-reveal',
+        shown ? 'ie-reveal--shown' : 'ie-reveal--hidden',
+        className,
+      )}
       style={{
-        opacity: shown ? 1 : 0,
-        transform: shown ? 'translateY(0)' : 'translateY(24px)',
-        transition: `opacity 520ms cubic-bezier(0.22,1,0.36,1) ${delay}s, transform 520ms cubic-bezier(0.22,1,0.36,1) ${delay}s`,
-        willChange: shown ? 'auto' : 'opacity, transform',
+        transitionDelay: `${delay}s`,
       }}
     >
       {children}

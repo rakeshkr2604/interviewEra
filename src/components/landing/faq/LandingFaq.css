@@ -1,0 +1,204 @@
+/* Categorized homepage FAQ — TUF-inspired layout, InterviewEra tokens */
+
+.landing-faq-layout {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 1024px) {
+  .landing-faq-layout {
+    grid-template-columns: minmax(13.5rem, 16.5rem) minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 3.5rem;
+    row-gap: 2.25rem;
+    align-items: start;
+  }
+
+  .landing-faq-intro--desktop {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .landing-faq-nav {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .landing-faq-content {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: start;
+  }
+}
+
+.landing-faq-intro {
+  text-align: left;
+}
+
+@media (max-width: 1023px) {
+  .landing-faq-intro--desktop {
+    margin-bottom: 0.25rem;
+  }
+}
+
+.landing-faq-title {
+  margin: 0;
+  font-size: clamp(2rem, 4.2vw, 3.25rem);
+  font-weight: 800;
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.landing-faq-title__line {
+  display: block;
+}
+
+.landing-faq-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .landing-faq-content {
+    gap: 0;
+    padding-top: 0.125rem;
+  }
+}
+
+.landing-faq-nav {
+  position: sticky;
+  top: 5.5rem;
+}
+
+.landing-faq-nav__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.landing-faq-pill {
+  display: block;
+  width: 100%;
+  padding: 0.75rem 1.125rem;
+  border: 1px solid color-mix(in srgb, var(--card-border) 88%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-bg) 70%, transparent);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.landing-faq-pill:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+  color: var(--text-primary);
+}
+
+.landing-faq-pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+}
+
+.landing-faq-pill--active {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary);
+  color: #fff;
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent-primary) 24%, transparent);
+}
+
+.landing-faq-pill--active:hover {
+  color: #fff;
+}
+
+.landing-faq-pill--chip {
+  width: auto;
+  flex: 0 0 auto;
+  min-height: 2.75rem;
+  padding: 0.8125rem 1.125rem;
+}
+
+.landing-faq-chips {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.landing-faq-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.landing-faq-panels {
+  position: relative;
+}
+
+.landing-faq-panel__shell {
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--card-border) 90%, transparent);
+  border-radius: 1.25rem;
+  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+}
+
+.landing-faq-accordion--divided {
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 75%, transparent);
+}
+
+.landing-faq-panel--visible {
+  animation: landing-faq-panel-in 0.22s ease-out;
+}
+
+@keyframes landing-faq-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-faq-accordion__icon {
+  transition: transform 0.22s ease;
+}
+
+.landing-faq-accordion[open] .landing-faq-accordion__icon {
+  transform: rotate(45deg);
+}
+
+.landing-faq-accordion__answer {
+  animation: landing-faq-answer-in 0.22s ease-out;
+}
+
+@keyframes landing-faq-answer-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-faq-panel--visible,
+  .landing-faq-accordion__answer {
+    animation: none;
+  }
+
+  .landing-faq-accordion__icon {
+    transition: none;
+  }
+}

@@ -17,6 +17,17 @@ export default function LandingFinalCta({ isLoggedIn }: { isLoggedIn: boolean })
     >
       <div className={LANDING_HOME_INNER}>
         <Reveal>
+          <p
+            className="mb-4 text-sm font-medium"
+            style={{ color: T.text2 }}
+          >
+            <span aria-hidden className="tracking-wide" style={{ color: T.warn }}>
+              ★★★★★
+            </span>
+            <span className="sr-only">4.5 out of 5 stars — </span>
+            {' '}
+            4.5 / 5 Average Candidate Rating
+          </p>
           <div className="mb-5 inline-block rounded-full px-4 py-1.5 text-xs font-semibold" style={{ background: T.accdim, border: `1px solid ${T.accbrd}`, color: T.acc2 }}>
             Free to start — no card required
           </div>

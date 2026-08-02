@@ -33,7 +33,7 @@ export default function LandingHeroCommunityLinks() {
               href={group.href}
               platform={group.platform}
               placement="landing_hero_mockup"
-              className="hero-wa-link ie-lh-text-accent inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[14.5px] font-semibold no-underline sm:text-[15px]"
+              className="hero-wa-link ie-lh-text-accent inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 py-2.5 text-[14.5px] font-semibold no-underline sm:text-[15px]"
             >
               <CommunityPlatformIcon
                 platformId="whatsapp_community"

@@ -5,17 +5,17 @@ import dynamic from 'next/dynamic';
 const LandingMeetInterviewers = dynamic(() => import('@/components/landing/LandingMeetInterviewers'), {
   loading: () => (
     <div
-      className="mx-auto my-12 min-h-[420px] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      className="mx-auto my-12 min-h-[420px] max-w-[1080px] animate-pulse motion-reduce:animate-none rounded-2xl px-7 opacity-40"
       style={{ background: 'var(--bg-secondary)' }}
       aria-hidden
     />
   ),
 });
 
-const LandingScrollShowcase = dynamic(() => import('@/components/landing/LandingScrollShowcase'), {
+const LandingTimelineSection = dynamic(() => import('@/components/landing/timeline/LandingTimelineSection'), {
   loading: () => (
     <div
-      className="mx-auto my-10 min-h-[70vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      className="mx-auto my-10 min-h-[70vh] max-w-[1080px] animate-pulse motion-reduce:animate-none rounded-2xl px-7 opacity-40"
       style={{ background: 'var(--bg-secondary)' }}
       aria-hidden
     />
@@ -25,7 +25,7 @@ const LandingScrollShowcase = dynamic(() => import('@/components/landing/Landing
 const LandingScoringEngine = dynamic(() => import('@/components/landing/LandingScoringEngine'), {
   loading: () => (
     <div
-      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse motion-reduce:animate-none rounded-2xl px-7 opacity-40"
       style={{ background: 'var(--card-bg)' }}
       aria-hidden
     />
@@ -35,7 +35,7 @@ const LandingScoringEngine = dynamic(() => import('@/components/landing/LandingS
 const LandingFinalCta = dynamic(() => import('@/components/landing/LandingFinalCta'), {
   loading: () => (
     <div
-      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse rounded-2xl px-7 opacity-40"
+      className="mx-auto my-12 min-h-[40vh] max-w-[1080px] animate-pulse motion-reduce:animate-none rounded-2xl px-7 opacity-40"
       style={{ background: 'var(--card-bg)' }}
       aria-hidden
     />
@@ -52,8 +52,8 @@ const LandingFinalCta = dynamic(() => import('@/components/landing/LandingFinalC
  * Exported as separate islands so `page.tsx` can interleave them with server sections.
  */
 
-export function LandingScrollShowcaseLazy() {
-  return <LandingScrollShowcase />;
+export function LandingTimelineSectionLazy() {
+  return <LandingTimelineSection />;
 }
 
 export function LandingMeetInterviewersLazy() {

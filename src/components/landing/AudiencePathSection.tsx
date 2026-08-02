@@ -7,7 +7,6 @@ import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import {
   LANDING_HOME_HEADER_BLOCK,
   LANDING_HOME_HEADING,
-  LANDING_HOME_SECTION,
   LANDING_HOME_SUBHEAD,
   LANDING_PAGE_CONTAINER,
 } from '@/lib/landing/container';
@@ -54,7 +53,10 @@ const PATHS: {
 export function AudiencePathSection() {
   return (
     <section
-      className={cn(LANDING_HOME_SECTION, 'ie-lh-surface-35 border-b pt-16 sm:pt-[4.5rem]')}
+      className={cn(
+        'px-4 pb-20 sm:px-5 sm:pb-24',
+        'ie-lh-surface-35 border-b pt-6 sm:pt-8',
+      )}
       aria-labelledby="audience-path-heading"
     >
       <div className={LANDING_PAGE_CONTAINER}>
