@@ -10,12 +10,19 @@ import { getLlmAttemptTimeoutMs } from '@/lib/ai/operation-registry';
 import { completeToolCompletionLogged, getToolChatClient } from '@/lib/ai/tool-chat-completion';
 import { OPENROUTER_CHEAP_MODEL } from '@/lib/ai/openrouter-model-router';
 import { jdRequirementsSchema } from '@/lib/ats/jd-extract-schema';
+import { ATS_JD_MAX_CHARS } from '@/lib/ats/jd-input';
 
-const JD_PROMPT_CHARS = 4000;
+// Must equal the form/action limit — a lower prompt slice silently truncates
+// the tail of long JDs (Qualifications / Nice-to-have sections).
+const JD_PROMPT_CHARS = ATS_JD_MAX_CHARS;
 
 export interface JdRequirements {
   requiredSkills: string[];
   preferredSkills: string[];
+  requiredEducation: {
+    level: 'diploma' | 'bachelor' | 'master' | 'phd';
+    field: string | null;
+  } | null;
   minYearsExperience: number | null;
   roleSummary: string | null;
 }
@@ -34,6 +41,7 @@ export interface JdExtractResult {
 const EMPTY: JdRequirements = {
   requiredSkills: [],
   preferredSkills: [],
+  requiredEducation: null,
   minYearsExperience: null,
   roleSummary: null,
 };
@@ -54,6 +62,13 @@ function buildPrompt(jdSlice: string, repairHint?: string): string {
     `Rules:\n` +
     `- If a skill is clearly required / must-have, put it in requiredSkills.\n` +
     `- If it is nice-to-have / preferred / bonus, put it in preferredSkills.\n` +
+    `- Each skill entry must be an ATOMIC skill/tool/technology name of 1-4 words ` +
+    `(e.g. "Java", "REST APIs", "distributed systems") — NEVER a full sentence or requirement phrase.\n` +
+    `- When the JD lists alternatives ("at least one coding language such as Java, Python, or Go"), ` +
+    `extract the umbrella category once (e.g. "programming") — not every alternative as separately required.\n` +
+    `- Degree/education requirements go ONLY in requiredEducation, never in requiredSkills. ` +
+    `level = the MINIMUM acceptable level ("Bachelor's or Master's" → "bachelor"); ` +
+    `field = the stated discipline ("engineering") or null. No degree requirement → null.\n` +
     `- Do not invent skills that are not stated or strongly implied.\n` +
     `- minYearsExperience: number only if the JD explicitly states years of experience; else null.\n` +
     `- roleSummary: one short sentence describing the role focus, or null.\n` +
@@ -61,6 +76,7 @@ function buildPrompt(jdSlice: string, repairHint?: string): string {
     `{\n` +
     `  "requiredSkills": string[],\n` +
     `  "preferredSkills": string[],\n` +
+    `  "requiredEducation": { "level": "diploma" | "bachelor" | "master" | "phd", "field": string | null } | null,\n` +
     `  "minYearsExperience": number | null,\n` +
     `  "roleSummary": string | null\n` +
     `}\n` +
@@ -108,22 +124,38 @@ async function complete(
   }
 }
 
+/** Truncated raw-response snippet for failure logs — enough to diagnose, not a transcript dump. */
+const RAW_LOG_SNIPPET_CHARS = 600;
+
+function rawSnippet(content: string): string {
+  const trimmed = content.trim();
+  return trimmed.length > RAW_LOG_SNIPPET_CHARS
+    ? `${trimmed.slice(0, RAW_LOG_SNIPPET_CHARS)}…[+${trimmed.length - RAW_LOG_SNIPPET_CHARS} chars]`
+    : trimmed;
+}
+
 export async function extractJdRequirements(jdText: string): Promise<JdExtractResult> {
   const model = resolveModel();
   const slice = jdText.slice(0, JD_PROMPT_CHARS);
   let lastZodError = '';
   let lastUsage: JdExtractResult['usage'];
+  let lastRaw = '';
 
   for (let attempt = 0; attempt < 2; attempt++) {
     const prompt = buildPrompt(slice, attempt === 1 ? lastZodError : undefined);
     const { content, usage } = await complete(model, prompt);
     lastUsage = usage;
+    lastRaw = content;
 
     let parsed: unknown;
     try {
       parsed = JSON.parse(extractJSON(content));
     } catch {
       lastZodError = 'Response was not valid JSON.';
+      console.warn(
+        `[ats-jd-extract] attempt ${attempt + 1} returned invalid JSON`,
+        { model, raw: rawSnippet(content) },
+      );
       continue;
     }
 
@@ -133,6 +165,7 @@ export async function extractJdRequirements(jdText: string): Promise<JdExtractRe
         requirements: {
           requiredSkills: result.data.requiredSkills,
           preferredSkills: result.data.preferredSkills,
+          requiredEducation: result.data.requiredEducation,
           minYearsExperience: result.data.minYearsExperience,
           roleSummary: result.data.roleSummary,
         },
@@ -145,9 +178,17 @@ export async function extractJdRequirements(jdText: string): Promise<JdExtractRe
       .slice(0, 8)
       .map((i) => `${i.path.join('.')}: ${i.message}`)
       .join('; ');
+    console.warn(
+      `[ats-jd-extract] attempt ${attempt + 1} failed schema validation`,
+      { model, zod: lastZodError, raw: rawSnippet(content) },
+    );
   }
 
-  console.warn('[ats-jd-extract] Zod validation failed twice — degrading');
+  console.warn('[ats-jd-extract] extraction failed twice — degrading to empty requirements', {
+    model,
+    lastError: lastZodError,
+    raw: rawSnippet(lastRaw),
+  });
   return {
     requirements: { ...EMPTY },
     degraded: true,

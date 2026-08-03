@@ -35,6 +35,35 @@ describe('reconstructJdMatchScore', () => {
     expect(a.score - c.score).toBe(12);
   });
 
+  it('semantic-only mode zeroes exact components and renormalizes weights', () => {
+    const b = reconstructJdMatchScore(
+      {
+        requiredCoverage: 100, // must be ignored
+        preferredCoverage: 100, // must be ignored
+        jdRequirementCoverage: 60,
+        resumeFocusAlignment: 60,
+      },
+      { semanticOnly: true },
+    );
+    expect(b.score).toBe(60); // 0.6×62.5 + 0.6×37.5
+    expect(b.contributions.requiredExact).toBe(0);
+    expect(b.contributions.preferredExact).toBe(0);
+    expect(b.formula).toMatch(/semantic-only/);
+
+    // Full semantic coverage in semantic-only mode reaches 100 — the mode
+    // renormalizes rather than capping.
+    const full = reconstructJdMatchScore(
+      {
+        requiredCoverage: 0,
+        preferredCoverage: 0,
+        jdRequirementCoverage: 100,
+        resumeFocusAlignment: 100,
+      },
+      { semanticOnly: true },
+    );
+    expect(full.score).toBe(100);
+  });
+
   it('is deterministic and clamps', () => {
     const over = reconstructJdMatchScore({
       requiredCoverage: 120,

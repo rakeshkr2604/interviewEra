@@ -7,8 +7,17 @@
  *          the caller must not call these helpers for JD requests.
  * Answers: keyed on (question, level, topic).
  *
- * QG_PROMPT_VERSION is part of every key so a prompt bump invalidates
- * previously cached output.
+ * Cache-freshness (durable pattern, same as src/lib/redis/ats-result-cache.ts +
+ * src/app/(marketing)/tools/ats-checker/actions.ts):
+ *   1. cacheReadsEnabled() skips reads entirely outside production — local/dev
+ *      testing always sees current prompt output, no version bump to remember.
+ *   2. DEPLOY_ID folds the live deploy's commit SHA into every key, so each
+ *      production deploy gets a fresh cache namespace automatically.
+ *   3. QG_PROMPT_VERSION remains a third, optional manual layer for
+ *      force-invalidating without a redeploy (e.g. a prompt-only hotfix).
+ *   4. safeParse on read (below) stays as a secondary safety net — it catches
+ *      incompatible shape changes but NOT additive ones (a new optional field
+ *      still parses), which is exactly why (1) and (2) exist.
  */
 
 import getRedis from '@/lib/redis/client';
@@ -18,6 +27,16 @@ import { z } from 'zod';
 
 const SET_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days per spec
 const ANSWER_TTL_SECONDS = 30 * 24 * 60 * 60;
+
+// Vercel injects this on every build (VERCEL_GIT_COMMIT_SHA) — same pattern
+// already used in src/app/(marketing)/tools/ats-checker/actions.ts and
+// src/lib/pdf/parser.ts. No commit SHA at local build time; that's fine
+// because local reads are skipped entirely by cacheReadsEnabled() below.
+const DEPLOY_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'local-dev';
+
+function cacheReadsEnabled(): boolean {
+  return process.env.NODE_ENV === 'production';
+}
 
 const cachedSetSchema = z.array(qgQuestionSchema).min(1);
 
@@ -48,7 +67,7 @@ export function buildQgSetCacheKey(input: QgSetCacheKeyInput): string {
     parts.push(normalize(input.company), normalize(input.role), normalize(input.level), normalize(input.domain));
   }
   const sig = parts.join('|');
-  return `qg:${QG_PROMPT_VERSION}:set:${djb2(sig)}`;
+  return `qg:${QG_PROMPT_VERSION}:${DEPLOY_ID}:set:${djb2(sig)}`;
 }
 
 export function buildQgAnswerCacheKey(
@@ -59,10 +78,11 @@ export function buildQgAnswerCacheKey(
   // Topic is included so agentic-AI coaching cannot be shadowed by a generic
   // cached guide for an identical question at the same experience level.
   const sig = `${normalize(question)}|${normalize(level)}|${normalize(topic)}`;
-  return `qg:${QG_PROMPT_VERSION}:ans:${djb2(sig)}`;
+  return `qg:${QG_PROMPT_VERSION}:${DEPLOY_ID}:ans:${djb2(sig)}`;
 }
 
 export async function getCachedQgSet(key: string): Promise<QgQuestion[] | null> {
+  if (!cacheReadsEnabled()) return null;
   try {
     const redis = getRedis();
     const cached = await redis.get<unknown>(key);
@@ -85,6 +105,7 @@ export async function setCachedQgSet(key: string, questions: QgQuestion[]): Prom
 }
 
 export async function getCachedQgAnswer(key: string): Promise<QgAnswer | null> {
+  if (!cacheReadsEnabled()) return null;
   try {
     const redis = getRedis();
     const cached = await redis.get<unknown>(key);

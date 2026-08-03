@@ -340,6 +340,11 @@ export async function buildStarAction(
   }
 
   if (!result) {
+    // Covers both failure modes above: completePrimaryStar() throwing and
+    // parseStarPayload() returning null for unusable JSON. Either way the
+    // user is silently downgraded to the offline draft — without this event
+    // a sustained OpenRouter outage is invisible on the founder dashboard.
+    logToolUsage({ tool: 'star', event: 'error', signed_in: signedIn });
     result = buildOfflineStarDraft(
       targetRole,
       level,

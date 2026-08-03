@@ -17,6 +17,7 @@ import {
   PDFUnsupportedError,
 } from '@/lib/pdf/parser';
 import { runAtsAnalysis } from '@/lib/ats/score-engine';
+import { ATS_JD_MAX_CHARS, precleanJdText } from '@/lib/ats/jd-input';
 import {
   DocxCorruptError,
   DocxEmptyError,
@@ -81,9 +82,21 @@ function normalizeAtsResumeName(name: string): string {
 }
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
-const JOB_DESC_MAX_CHARS = 4000;
+const JOB_DESC_MAX_CHARS = ATS_JD_MAX_CHARS;
 const MIN_RESUME_CHARS = 50;
-const ENGINE_CACHE_PREFIX = 'ats-v2';
+// Cache-freshness is now handled structurally, not by remembering to bump
+// this: getCachedAtsResult() skips reads entirely outside production
+// (ats-result-cache.ts), and DEPLOY_ID below folds the live deploy's commit
+// SHA into the key so every production deploy gets a fresh cache namespace
+// automatically. This prefix is a third, manual layer on top of those two —
+// bump it only if you want to force-invalidate mid-deploy without a redeploy.
+const ENGINE_CACHE_PREFIX = 'ats-v3';
+
+// Vercel injects this on every build (VERCEL_GIT_COMMIT_SHA) — already used
+// elsewhere in this repo (src/lib/pdf/parser.ts). Local dev has no commit
+// SHA at build time, so cache keys there fall back to a constant marker;
+// that's fine because local reads are skipped entirely (see above).
+const DEPLOY_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'local-dev';
 
 function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
   return (
@@ -95,7 +108,7 @@ function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
 
 function buildCacheKey(text: string, jd: string, routeTag: string): string {
   return createHash('sha256')
-    .update(`${ENGINE_CACHE_PREFIX}|${text}|${jd}|${routeTag}`)
+    .update(`${ENGINE_CACHE_PREFIX}|${DEPLOY_ID}|${text}|${jd}|${routeTag}`)
     .digest('hex');
 }
 
@@ -151,8 +164,12 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   const file = formData.get('file');
   const rawJd = formData.get('jobDescription');
   const jdFile = formData.get('jobDescriptionFile');
+  // Pre-clean BEFORE slicing so job-board boilerplate doesn't consume the
+  // character budget (long JDs keep their Qualifications/Nice-to-have tail).
   const pastedJd =
-    typeof rawJd === 'string' ? rawJd.trim().slice(0, JOB_DESC_MAX_CHARS) : '';
+    typeof rawJd === 'string'
+      ? precleanJdText(rawJd).slice(0, JOB_DESC_MAX_CHARS)
+      : '';
 
   if (!file || !(file instanceof File)) {
     return { error: 'Please upload a resume file.', code: 'NO_FILE' };
@@ -259,7 +276,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
               vercelId: jdHeaderList.get('x-vercel-id') ?? '',
               source: 'ats-checker-jd',
             });
-      const jdText = extracted.trim();
+      const jdText = precleanJdText(extracted);
       if (jdText.length > 0) jobDescription = jdText.slice(0, JOB_DESC_MAX_CHARS);
     } catch (err) {
       console.error('[ats-checker] JD extract error', err);

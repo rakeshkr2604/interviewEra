@@ -158,7 +158,7 @@ function SkillChipList({
   label: string;
   items: string[];
   empty: string;
-  tone: 'ok' | 'gap';
+  tone: 'ok' | 'gap' | 'inferred';
 }) {
   return (
     <div>
@@ -179,12 +179,21 @@ function SkillChipList({
                 borderColor:
                   tone === 'gap'
                     ? 'color-mix(in srgb, var(--accent-warning) 35%, var(--card-border))'
-                    : 'var(--card-border)',
-                color: tone === 'gap' ? 'var(--accent-warning)' : 'var(--text-secondary)',
+                    : tone === 'inferred'
+                      ? 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))'
+                      : 'var(--card-border)',
+                color:
+                  tone === 'gap'
+                    ? 'var(--accent-warning)'
+                    : tone === 'inferred'
+                      ? 'var(--accent-primary)'
+                      : 'var(--text-secondary)',
                 background:
                   tone === 'gap'
                     ? 'color-mix(in srgb, var(--accent-warning) 8%, transparent)'
-                    : 'transparent',
+                    : tone === 'inferred'
+                      ? 'color-mix(in srgb, var(--accent-primary) 8%, transparent)'
+                      : 'transparent',
               }}
             >
               {s}
@@ -319,6 +328,15 @@ function JdMatchCard({ jd }: { jd: AtsJdMatch }) {
             tone="gap"
           />
         </div>
+
+        {jd.inferredFromExperience && jd.inferredFromExperience.length > 0 ? (
+          <SkillChipList
+            label="Found in experience, not in your skills list"
+            items={jd.inferredFromExperience}
+            empty=""
+            tone="inferred"
+          />
+        ) : null}
 
         {issueFindings.length > 0 ? (
           <ul className="space-y-2">
@@ -636,6 +654,11 @@ export function AtsResultsView({
               <p className="mt-0.5 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                 Derived from the checks above — not free-form AI advice.
               </p>
+              {result.actionItems.some((i) => typeof i.pointsEstimate === 'number') ? (
+                <p className="mt-1 text-[11px] leading-snug sm:text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Point estimates are approximate and additive within each category.
+                </p>
+              ) : null}
             </div>
             {result.actionItems.length === 0 ? (
               <div
@@ -675,6 +698,11 @@ export function AtsResultsView({
                       <p className="mt-1 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                         {item.expectedImpact}
                       </p>
+                      {typeof item.pointsEstimate === 'number' && item.pointsEstimate > 0 ? (
+                        <p className="mt-1 text-xs font-medium sm:text-sm" style={{ color: accent }}>
+                          Fixing this could recover ~{item.pointsEstimate} points.
+                        </p>
+                      ) : null}
                     </li>
                   );
                 })}

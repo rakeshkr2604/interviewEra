@@ -88,7 +88,7 @@ export async function runAtsAnalysis(
   let embeddingModel: string | undefined;
 
   if (jdText.length >= 40) {
-    const computed = await computeJdMatch(llm.extracted, jdText);
+    const computed = await computeJdMatch(llm.extracted, jdText, input.rawText);
     jdMatch = computed.jdMatch;
     jdMeta = computed.meta.jdExtractUsage;
     embeddingUsage = computed.meta.embeddingUsage;

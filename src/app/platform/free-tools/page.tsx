@@ -213,7 +213,7 @@ function ToolSummaryCard({
 
       {loading || !stats ? (
         <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-8 animate-pulse rounded-lg" style={{ background: 'var(--card-border)' }} />
           ))}
         </div>
@@ -238,6 +238,17 @@ function ToolSummaryCard({
                 <span className="inline-flex items-center gap-1">
                   {blocksToday > 0 && <ShieldAlert className="h-3 w-3" style={{ color: 'var(--accent-danger)' }} />}
                   {fmt(blocksToday)}
+                </span>
+              }
+            />
+            <StatRow
+              label="Errors"
+              value={
+                <span className="inline-flex items-center gap-1">
+                  {stats.errors > 0 && <AlertCircle className="h-3 w-3" style={{ color: 'var(--accent-danger)' }} />}
+                  <span style={stats.errors > 0 ? { color: 'var(--accent-danger)' } : undefined}>
+                    {fmt(stats.errors)}
+                  </span>
                 </span>
               }
             />

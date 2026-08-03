@@ -22,6 +22,7 @@ import { ATS_RESULT_STORAGE_KEY, serializeAtsResult } from './ats-result-storage
 import { AtsResultsView } from './AtsResultsView';
 import { initialState } from './ats-types';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import { ATS_JD_MAX_CHARS } from '@/lib/ats/jd-input';
 import { cn } from '@/lib/utils';
 
 function setInputFile(input: HTMLInputElement, file: File) {
@@ -35,7 +36,7 @@ type JdMode = 'paste' | 'upload';
 /** Shared resume accept copy — keep SSR/client identical (avoids hydration drift). */
 const RESUME_ACCEPT_HINT = 'PDF, DOCX, or TXT · max 5 MB';
 const RESUME_DROPZONE_HINT = 'PDF, Word (.docx), or plain text · up to 5 MB';
-const JD_MAX_CHARS = 3000;
+const JD_MAX_CHARS = ATS_JD_MAX_CHARS;
 
 export function AtsCheckerForm() {
   const router = useRouter();

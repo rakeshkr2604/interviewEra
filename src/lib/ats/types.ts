@@ -42,6 +42,12 @@ export interface AtsActionItem {
   priority: ActionPriority;
   text: string;
   expectedImpact: string;
+  /**
+   * Approximate JD-match score points recoverable by addressing this fix,
+   * derived from the existing required×45 + preferred×15 weighting (display
+   * only — never feeds back into the actual score calculation).
+   */
+  pointsEstimate?: number;
 }
 
 /**
@@ -63,6 +69,20 @@ export interface AtsJdMatch {
   missingRequired: string[];
   matchedPreferred: string[];
   missingPreferred: string[];
+  /** Total canonical required items contributing to the required-coverage weight (matched + missing). */
+  requiredTotalCount: number;
+  /** Total canonical preferred items contributing to the preferred-coverage weight (matched + missing). */
+  preferredTotalCount: number;
+  /** Full missing-required count (missingRequired[] above may be display-truncated to 8). */
+  requiredMissingCount: number;
+  /** Full missing-preferred count (missingPreferred[] above may be display-truncated to 8). */
+  preferredMissingCount: number;
+  /**
+   * JD skills matched ONLY via mentions found in resume free text (experience
+   * bullets / projects) — not listed in the skills section. Distinguishes
+   * "you listed this" from "we found evidence but you didn't list it".
+   */
+  inferredFromExperience?: string[];
   degraded?: boolean;
 }
 

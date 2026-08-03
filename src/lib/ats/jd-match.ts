@@ -8,13 +8,21 @@
 
 import type { AtsJdMatch, ExtractedResumeData, Finding } from '@/lib/ats/types';
 import { extractJdRequirements } from '@/lib/ats/jd-requirements';
-import { canonicalizeSkill, matchSkillLists } from '@/lib/ats/skill-normalize';
+import {
+  canonicalizeSkill,
+  inferSkillsFromText,
+  matchSkillLists,
+} from '@/lib/ats/skill-normalize';
+import {
+  educationRequirementPhrase,
+  meetsEducationRequirement,
+} from '@/lib/ats/education-match';
 import {
   embedTexts,
   meanMaxCoverage,
   type EmbedUsage,
 } from '@/lib/ats/embeddings';
-import { reconstructJdMatchScore } from '@/lib/ats/jd-match-score';
+import { JD_MATCH_WEIGHTS, reconstructJdMatchScore } from '@/lib/ats/jd-match-score';
 
 const MAX_EMBED_ITEMS = 16;
 
@@ -30,8 +38,13 @@ export interface JdMatchMeta {
   degraded: boolean;
 }
 
-function resumeSkillTexts(extracted: ExtractedResumeData): string[] {
-  const fromSkills = extracted.skills.map((s) => s.trim()).filter(Boolean);
+function resumeSkillTexts(
+  extracted: ExtractedResumeData,
+  extraSkills: readonly string[] = [],
+): string[] {
+  const fromSkills = [...extracted.skills, ...extraSkills]
+    .map((s) => s.trim())
+    .filter(Boolean);
   const fromExp = extracted.experience
     .map((e) => [e.title, e.company].filter(Boolean).join(' at '))
     .map((s) => s.trim())
@@ -51,6 +64,22 @@ function estimateYearsFromResume(extracted: ExtractedResumeData): number | null 
   return Math.max(0, now - earliest);
 }
 
+/**
+ * Fallback JD phrases when structured extraction degraded: raw JD lines /
+ * sentences, so semantic comparison still measures something real instead of
+ * scoring against an empty requirement list.
+ */
+function jdFallbackPhrases(jdText: string): string[] {
+  return jdText
+    .split(/[\n\r]+|(?<=[.;])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 12)
+    .slice(0, MAX_EMBED_ITEMS);
+}
+
+/** Neutral fallback when extraction degraded AND semantic comparison is unavailable. */
+export const JD_MATCH_NEUTRAL_SCORE = 50;
+
 /** Map canonical missing keys back to the JD's original phrasing. */
 function originalPhrasing(canonicalMissing: string[], jdSkills: string[]): string[] {
   return canonicalMissing.map((canon) => {
@@ -65,47 +94,108 @@ function originalPhrasing(canonicalMissing: string[], jdSkills: string[]): strin
 export async function computeJdMatch(
   extracted: ExtractedResumeData,
   jdText: string,
+  /** Raw resume text — enables skill inference from experience bullets etc. */
+  rawResumeText?: string,
 ): Promise<{ jdMatch: AtsJdMatch; meta: JdMatchMeta }> {
   const findings: Finding[] = [];
   const jdExtract = await extractJdRequirements(jdText);
   const req = jdExtract.requirements;
+  const degraded = jdExtract.degraded;
 
-  if (jdExtract.degraded) {
+  // Skills evidenced in resume free text (experience bullets, projects) but
+  // not listed in the skills section. Deterministic taxonomy scan — matched
+  // requirements count either way; the UI/action items flag the distinction.
+  const inferredSkills = rawResumeText
+    ? inferSkillsFromText(rawResumeText, extracted.skills)
+    : [];
+  const matchingPool = [...extracted.skills, ...inferredSkills];
+
+  if (degraded) {
     findings.push({
       id: 'jd_extract_degraded',
       severity: 'warning',
       message:
-        'Could not fully validate structured requirements from this job description. Overlap scores may be incomplete — try pasting a cleaner JD text.',
+        'Could not fully validate structured requirements from this job description. The score below relies on semantic text similarity only — try pasting a cleaner JD text for a full breakdown.',
     });
   }
 
-  const requiredOverlap = matchSkillLists(extracted.skills, req.requiredSkills);
-  const preferredOverlap = matchSkillLists(extracted.skills, req.preferredSkills);
+  const requiredOverlap = matchSkillLists(matchingPool, req.requiredSkills);
+  const preferredOverlap = matchSkillLists(matchingPool, req.preferredSkills);
 
-  const missingRequiredDisplay = originalPhrasing(
-    requiredOverlap.missing,
-    req.requiredSkills,
-  ).slice(0, 8);
+  // Which matches exist ONLY thanks to inferred skills? (Declared-only pass
+  // misses them; pool pass catches them.)
+  const declaredRequired = matchSkillLists(extracted.skills, req.requiredSkills);
+  const declaredPreferred = matchSkillLists(extracted.skills, req.preferredSkills);
+  const inferredOnlyMatches = [
+    ...requiredOverlap.matched.filter((m) => declaredRequired.missing.includes(m)),
+    ...preferredOverlap.matched.filter((m) => declaredPreferred.missing.includes(m)),
+  ];
+
+  // Degraded extraction returns empty requirement lists, for which
+  // matchSkillLists defaults coverage to 1 ("nothing required, nothing
+  // missing"). That default is only meaningful when extraction SUCCEEDED and
+  // the JD genuinely lists no skills — on a failed extraction the exact
+  // components carry zero signal and must not contribute to the score.
+  const exactSignalValid = !degraded;
+
+  // Education requirement — matched by degree LEVEL against resume education
+  // entries, not by lexical skill comparison (a "Master of Computer
+  // Applications" satisfies "Bachelor's or Master's in engineering or a
+  // related field"). Counts as one required item in coverage.
+  const eduReq = req.requiredEducation;
+  const eduMatched = eduReq
+    ? meetsEducationRequirement(extracted.education, eduReq.level)
+    : null;
+  const eduPhrase = eduReq
+    ? educationRequirementPhrase(eduReq.level, eduReq.field)
+    : null;
+
+  const requiredDenom =
+    requiredOverlap.matched.length +
+    requiredOverlap.missing.length +
+    (eduReq ? 1 : 0);
+  const requiredMatchedCount =
+    requiredOverlap.matched.length + (eduMatched ? 1 : 0);
+  const requiredCoverageFrac =
+    requiredDenom === 0
+      ? requiredOverlap.coverage
+      : requiredMatchedCount / requiredDenom;
+
+  const matchedRequiredDisplay = [
+    ...requiredOverlap.matched,
+    ...(eduReq && eduMatched && eduPhrase ? [eduPhrase] : []),
+  ];
+  const missingRequiredDisplay = [
+    ...(eduReq && !eduMatched && eduPhrase ? [eduPhrase] : []),
+    ...originalPhrasing(requiredOverlap.missing, req.requiredSkills),
+  ].slice(0, 8);
   const missingPreferredDisplay = originalPhrasing(
     preferredOverlap.missing,
     req.preferredSkills,
   ).slice(0, 8);
 
-  const jdPhrases = [
-    ...req.requiredSkills,
-    ...req.preferredSkills,
-    ...(req.roleSummary ? [req.roleSummary] : []),
-  ]
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, MAX_EMBED_ITEMS);
+  const jdPhrases = degraded
+    ? jdFallbackPhrases(jdText)
+    : [
+        ...req.requiredSkills,
+        ...req.preferredSkills,
+        ...(req.roleSummary ? [req.roleSummary] : []),
+      ]
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .slice(0, MAX_EMBED_ITEMS);
 
-  const resumePhrases = resumeSkillTexts(extracted);
+  const resumePhrases = resumeSkillTexts(extracted, inferredSkills);
 
   let jdRequirementCoverage = 0;
   let resumeFocusAlignment = 0;
   let embeddingUsage: EmbedUsage | undefined;
   let embeddingModel = '';
+  let semanticMeasured = false;
+
+  // Exact-overlap fallback for the semantic components — zero when degraded
+  // (an empty extraction's coverage=1 default is not a real signal).
+  const exactFallback = exactSignalValid ? requiredCoverageFrac : 0;
 
   if (jdPhrases.length === 0 && resumePhrases.length === 0) {
     findings.push({
@@ -115,8 +205,8 @@ export async function computeJdMatch(
         'Not enough structured skills on either side for a strong overlap analysis. Scores lean on whatever text was available.',
     });
   } else if (jdPhrases.length === 0 || resumePhrases.length === 0) {
-    jdRequirementCoverage = requiredOverlap.coverage;
-    resumeFocusAlignment = requiredOverlap.coverage;
+    jdRequirementCoverage = exactFallback;
+    resumeFocusAlignment = exactFallback;
     findings.push({
       id: 'jd_match_one_sided',
       severity: 'info',
@@ -138,6 +228,7 @@ export async function computeJdMatch(
 
       jdRequirementCoverage = meanMaxCoverage(coverageSource, resumeVecs);
       resumeFocusAlignment = meanMaxCoverage(resumeVecs, jdVecs);
+      semanticMeasured = true;
     } catch (err) {
       console.warn(
         '[ats-jd-match] embeddings failed — keyword overlap only',
@@ -149,9 +240,10 @@ export async function computeJdMatch(
         message:
           'Semantic similarity was unavailable for this run. Score uses exact/normalized skill overlap only.',
       });
-      jdRequirementCoverage = requiredOverlap.coverage;
-      resumeFocusAlignment =
-        preferredOverlap.coverage * 0.5 + requiredOverlap.coverage * 0.5;
+      jdRequirementCoverage = exactFallback;
+      resumeFocusAlignment = exactSignalValid
+        ? preferredOverlap.coverage * 0.5 + requiredCoverageFrac * 0.5
+        : 0;
     }
   }
 
@@ -166,8 +258,14 @@ export async function computeJdMatch(
     }
   }
 
-  const requiredCoveragePct = Math.round(requiredOverlap.coverage * 100);
-  const preferredCoveragePct = Math.round(preferredOverlap.coverage * 100);
+  // On a degraded extraction the empty-list coverage=1 default must not be
+  // displayed (or scored) as 100% required coverage.
+  const requiredCoveragePct = exactSignalValid
+    ? Math.round(requiredCoverageFrac * 100)
+    : 0;
+  const preferredCoveragePct = exactSignalValid
+    ? Math.round(preferredOverlap.coverage * 100)
+    : 0;
   const jdRequirementCoveragePct = Math.round(
     Math.max(0, Math.min(1, jdRequirementCoverage)) * 100,
   );
@@ -175,12 +273,44 @@ export async function computeJdMatch(
     Math.max(0, Math.min(1, resumeFocusAlignment)) * 100,
   );
 
-  const { score } = reconstructJdMatchScore({
-    requiredCoverage: requiredCoveragePct,
-    preferredCoverage: preferredCoveragePct,
-    jdRequirementCoverage: jdRequirementCoveragePct,
-    resumeFocusAlignment: resumeFocusAlignmentPct,
-  });
+  let { score } = reconstructJdMatchScore(
+    {
+      requiredCoverage: requiredCoveragePct,
+      preferredCoverage: preferredCoveragePct,
+      jdRequirementCoverage: jdRequirementCoveragePct,
+      resumeFocusAlignment: resumeFocusAlignmentPct,
+    },
+    degraded ? { semanticOnly: true } : undefined,
+  );
+
+  // Degraded extraction AND no semantic measurement: nothing real was
+  // compared — abstain to a neutral score instead of an extreme one
+  // (degrade-don't-fail: the dimension still returns a number).
+  if (degraded && !semanticMeasured) {
+    score = JD_MATCH_NEUTRAL_SCORE;
+    findings.push({
+      id: 'jd_match_neutral_fallback',
+      severity: 'warning',
+      message:
+        'Structured requirements and semantic comparison were both unavailable for this run, so a neutral score is shown. Re-run with a cleaner JD text for a real match analysis.',
+    });
+  }
+
+  if (eduReq && eduPhrase) {
+    if (eduMatched) {
+      findings.push({
+        id: 'education_requirement_met',
+        severity: 'info',
+        message: `This JD's education requirement (${eduPhrase} minimum) appears covered by your listed education.`,
+      });
+    } else {
+      findings.push({
+        id: 'education_requirement_gap',
+        severity: 'warning',
+        message: `This JD asks for a ${eduPhrase} minimum, and no equivalent degree was detected on your resume. If you do hold one, make sure the Education section names it clearly (e.g. "B.Tech", "MCA").`,
+      });
+    }
+  }
 
   if (requiredOverlap.missing.length === 0 && req.requiredSkills.length > 0) {
     findings.push({
@@ -217,10 +347,17 @@ export async function computeJdMatch(
     preferredCoverage: preferredCoveragePct,
     jdRequirementCoverage: jdRequirementCoveragePct,
     resumeFocusAlignment: resumeFocusAlignmentPct,
-    matchedRequired: requiredOverlap.matched,
+    matchedRequired: matchedRequiredDisplay,
     missingRequired: missingRequiredDisplay,
     matchedPreferred: preferredOverlap.matched,
     missingPreferred: missingPreferredDisplay,
+    requiredTotalCount: requiredDenom,
+    preferredTotalCount:
+      preferredOverlap.matched.length + preferredOverlap.missing.length,
+    requiredMissingCount: requiredDenom - requiredMatchedCount,
+    preferredMissingCount: preferredOverlap.missing.length,
+    inferredFromExperience:
+      inferredOnlyMatches.length > 0 ? inferredOnlyMatches : undefined,
     degraded: jdExtract.degraded || undefined,
   };
 
@@ -248,15 +385,33 @@ export function formatSkillListForAction(skills: string[], visibleCap = SKILL_LI
   return extra > 0 ? `${body}, +${extra} more` : body;
 }
 
+/**
+ * Approximate score points recoverable by fixing `itemCount` missing items
+ * out of `totalCount` contributing to a weighted component (required=45,
+ * preferred=15). Display-only — mirrors reconstructJdMatchScore's formula,
+ * never feeds back into it. Null when there's nothing to attribute weight to
+ * (e.g. degraded extraction, where these components already score 0).
+ */
+function pointsRecoverable(
+  weight: number,
+  totalCount: number,
+  itemCount: number,
+): number | undefined {
+  if (!(totalCount > 0) || !(itemCount > 0)) return undefined;
+  return Math.round((weight / totalCount) * itemCount);
+}
+
 export function buildJdMatchActionItems(jdMatch: AtsJdMatch): Array<{
   priority: 'high' | 'medium' | 'low';
   text: string;
   expectedImpact: string;
+  pointsEstimate?: number;
 }> {
   const items: Array<{
     priority: 'high' | 'medium' | 'low';
     text: string;
     expectedImpact: string;
+    pointsEstimate?: number;
   }> = [];
 
   const missingRequired = jdMatch.missingRequired;
@@ -266,6 +421,11 @@ export function buildJdMatchActionItems(jdMatch: AtsJdMatch): Array<{
       text: `Your resume doesn’t clearly cover the required skill ${formatSkillListForAction(missingRequired)} from this JD. Add it only if you genuinely have that experience (with a concrete project or role bullet) — don’t paste keywords you can’t defend.`,
       expectedImpact:
         'Improves language overlap with a skill this posting treats as required.',
+      pointsEstimate: pointsRecoverable(
+        JD_MATCH_WEIGHTS.requiredExact,
+        jdMatch.requiredTotalCount,
+        jdMatch.requiredMissingCount,
+      ),
     });
   } else if (missingRequired.length > 1) {
     items.push({
@@ -273,6 +433,11 @@ export function buildJdMatchActionItems(jdMatch: AtsJdMatch): Array<{
       text: `Your resume doesn’t clearly cover ${missingRequired.length} required skills from this JD: ${formatSkillListForAction(missingRequired)}. Add any you genuinely have experience with — cite a concrete project or role bullet, don’t paste keywords you can’t defend.`,
       expectedImpact:
         'Improves language overlap with skills this posting treats as required.',
+      pointsEstimate: pointsRecoverable(
+        JD_MATCH_WEIGHTS.requiredExact,
+        jdMatch.requiredTotalCount,
+        jdMatch.requiredMissingCount,
+      ),
     });
   }
 
@@ -283,6 +448,11 @@ export function buildJdMatchActionItems(jdMatch: AtsJdMatch): Array<{
         priority: 'low',
         text: `“${skill}” appears as a preferred (not required) skill in this JD. Include it if you have real exposure.`,
         expectedImpact: 'Small boost to preferred-skill overlap with this posting.',
+        pointsEstimate: pointsRecoverable(
+          JD_MATCH_WEIGHTS.preferredExact,
+          jdMatch.preferredTotalCount,
+          1,
+        ),
       });
     }
   } else if (missingPreferred.length > 2) {
@@ -290,6 +460,29 @@ export function buildJdMatchActionItems(jdMatch: AtsJdMatch): Array<{
       priority: 'low',
       text: `${missingPreferred.length} preferred skills from this JD aren’t clearly on your resume: ${formatSkillListForAction(missingPreferred)}. Include any you have real exposure to.`,
       expectedImpact: 'Small boost to preferred-skill overlap with this posting.',
+      pointsEstimate: pointsRecoverable(
+        JD_MATCH_WEIGHTS.preferredExact,
+        jdMatch.preferredTotalCount,
+        jdMatch.preferredMissingCount,
+      ),
+    });
+  }
+
+  const inferredOnly = jdMatch.inferredFromExperience ?? [];
+  for (const skill of inferredOnly.slice(0, 3)) {
+    items.push({
+      priority: 'low',
+      text: `Add “${skill}” to your skills list — we found it in your experience but recruiters’ ATS systems may only scan your skills section.`,
+      expectedImpact:
+        'Makes an already-evidenced skill visible to skills-section-only ATS scans.',
+    });
+  }
+  if (inferredOnly.length > 3) {
+    items.push({
+      priority: 'low',
+      text: `${inferredOnly.length - 3} more skills appear in your experience but not in your skills list: ${formatSkillListForAction(inferredOnly.slice(3))}. Add the ones you want recruiters to see at a glance.`,
+      expectedImpact:
+        'Makes already-evidenced skills visible to skills-section-only ATS scans.',
     });
   }
 

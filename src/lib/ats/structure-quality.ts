@@ -144,8 +144,9 @@ export function analyzeStructureQuality(
   } else {
     findings.push({
       id: 'chrono_insufficient_dates',
-      severity: 'info',
-      message: 'Not enough dated experience entries to verify reverse-chronological order.',
+      severity: 'warning',
+      message:
+        'Not enough dated experience entries to verify reverse-chronological order — awarded partial credit (10 of 20 points) for this check instead of full marks. Add clear start/end dates to at least two roles to verify ordering.',
     });
     // Neutral credit when unverifiable
     score += 10;
@@ -170,8 +171,8 @@ export function analyzeStructureQuality(
   } else {
     findings.push({
       id: 'length_long',
-      severity: 'info',
-      message: `Resume text is long (~${words} words). Consider tightening older roles so the important signals stay near the top.`,
+      severity: 'warning',
+      message: `Resume text is long (~${words} words) — awarded partial credit (10 of 15 points) for this check. Consider tightening older roles so the important signals stay near the top.`,
     });
     score += 10;
   }

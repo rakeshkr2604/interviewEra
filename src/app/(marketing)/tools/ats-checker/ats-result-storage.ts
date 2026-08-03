@@ -96,6 +96,11 @@ function clampScore(n: unknown): number | null {
   return Math.round(Math.min(100, Math.max(0, n)));
 }
 
+function nonNegInt(x: unknown, fallback = 0): number {
+  if (typeof x !== 'number' || !Number.isFinite(x) || x < 0) return fallback;
+  return Math.round(x);
+}
+
 function stringArray(x: unknown): string[] {
   if (!Array.isArray(x)) return [];
   return x.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
@@ -131,6 +136,14 @@ function parseJdMatch(raw: unknown): AtsJdMatch | null {
     missingRequired: stringArray(o.missingRequired),
     matchedPreferred: stringArray(o.matchedPreferred),
     missingPreferred: stringArray(o.missingPreferred),
+    requiredTotalCount: nonNegInt(o.requiredTotalCount),
+    preferredTotalCount: nonNegInt(o.preferredTotalCount),
+    requiredMissingCount: nonNegInt(o.requiredMissingCount),
+    preferredMissingCount: nonNegInt(o.preferredMissingCount),
+    inferredFromExperience: (() => {
+      const arr = stringArray(o.inferredFromExperience);
+      return arr.length > 0 ? arr : undefined;
+    })(),
     degraded: o.degraded === true ? true : undefined,
   };
 }
@@ -196,6 +209,10 @@ export function parseStoredAtsResult(json: string): AtsResultV2 | null {
         priority: a.priority,
         text: String(a.text).trim(),
         expectedImpact: String(a.expectedImpact).trim(),
+        pointsEstimate:
+          typeof a.pointsEstimate === 'number' && Number.isFinite(a.pointsEstimate)
+            ? a.pointsEstimate
+            : undefined,
       })),
       jdMatch,
     };
