@@ -9,6 +9,10 @@ describe('trackLandingCtaClicked', () => {
       location: { pathname: '/' },
       dispatchEvent: vi.fn(),
     });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true })),
+    );
   });
 
   afterEach(() => {
@@ -31,18 +35,40 @@ describe('trackLandingCtaClicked', () => {
     expect(event.detail.cta_key).toBe('start_free_interview');
   });
 
+  it('beacons durable CTA click to /api/analytics/cta-click', () => {
+    trackLandingCtaClicked({
+      ctaKey: CTA_KEYS.TOOL_CTA,
+      ctaText: 'Start practicing free',
+      section: 'tool_cta',
+      page: '/tools/ats-checker/results',
+    });
+
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/analytics/cta-click',
+      expect.objectContaining({
+        method: 'POST',
+        keepalive: true,
+      }),
+    );
+    const init = (fetch as ReturnType<typeof vi.fn>).mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(init.body)) as Record<string, string>;
+    expect(body.cta_key).toBe('tool_cta');
+    expect(body.page).toBe('/tools/ats-checker/results');
+  });
+
   it('dedupes rapid duplicate clicks', () => {
     trackLandingCtaClicked({
-      ctaKey: CTA_KEYS.FOR_TEAMS,
-      ctaText: 'For Teams',
+      ctaKey: CTA_KEYS.SIGN_UP,
+      ctaText: 'Sign up',
       section: 'navbar',
     });
     trackLandingCtaClicked({
-      ctaKey: CTA_KEYS.FOR_TEAMS,
-      ctaText: 'For Teams',
+      ctaKey: CTA_KEYS.SIGN_UP,
+      ctaText: 'Sign up',
       section: 'navbar',
     });
 
     expect(window.dispatchEvent).toHaveBeenCalledTimes(1);
+    expect(fetch).toHaveBeenCalledTimes(1);
   });
 });

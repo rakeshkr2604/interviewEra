@@ -39,6 +39,17 @@ const RELATED_TAG_MAP: Record<string, readonly string[]> = {
   '/blog/ai-mock-interviews-smartest-prep-2026': ['mock-interview', 'ai', 'agentic-ai', 'behavioral', 'placement'],
   '/blog/english-confidence-interviews': ['english', 'behavioral', 'hr', 'communication', 'confidence'],
   '/blog/how-to-get-internship-opportunities': ['internship', 'placement', 'campus', 'fresher', 'career'],
+  '/blog/amazon-sde-intern-interview-experience-2026': [
+    'amazon',
+    'internship',
+    'sde',
+    'oa',
+    'leadership-principles',
+    'dsa',
+    'campus',
+    'fresher',
+    'star',
+  ],
   '/google-apprenticeship': ['google', 'apprenticeship', 'internship', 'career', 'fresher', 'placement'],
   '/blog/top-10-interview-questions-freshers-india-2026': ['fresher', 'placement', 'campus', 'hr', 'software-engineer'],
 }

@@ -5,9 +5,9 @@ import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
   { path: '/', heading: HOME_HERO_HEADING },
-  { path: '/teams', heading: /choose your path/i },
   { path: '/campus', heading: /placement outcomes/i },
   { path: '/pricing', heading: /simple plans/i },
+  { path: '/how-it-works', heading: /before the interview/i },
 ];
 
 async function applyTheme(page: import('@playwright/test').Page, theme: 'dark' | 'light') {

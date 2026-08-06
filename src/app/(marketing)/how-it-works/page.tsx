@@ -217,7 +217,7 @@ export default function HowItWorksPage() {
               >
                 <Icon className="size-5" aria-hidden />
               </span>
-              <h3 className="mt-4 text-[15px] font-bold">{title}</h3>
+              <h2 className="mt-4 text-[15px] font-bold">{title}</h2>
               <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                 {body}
               </p>

@@ -148,7 +148,7 @@ export default function RootLayout({
       lang="en"
       suppressHydrationWarning
       data-theme="dark"
-      data-scroll-behavior="smooth"
+      data-scroll-behavior="auto"
       className={`${bricolage.variable} ${dmSans.variable} ${jetbrains.variable} ${instrumentSerif.variable} dark h-full antialiased`}
     >
       <head>

@@ -6,9 +6,9 @@
  * Features:
  *  - Paginated inbox with newest-first default
  *  - Full-text search (name, email, feedback content)
- *  - Filter pills: severity, read/unread, resolved, pinned, consented, archived, rating, date
+ *  - Filter dropdowns: severity, inbox status, half-star rating, date, label
  *  - Per-card actions: mark read, resolve, archive, pin
- *  - Expandable card: full text, screenshot, session context, internal notes
+ *  - Expandable card: structured liked/confusion/bugs, screenshot, session context, notes
  *  - Global stats bar: total / unread / unresolved / critical+high
  *  - Mobile-responsive single-column layout
  *
@@ -25,7 +25,7 @@ import {
   Star, AlertCircle, X, ChevronDown, ChevronUp,
   Mail, ExternalLink, Monitor, Smartphone, Tablet,
   Wifi, MessageSquare, StickyNote,
-  RotateCcw,
+  RotateCcw, Trash2,
 } from 'lucide-react';
 import type {
   FeedbackRow,
@@ -102,19 +102,37 @@ function SeverityBadge({ severity }: { severity: string | null }) {
 }
 
 function RatingStars({ rating }: { rating: number }) {
+  const value = Number(rating);
+  const label = Number.isInteger(value) ? `${value}` : value.toFixed(1);
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`${rating} out of 5`}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Star
-          key={n}
-          className="h-3.5 w-3.5"
-          style={{
-            fill:  n <= rating ? '#f59e0b' : 'transparent',
-            color: n <= rating ? '#f59e0b' : 'var(--card-border)',
-          }}
-          strokeWidth={1.5}
-        />
-      ))}
+    <span className="inline-flex items-center gap-1.5" aria-label={`${label} out of 5`}>
+      <span className="inline-flex items-center gap-0.5">
+        {[1, 2, 3, 4, 5].map((n) => {
+          const fill =
+            value >= n ? '100%' : value >= n - 0.5 ? '50%' : '0%';
+          return (
+            <span key={n} className="relative inline-block h-3.5 w-3.5 shrink-0">
+              <Star
+                className="absolute inset-0 h-3.5 w-3.5"
+                style={{ fill: 'transparent', color: 'var(--card-border)' }}
+                strokeWidth={1.5}
+                aria-hidden
+              />
+              <span className="absolute inset-0 overflow-hidden" style={{ width: fill }}>
+                <Star
+                  className="h-3.5 w-3.5"
+                  style={{ fill: '#f59e0b', color: '#f59e0b' }}
+                  strokeWidth={1.5}
+                  aria-hidden
+                />
+              </span>
+            </span>
+          );
+        })}
+      </span>
+      <span className="text-[11px] font-semibold tabular-nums" style={{ color: '#b45309' }}>
+        {label}/5
+      </span>
     </span>
   );
 }
@@ -382,32 +400,60 @@ function StatsBar({
   );
 }
 
-// ─── Filter pill ──────────────────────────────────────────────────────────────
+// ─── Filter dropdown ──────────────────────────────────────────────────────────
 
-function FilterPill({
-  active,
-  onClick,
+const FILTER_SELECT_STYLE: React.CSSProperties = {
+  borderColor: 'var(--card-border)',
+  background: 'var(--card-bg)',
+  color: 'var(--text-primary)',
+};
+
+const HALF_STAR_RATINGS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1] as const;
+
+function FilterSelect({
+  value,
+  onChange,
+  label,
   children,
-  activeColor = 'var(--accent-primary)',
 }: {
-  active: boolean;
-  onClick: () => void;
+  value: string;
+  onChange: (v: string) => void;
+  label: string;
   children: React.ReactNode;
-  activeColor?: string;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition-all"
-      style={{
-        borderColor:  active ? activeColor  : 'var(--card-border)',
-        background:   active ? `color-mix(in srgb, ${activeColor} 12%, var(--card-bg))` : 'var(--card-bg)',
-        color:        active ? activeColor  : 'var(--text-secondary)',
-      }}
-    >
-      {children}
-    </button>
+    <label className="flex min-w-0 flex-col gap-1">
+      <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="rounded-xl border px-3 py-2 text-sm font-medium outline-none"
+        style={FILTER_SELECT_STYLE}
+        aria-label={label}
+      >
+        {children}
+      </select>
+    </label>
+  );
+}
+
+function formatRatingOption(r: number): string {
+  const label = Number.isInteger(r) ? String(r) : r.toFixed(1);
+  const full = Math.floor(r);
+  const half = r - full >= 0.5;
+  return `${'★'.repeat(full)}${half ? '½' : ''}  ${label}`;
+}
+
+function isPositiveFeedbackNote(text: string): boolean {
+  const t = text.trim().toLowerCase();
+  return (
+    t.startsWith('no issues') ||
+    t.startsWith('nothing —') ||
+    t.startsWith('nothing -') ||
+    t.includes('everything worked smoothly') ||
+    t.includes('everything was clear')
   );
 }
 
@@ -463,6 +509,7 @@ function FeedbackCard({
   onToggleExpand,
   onPatch,
   onSaveNotes,
+  onDelete,
 }: {
   row:            FeedbackRow;
   expanded:       boolean;
@@ -470,6 +517,7 @@ function FeedbackCard({
   onToggleExpand: () => void;
   onPatch:        (patch: Partial<FeedbackRow>) => Promise<void>;
   onSaveNotes:    (notes: string) => void;
+  onDelete:       () => Promise<void>;
 }) {
   const [notes, setNotes] = useState(row.notes ?? '');
   const notesTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -495,12 +543,11 @@ function FeedbackCard({
   const hasSession = ctx && (ctx.interview_role || ctx.session_id);
   const hasDevice  = ctx && (ctx.browser_name || ctx.os || ctx.device_type);
 
-  // Text preview: first non-empty field
-  const preview =
-    row.liked_text?.trim()     ||
-    row.bugs_text?.trim()      ||
-    row.confusion_text?.trim() ||
-    '';
+  // Text preview: structured liked / confusion / bugs (dropdown answers)
+  const likedPreview = row.liked_text?.trim() ?? '';
+  const confusionPreview = row.confusion_text?.trim() ?? '';
+  const bugsPreview = row.bugs_text?.trim() ?? '';
+  const hasStructuredPreview = Boolean(likedPreview || confusionPreview || bugsPreview);
 
   // Affected page: prefer session_context.current_page, fall back to page_url
   const affectedPage = (ctx?.current_page as string | undefined) || row.page_url || '';
@@ -587,11 +634,44 @@ function FeedbackCard({
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{row.email}</span>
             </div>
 
-            {/* Row 3: text preview */}
-            {preview && (
-              <p className="line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                "{preview}"
-              </p>
+            {/* Row 3: structured feedback preview */}
+            {hasStructuredPreview && (
+              <div className="space-y-1.5">
+                {likedPreview ? (
+                  <p className="line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Liked · </span>
+                    {likedPreview}
+                  </p>
+                ) : null}
+                {confusionPreview ? (
+                  <p className="line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Confused · </span>
+                    {confusionPreview}
+                    {isPositiveFeedbackNote(confusionPreview) ? (
+                      <span
+                        className="ml-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ background: '#dcfce7', color: '#15803d' }}
+                      >
+                        Clear
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+                {bugsPreview ? (
+                  <p className="line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Bugs · </span>
+                    {bugsPreview}
+                    {isPositiveFeedbackNote(bugsPreview) ? (
+                      <span
+                        className="ml-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ background: '#dcfce7', color: '#15803d' }}
+                      >
+                        Smooth
+                      </span>
+                    ) : null}
+                  </p>
+                ) : null}
+              </div>
             )}
 
             {/* Row 4: context chips */}
@@ -672,6 +752,24 @@ function FeedbackCard({
           loading={mutating}
           onClick={(e) => { e.stopPropagation(); void onPatch({ is_archived: !row.is_archived }); }}
         />
+        <ActionBtn
+          icon={<Trash2 className="h-3.5 w-3.5" />}
+          label="Delete"
+          active
+          activeColor="#b91c1c"
+          loading={mutating}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (
+              !window.confirm(
+                `Permanently delete feedback from ${row.name}? This cannot be undone.`,
+              )
+            ) {
+              return;
+            }
+            void onDelete();
+          }}
+        />
         <FeedbackReplyButton row={row} />
       </div>
 
@@ -681,14 +779,24 @@ function FeedbackCard({
           {/* Feedback text */}
           <div className="space-y-4 p-4 sm:p-5">
             {[
-              { label: 'What they liked',      text: row.liked_text      },
-              { label: 'What confused them',   text: row.confusion_text  },
-              { label: 'Bugs / issues',        text: row.bugs_text       },
+              { label: 'What did you like?', text: row.liked_text },
+              { label: 'What confused you?', text: row.confusion_text },
+              { label: 'Bugs or issues?', text: row.bugs_text },
             ].map(({ label, text }) => text?.trim() ? (
               <div key={label}>
-                <p className="mb-1 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
-                  {label}
-                </p>
+                <div className="mb-1 flex flex-wrap items-center gap-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                    {label}
+                  </p>
+                  {isPositiveFeedbackNote(text) ? (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                      style={{ background: '#dcfce7', color: '#15803d' }}
+                    >
+                      Positive
+                    </span>
+                  ) : null}
+                </div>
                 <p className="whitespace-pre-wrap text-sm leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                   {text}
                 </p>
@@ -966,6 +1074,32 @@ export default function PlatformFeedbackPage() {
     setPage(1);
   }
 
+  function inboxStatusValue(): string {
+    if (filters.show_archived === 'true') return 'archived';
+    if (filters.consent_public === 'true') return 'consented';
+    if (filters.is_pinned === 'true') return 'pinned';
+    if (filters.is_resolved === 'false') return 'open';
+    if (filters.is_read === 'false') return 'unread';
+    return '';
+  }
+
+  function setInboxStatus(value: string) {
+    setFilters((f) => ({
+      ...f,
+      is_read: '',
+      is_resolved: '',
+      is_pinned: '',
+      show_archived: '',
+      consent_public: '',
+      ...(value === 'unread' ? { is_read: 'false' } : {}),
+      ...(value === 'open' ? { is_resolved: 'false' } : {}),
+      ...(value === 'pinned' ? { is_pinned: 'true' } : {}),
+      ...(value === 'consented' ? { consent_public: 'true' } : {}),
+      ...(value === 'archived' ? { show_archived: 'true' } : {}),
+    }));
+    setPage(1);
+  }
+
   // ── Fetch ──────────────────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -1023,6 +1157,29 @@ export default function PlatformFeedbackPage() {
       void fetchData();
     } finally {
       setMutating(m => ({ ...m, [id]: false }));
+    }
+  }
+
+  async function deleteItem(id: string) {
+    setMutating((m) => ({ ...m, [id]: true }));
+    const previous = items;
+    setItems((prev) => prev.filter((r) => r.id !== id));
+    if (expandedId === id) setExpandedId(null);
+    try {
+      const res = await fetch(`/api/admin/feedback/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setItems(previous);
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast.error(data?.error || 'Failed to delete feedback.');
+        return;
+      }
+      toast.success('Feedback deleted.');
+      void fetchData();
+    } catch {
+      setItems(previous);
+      toast.error('Failed to delete feedback.');
+    } finally {
+      setMutating((m) => ({ ...m, [id]: false }));
     }
   }
 
@@ -1124,89 +1281,90 @@ export default function PlatformFeedbackPage() {
         </select>
       </div>
 
-      {/* ── Filter pills ── */}
-      <div className="flex flex-wrap gap-2">
-        {/* Severity */}
-        {(['critical', 'high', 'medium', 'low'] as const).map((s) => (
-          <FilterPill
-            key={s}
-            active={filters.severity === s}
-            activeColor={SEVERITY_MAP[s].fg}
-            onClick={() => setFilter('severity', filters.severity === s ? '' : s)}
-          >
-            <span className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: SEVERITY_MAP[s].dot }} />
-            {s.charAt(0).toUpperCase() + s.slice(1)}
-          </FilterPill>
-        ))}
-
-        <div className="mx-1 w-px self-stretch" style={{ background: 'var(--card-border)' }} />
-
-        {/* Read status */}
-        <FilterPill active={filters.is_read === 'false'} onClick={() => setFilter('is_read', filters.is_read === 'false' ? '' : 'false')}>
-          <EyeOff className="h-3 w-3" /> Unread
-        </FilterPill>
-        <FilterPill active={filters.is_resolved === 'false'} activeColor="#b45309" onClick={() => setFilter('is_resolved', filters.is_resolved === 'false' ? '' : 'false')}>
-          <AlertCircle className="h-3 w-3" /> Open
-        </FilterPill>
-        <FilterPill active={filters.is_pinned === 'true'} activeColor="var(--accent-primary)" onClick={() => setFilter('is_pinned', filters.is_pinned === 'true' ? '' : 'true')}>
-          <Pin className="h-3 w-3" /> Pinned
-        </FilterPill>
-        <FilterPill
-          active={filters.consent_public === 'true'}
-          activeColor="#6d28d9"
-          onClick={() => setFilter('consent_public', filters.consent_public === 'true' ? '' : 'true')}
+      {/* ── Filters (dropdown system — mirrors submit form upgrades) ── */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <FilterSelect
+          label="Severity"
+          value={filters.severity}
+          onChange={(v) => setFilter('severity', v)}
         >
-          ✓ Consented
-        </FilterPill>
-        <FilterPill active={filters.show_archived === 'true'} activeColor="#6b7280" onClick={() => setFilter('show_archived', filters.show_archived === 'true' ? '' : 'true')}>
-          <Archive className="h-3 w-3" /> Archived
-        </FilterPill>
+          <option value="">All severities</option>
+          <option value="critical">Critical</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </FilterSelect>
 
-        <div className="mx-1 w-px self-stretch" style={{ background: 'var(--card-border)' }} />
+        <FilterSelect
+          label="Inbox"
+          value={inboxStatusValue()}
+          onChange={setInboxStatus}
+        >
+          <option value="">All items</option>
+          <option value="unread">Unread</option>
+          <option value="open">Open</option>
+          <option value="pinned">Pinned</option>
+          <option value="consented">Consented</option>
+          <option value="archived">Archived</option>
+        </FilterSelect>
 
-        {/* Rating */}
-        {[1, 2, 3, 4, 5].map((r) => (
-          <FilterPill key={r} active={filters.rating === String(r)} activeColor="#f59e0b" onClick={() => setFilter('rating', filters.rating === String(r) ? '' : String(r))}>
-            {'★'.repeat(r)}
-          </FilterPill>
-        ))}
+        <FilterSelect
+          label="Rating"
+          value={filters.rating}
+          onChange={(v) => setFilter('rating', v)}
+        >
+          <option value="">All ratings</option>
+          {HALF_STAR_RATINGS.map((r) => (
+            <option key={r} value={String(r)}>
+              {formatRatingOption(r)}
+            </option>
+          ))}
+        </FilterSelect>
 
-        <div className="mx-1 w-px self-stretch" style={{ background: 'var(--card-border)' }} />
+        <FilterSelect
+          label="Date"
+          value={filters.date_range}
+          onChange={(v) => setFilter('date_range', v)}
+        >
+          <option value="">All time</option>
+          <option value="today">Today</option>
+          <option value="week">This week</option>
+          <option value="month">This month</option>
+        </FilterSelect>
 
-        {/* Date range */}
-        {(['today', 'week', 'month'] as const).map((d) => (
-          <FilterPill key={d} active={filters.date_range === d} onClick={() => setFilter('date_range', filters.date_range === d ? '' : d)}>
-            {d === 'today' ? 'Today' : d === 'week' ? 'This week' : 'This month'}
-          </FilterPill>
-        ))}
-
-        <div className="mx-1 w-px self-stretch" style={{ background: 'var(--card-border)' }} />
-
-        {/* Labels */}
-        {ALL_LABELS.map((l) => {
-          const c = LABEL_COLOR[l];
-          return (
-            <FilterPill
-              key={l}
-              active={filters.label === l}
-              activeColor={c.fg}
-              onClick={() => setFilter('label', filters.label === l ? '' : l)}
-            >
+        <FilterSelect
+          label="Label"
+          value={filters.label}
+          onChange={(v) => setFilter('label', v)}
+        >
+          <option value="">All labels</option>
+          {ALL_LABELS.map((l) => (
+            <option key={l} value={l}>
               {l}
-            </FilterPill>
-          );
-        })}
+            </option>
+          ))}
+        </FilterSelect>
 
-        {/* Clear all */}
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold transition-colors"
-            style={{ background: 'color-mix(in srgb, var(--accent-danger) 10%, var(--card-bg))', color: 'var(--accent-danger)', border: '1px solid color-mix(in srgb, var(--accent-danger) 30%, var(--card-border))' }}
-          >
-            <X className="h-3 w-3" /> Clear filters
-          </button>
-        )}
+        <div className="flex flex-col justify-end">
+          {hasActiveFilters ? (
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border px-3 py-2 text-sm font-semibold transition-colors"
+              style={{
+                background: 'color-mix(in srgb, var(--accent-danger) 10%, var(--card-bg))',
+                color: 'var(--accent-danger)',
+                borderColor: 'color-mix(in srgb, var(--accent-danger) 30%, var(--card-border))',
+              }}
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </button>
+          ) : (
+            <span className="rounded-xl border px-3 py-2 text-center text-xs" style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}>
+              No filters
+            </span>
+          )}
+        </div>
       </div>
 
       {/* ── Error banner ── */}
@@ -1253,6 +1411,7 @@ export default function PlatformFeedbackPage() {
               onToggleExpand={() => setExpandedId(expandedId === row.id ? null : row.id)}
               onPatch={(patch) => patchItem(row.id, patch)}
               onSaveNotes={(notes) => saveNotes(row.id, notes)}
+              onDelete={() => deleteItem(row.id)}
             />
           ))}
         </div>

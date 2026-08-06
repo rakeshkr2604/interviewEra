@@ -7,7 +7,6 @@ import {
   ListChecks,
   RefreshCw,
   ShieldAlert,
-  Sparkles,
   Star,
 } from 'lucide-react';
 import type {
@@ -485,29 +484,55 @@ export default function FreeToolsPage() {
         <QgModePanel data={data} window={window} loading={loading && !data} />
       </div>
 
-      {/* Conversion signal */}
+      {/* Conversion signal — signup CTA CTR from durable product_events */}
       <div>
-        <SectionLabel>Conversion Signal</SectionLabel>
-        <div style={cardStyle} className="flex items-center gap-4 p-5">
-          <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-            style={{
-              background: 'color-mix(in srgb, var(--accent-primary) 18%, var(--bg-secondary))',
-              color: 'var(--accent-primary)',
-            }}
-          >
-            <Sparkles className="h-4 w-4" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Signup CTA click-through rate per tool
-            </p>
-            <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-              Coming soon — requires GA4 integration. CTA clicks are tracked client-side in GA4 only
-              and are not persisted server-side, so this dashboard cannot compute them yet.
-            </p>
-          </div>
+        <SectionLabel>Conversion Signal — {WINDOW_OPTIONS.find((w) => w.key === window)?.label}</SectionLabel>
+        <div className="grid gap-3 sm:grid-cols-3">
+          {TOOL_ORDER.map((tool) => {
+            const stats = data?.cta_conversion?.[tool]?.[window];
+            const accent = TOOL_ACCENTS[tool];
+            return (
+              <div key={tool} style={cardStyle} className="p-4">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                    style={{
+                      background: `color-mix(in srgb, ${accent} 18%, var(--bg-secondary))`,
+                      color: accent,
+                    }}
+                  >
+                    {TOOL_ICONS[tool]}
+                  </div>
+                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {TOOL_LABELS[tool]}
+                  </p>
+                </div>
+                {loading && !data ? (
+                  <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Loading…
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-3 text-2xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                      {stats?.ctr_pct == null ? '—' : `${stats.ctr_pct}%`}
+                    </p>
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                      Signup CTA CTR
+                    </p>
+                    <p className="mt-2 text-[11px] leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {fmt(stats?.cta_clicks ?? 0)} CTA clicks / {fmt(stats?.page_views ?? 0)} tool page
+                      views
+                    </p>
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
+        <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          CTR = durable <code className="text-[10px]">landing_cta_clicked</code> ÷{' '}
+          <code className="text-[10px]">page_view</code> on each tool path (persisted server-side).
+        </p>
       </div>
 
       <p className="text-center text-[10px]" style={{ color: 'var(--text-muted)' }}>

@@ -170,7 +170,10 @@ const SEVERITY_COLORS: Record<FeedbackSeverity, { bg: string; fg: string }> = {
 };
 
 function ratingStars(rating: number): string {
-  return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+  const full = Math.floor(rating);
+  const half = rating - full >= 0.5;
+  const empty = Math.max(0, 5 - Math.ceil(rating));
+  return '★'.repeat(full) + (half ? '½' : '') + '☆'.repeat(empty);
 }
 
 function section(title: string, body: string): string {

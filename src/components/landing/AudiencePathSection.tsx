@@ -2,8 +2,14 @@
 
 import { Building2, GraduationCap, Rocket } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import {
+  CollegesProductShot,
+  HiringTeamsProductShot,
+  StudentsProductShot,
+} from '@/components/landing/AudienceProductShots';
 import {
   LANDING_HOME_HEADER_BLOCK,
   LANDING_HOME_HEADING,
@@ -20,6 +26,7 @@ const PATHS: {
   ctaKey: (typeof CTA_KEYS)[keyof typeof CTA_KEYS];
   section: string;
   icon: LucideIcon;
+  shot?: 'students' | 'colleges' | 'hiring';
 }[] = [
   {
     title: 'Students',
@@ -29,6 +36,7 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_STUDENTS,
     section: 'audience_students',
     icon: Rocket,
+    shot: 'students',
   },
   {
     title: 'Colleges',
@@ -38,6 +46,7 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_COLLEGES,
     section: 'audience_colleges',
     icon: GraduationCap,
+    shot: 'colleges',
   },
   {
     title: 'Hiring Teams',
@@ -47,8 +56,15 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_HIRING_TEAMS,
     section: 'audience_hiring_teams',
     icon: Building2,
+    shot: 'hiring',
   },
 ];
+
+function Shot({ kind }: { kind: 'students' | 'colleges' | 'hiring' }): ReactNode {
+  if (kind === 'students') return <StudentsProductShot />;
+  if (kind === 'colleges') return <CollegesProductShot />;
+  return <HiringTeamsProductShot />;
+}
 
 export function AudiencePathSection() {
   return (
@@ -94,9 +110,16 @@ export function AudiencePathSection() {
                     <Icon className="size-5" />
                   </span>
                   <h3 className="ie-lh-text-primary text-lg font-semibold">{path.title}</h3>
-                  <p className="ie-lh-text-secondary mt-2 flex-1 text-sm leading-relaxed">
+                  <p className="ie-lh-text-secondary mt-2 text-sm leading-relaxed">
                     {path.description}
                   </p>
+                  {path.shot ? (
+                    <div className="mt-1 flex-1">
+                      <Shot kind={path.shot} />
+                    </div>
+                  ) : (
+                    <div className="flex-1" />
+                  )}
                   <span className="ie-lh-text-link mt-4 text-sm font-semibold">{path.cta} →</span>
                 </TrackedCtaLink>
               </li>

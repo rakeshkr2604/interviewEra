@@ -5,6 +5,7 @@ vi.mock('./client', () => ({
   default: () => {
     throw new Error('redis down');
   },
+  isRedisConfigured: () => true,
 }));
 
 describe('rate-limit fail-closed', () => {

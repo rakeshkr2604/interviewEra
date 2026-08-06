@@ -1,13 +1,22 @@
 'use client';
 
-import { useCallback, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import type { LandingFaqCategoryId, LandingFaqCategoryView } from '@/lib/landing/faq-content';
+import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import type { LandingFaqCategoryView, LandingFaqItem } from '@/lib/landing/faq-content';
 import { LandingFaqAccordionItem } from '@/components/landing/faq/LandingFaqAccordionItem';
 import { cn } from '@/lib/utils';
 
+/** Category shape for landing + blog FAQ shells (sidebar pills + accordion panels). */
+export type CategorizedFaqCategory = {
+  id: string;
+  label: string;
+  items: readonly LandingFaqItem[];
+};
+
 type LandingFaqCategorizedProps = {
-  categories: readonly LandingFaqCategoryView[];
+  categories: readonly CategorizedFaqCategory[] | readonly LandingFaqCategoryView[];
   heading: ReactNode;
+  /** When true, every accordion item starts expanded. Homepage keeps first-only. */
+  defaultOpenAll?: boolean;
 };
 
 function prefersReducedMotion(): boolean {
@@ -19,35 +28,60 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-export function LandingFaqCategorized({ categories, heading }: LandingFaqCategorizedProps) {
+export function LandingFaqCategorized({
+  categories,
+  heading,
+  defaultOpenAll = false,
+}: LandingFaqCategorizedProps) {
   const baseId = useId();
   const chipRailRef = useRef<HTMLDivElement | null>(null);
-  const tabRefs = useRef<Partial<Record<LandingFaqCategoryId, HTMLButtonElement | null>>>({});
-  const [activeId, setActiveId] = useState<LandingFaqCategoryId>(categories[0]?.id ?? 'getting-started');
+  const tabRefs = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
+  const chipRefs = useRef<Partial<Record<string, HTMLButtonElement | null>>>({});
+  const marqueeResumeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [activeId, setActiveId] = useState<string>(categories[0]?.id ?? 'getting-started');
+  const [marqueePaused, setMarqueePaused] = useState(false);
 
-  const focusTab = useCallback(
-    (id: LandingFaqCategoryId) => {
-      const desktop = window.matchMedia('(min-width: 1024px)').matches;
-      const target = desktop ? tabRefs.current[id] : chipRefs.current[id];
-      target?.focus();
-    },
-    [],
-  );
+  const pauseMarqueeBriefly = useCallback(() => {
+    setMarqueePaused(true);
+    if (marqueeResumeTimer.current) clearTimeout(marqueeResumeTimer.current);
+    marqueeResumeTimer.current = setTimeout(() => {
+      marqueeResumeTimer.current = null;
+      setMarqueePaused(false);
+    }, 4200);
+  }, []);
 
-  const chipRefs = useRef<Partial<Record<LandingFaqCategoryId, HTMLButtonElement | null>>>({});
+  useEffect(() => {
+    return () => {
+      if (marqueeResumeTimer.current) clearTimeout(marqueeResumeTimer.current);
+    };
+  }, []);
+
+  const focusTab = useCallback((id: string) => {
+    const desktop = window.matchMedia('(min-width: 1024px)').matches;
+    const target = desktop ? tabRefs.current[id] : chipRefs.current[id];
+    target?.focus();
+  }, []);
 
   const selectCategory = useCallback(
-    (id: LandingFaqCategoryId, options?: { focus?: boolean }) => {
+    (id: string, options?: { focus?: boolean }) => {
       setActiveId(id);
-      const chip = chipRailRef.current?.querySelector<HTMLButtonElement>(`[data-category="${id}"]`);
-      chip?.scrollIntoView({
-        behavior: prefersReducedMotion() ? 'auto' : 'smooth',
-        block: 'nearest',
-        inline: 'center',
-      });
+      pauseMarqueeBriefly();
+
+      // Only nudge the chip into view when marquee is off (reduced motion / manual scroll).
+      if (prefersReducedMotion()) {
+        const chip = chipRailRef.current?.querySelector<HTMLButtonElement>(
+          `[data-category="${id}"]`,
+        );
+        chip?.scrollIntoView({
+          behavior: 'auto',
+          block: 'nearest',
+          inline: 'center',
+        });
+      }
+
       if (options?.focus) focusTab(id);
     },
-    [focusTab],
+    [focusTab, pauseMarqueeBriefly],
   );
 
   const onTabKeyDown = useCallback(
@@ -73,6 +107,40 @@ export function LandingFaqCategorized({ categories, heading }: LandingFaqCategor
     },
     [categories, selectCategory],
   );
+
+  const renderChipButtons = (opts: { interactive: boolean; keyPrefix: string }) =>
+    categories.map((category, index) => {
+      const selected = activeId === category.id;
+      return (
+        <button
+          key={`${opts.keyPrefix}-${category.id}`}
+          ref={
+            opts.interactive
+              ? (node) => {
+                  chipRefs.current[category.id] = node;
+                }
+              : undefined
+          }
+          type="button"
+          role={opts.interactive ? 'tab' : undefined}
+          data-category={category.id}
+          id={opts.interactive ? `${baseId}-mob-tab-${category.id}` : undefined}
+          aria-selected={opts.interactive ? selected : undefined}
+          aria-controls={opts.interactive ? `${baseId}-panel-${category.id}` : undefined}
+          tabIndex={opts.interactive ? (selected ? 0 : -1) : -1}
+          className={cn(
+            'landing-faq-pill landing-faq-pill--chip',
+            selected && 'landing-faq-pill--active',
+          )}
+          onClick={() => selectCategory(category.id)}
+          onKeyDown={
+            opts.interactive ? (event) => onTabKeyDown(event, index) : undefined
+          }
+        >
+          {category.label}
+        </button>
+      );
+    });
 
   return (
     <div className="landing-faq-layout">
@@ -109,33 +177,32 @@ export function LandingFaqCategorized({ categories, heading }: LandingFaqCategor
       <div className="landing-faq-content min-w-0">
         <div
           ref={chipRailRef}
-          className="landing-faq-chips -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 lg:hidden"
-          role="tablist"
-          aria-label="FAQ categories"
+          className={cn(
+            'landing-faq-chips landing-faq-chips--marquee -mx-4 lg:hidden',
+            marqueePaused && 'landing-faq-chips--paused',
+          )}
+          onPointerEnter={() => setMarqueePaused(true)}
+          onPointerLeave={() => setMarqueePaused(false)}
+          onFocusCapture={() => setMarqueePaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setMarqueePaused(false);
+            }
+          }}
         >
-          {categories.map((category, index) => {
-            const selected = activeId === category.id;
-            return (
-              <button
-                key={category.id}
-                ref={(node) => {
-                    chipRefs.current[category.id] = node;
-                  }}
-                  type="button"
-                  role="tab"
-                  data-category={category.id}
-                  id={`${baseId}-mob-tab-${category.id}`}
-                aria-selected={selected}
-                aria-controls={`${baseId}-panel-${category.id}`}
-                tabIndex={selected ? 0 : -1}
-                className={cn('landing-faq-pill landing-faq-pill--chip', selected && 'landing-faq-pill--active')}
-                onClick={() => selectCategory(category.id)}
-                onKeyDown={(event) => onTabKeyDown(event, index)}
-              >
-                {category.label}
-              </button>
-            );
-          })}
+          <div className="landing-faq-chips__track">
+            <div
+              className="landing-faq-chips__group"
+              role="tablist"
+              aria-label="FAQ categories"
+            >
+              {renderChipButtons({ interactive: true, keyPrefix: 'a' })}
+            </div>
+            {/* Duplicate set for seamless loop — not in tab order */}
+            <div className="landing-faq-chips__group" aria-hidden="true">
+              {renderChipButtons({ interactive: false, keyPrefix: 'b' })}
+            </div>
+          </div>
         </div>
 
         <div className="landing-faq-panels">
@@ -161,7 +228,7 @@ export function LandingFaqCategorized({ categories, heading }: LandingFaqCategor
                           panelId={`${baseId}-faq-${category.id}-${index}`}
                           question={item.q}
                           answer={item.a}
-                          defaultOpen={index === 0}
+                          defaultOpen={defaultOpenAll || index === 0}
                           isLast={index === category.items.length - 1}
                         />
                       ))}

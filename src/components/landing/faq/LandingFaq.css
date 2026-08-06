@@ -139,6 +139,68 @@
   display: none;
 }
 
+/* Mobile category marquee — slow continuous scroll */
+.landing-faq-chips--marquee {
+  overflow: hidden;
+  padding-block: 0.25rem 0.5rem;
+  padding-inline: 1rem;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 6%,
+    #000 94%,
+    transparent
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+}
+
+.landing-faq-chips__track {
+  display: flex;
+  width: max-content;
+  gap: 0.5rem;
+  animation: landing-faq-chip-marquee 38s linear infinite;
+  will-change: transform;
+}
+
+.landing-faq-chips--marquee:hover .landing-faq-chips__track,
+.landing-faq-chips--marquee:focus-within .landing-faq-chips__track,
+.landing-faq-chips--paused .landing-faq-chips__track {
+  animation-play-state: paused;
+}
+
+.landing-faq-chips__group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
+}
+
+@keyframes landing-faq-chip-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    /* Two identical groups → shift by one group (+ gap) */
+    transform: translate3d(calc(-50% - 0.25rem), 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-faq-chips--marquee {
+    overflow-x: auto;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .landing-faq-chips__track {
+    animation: none;
+    will-change: auto;
+  }
+
+  .landing-faq-chips__group[aria-hidden='true'] {
+    display: none;
+  }
+}
+
 .landing-faq-panels {
   position: relative;
 }

@@ -9,7 +9,7 @@
  *   limit       (int, default 20, max 50)
  *   q           (search: email | name | liked_text | confusion_text | bugs_text)
  *   severity    ('critical' | 'high' | 'medium' | 'low' | '')
- *   rating      (1-5 | '')
+ *   rating      (1–5 half-star steps, e.g. 3.5 | '')
  *   is_read     ('true' | 'false' | '')
  *   is_resolved ('true' | 'false' | '')
  *   is_pinned   ('true' | '')
@@ -151,7 +151,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   // Filters
   if (severity)               query = query.eq('severity', severity);
-  if (ratingParam)            query = query.eq('rating', parseInt(ratingParam, 10));
+  if (ratingParam) {
+    const ratingFilter = Number(ratingParam);
+    if (Number.isFinite(ratingFilter)) query = query.eq('rating', ratingFilter);
+  }
   if (isReadParam !== '')     query = query.eq('is_read',     isReadParam === 'true');
   if (isResolvedParam !== '') query = query.eq('is_resolved', isResolvedParam === 'true');
   if (isPinnedParam === 'true') query = query.eq('is_pinned', true);

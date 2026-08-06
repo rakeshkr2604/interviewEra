@@ -1,4 +1,4 @@
-import getRedis from './client';
+import getRedis, { isRedisConfigured } from './client';
 import type { ParsedResume } from '@/types/app.types';
 import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
@@ -75,6 +75,7 @@ export function buildCacheKey(
 export async function getCachedQuestions(
   key: string
 ): Promise<CachedGeneratedQuestion[] | null> {
+  if (!isRedisConfigured()) return null;
   try {
     const redis = getRedis();
     const cached = await redis.get<CachedGeneratedQuestion[]>(key);
@@ -89,6 +90,7 @@ export async function setCachedQuestions(
   key: string,
   questions: CachedGeneratedQuestion[]
 ): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     await redis.set(key, questions, { ex: TTL_SECONDS });

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { safeText } from '@/lib/utils/sanitize';
+import { halfStarRatingSchema } from '@/lib/validations/schemas';
 
 export const anonymousFeedbackSchema = z.object({
-  rating: z.coerce.number().int().min(1).max(5).optional().default(3),
+  rating: halfStarRatingSchema.optional().default(3),
   /** Opt-in only — default false; anonymous UI does not currently expose this. */
   consentPublicDisplay: z.boolean().optional().default(false),
   npsScore: z.coerce.number().int().min(0).max(10).nullable().optional().default(null),

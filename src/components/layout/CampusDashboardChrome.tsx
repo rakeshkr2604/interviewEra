@@ -10,6 +10,7 @@ interface CampusDashboardChromeProps {
   orgName: string
   seatCount: number
   seatsUsed: number
+  showWorkspaceSwitcher?: boolean
 }
 
 export function CampusDashboardChrome({
@@ -17,6 +18,7 @@ export function CampusDashboardChrome({
   orgName,
   seatCount,
   seatsUsed,
+  showWorkspaceSwitcher = false,
 }: CampusDashboardChromeProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -69,6 +71,7 @@ export function CampusDashboardChrome({
           seatCount={seatCount}
           seatsUsed={seatsUsed}
           onNavigate={() => setMobileOpen(false)}
+          showWorkspaceSwitcher={showWorkspaceSwitcher}
         />
       </div>
 

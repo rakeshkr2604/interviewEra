@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { ProductEventName } from '@/lib/analytics/product-events';
+import { isPlaceholderValue } from '@/lib/redis/client';
 
 const MAX_PROP_KEYS = 32;
 const MAX_STRING_LEN = 500;
@@ -12,7 +13,7 @@ const MAX_STRING_LEN = 500;
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
+  if (!url || !key || isPlaceholderValue(url) || isPlaceholderValue(key)) return null;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

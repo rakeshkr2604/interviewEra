@@ -1,17 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
-import { Star, Loader2, MessageSquarePlus } from 'lucide-react'
+import { Star, Loader2 } from 'lucide-react'
 import { collectFeedbackContext, type FeedbackSessionContext } from '@/lib/feedback/collect-context'
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -30,7 +23,140 @@ import {
 
 const MAX_TEXT = 2000
 
+const OTHER_OPTION_ID = 'other' as const
+
+type FeedbackOption = { id: string; label: string }
+
+const LIKED_OPTIONS: readonly FeedbackOption[] = [
+  { id: 'resume_aware', label: 'Questions matched my resume and experience' },
+  { id: 'voice_practice', label: 'Voice interview felt realistic' },
+  { id: 'follow_ups', label: 'Smart follow-up questions' },
+  { id: 'scoring', label: 'Clear scores and actionable feedback' },
+  { id: 'report', label: 'Interview report helped me improve' },
+  { id: 'ui', label: 'Simple, clean, and easy to use' },
+  { id: 'speed', label: 'Fast setup — started practicing quickly' },
+  { id: OTHER_OPTION_ID, label: 'Other (tell us yourself)' },
+]
+
+const CONFUSION_OPTIONS: readonly FeedbackOption[] = [
+  { id: 'nothing', label: 'Nothing — everything was clear' },
+  { id: 'how_to_start', label: 'Unclear how to start an interview' },
+  { id: 'mic_setup', label: 'Mic or voice setup was confusing' },
+  { id: 'credits', label: 'Credits, plans, or pricing were unclear' },
+  { id: 'report_meaning', label: 'Hard to understand what the scores mean' },
+  { id: 'next_steps', label: 'Unsure what to practice next' },
+  { id: 'too_many_steps', label: 'Too many steps before I could practice' },
+  { id: OTHER_OPTION_ID, label: 'Other (tell us yourself)' },
+]
+
+const BUGS_OPTIONS: readonly FeedbackOption[] = [
+  { id: 'none', label: 'No issues — everything worked smoothly' },
+  { id: 'mic_failed', label: 'Microphone did not work' },
+  { id: 'audio_glitch', label: 'Audio or playback glitched' },
+  { id: 'session_stuck', label: 'Session froze or got stuck' },
+  { id: 'upload_fail', label: 'Resume upload failed' },
+  { id: 'wrong_score', label: 'Score was missing or looked wrong' },
+  { id: 'mobile_issue', label: 'Broke or lagged on mobile' },
+  { id: 'login_issue', label: 'Login or account issue' },
+  { id: OTHER_OPTION_ID, label: 'Other (tell us yourself)' },
+]
+
 type WouldUse = boolean | null
+
+function composeFeedbackField(
+  selectedId: string,
+  options: readonly FeedbackOption[],
+  otherText: string,
+): string {
+  if (!selectedId) return ''
+
+  if (selectedId === OTHER_OPTION_ID) {
+    return otherText.trim().slice(0, MAX_TEXT)
+  }
+
+  const label = options.find((o) => o.id === selectedId)?.label ?? ''
+  return label.slice(0, MAX_TEXT)
+}
+
+function FeedbackOptionField({
+  id,
+  label,
+  options,
+  selectedId,
+  onSelectedIdChange,
+  otherText,
+  onOtherTextChange,
+  disabled,
+  placeholder,
+  otherPlaceholder,
+}: {
+  id: string
+  label: string
+  options: readonly FeedbackOption[]
+  selectedId: string
+  onSelectedIdChange: (id: string) => void
+  otherText: string
+  onOtherTextChange: (v: string) => void
+  disabled?: boolean
+  placeholder?: string
+  otherPlaceholder?: string
+}) {
+  const otherSelected = selectedId === OTHER_OPTION_ID
+
+  function handleSelect(nextId: string) {
+    onSelectedIdChange(nextId)
+    if (nextId !== OTHER_OPTION_ID) onOtherTextChange('')
+  }
+
+  return (
+    <div className={IE_FIELD_GROUP_CLASS}>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
+      <select
+        id={id}
+        value={selectedId}
+        disabled={disabled}
+        onChange={(e) => handleSelect(e.target.value)}
+        className={IE_INPUT_TOOL_CLASS}
+        style={IE_FIELD_SURFACE_STYLE}
+      >
+        <option value="">{placeholder ?? 'Select an option…'}</option>
+        {options.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {otherSelected ? (
+        <div className="mt-2 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              Tell us more
+            </span>
+            <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+              {otherText.length}/{MAX_TEXT}
+            </span>
+          </div>
+          <Textarea
+            id={`${id}-other`}
+            value={otherText}
+            maxLength={MAX_TEXT}
+            disabled={disabled}
+            placeholder={otherPlaceholder ?? 'Add your own note…'}
+            onChange={(e) => onOtherTextChange(e.target.value)}
+            className={IE_TEXTAREA_TOOL_CLASS}
+            style={IE_FIELD_SURFACE_STYLE}
+          />
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+function starFillWidth(starIndex: number, rating: number): string {
+  if (rating >= starIndex) return '100%'
+  if (rating >= starIndex - 0.5) return '50%'
+  return '0%'
+}
 
 function RatingPicker({
   value,
@@ -43,33 +169,77 @@ function RatingPicker({
 }) {
   const [hover, setHover] = useState(0)
   const active = hover || value
+
+  function pick(starIndex: number, half: boolean) {
+    // Star 1 left half still maps to 1 (DB min); halves start at 1.5.
+    const next = half ? Math.max(1, starIndex - 0.5) : starIndex
+    onChange(next)
+  }
+
   return (
-    <div
-      className="flex items-center gap-1.5"
-      role="radiogroup"
-      aria-label="Overall rating, 1 to 5"
-      onMouseLeave={() => setHover(0)}
-    >
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          role="radio"
-          aria-checked={value === n}
-          aria-label={`${n} star${n > 1 ? 's' : ''}`}
-          disabled={disabled}
-          onMouseEnter={() => setHover(n)}
-          onFocus={() => setHover(n)}
-          onClick={() => onChange(n)}
-          className="rounded-md p-1 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <Star
-            className={cn('size-7 transition-colors', n <= active ? 'fill-amber-400' : 'fill-transparent')}
-            style={{ color: n <= active ? '#f59e0b' : 'var(--text-muted)' }}
-            strokeWidth={1.75}
-          />
-        </button>
-      ))}
+    <div className="flex flex-wrap items-center gap-2">
+      <div
+        className="flex items-center gap-0.5"
+        role="radiogroup"
+        aria-label="Overall rating, 1 to 5 in half-star steps"
+        onMouseLeave={() => setHover(0)}
+      >
+        {[1, 2, 3, 4, 5].map((n) => {
+          const fill = starFillWidth(n, active)
+          const halfValue = Math.max(1, n - 0.5)
+          return (
+            <div
+              key={n}
+              className="relative size-8 shrink-0 rounded-md transition-transform hover:scale-110 focus-within:outline-none focus-within:ring-2 focus-within:ring-[var(--accent-primary)]/40"
+            >
+              <Star
+                className="pointer-events-none absolute inset-0.5 size-7 fill-transparent"
+                style={{ color: 'var(--text-muted)' }}
+                strokeWidth={1.75}
+                aria-hidden
+              />
+              <span
+                className="pointer-events-none absolute inset-0.5 overflow-hidden"
+                style={{ width: fill }}
+              >
+                <Star
+                  className="size-7 fill-amber-400"
+                  style={{ color: '#f59e0b' }}
+                  strokeWidth={1.75}
+                  aria-hidden
+                />
+              </span>
+              <button
+                type="button"
+                role="radio"
+                aria-checked={value === halfValue}
+                aria-label={`${halfValue} stars`}
+                disabled={disabled}
+                className="absolute inset-y-0 left-0 w-1/2 disabled:cursor-not-allowed disabled:opacity-60"
+                onMouseEnter={() => setHover(halfValue)}
+                onFocus={() => setHover(halfValue)}
+                onClick={() => pick(n, true)}
+              />
+              <button
+                type="button"
+                role="radio"
+                aria-checked={value === n}
+                aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                disabled={disabled}
+                className="absolute inset-y-0 right-0 w-1/2 disabled:cursor-not-allowed disabled:opacity-60"
+                onMouseEnter={() => setHover(n)}
+                onFocus={() => setHover(n)}
+                onClick={() => pick(n, false)}
+              />
+            </div>
+          )
+        })}
+      </div>
+      {value > 0 ? (
+        <span className="text-sm font-semibold tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+          {Number.isInteger(value) ? value : value.toFixed(1)} / 5
+        </span>
+      ) : null}
     </div>
   )
 }
@@ -83,45 +253,48 @@ function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.Re
 }
 
 export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
-  const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const [name, setName] = useState(defaultName)
   const [rating, setRating] = useState(0)
-  const [liked, setLiked] = useState('')
-  const [confusion, setConfusion] = useState('')
-  const [bugs, setBugs] = useState('')
+  const [likedId, setLikedId] = useState('')
+  const [likedOther, setLikedOther] = useState('')
+  const [confusionId, setConfusionId] = useState('')
+  const [confusionOther, setConfusionOther] = useState('')
+  const [bugsId, setBugsId] = useState('')
+  const [bugsOther, setBugsOther] = useState('')
   const [wouldUse, setWouldUse] = useState<WouldUse>(null)
   const [consentPublicDisplay, setConsentPublicDisplay] = useState(false)
   const [npsScore, setNpsScore] = useState<number | null>(null)
   const [feedbackCategory, setFeedbackCategory] = useState<
     'general' | 'bug' | 'feature' | 'interview' | 'report' | 'ai_quality'
-  >('general')
+  >('interview')
   const [screenshotPath, setScreenshotPath] = useState<string | null>(null)
   const [screenshotUploading, setScreenshotUploading] = useState(false)
   // Bumping this key remounts the uploader, clearing its internal state on reset.
   const [uploaderKey, setUploaderKey] = useState(0)
-  // Collected once when the dialog opens; cached so submit has no async delay.
+  // Collected on mount; cached so submit has no async delay.
   const [sessionCtx, setSessionCtx] = useState<FeedbackSessionContext | null>(null)
 
-  // Kick off context collection the moment the dialog opens.
   useEffect(() => {
-    if (!open) return
     collectFeedbackContext()
       .then(setSessionCtx)
       .catch(() => { /* non-fatal — feedback still submits without context */ })
-  }, [open])
+  }, [])
 
   function reset() {
     setName(defaultName)
     setRating(0)
-    setLiked('')
-    setConfusion('')
-    setBugs('')
+    setLikedId('')
+    setLikedOther('')
+    setConfusionId('')
+    setConfusionOther('')
+    setBugsId('')
+    setBugsOther('')
     setWouldUse(null)
     setConsentPublicDisplay(false)
     setNpsScore(null)
-    setFeedbackCategory('general')
+    setFeedbackCategory('interview')
     setScreenshotPath(null)
     setScreenshotUploading(false)
     setUploaderKey((k) => k + 1)
@@ -139,8 +312,26 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
       toast.error('Please pick a star rating first.')
       return
     }
-    if (!liked.trim() && !confusion.trim() && !bugs.trim() && !screenshotPath) {
-      toast.error('Add at least one note or a screenshot so we know what to improve.')
+
+    const likedText = composeFeedbackField(likedId, LIKED_OPTIONS, likedOther)
+    const confusionText = composeFeedbackField(confusionId, CONFUSION_OPTIONS, confusionOther)
+    const bugsText = composeFeedbackField(bugsId, BUGS_OPTIONS, bugsOther)
+
+    if (likedId === OTHER_OPTION_ID && !likedOther.trim()) {
+      toast.error('Add a short note for “Other” under what you liked.')
+      return
+    }
+    if (confusionId === OTHER_OPTION_ID && !confusionOther.trim()) {
+      toast.error('Add a short note for “Other” under what confused you.')
+      return
+    }
+    if (bugsId === OTHER_OPTION_ID && !bugsOther.trim()) {
+      toast.error('Add a short note for “Other” under bugs or issues.')
+      return
+    }
+
+    if (!likedText && !confusionText && !bugsText && !screenshotPath) {
+      toast.error('Choose at least one dropdown option, or attach a screenshot.')
       return
     }
 
@@ -152,9 +343,9 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
         body: JSON.stringify({
           name: name.trim() || defaultName,
           rating,
-          likedText: liked,
-          confusionText: confusion,
-          bugsText: bugs,
+          likedText,
+          confusionText,
+          bugsText,
           wouldUseAgain: wouldUse,
           consentPublicDisplay,
           npsScore,
@@ -174,7 +365,6 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
 
       toast.success('Thanks for your feedback. We review every submission.')
       reset()
-      setOpen(false)
     } catch {
       toast.error('Something went wrong. Please try again.')
     } finally {
@@ -183,44 +373,11 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        // Don't allow closing mid-submit so the request isn't visually abandoned.
-        if (submitting && !next) return
-        setOpen(next)
-      }}
+    <form
+      onSubmit={handleSubmit}
+      className="dashboard-premium-card overflow-hidden"
+      style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
     >
-      <DialogTrigger
-        render={
-          <Button
-            className="landing-cta-lift h-auto rounded-[14px] px-4 py-2.5 text-sm font-semibold text-white"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-              boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
-            }}
-          />
-        }
-      >
-        <MessageSquarePlus className="size-4" aria-hidden />
-        Share feedback
-      </DialogTrigger>
-
-      <DialogContent
-        showCloseButton={!submitting}
-        className="max-h-[calc(100dvh-2rem)] w-full overflow-y-auto p-0 sm:max-w-lg"
-        style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
-      >
-        <form onSubmit={handleSubmit}>
-          <DialogHeader className="gap-1.5 border-b p-5 sm:p-6" style={{ borderColor: 'var(--card-border)' }}>
-            <DialogTitle className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-              Share your feedback
-            </DialogTitle>
-            <DialogDescription className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              It goes straight to the founder. We read every submission.
-            </DialogDescription>
-          </DialogHeader>
-
           <div className="space-y-5 p-5 sm:p-6">
             {/* Rating */}
             <div className={IE_FIELD_GROUP_CLASS}>
@@ -244,29 +401,41 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
               />
             </div>
 
-            <FeedbackTextarea
+            <FeedbackOptionField
               id="fb-liked"
               label="What did you like?"
-              value={liked}
-              onChange={setLiked}
+              options={LIKED_OPTIONS}
+              selectedId={likedId}
+              onSelectedIdChange={setLikedId}
+              otherText={likedOther}
+              onOtherTextChange={setLikedOther}
               disabled={submitting}
-              placeholder="The part that worked well for you…"
+              placeholder="Select what worked well…"
+              otherPlaceholder="What else worked well for you…"
             />
-            <FeedbackTextarea
+            <FeedbackOptionField
               id="fb-confusion"
               label="What confused you?"
-              value={confusion}
-              onChange={setConfusion}
+              options={CONFUSION_OPTIONS}
+              selectedId={confusionId}
+              onSelectedIdChange={setConfusionId}
+              otherText={confusionOther}
+              onOtherTextChange={setConfusionOther}
               disabled={submitting}
-              placeholder="Anything unclear or harder than it should be…"
+              placeholder="Select what felt unclear…"
+              otherPlaceholder="What felt unclear or harder than it should be…"
             />
-            <FeedbackTextarea
+            <FeedbackOptionField
               id="fb-bugs"
               label="Bugs or issues?"
-              value={bugs}
-              onChange={setBugs}
+              options={BUGS_OPTIONS}
+              selectedId={bugsId}
+              onSelectedIdChange={setBugsId}
+              otherText={bugsOther}
+              onOtherTextChange={setBugsOther}
               disabled={submitting}
-              placeholder="What broke, and what were you doing at the time…"
+              placeholder="Select an issue, or none…"
+              otherPlaceholder="What broke, and what were you doing…"
             />
 
             {/* Would use again */}
@@ -328,7 +497,7 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
             </div>
 
             <div className={IE_FIELD_GROUP_CLASS}>
-              <FieldLabel htmlFor="fb-nps">NPS (0–10, optional)</FieldLabel>
+              <FieldLabel htmlFor="fb-nps">Overall Score (0–10, optional)</FieldLabel>
               <input
                 id="fb-nps"
                 type="range"
@@ -381,15 +550,19 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
             className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end sm:p-6"
             style={{ borderColor: 'var(--card-border)' }}
           >
-            <Button
-              type="button"
-              variant="outline"
-              disabled={submitting}
-              onClick={() => setOpen(false)}
-              className="h-auto rounded-[14px] px-4 py-2.5"
+            <Link
+              href="/dashboard"
+              className="inline-flex h-auto items-center justify-center rounded-[14px] border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+              style={{
+                borderColor: 'var(--card-border)',
+                color: 'var(--text-primary)',
+                background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+                pointerEvents: submitting ? 'none' : undefined,
+                opacity: submitting ? 0.6 : undefined,
+              }}
             >
-              Cancel
-            </Button>
+              Back to dashboard
+            </Link>
             <Button
               type="submit"
               disabled={submitting || screenshotUploading}
@@ -408,45 +581,6 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
               )}
             </Button>
           </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function FeedbackTextarea({
-  id,
-  label,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-}: {
-  id: string
-  label: string
-  value: string
-  onChange: (v: string) => void
-  disabled?: boolean
-  placeholder?: string
-}) {
-  return (
-    <div className={IE_FIELD_GROUP_CLASS}>
-      <div className="flex items-center justify-between">
-        <FieldLabel htmlFor={id}>{label}</FieldLabel>
-        <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
-          {value.length}/{MAX_TEXT}
-        </span>
-      </div>
-      <Textarea
-        id={id}
-        value={value}
-        maxLength={MAX_TEXT}
-        disabled={disabled}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-        className={IE_TEXTAREA_TOOL_CLASS}
-        style={IE_FIELD_SURFACE_STYLE}
-      />
-    </div>
+    </form>
   )
 }

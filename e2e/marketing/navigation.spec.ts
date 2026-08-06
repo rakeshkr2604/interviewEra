@@ -5,7 +5,13 @@ import {
   HOME_CTA_START_FREE,
   HOME_HERO_HEADING,
 } from '../helpers/marketing-home';
-import { waitForMainNav } from '../helpers/marketing-nav';
+import {
+  NAV_PRICING_LINK,
+  NAV_PRODUCT_MENU,
+  NAV_SIGN_IN,
+  NAV_SIGN_UP,
+  waitForMainNav,
+} from '../helpers/marketing-nav';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -28,22 +34,16 @@ test.describe('Phase 1 marketing navigation', () => {
     await expect(page.getByRole('link', { name: /students/i })).toBeVisible();
   });
 
-  test('navbar has For Teams and Campus dropdown', async ({ page }) => {
+  test('navbar shows current marketing IA', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     await waitForMainNav(page);
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
-    await expect(nav.getByRole('link', { name: 'For Teams' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Campus' })).toBeVisible();
-    await expect(nav.getByRole('link', { name: 'Sign in' })).toBeVisible();
-  });
-
-  test('teams page uses unified navbar', async ({ page }) => {
-    await page.goto('/teams');
-    await waitForMainNav(page);
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /choose your path/i })).toBeVisible();
-    await expect(page.locator('footer[aria-label="Site footer"]')).toHaveCount(1);
+    await expect(page.getByRole('button', { name: NAV_PRODUCT_MENU })).toBeVisible();
+    await expect(nav.getByRole('link', { name: NAV_PRICING_LINK })).toBeVisible();
+    await expect(nav.getByRole('link', { name: NAV_SIGN_IN })).toBeVisible();
+    await expect(nav.getByRole('link', { name: NAV_SIGN_UP })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'For Teams' })).toHaveCount(0);
   });
 
   test('tablet viewport uses mobile nav chrome', async ({ page }) => {

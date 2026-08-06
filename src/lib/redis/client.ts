@@ -4,15 +4,37 @@ import { Redis } from '@upstash/redis';
 // when env vars are absent (e.g., during static analysis / tsc).
 let _redis: Redis | null = null;
 
+export function isPlaceholderValue(val?: string): boolean {
+  if (!val) return true;
+  const lower = val.toLowerCase().trim();
+  return (
+    lower.includes('placeholder') ||
+    lower.includes('supabase-demo') ||
+    lower === 'sk-placeholder' ||
+    lower === 're_placeholder' ||
+    lower === 'rzp_test_placeholder'
+  );
+}
+
+export function isRedisConfigured(): boolean {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  if (!url || !token) return false;
+  if (isPlaceholderValue(url) || isPlaceholderValue(token)) return false;
+
+  return true;
+}
+
 export function getRedis(): Redis {
   if (_redis) return _redis;
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
 
-  if (!url || !token) {
+  if (!url || !token || !isRedisConfigured()) {
     throw new Error(
-      'Missing Upstash Redis env vars: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN'
+      'Missing or placeholder Upstash Redis env vars: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN'
     );
   }
 

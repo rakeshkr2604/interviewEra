@@ -8,6 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { ProductEventName } from '@/lib/analytics/product-events';
+import { isPlaceholderValue } from '@/lib/redis/client';
 
 /** Postgres unique_violation — the dedupe partial indexes in migration 052. */
 const UNIQUE_VIOLATION = '23505';
@@ -28,7 +29,7 @@ export type MilestoneEventName = Extract<
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key) return null;
+  if (!url || !key || isPlaceholderValue(url) || isPlaceholderValue(key)) return null;
   return createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });

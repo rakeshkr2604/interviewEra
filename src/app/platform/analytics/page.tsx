@@ -9,8 +9,8 @@ import {
 import {
   Users, Activity, Zap, MessageSquare, RefreshCw,
   TrendingUp, Clock, CheckCircle, AlertCircle,
-  Database, Server, Cpu, ChevronLeft, ChevronRight,
-  Copy, Check,
+  Database, Server,   Cpu, ChevronLeft, ChevronRight,
+  Copy, Check, Mic,
 } from 'lucide-react';
 import {
   useAdminStats,
@@ -27,6 +27,11 @@ import {
 } from '@/hooks/useAdminStats';
 import { toast } from 'sonner';
 import { formatElevenLabsHealthReason, type ElevenLabsHealthReason } from '@/lib/voice/elevenlabs-health-labels';
+import {
+  formatDeepgramHealthReason,
+  type DeepgramHealthReason,
+} from '@/lib/voice/deepgram-admin-health-labels';
+import { USD_TO_INR } from '@/lib/cost/cost-engine';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -109,6 +114,58 @@ function StatusDot({ status }: { status: string }) {
   return <span className="inline-block h-2 w-2 rounded-full" style={{ background: color }} />;
 }
 
+function formatInrFromUsd(usd: number): string {
+  const inr = usd * USD_TO_INR;
+  if (inr <= 0) return '₹0';
+  if (inr < 1) return `₹${inr.toFixed(2)}`;
+  if (inr < 100) return `₹${inr.toFixed(2)}`;
+  return `₹${Math.round(inr).toLocaleString('en-IN')}`;
+}
+
+/** Compact AI Providers subtitle: routing, reliability, samples, est. INR. */
+function formatAiProvidersExtra(ai: SystemHealth['services']['ai_providers']): string {
+  const routing =
+    ai.routing_basis === 'intelligence' ? 'Live routing' : 'Static defaults';
+
+  const counts = ai.sample_counts;
+  const samples =
+    (counts?.openrouter ?? 0) + (counts?.openai ?? 0) + (counts?.mistral ?? 0);
+
+  const parts: string[] = [routing];
+
+  const openrouterRel = ai.scores?.openrouter?.reliability;
+  const openaiRel = ai.scores?.openai?.reliability;
+  const mistralRel = ai.scores?.mistral?.reliability;
+
+  if (typeof openrouterRel === 'number') {
+    parts.push(`OpenRouter ${Math.round(openrouterRel)}%`);
+  }
+  if (typeof openaiRel === 'number') {
+    parts.push(`OpenAI ${Math.round(openaiRel)}%`);
+  }
+  if (typeof mistralRel === 'number') {
+    parts.push(`Mistral ${Math.round(mistralRel)}%`);
+  }
+
+  if (samples === 0) {
+    parts.push('no live samples yet');
+  } else {
+    parts.push(`${samples} sample${samples === 1 ? '' : 's'}`);
+  }
+
+  parts.push(`est. ${formatInrFromUsd(ai.total_cost_usd ?? 0)}`);
+
+  return parts.join(' · ');
+}
+
+function formatAiProvidersTitle(ai: SystemHealth['services']['ai_providers']): string {
+  const names = ['OpenRouter', 'OpenAI'];
+  if ((ai.sample_counts?.mistral ?? 0) > 0 || ai.scores?.mistral?.reliability != null) {
+    names.push('Mistral');
+  }
+  return `AI Providers (${names.join(', ')})`;
+}
+
 // ─── System Health Panel ──────────────────────────────────────────────────────
 
 function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; loading: boolean }) {
@@ -120,11 +177,11 @@ function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; l
     { name: 'Database',     icon: <Database className="h-4 w-4" />, ...health.services.database },
     { name: 'Redis',        icon: <Server   className="h-4 w-4" />, ...health.services.redis },
     {
-      name:       'AI Providers',
+      name:       formatAiProvidersTitle(health.services.ai_providers),
       icon:       <Cpu className="h-4 w-4" />,
       status:     health.services.ai_providers.status,
       latency_ms: undefined as number | undefined,
-      extra:      `${health.services.ai_providers.routing_basis} · $${health.services.ai_providers.total_cost_usd}`,
+      extra:      formatAiProvidersExtra(health.services.ai_providers),
     },
     {
       name:       'ElevenLabs',
@@ -132,6 +189,13 @@ function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; l
       status:     health.services.elevenlabs.status,
       latency_ms: health.services.elevenlabs.latency_ms,
       extra:      formatElevenLabsHealthReason(health.services.elevenlabs.reason as ElevenLabsHealthReason | undefined),
+    },
+    {
+      name:       'Deepgram',
+      icon:       <Mic className="h-4 w-4" />,
+      status:     health.services.deepgram?.status ?? 'offline',
+      latency_ms: health.services.deepgram?.latency_ms,
+      extra:      formatDeepgramHealthReason(health.services.deepgram?.reason as DeepgramHealthReason | undefined),
     },
   ] : [];
 
@@ -148,7 +212,7 @@ function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; l
       </div>
       {loading ? (
         <div className="space-y-2">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-10 animate-pulse rounded-lg" style={{ background: 'var(--card-border)' }} />
           ))}
         </div>
@@ -157,17 +221,21 @@ function SystemHealthPanel({ health, loading }: { health: SystemHealth | null; l
           {services.map((s) => (
             <div
               key={s.name}
-              className="flex items-center justify-between rounded-lg px-3 py-2.5"
+              className="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5"
               style={{ background: 'var(--bg-secondary)' }}
             >
-              <div className="flex items-center gap-2.5">
-                <span style={{ color: 'var(--text-muted)' }}>{s.icon}</span>
-                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.name}</span>
-                {'extra' in s && s.extra && (
-                  <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>{s.extra}</span>
-                )}
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span className="mt-0.5 shrink-0" style={{ color: 'var(--text-muted)' }}>{s.icon}</span>
+                <div className="min-w-0">
+                  <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{s.name}</span>
+                  {'extra' in s && s.extra ? (
+                    <p className="mt-0.5 text-[10px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+                      {s.extra}
+                    </p>
+                  ) : null}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex shrink-0 items-center gap-2">
                 {s.latency_ms !== undefined && (
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.latency_ms}ms</span>
                 )}

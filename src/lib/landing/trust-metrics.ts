@@ -18,7 +18,7 @@ export const TRUST_METRICS: readonly TrustMetric[] = [
   {
     id: 'candidates',
     tone: 'primary',
-    value: 500,
+    value: 537,
     suffix: '+',
     label: 'Candidates Practiced',
     description: 'Candidates who prepared using InterviewEra.',
@@ -26,7 +26,7 @@ export const TRUST_METRICS: readonly TrustMetric[] = [
   {
     id: 'interviews',
     tone: 'success',
-    value: 2000,
+    value: 2143,
     suffix: '+',
     label: 'AI Mock Interviews Completed',
     description: 'Complete interview sessions successfully finished.',
@@ -34,7 +34,7 @@ export const TRUST_METRICS: readonly TrustMetric[] = [
   {
     id: 'resume',
     tone: 'sky',
-    value: 5000,
+    value: 5186,
     suffix: '+',
     label: 'ATS Resume Checks',
     description: 'Resumes analyzed using InterviewEra ATS Checker.',
@@ -42,7 +42,7 @@ export const TRUST_METRICS: readonly TrustMetric[] = [
   {
     id: 'questions',
     tone: 'amber',
-    value: 8500,
+    value: 8742,
     suffix: '+',
     label: 'Interview Questions Generated',
     description: 'Questions generated using InterviewEra Question Generator.',

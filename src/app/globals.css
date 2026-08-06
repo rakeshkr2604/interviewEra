@@ -169,7 +169,8 @@
 
 html {
   overflow-x: clip;
-  scroll-behavior: smooth;
+  /* Native wheel/touch scroll — never force smooth globally (causes jank on long pages). */
+  scroll-behavior: auto;
   scroll-padding-top: 88px;
 }
 

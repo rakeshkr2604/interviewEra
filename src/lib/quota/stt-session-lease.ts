@@ -6,7 +6,7 @@
  *   vs:active:{user_id}    → concurrent count (existing)
  */
 
-import getRedis from '@/lib/redis/client';
+import getRedis, { isRedisConfigured } from '@/lib/redis/client';
 import { checkAndAcquireSession, releaseSession, recordSTTUsage } from '@/lib/quota/voice-quota';
 import type { PlanTier } from '@/lib/quota/plan-limits';
 
@@ -35,6 +35,10 @@ export async function createSessionLease(userId: string, planTier: PlanTier): Pr
   }
 
   const leaseId = crypto.randomUUID();
+  if (!isRedisConfigured()) {
+    return { ok: true, lease_id: leaseId, active_sessions: acquired.active_sessions };
+  }
+
   try {
     const redis = getRedis();
     await redis.set(leaseKey(leaseId), userId, { ex: LEASE_TTL_SECONDS });
@@ -48,6 +52,7 @@ export async function createSessionLease(userId: string, planTier: PlanTier): Pr
 }
 
 export async function validateRefreshLease(userId: string, leaseId: string): Promise<boolean> {
+  if (!isRedisConfigured()) return true;
   try {
     const redis = getRedis();
     const owner = await redis.get<string>(leaseKey(leaseId));
@@ -64,16 +69,18 @@ export async function releaseSessionLease(
   leaseId: string,
   durationSeconds?: number,
 ): Promise<void> {
-  try {
-    const redis = getRedis();
-    const owner = await redis.get<string>(leaseKey(leaseId));
-    if (owner !== userId) {
-      console.warn('[voice-quota] release ignored — lease owner mismatch', { leaseId });
-      return;
+  if (isRedisConfigured()) {
+    try {
+      const redis = getRedis();
+      const owner = await redis.get<string>(leaseKey(leaseId));
+      if (owner !== userId) {
+        console.warn('[voice-quota] release ignored — lease owner mismatch', { leaseId });
+        return;
+      }
+      await redis.del(leaseKey(leaseId));
+    } catch (err) {
+      console.error('[voice-quota] lease delete failed:', err);
     }
-    await redis.del(leaseKey(leaseId));
-  } catch (err) {
-    console.error('[voice-quota] lease delete failed:', err);
   }
 
   await releaseSession(userId);

@@ -2,13 +2,15 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 
-import {  extractInviteTokenFromNext,
+import {
+  extractInviteTokenFromNext,
   resolveDestinationFromTier,
 } from '@/lib/auth/resolve-destination-core';
 import { resolvePostAuthDestination } from '@/lib/auth/resolve-destination';
 
 const mockSingle = vi.fn();
-const mockEq = vi.fn(() => ({ single: mockSingle }));
+const mockMaybeSingle = vi.fn();
+const mockEq = vi.fn(() => ({ single: mockSingle, maybeSingle: mockMaybeSingle }));
 const mockSelect = vi.fn(() => ({ eq: mockEq }));
 const mockFrom = vi.fn(() => ({ select: mockSelect }));
 
@@ -28,6 +30,7 @@ describe('resolveDestinationFromTier', () => {
 describe('resolvePostAuthDestination', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMaybeSingle.mockResolvedValue({ data: null });
   });
 
   it('honours safe next param', async () => {
@@ -47,12 +50,20 @@ describe('resolvePostAuthDestination', () => {
     mockSingle.mockResolvedValue({ data: { plan_tier: 'campus_admin' } });
     const dest = await resolvePostAuthDestination('admin-1', {});
     expect(dest).toBe('/college/dashboard');
+    expect(mockFrom).not.toHaveBeenCalledWith('hiring_organizations');
   });
 
   it('defaults free users to dashboard', async () => {
     mockSingle.mockResolvedValue({ data: { plan_tier: 'free' } });
     const dest = await resolvePostAuthDestination('user-1', {});
     expect(dest).toBe('/dashboard');
+  });
+
+  it('routes hiring workspace admins to HR dashboard', async () => {
+    mockSingle.mockResolvedValue({ data: { plan_tier: 'free' } });
+    mockMaybeSingle.mockResolvedValue({ data: { id: 'org-1' } });
+    const dest = await resolvePostAuthDestination('hr-1', {});
+    expect(dest).toBe('/hiring/dashboard');
   });
 
   it('uses invite token when provided', async () => {

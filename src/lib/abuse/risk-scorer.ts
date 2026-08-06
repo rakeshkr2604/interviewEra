@@ -18,7 +18,7 @@
  *   100:    Block + flag for manual review
  */
 
-import getRedis from '@/lib/redis/client';
+import getRedis, { isRedisConfigured } from '@/lib/redis/client';
 import { createServiceClient } from '@/lib/supabase/server';
 
 // ─── Thresholds ──────────────────────────────────────────────────────────────
@@ -44,6 +44,7 @@ export interface BlockStatus {
 }
 
 export async function isBlocked(userId: string, ip: string): Promise<BlockStatus> {
+  if (!isRedisConfigured()) return { is_blocked: false };
   try {
     const redis = getRedis();
     const [userBlock, ipBlock] = await Promise.all([
@@ -68,6 +69,7 @@ export async function isBlocked(userId: string, ip: string): Promise<BlockStatus
 // ─── Event recording ─────────────────────────────────────────────────────────
 
 export async function recordSTTTokenRequest(userId: string, ip: string): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const today = new Date().toISOString().slice(0, 10);
@@ -85,6 +87,7 @@ export async function recordSTTTokenRequest(userId: string, ip: string): Promise
 }
 
 export async function recordAuthFailure(ip: string): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const slot = Math.floor(Date.now() / 3_600_000); // hourly slot
@@ -99,6 +102,7 @@ export async function recordAuthFailure(ip: string): Promise<void> {
 }
 
 export async function recordLongSTTSession(userId: string): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const key = `ab:stt_long:${userId}`;
@@ -126,6 +130,10 @@ export async function computeRiskScore(
 ): Promise<RiskScoreResult> {
   let score = 0;
   const flags: string[] = [];
+
+  if (!isRedisConfigured()) {
+    return { score: 0, flags: [], action: 'allow' };
+  }
 
   try {
     const redis = getRedis();
@@ -200,6 +208,10 @@ export async function applyBlock(
   durationSeconds: number,
   reason: string,
 ): Promise<void> {
+  if (!isRedisConfigured()) {
+    void persistAbuseEvent(userId, ip, 'block', reason, durationSeconds);
+    return;
+  }
   try {
     const redis = getRedis();
     await Promise.all([

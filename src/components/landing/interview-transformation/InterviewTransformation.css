@@ -197,10 +197,19 @@
   color: color-mix(in srgb, var(--text-secondary) 70%, transparent);
 }
 
+/* Stacked on phone → arrow points down; row from sm+ → arrow points right */
+.ie-it-journey__arrow svg {
+  transform: rotate(90deg);
+}
+
 @media (min-width: 640px) {
   .ie-it-journey__arrow {
     width: 1.25rem;
     margin: 0 0.25rem;
+  }
+
+  .ie-it-journey__arrow svg {
+    transform: none;
   }
 }
 

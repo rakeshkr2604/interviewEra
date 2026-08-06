@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   aggregateFreeToolMetrics,
+  aggregateToolCtaConversion,
+  resolveFreeToolFromPagePath,
   type AllTimeCounts,
   type CostLogRow,
   type UsageEventRow,
@@ -166,5 +168,56 @@ describe('aggregateFreeToolMetrics', () => {
       boundaries,
     });
     expect(tools.question_generator.d30.runs).toBe(0);
+  });
+});
+
+describe('aggregateToolCtaConversion', () => {
+  it('computes CTR from tool page_views and landing_cta_clicked', () => {
+    const events = [
+      {
+        event_name: 'page_view',
+        props: { page_path: '/tools/ats-checker' },
+        created_at: '2026-07-20T10:00:00Z',
+      },
+      {
+        event_name: 'page_view',
+        props: { page: '/tools/ats-checker/results' },
+        created_at: '2026-07-20T10:01:00Z',
+      },
+      {
+        event_name: 'landing_cta_clicked',
+        props: { page: '/tools/ats-checker/results', cta_key: 'tool_cta' },
+        created_at: '2026-07-20T10:02:00Z',
+      },
+      {
+        event_name: 'page_view',
+        props: { page_path: '/pricing' },
+        created_at: '2026-07-20T10:03:00Z',
+      },
+    ];
+
+    const cta = aggregateToolCtaConversion({
+      events30d: events,
+      allTime: {
+        ats: { page_views: 10, cta_clicks: 2 },
+        question_generator: { page_views: 0, cta_clicks: 0 },
+        star: { page_views: 0, cta_clicks: 0 },
+      },
+      boundaries,
+    });
+
+    expect(cta.ats.today.page_views).toBe(2);
+    expect(cta.ats.today.cta_clicks).toBe(1);
+    expect(cta.ats.today.ctr_pct).toBe(50);
+    expect(cta.ats.all.ctr_pct).toBe(20);
+    expect(cta.question_generator.today.ctr_pct).toBeNull();
+  });
+
+  it('resolves free tool from nested paths', () => {
+    expect(resolveFreeToolFromPagePath('/tools/question-generator/results')).toBe(
+      'question_generator',
+    );
+    expect(resolveFreeToolFromPagePath('/tools/star-builder')).toBe('star');
+    expect(resolveFreeToolFromPagePath('/dashboard')).toBeNull();
   });
 });

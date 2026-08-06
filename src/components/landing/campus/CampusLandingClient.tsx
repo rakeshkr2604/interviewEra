@@ -40,7 +40,7 @@ import {
   PRICING_FEATURES,
   SOLUTION_PILLARS,
 } from '@/lib/landing/campus-content';
-import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { CampusHeroHeadline } from '@/components/landing/campus/CampusHeroHeadline';
 import { cn } from '@/lib/utils';
 
 const PRIMARY_FEATURE_ICONS = [Layers, Users, LineChart] as const;
@@ -284,17 +284,18 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
     <main id="main-content" className="relative" style={{ color: 'var(--text-primary)' }}>
       {/* Hero — two columns on lg+: copy left, mechanism mockup right */}
       <section
-        className="relative overflow-hidden border-b px-4 py-16 sm:px-5 sm:py-20"
+        className="relative overflow-hidden border-b px-5 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-12 lg:px-8 lg:pb-24 lg:pt-14 xl:px-10"
         style={{
           borderColor: 'var(--card-border)',
           background: 'var(--page-gradient)',
         }}
       >
         <AmbientOrbs />
-        <div className={cn('relative', LANDING_PAGE_CONTAINER)}>
-          <div className="grid items-start gap-10 text-center lg:grid-cols-12 lg:gap-10 lg:text-left xl:gap-12 2xl:gap-14">
-            <div className="mx-auto flex w-full max-w-xl flex-col items-center space-y-7 lg:col-span-5 lg:mx-0 lg:max-w-none lg:items-start lg:pt-1">
+        <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl">
+          <div className="grid items-start gap-12 text-center lg:grid-cols-12 lg:items-center lg:gap-14 lg:text-left xl:gap-16">
+            <div className="mx-auto flex w-full max-w-xl flex-col items-center space-y-6 text-left sm:space-y-7 lg:col-span-5 lg:mx-0 lg:max-w-none lg:items-start lg:pr-2 xl:pr-4">
               <motion.div
+                className="w-full"
                 initial={reduce ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45 }}
@@ -313,99 +314,122 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 </Badge>
               </motion.div>
 
-              <motion.h1
-                className="text-[2.25rem] font-extrabold leading-[1.08] tracking-tight text-balance sm:text-5xl md:text-6xl md:leading-[1.05]"
-                style={{ color: 'var(--text-primary)' }}
+              <motion.div
+                className="w-full"
                 initial={reduce ? false : { opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.04 }}
               >
-                Improve placement outcomes with structured mock interviews at scale
-              </motion.h1>
+                <CampusHeroHeadline className="mx-auto lg:mx-0" />
+              </motion.div>
 
               <motion.div
-                className="w-full max-w-[600px] space-y-1.5 lg:max-w-none"
+                className="w-full max-w-[36rem] space-y-1.5 lg:max-w-none"
                 initial={reduce ? false : { opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: 0.08 }}
               >
-                <p className="text-base font-medium leading-relaxed sm:text-xl" style={{ color: 'var(--text-secondary)' }}>
-                  Run structured mock interviews for entire batches and track performance before Day 1
+                <p className="text-[15px] font-medium leading-snug sm:text-lg lg:text-xl lg:leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                  Run structured mock interviews for entire batches and track performance before Day 1.
                 </p>
-                <p className="text-base leading-relaxed sm:text-xl" style={{ color: 'var(--text-muted)' }}>
-                  Without increasing placement team workload
+                <p className="text-[15px] leading-snug sm:text-lg lg:text-xl lg:leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Without increasing placement team workload.
                 </p>
               </motion.div>
 
-              <div className="flex w-full flex-col items-center space-y-4 lg:items-stretch">
-                <motion.div
-                  className="flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap lg:justify-start"
-                  initial={reduce ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.12 }}
-                >
-                  <a
-                    href={calendlyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      buttonVariants({ size: 'lg' }),
-                      'inline-flex h-12 rounded-xl px-6 text-base font-semibold shadow-lg transition-transform hover:-translate-y-0.5'
-                    )}
-                    style={{ background: 'var(--accent-primary)', color: '#fff' }}
-                  >
-                    Book a 20-min demo
-                    <ArrowRight className="ml-2 size-4" aria-hidden />
-                  </a>
+              <motion.div
+                className="flex w-full max-w-md flex-col gap-6 lg:max-w-none"
+                initial={reduce ? false : { opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.12 }}
+              >
+                {/* Primary actions */}
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+                    <a
+                      href={calendlyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={cn(
+                        buttonVariants({ size: 'lg' }),
+                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl px-5 text-[15px] font-semibold shadow-lg transition-transform hover:-translate-y-0.5'
+                      )}
+                      style={{ background: 'var(--accent-primary)', color: '#fff' }}
+                    >
+                      Book a 20-min demo
+                      <ArrowRight className="ml-2 size-4 shrink-0" aria-hidden />
+                    </a>
+                    <TrackedCtaLink
+                      href="/signup?intent=college"
+                      ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                      ctaText="Set up Campus Workspace"
+                      section="campus_hero"
+                      className={cn(
+                        buttonVariants({ variant: 'outline', size: 'lg' }),
+                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl border-[1.5px] px-5 text-[15px] font-semibold transition-transform hover:-translate-y-0.5'
+                      )}
+                      style={{
+                        borderColor: 'var(--accent-primary)',
+                        color: 'var(--accent-primary)',
+                        background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
+                      }}
+                    >
+                      Set up Campus Workspace
+                      <ArrowRight className="ml-2 size-4 shrink-0" aria-hidden />
+                    </TrackedCtaLink>
+                  </div>
                   <a
                     href="mailto:campus@interviewera.com"
-                    className={cn(
-                      buttonVariants({ variant: 'ghost', size: 'lg' }),
-                      'inline-flex h-12 rounded-xl px-4 text-base font-semibold hover:bg-transparent'
-                    )}
+                    className="inline-flex min-h-[44px] items-center gap-2 self-start text-sm font-semibold underline-offset-4 hover:underline"
                     style={{ color: 'var(--accent-primary)' }}
                   >
-                    <Mail className="mr-2 size-4 opacity-90" aria-hidden />
+                    <Mail className="size-4 opacity-90" aria-hidden />
                     Email campus team
                   </a>
-                </motion.div>
+                </div>
 
-                <motion.ul
-                  className="flex w-full max-w-md flex-col items-center space-y-2 lg:max-w-none lg:items-start"
-                  initial={reduce ? false : { opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.14 }}
+                {/* Proof points */}
+                <ul
+                  className="space-y-2.5 rounded-2xl border px-4 py-3.5 sm:px-5 sm:py-4"
+                  style={{
+                    borderColor: 'color-mix(in srgb, var(--card-border) 90%, transparent)',
+                    background: 'color-mix(in srgb, var(--card-bg) 70%, transparent)',
+                  }}
+                  role="list"
                 >
                   {HERO_BULLETS.map((line) => (
                     <li
                       key={line}
-                      className="flex items-start justify-center gap-2 text-sm leading-snug sm:text-base lg:justify-start"
-                      style={{ color: 'var(--text-muted)' }}
+                      className="flex items-start gap-2.5 text-sm leading-snug sm:text-[15px]"
+                      style={{ color: 'var(--text-secondary)' }}
                     >
-                      <Check className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--accent-success)' }} aria-hidden />
-                      <span className="max-w-[min(100%,22rem)] text-left sm:max-w-none">{line}</span>
+                      <Check
+                        className="mt-0.5 size-4 shrink-0"
+                        style={{ color: 'var(--accent-success)' }}
+                        aria-hidden
+                      />
+                      <span>{line}</span>
                     </li>
                   ))}
-                </motion.ul>
-              </div>
+                </ul>
 
-              <motion.div
-                className="space-y-1.5 text-sm sm:text-base"
-                initial={reduce ? false : { opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.16 }}
-              >
-                <p style={{ color: 'var(--text-muted)' }}>
-                  Free 30-day pilot · up to 20 students · no purchase order required to evaluate
-                </p>
-                <p className="font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>
-                  {HERO_PRICE_LINE}
-                </p>
+                {/* Commercial terms */}
+                <div
+                  className="space-y-1 border-t pt-4 text-left text-[13px] leading-relaxed sm:text-sm"
+                  style={{ borderColor: 'color-mix(in srgb, var(--card-border) 85%, transparent)' }}
+                >
+                  <p style={{ color: 'var(--text-muted)' }}>
+                    Free 30-day pilot · up to 20 students · no purchase order required
+                  </p>
+                  <p className="font-medium tabular-nums" style={{ color: 'var(--text-secondary)' }}>
+                    {HERO_PRICE_LINE}
+                  </p>
+                </div>
               </motion.div>
             </div>
 
             <motion.div
-              className="mx-auto w-full max-w-lg lg:col-span-7 lg:mx-0 lg:max-w-none lg:min-w-0"
+              className="mx-auto w-full max-w-lg lg:col-span-7 lg:mx-0 lg:max-w-none lg:min-w-0 lg:pl-2 xl:pl-4"
               initial={reduce ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
@@ -418,7 +442,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* Before / after — no fake logos or testimonials */}
       <section
-        className="border-y px-4 py-16 sm:px-6 md:py-24"
+        className="border-y px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
         style={{
           borderColor: 'var(--card-border)',
           background:
@@ -488,7 +512,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
       </section>
 
       {/* Problem → Solution */}
-      <section className="px-4 py-16 sm:px-6 md:py-24">
+      <section className="px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10">
         <div className="mx-auto max-w-6xl">
           <Reveal className="mb-12 text-center md:mb-16">
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
@@ -576,7 +600,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* Features — primary + secondary hierarchy */}
       <section
-        className="border-t px-4 py-16 sm:px-6 md:py-28"
+        className="border-t px-5 py-16 sm:px-6 md:py-28 lg:px-8 xl:px-10"
         style={{
           borderColor: 'var(--card-border)',
           background:
@@ -692,7 +716,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
       </section>
 
       {/* How it works */}
-      <section className="px-4 py-16 sm:px-6 md:py-24">
+      <section className="px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10">
         <div className="mx-auto max-w-6xl">
           <Reveal className="mb-12 text-center md:mb-16">
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
@@ -744,7 +768,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* InterviewEra vs alternatives */}
       <section
-        className="border-t px-4 py-16 sm:px-6 md:py-24"
+        className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
         <div className="mx-auto max-w-6xl">
@@ -839,7 +863,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
       </section>
 
       {/* Pricing */}
-      <section className="border-t px-4 py-16 sm:px-6 md:py-24" style={{ borderColor: 'var(--card-border)' }}>
+      <section className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10" style={{ borderColor: 'var(--card-border)' }}>
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
@@ -920,7 +944,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* FAQ */}
       <section
-        className="border-t px-4 py-16 sm:px-6 md:py-24"
+        className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
         <div className="mx-auto max-w-3xl">
@@ -965,11 +989,11 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* Campus workspace bridge — qualified visitors toward activation */}
       <section
-        className="border-t px-4 py-16 sm:px-6 md:py-20"
+        className="border-t px-5 py-16 sm:px-6 md:py-20 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)' }}
         aria-labelledby="campus-workspace-bridge-heading"
       >
-        <div className={cn('mx-auto max-w-3xl text-center', LANDING_PAGE_CONTAINER)}>
+        <div className="mx-auto w-full max-w-3xl text-center">
           <Reveal>
             <h2
               id="campus-workspace-bridge-heading"
@@ -1014,10 +1038,10 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
       {/* Final CTA — two columns on lg: copy + CTAs left, timeline right; Calendly full width below */}
       <section
         id="campus-final-cta"
-        className="border-t px-4 py-20 sm:px-5 md:py-28"
+        className="border-t px-5 py-20 sm:px-6 md:py-28 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
-        <div className={cn('relative', LANDING_PAGE_CONTAINER)}>
+        <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl">
           <div className="flex flex-col gap-10 text-center lg:grid lg:grid-cols-12 lg:items-start lg:gap-12 lg:text-left xl:gap-14">
             <Reveal className="order-1 mx-auto w-full max-w-xl lg:col-span-4 lg:col-start-1 lg:row-start-1 lg:mx-0 lg:max-w-none lg:self-start">
               <h2 className="text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
@@ -1080,6 +1104,24 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                   Book a 20-min demo
                   <ArrowRight className="ml-2 size-4 sm:size-[1.125rem]" aria-hidden />
                 </a>
+                <TrackedCtaLink
+                  href="/signup?intent=college"
+                  ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                  ctaText="Set up Campus Workspace"
+                  section="campus_final_cta"
+                  className={cn(
+                    buttonVariants({ variant: 'outline', size: 'lg' }),
+                    'inline-flex h-12 min-h-[44px] rounded-xl border-[1.5px] px-6 text-base font-semibold sm:h-[3.25rem] sm:px-8 sm:text-lg'
+                  )}
+                  style={{
+                    borderColor: 'var(--accent-primary)',
+                    color: 'var(--accent-primary)',
+                    background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+                  }}
+                >
+                  Set up Campus Workspace
+                  <ArrowRight className="ml-2 size-4 sm:size-[1.125rem]" aria-hidden />
+                </TrackedCtaLink>
                 <a
                   href="mailto:campus@interviewera.com"
                   className={cn(

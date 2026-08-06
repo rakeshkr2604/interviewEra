@@ -11,7 +11,7 @@
  *   Active session keys: expire after 30 min (hard ceiling, orphan protection)
  */
 
-import getRedis from '@/lib/redis/client';
+import getRedis, { isRedisConfigured } from '@/lib/redis/client';
 import { getPlanLimits, getWarningLevel } from '@/lib/quota/plan-limits';
 import type { QuotaWarningLevel, PlanTier } from '@/lib/quota/plan-limits';
 
@@ -47,6 +47,10 @@ export async function checkSTTQuota(
   const limits = getPlanLimits(planTier);
   const limit = limits.stt_seconds_per_month;
 
+  if (!isRedisConfigured()) {
+    return { allowed: true, used_seconds: 0, limit_seconds: limit, warning: 'ok', remaining_seconds: limit };
+  }
+
   try {
     const redis = getRedis();
     const key = `vq:stt:${userId}:${monthKey()}`;
@@ -67,6 +71,7 @@ export async function checkSTTQuota(
 }
 
 export async function recordSTTUsage(userId: string, seconds: number): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const key = `vq:stt:${userId}:${monthKey()}`;
@@ -97,6 +102,10 @@ export async function checkTTSQuota(
   const limits = getPlanLimits(planTier);
   const limit = limits.tts_chars_per_month;
 
+  if (!isRedisConfigured()) {
+    return { allowed: true, used_chars: 0, limit_chars: limit, warning: 'ok', remaining_chars: limit };
+  }
+
   try {
     const redis = getRedis();
     const key = `vq:tts:${userId}:${monthKey()}`;
@@ -116,6 +125,7 @@ export async function checkTTSQuota(
 }
 
 export async function recordTTSUsage(userId: string, chars: number): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const key = `vq:tts:${userId}:${monthKey()}`;
@@ -142,6 +152,10 @@ export async function checkAndAcquireSession(
 ): Promise<ConcurrencyCheck> {
   const limits = getPlanLimits(planTier);
   const maxSessions = limits.max_concurrent_sessions;
+
+  if (!isRedisConfigured()) {
+    return { allowed: true, active_sessions: 0, max_sessions: maxSessions };
+  }
 
   try {
     const redis = getRedis();
@@ -171,6 +185,7 @@ export async function checkAndAcquireSession(
 }
 
 export async function releaseSession(userId: string): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const key = `vs:active:${userId}`;

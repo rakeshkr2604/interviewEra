@@ -6,9 +6,9 @@ const OUT_DIR = 'screenshots/phase2-release';
 
 const PAGES: { path: string; heading?: RegExp; name: string }[] = [
   { path: '/', heading: HOME_HERO_HEADING, name: 'homepage' },
-  { path: '/teams', heading: /choose your path/i, name: 'teams' },
   { path: '/campus', heading: /placement outcomes/i, name: 'campus' },
   { path: '/pricing', heading: /simple plans/i, name: 'pricing' },
+  { path: '/how-it-works', heading: /before the interview/i, name: 'how-it-works' },
 ];
 
 const VIEWPORTS = [

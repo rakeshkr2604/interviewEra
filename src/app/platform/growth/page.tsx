@@ -374,7 +374,7 @@ export default function PlatformGrowthPage() {
           { label: 'WAU', value: growth?.wau ?? '—', icon: Users },
           { label: 'MAU', value: growth?.mau ?? '—', icon: Users },
           { label: 'Revenue (INR)', value: growth ? `₹${growth.revenue.revenue_inr.toFixed(0)}` : '—', icon: CreditCard },
-          { label: 'NPS avg', value: growth?.feedback.avg_nps ?? '—', icon: MessageSquare },
+          { label: 'Overall Score avg', value: growth?.feedback.avg_nps ?? '—', icon: MessageSquare },
         ].map(({ label, value, icon: Icon }) => (
           <div key={label} style={cardStyle} className="p-4">
             <Icon className="mb-2 h-4 w-4" style={{ color: 'var(--accent-primary)' }} />

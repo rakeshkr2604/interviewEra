@@ -16,6 +16,8 @@ import {
   XCircle,
   type LucideProps,
 } from 'lucide-react';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import type {
   AtsActionItem,
   AtsJdMatch,
@@ -725,8 +727,11 @@ export function AtsResultsView({
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
               Upload once in InterviewEra, get AI panel questions, STAR coaching, and rubric scores — free to start.
             </p>
-            <Link
+            <TrackedCtaLink
               href="/signup"
+              ctaKey={CTA_KEYS.TOOL_CTA}
+              ctaText="Start practicing free"
+              section="ats_results_cta"
               className="landing-cta-lift mt-6 inline-flex h-11 items-center justify-center rounded-[12px] px-6 text-sm font-semibold text-white sm:h-12 sm:px-8 sm:text-base"
               style={{
                 background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
@@ -735,7 +740,7 @@ export function AtsResultsView({
             >
               Start practicing free
               <ArrowRight className="ml-2 size-4" aria-hidden />
-            </Link>
+            </TrackedCtaLink>
           </div>
         </div>
       </div>

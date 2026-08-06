@@ -1,23 +1,26 @@
 import { JsonLdScript } from '@/components/seo/JsonLdScript';
-import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { HiringTeamsLandingClient } from '@/components/landing/hiring/HiringTeamsLandingClient';
+import { HIRING_FAQ, HIRING_META } from '@/lib/landing/hiring-content';
 import { generateMetadata } from '@/lib/seo/metadata';
-import { breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
+import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld';
 import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
-import { TeamsPageContent } from './TeamsPageContent';
-import { cn } from '@/lib/utils';
 
 export const metadata = generateMetadata({
-  title: 'For Teams',
-  description: 'InterviewEra for hiring teams and campus placement programs.',
+  title: HIRING_META.title,
+  description: HIRING_META.description,
   path: '/teams',
+  keywords:
+    'AI candidate evaluation, hiring team dashboard, structured interview scoring, recruiter pipeline, HR interview platform',
 });
 
 const ORIGIN = getCanonicalSiteOrigin();
 
+const TEAMS_FAQ_LD = faqPageJsonLd(HIRING_FAQ.map((item) => ({ question: item.q, answer: item.a })));
+
 const TEAMS_BREADCRUMB_LD = breadcrumbListJsonLd(
   [
     { name: 'Home', path: '/' },
-    { name: 'For Teams', path: '/teams' },
+    { name: 'Hiring Teams', path: '/teams' },
   ],
   ORIGIN,
 );
@@ -25,9 +28,10 @@ const TEAMS_BREADCRUMB_LD = breadcrumbListJsonLd(
 export default function TeamsPage() {
   return (
     <>
+      <JsonLdScript id="teams-faq-ld" data={TEAMS_FAQ_LD} />
       <JsonLdScript id="teams-breadcrumb-ld" data={TEAMS_BREADCRUMB_LD} />
-      <main id="main-content" className={cn(LANDING_PAGE_CONTAINER, 'px-4 sm:px-5')}>
-        <TeamsPageContent />
+      <main id="main-content">
+        <HiringTeamsLandingClient />
       </main>
     </>
   );

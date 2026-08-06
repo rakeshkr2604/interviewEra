@@ -43,10 +43,20 @@ export interface ToolWindowStats {
   cost_inr: number;
 }
 
+/** Signup CTA conversion from tool pages (page_view → landing_cta_clicked). */
+export interface ToolCtaWindowStats {
+  page_views: number;
+  cta_clicks: number;
+  /** cta_clicks / page_views * 100; null when no page views yet. */
+  ctr_pct: number | null;
+}
+
 export interface FreeToolMetricsResult {
   tools: Record<FreeToolKey, Record<WindowKey, ToolWindowStats>>;
   /** QG set-generation runs by mode (answer reveals excluded). */
   qg_mode_breakdown: Record<WindowKey, Record<string, number>>;
+  /** Per-tool signup CTA CTR from durable product_events. */
+  cta_conversion: Record<FreeToolKey, Record<WindowKey, ToolCtaWindowStats>>;
   usd_to_inr: number;
   generated_at: string;
 }
@@ -79,6 +89,96 @@ interface WindowBoundaries {
   todayStartMs: number;
   d7StartMs: number;
   d30StartMs: number;
+}
+
+/** Marketing path prefixes used to attribute page_view / CTA events to a free tool. */
+export const FREE_TOOL_PAGE_PREFIXES: Record<FreeToolKey, string> = {
+  ats: '/tools/ats-checker',
+  question_generator: '/tools/question-generator',
+  star: '/tools/star-builder',
+};
+
+export interface ProductEventRow {
+  event_name: string;
+  props: Record<string, unknown> | null;
+  created_at: string;
+}
+
+function emptyCtaStats(): ToolCtaWindowStats {
+  return { page_views: 0, cta_clicks: 0, ctr_pct: null };
+}
+
+function emptyCtaMatrix(): Record<FreeToolKey, Record<WindowKey, ToolCtaWindowStats>> {
+  const out = {} as Record<FreeToolKey, Record<WindowKey, ToolCtaWindowStats>>;
+  for (const tool of FREE_TOOL_KEYS) {
+    out[tool] = {
+      today: emptyCtaStats(),
+      d7: emptyCtaStats(),
+      d30: emptyCtaStats(),
+      all: emptyCtaStats(),
+    };
+  }
+  return out;
+}
+
+export function resolveFreeToolFromPagePath(path: string): FreeToolKey | null {
+  const normalized = path.trim().startsWith('/') ? path.trim() : `/${path.trim()}`;
+  for (const tool of FREE_TOOL_KEYS) {
+    const prefix = FREE_TOOL_PAGE_PREFIXES[tool];
+    if (normalized === prefix || normalized.startsWith(`${prefix}/`)) return tool;
+  }
+  return null;
+}
+
+function pagePathFromProps(props: Record<string, unknown> | null): string | null {
+  if (!props) return null;
+  const raw = props.page_path ?? props.page;
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  return raw.trim().startsWith('/') ? raw.trim() : `/${raw.trim()}`;
+}
+
+function roundCtr(clicks: number, views: number): number | null {
+  if (views <= 0) return null;
+  return Math.round((clicks / views) * 1000) / 10;
+}
+
+/**
+ * Pure CTA CTR aggregation from durable product_events (page_view + landing_cta_clicked).
+ */
+export function aggregateToolCtaConversion(input: {
+  events30d: ProductEventRow[];
+  allTime: Record<FreeToolKey, { page_views: number; cta_clicks: number }>;
+  boundaries: WindowBoundaries;
+}): Record<FreeToolKey, Record<WindowKey, ToolCtaWindowStats>> {
+  const { events30d, allTime, boundaries } = input;
+  const cta = emptyCtaMatrix();
+
+  for (const row of events30d) {
+    const path = pagePathFromProps(row.props);
+    if (!path) continue;
+    const tool = resolveFreeToolFromPagePath(path);
+    if (!tool) continue;
+    const createdMs = Date.parse(row.created_at);
+    if (!Number.isFinite(createdMs)) continue;
+
+    for (const window of windowsFor(createdMs, boundaries)) {
+      if (window === 'all') continue;
+      const stats = cta[tool][window];
+      if (row.event_name === 'page_view') stats.page_views += 1;
+      else if (row.event_name === 'landing_cta_clicked') stats.cta_clicks += 1;
+    }
+  }
+
+  for (const tool of FREE_TOOL_KEYS) {
+    cta[tool].all.page_views = allTime[tool]?.page_views ?? 0;
+    cta[tool].all.cta_clicks = allTime[tool]?.cta_clicks ?? 0;
+    for (const window of WINDOW_KEYS) {
+      const stats = cta[tool][window];
+      stats.ctr_pct = roundCtr(stats.cta_clicks, stats.page_views);
+    }
+  }
+
+  return cta;
 }
 
 function emptyStats(tool: FreeToolKey): ToolWindowStats {
@@ -125,7 +225,7 @@ export function aggregateFreeToolMetrics(input: {
   costRows: CostLogRow[];
   allTime: AllTimeCounts;
   boundaries: WindowBoundaries;
-}): Omit<FreeToolMetricsResult, 'usd_to_inr' | 'generated_at'> {
+}): Pick<FreeToolMetricsResult, 'tools' | 'qg_mode_breakdown'> {
   const { events30d, costRows, allTime, boundaries } = input;
 
   const tools = {} as Record<FreeToolKey, Record<WindowKey, ToolWindowStats>>;
@@ -324,6 +424,68 @@ async function fetchAllTimeCounts(svc: SupabaseClient): Promise<AllTimeCounts> {
   return { events, signedIn, qgModes };
 }
 
+async function fetchProductEventsForToolsSince(
+  svc: SupabaseClient,
+  sinceIso: string,
+): Promise<ProductEventRow[]> {
+  const rows: ProductEventRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await svc
+      .from('product_events')
+      .select('event_name, props, created_at')
+      .in('event_name', ['page_view', 'landing_cta_clicked'])
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (error) throw new Error(`product_events fetch failed: ${error.message}`);
+    const batch = (data ?? []) as ProductEventRow[];
+    // Keep only free-tool pages — avoids paging through entire site traffic forever.
+    for (const row of batch) {
+      const path = pagePathFromProps(row.props);
+      if (path && resolveFreeToolFromPagePath(path)) rows.push(row);
+    }
+    if (batch.length < PAGE_SIZE) return rows;
+  }
+  console.warn('[free-tool-metrics] product events truncated at', rows.length, 'tool rows');
+  return rows;
+}
+
+async function fetchAllTimeToolCtaCounts(
+  svc: SupabaseClient,
+): Promise<Record<FreeToolKey, { page_views: number; cta_clicks: number }>> {
+  const out = {} as Record<FreeToolKey, { page_views: number; cta_clicks: number }>;
+  for (const tool of FREE_TOOL_KEYS) {
+    out[tool] = { page_views: 0, cta_clicks: 0 };
+  }
+
+  // All-time: page through recent product events for tool paths (cap pages).
+  // Exact all-time JSONB path filters are expensive; approximate via capped scan is OK for founder UI.
+  const rows: ProductEventRow[] = [];
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await svc
+      .from('product_events')
+      .select('event_name, props, created_at')
+      .in('event_name', ['page_view', 'landing_cta_clicked'])
+      .order('created_at', { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (error) throw new Error(`product_events all-time fetch failed: ${error.message}`);
+    const batch = (data ?? []) as ProductEventRow[];
+    rows.push(...batch);
+    if (batch.length < PAGE_SIZE) break;
+  }
+
+  for (const row of rows) {
+    const path = pagePathFromProps(row.props);
+    if (!path) continue;
+    const tool = resolveFreeToolFromPagePath(path);
+    if (!tool) continue;
+    if (row.event_name === 'page_view') out[tool].page_views += 1;
+    else if (row.event_name === 'landing_cta_clicked') out[tool].cta_clicks += 1;
+  }
+
+  return out;
+}
+
 export async function computeFreeToolMetrics(
   svc: SupabaseClient,
 ): Promise<FreeToolMetricsResult> {
@@ -335,16 +497,24 @@ export async function computeFreeToolMetrics(
   };
   const d30Iso = new Date(boundaries.d30StartMs).toISOString();
 
-  const [events30d, costRows, allTime] = await Promise.all([
+  const [events30d, costRows, allTime, ctaEvents30d, ctaAllTime] = await Promise.all([
     fetchUsageEventsSince(svc, d30Iso),
     fetchFreeToolCostRows(svc),
     fetchAllTimeCounts(svc),
+    fetchProductEventsForToolsSince(svc, d30Iso),
+    fetchAllTimeToolCtaCounts(svc),
   ]);
 
   const aggregated = aggregateFreeToolMetrics({ events30d, costRows, allTime, boundaries });
+  const cta_conversion = aggregateToolCtaConversion({
+    events30d: ctaEvents30d,
+    allTime: ctaAllTime,
+    boundaries,
+  });
 
   return {
     ...aggregated,
+    cta_conversion,
     usd_to_inr: USD_TO_INR,
     generated_at: new Date().toISOString(),
   };

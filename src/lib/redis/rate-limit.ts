@@ -1,4 +1,4 @@
-import getRedis from './client';
+import getRedis, { isRedisConfigured } from './client';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -29,6 +29,10 @@ export async function checkRateLimit(
   options: RateLimitOptions = {},
 ): Promise<RateLimitResult> {
   const { failClosed = false } = options;
+
+  if (typeof isRedisConfigured === 'function' && !isRedisConfigured()) {
+    return { allowed: true, remaining: maxRequests, resetInSeconds: windowSeconds };
+  }
 
   try {
     const redis = getRedis();

@@ -18,22 +18,40 @@ function AgenticHubReadingShellInner({ children }: { children: React.ReactNode }
   const [showFloatingCta, setShowFloatingCta] = useState(false)
   const [showBackToTop, setShowBackToTop] = useState(false)
   const observerRef = useRef<IntersectionObserver | null>(null)
+  const activeIdRef = useRef(activeId)
+
+  useEffect(() => {
+    activeIdRef.current = activeId
+  }, [activeId])
 
   const updateScrollUi = useCallback(() => {
     const { documentElement } = document
+    const nextBack = documentElement.scrollTop > 480
     const scrollable = documentElement.scrollHeight - documentElement.clientHeight
     const ratio = scrollable > 0 ? documentElement.scrollTop / scrollable : 0
-    setShowFloatingCta(ratio >= 0.3)
-    setShowBackToTop(documentElement.scrollTop > 480)
+    const nextCta = ratio >= 0.3
+    setShowBackToTop((prev) => (prev === nextBack ? prev : nextBack))
+    setShowFloatingCta((prev) => (prev === nextCta ? prev : nextCta))
   }, [])
 
   useEffect(() => {
-    const onScroll = () => updateScrollUi()
-    const raf = requestAnimationFrame(onScroll)
+    let raf = 0
+    const onScroll = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        updateScrollUi()
+      })
+    }
+    // Defer initial sync so we don't setState synchronously inside the effect body.
+    raf = window.requestAnimationFrame(() => {
+      raf = 0
+      updateScrollUi()
+    })
     window.addEventListener('scroll', onScroll, { passive: true })
     window.addEventListener('resize', onScroll, { passive: true })
     return () => {
-      cancelAnimationFrame(raf)
+      if (raf) window.cancelAnimationFrame(raf)
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
     }
@@ -48,12 +66,13 @@ function AgenticHubReadingShellInner({ children }: { children: React.ReactNode }
       (entries) => {
         const visible = entries
           .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)
-        if (visible[0]?.target.id) {
-          setActiveId(visible[0].target.id)
-        }
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        const id = visible[0]?.target.id
+        if (!id || id === activeIdRef.current) return
+        activeIdRef.current = id
+        setActiveId(id)
       },
-      { rootMargin: '-20% 0px -55% 0px', threshold: [0, 0.1, 0.25, 0.5] },
+      { rootMargin: '-20% 0px -65% 0px', threshold: 0 },
     )
 
     sections.forEach((el) => observerRef.current?.observe(el))
@@ -61,7 +80,10 @@ function AgenticHubReadingShellInner({ children }: { children: React.ReactNode }
   }, [setActiveId])
 
   const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    const reduce =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' })
   }
 
   return (

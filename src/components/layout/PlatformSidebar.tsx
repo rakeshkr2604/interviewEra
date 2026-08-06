@@ -6,16 +6,15 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
   BarChart3,
-  LayoutGrid,
   LogOut,
   MessageSquare,
-  Shield,
   TrendingUp,
   Wrench,
   Gift,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
+import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { performClientLogout } from '@/lib/supabase/client-logout';
 
 const BRAND_MARK = '/brand/logos/icon-only.svg';
@@ -144,24 +143,7 @@ export function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
         }}
       >
-        <Link
-          href="/dashboard"
-          onClick={onNavigate}
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none hover:bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] hover:text-[var(--accent-primary)]"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <LayoutGrid size={16} strokeWidth={2} />
-          Student view
-        </Link>
-        <Link
-          href="/college/dashboard"
-          onClick={onNavigate}
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none hover:bg-[color-mix(in_srgb,var(--accent-primary)_10%,transparent)] hover:text-[var(--accent-primary)]"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          <Shield size={16} strokeWidth={2} />
-          Campus admin
-        </Link>
+        <WorkspaceSwitcher current="platform" onNavigate={onNavigate} className="pb-1" />
         <div className="flex items-center justify-between px-2 pt-1">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Theme

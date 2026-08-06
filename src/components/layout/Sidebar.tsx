@@ -36,6 +36,7 @@ import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { performClientLogout } from '@/lib/supabase/client-logout'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
+import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher'
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community'
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 
@@ -339,11 +340,13 @@ export function Sidebar({
   onNavigate,
   initialStreak,
   canAccessAdmin,
+  showWorkspaceSwitcher = false,
 }: {
   className?: string
   onNavigate?: () => void
   initialStreak: number
   canAccessAdmin: boolean
+  showWorkspaceSwitcher?: boolean
 }) {
   const pathname = usePathname()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -507,7 +510,7 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* Bottom: Theme + Logout */}
+      {/* Bottom: Workspaces (platform admin) + Theme + Logout */}
       <div
         className="space-y-2 border-t px-3 pt-4"
         style={{
@@ -515,6 +518,10 @@ export function Sidebar({
           paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
         }}
       >
+        {showWorkspaceSwitcher ? (
+          <WorkspaceSwitcher current="student" onNavigate={onNavigate} className="pb-1" />
+        ) : null}
+
         <div className="flex items-center justify-between px-2">
           <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Theme

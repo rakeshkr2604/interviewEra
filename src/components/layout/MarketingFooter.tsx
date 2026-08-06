@@ -100,38 +100,36 @@ const COL_HEADING_CLS = 'text-xs font-semibold uppercase tracking-widest';
 export function MarketingFooter() {
   return (
     <footer
-      className="border-t"
+      className="ie-marketing-footer border-t"
       style={{
         borderColor: 'var(--card-border)',
         background: 'color-mix(in srgb, var(--card-bg) 60%, transparent)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
       }}
       aria-label="Site footer"
     >
-      {/* Main grid — brand block + 4 link columns */}
-      <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 py-14 sm:px-5 md:py-16')}>
-        <div className="grid gap-10 md:grid-cols-12 md:gap-8 lg:gap-8 xl:gap-10">
+      {/* Main grid — brand block + link columns */}
+      <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 py-10 sm:px-5 sm:py-12 md:py-16')}>
+        <div className="grid gap-8 sm:gap-10 md:grid-cols-12 md:gap-8 lg:gap-8 xl:gap-10">
 
           {/* ── Brand column ───────────────────────────────────────────── */}
-          <div className="md:col-span-4 lg:col-span-3">
+          <div className="min-w-0 md:col-span-4 lg:col-span-3">
             <BrandHomeLink variant="footer" />
             {/* Canonical brand statement — kept in sync via siteConfig.entityDefinition. */}
             <p
-              className="mt-4 max-w-xs text-sm leading-relaxed"
+              className="mt-3 max-w-prose text-sm leading-relaxed sm:mt-4 sm:max-w-xs"
               style={{ color: 'var(--text-secondary)' }}
             >
               <strong style={{ color: 'var(--text-primary)' }}>InterviewEra</strong>
               {siteConfig.entityDefinition.replace(/^InterviewEra/, '')}
             </p>
 
-            {/* CTA */}
+            {/* CTA — full width on phones for a reliable tap target */}
             <TrackedCtaLink
               href="/signup"
               ctaKey={CTA_KEYS.START_MOCK_INTERVIEW}
               ctaText="Start Mock Interview"
               section="footer"
-              className="landing-cta-lift mt-5 inline-flex items-center justify-center rounded-xl px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+              className="landing-cta-lift mt-4 inline-flex w-full items-center justify-center rounded-xl px-5 py-3 text-sm font-semibold text-white hover:opacity-90 sm:mt-5 sm:w-auto sm:py-2.5"
               style={{
                 background: 'var(--accent-primary)',
                 boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
@@ -141,7 +139,7 @@ export function MarketingFooter() {
             </TrackedCtaLink>
 
             {/* Social icons */}
-            <div className="mt-5 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3 sm:mt-5">
               {SOCIAL_LINKS.map(({ href, label, Icon }) => (
                 <a
                   key={label}
@@ -149,7 +147,7 @@ export function MarketingFooter() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label={label}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border transition-[transform,border-color] duration-200 hover:scale-105 hover:border-(--accent-primary) motion-reduce:transform-none"
+                  className="flex h-10 w-10 items-center justify-center rounded-lg border transition-[transform,border-color] duration-200 hover:scale-105 hover:border-(--accent-primary) motion-reduce:transform-none sm:h-9 sm:w-9"
                   style={{
                     borderColor: 'var(--card-border)',
                     background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
@@ -162,23 +160,23 @@ export function MarketingFooter() {
             </div>
           </div>
 
-          {/* ── Link columns — 1 col mobile, 2 col sm/md, 4 col lg+ ─── */}
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:col-span-8 lg:col-span-9 lg:grid-cols-4 lg:gap-6 xl:gap-8">
+          {/* ── Link columns — 2 col mobile-first, 4 col lg+ ─── */}
+          <div className="grid min-w-0 grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 sm:gap-y-8 md:col-span-8 lg:col-span-9 lg:grid-cols-4 lg:gap-6 xl:gap-8">
             {LINK_SECTIONS.map(({ heading, links }) => (
-              <div key={heading}>
+              <div key={heading} className="min-w-0">
                 <p
                   className={COL_HEADING_CLS}
                   style={{ color: 'var(--text-muted)' }}
                 >
                   {heading}
                 </p>
-                <ul className="mt-4 space-y-2.5" role="list">
+                <ul className="mt-3 space-y-2 sm:mt-4 sm:space-y-2.5" role="list">
                   {links.map(({ href, label }) => (
-                    <li key={label}>
+                    <li key={label} className="min-w-0">
                       <Link
                         href={href}
                         prefetch={href === '/campus' ? false : undefined}
-                        className={LINK_CLS}
+                        className={cn(LINK_CLS, 'break-words')}
                         style={{ color: 'var(--text-secondary)', opacity: 0.85 }}
                       >
                         {label}
@@ -192,16 +190,16 @@ export function MarketingFooter() {
         </div>
       </div>
 
-      {/* Bottom bar — copyright + legal (redundant with Company column, standard SaaS pattern) */}
+      {/* Bottom bar — copyright + legal */}
       <div className="border-t" style={{ borderColor: 'var(--card-border)' }}>
         <div
           className={cn(
             LANDING_PAGE_CONTAINER,
-            'flex flex-col gap-3 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-5',
+            'flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-5',
           )}
           style={{ color: 'var(--text-muted)' }}
         >
-          <p className="flex items-center gap-2 text-xs">
+          <p className="flex min-w-0 items-center gap-2 text-xs">
             <Image
               src={BRAND_MARK_PATH}
               width={20}
@@ -210,25 +208,27 @@ export function MarketingFooter() {
               alt=""
               aria-hidden
             />
-            <span>© 2026 InterviewEra. All rights reserved.</span>
+            <span className="min-w-0">© 2026 InterviewEra. All rights reserved.</span>
           </p>
           <nav
-            className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs"
+            className="flex flex-col gap-2 text-xs sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-1"
             aria-label="Legal"
           >
-            {LEGAL_LINKS.map(({ href, label }, i) => (
-              <span key={label} className="inline-flex items-center gap-x-2">
-                {i > 0 && <span aria-hidden className="opacity-40">|</span>}
-                <Link
-                  href={href}
-                  className="font-medium transition-colors hover:text-[var(--accent-primary)]"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {label}
-                </Link>
-              </span>
-            ))}
-            <span aria-hidden className="opacity-40">|</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              {LEGAL_LINKS.map(({ href, label }, i) => (
+                <span key={label} className="inline-flex items-center gap-x-2">
+                  {i > 0 && <span aria-hidden className="opacity-40">|</span>}
+                  <Link
+                    href={href}
+                    className="font-medium transition-colors hover:text-[var(--accent-primary)]"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    {label}
+                  </Link>
+                </span>
+              ))}
+            </div>
+            <span className="hidden opacity-40 sm:inline" aria-hidden>|</span>
             <span>Ranchi, Jharkhand, India</span>
           </nav>
         </div>

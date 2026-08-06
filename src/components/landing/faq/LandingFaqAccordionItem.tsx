@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { useState, type ToggleEvent } from 'react';
 import { Plus } from 'lucide-react';
 import { COMMUNITY_FAQ_Q } from '@/lib/landing/faq-content';
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
@@ -25,6 +28,7 @@ function FaqAnswer({ question, answer }: { question: string; answer: string }) {
 type LandingFaqAccordionItemProps = {
   question: string;
   answer: string;
+  /** Initial open state — user can still close/reopen. */
   defaultOpen?: boolean;
   panelId: string;
   isLast?: boolean;
@@ -37,6 +41,12 @@ export function LandingFaqAccordionItem({
   panelId,
   isLast = false,
 }: LandingFaqAccordionItemProps) {
+  const [open, setOpen] = useState(defaultOpen);
+
+  const onToggle = (event: ToggleEvent<HTMLDetailsElement>) => {
+    setOpen(event.currentTarget.open);
+  };
+
   return (
     <details
       id={panelId}
@@ -46,7 +56,8 @@ export function LandingFaqAccordionItem({
         'transition-[background-color] duration-200',
         'open:bg-[color-mix(in_srgb,var(--accent-primary)_4%,var(--card-bg))]',
       )}
-      {...(defaultOpen ? { open: true } : {})}
+      open={open}
+      onToggle={onToggle}
     >
       <summary
         className={cn(

@@ -157,8 +157,23 @@ export interface SystemHealth {
   services: {
     database:     { status: string; latency_ms: number };
     redis:        { status: string; latency_ms: number };
-    ai_providers: { status: string; routing_basis: string; total_cost_usd: number };
+    ai_providers: {
+      status: string;
+      routing_basis: string;
+      total_cost_usd: number;
+      sample_counts?: {
+        openrouter?: number;
+        openai?: number;
+        mistral?: number;
+      };
+      scores?: {
+        openrouter?: { reliability: number } | null;
+        openai?: { reliability: number } | null;
+        mistral?: { reliability: number } | null;
+      };
+    };
     elevenlabs:   { status: string; latency_ms?: number; reason?: string; quota_remaining_pct?: number };
+    deepgram:     { status: string; latency_ms?: number; reason?: string };
   };
   checked_at: string;
 }

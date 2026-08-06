@@ -128,7 +128,7 @@ export default function LandingTimelineSection() {
       className="landing-timeline"
       aria-labelledby="landing-timeline-heading"
     >
-      <div className={cn(LANDING_PAGE_CONTAINER, 'landing-timeline__container')}>
+      <div className={cn(LANDING_PAGE_CONTAINER, 'px-4 sm:px-5', 'landing-timeline__container')}>
         <header className="landing-timeline__intro">
           <p className="landing-timeline__eyebrow">{TIMELINE_INTRO.eyebrow}</p>
           <h2 id="landing-timeline-heading" className="landing-timeline__headline">

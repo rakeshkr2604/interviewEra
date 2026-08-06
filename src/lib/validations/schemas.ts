@@ -165,6 +165,15 @@ const feedbackText = (max: number) =>
       .transform((s) => safeText(s, max)),
   )
 
+/** Overall star rating: 1–5 in half-star steps (1, 1.5, …, 5). */
+export const halfStarRatingSchema = z.coerce
+  .number()
+  .min(1, 'Pick a rating.')
+  .max(5)
+  .refine((n) => Number.isFinite(n) && Math.round(n * 2) === n * 2, {
+    message: 'Rating must be a whole or half star.',
+  })
+
 export const feedbackSubmitSchema = z.object({
   name: z
     .string()
@@ -172,7 +181,7 @@ export const feedbackSubmitSchema = z.object({
     .max(160)
     .transform((s) => safeText(s, 80))
     .refine((s) => s.length >= 1, 'Name is required.'),
-  rating: z.coerce.number().int().min(1, 'Pick a rating.').max(5),
+  rating: halfStarRatingSchema,
   likedText: feedbackText(2000),
   confusionText: feedbackText(2000),
   bugsText: feedbackText(2000),

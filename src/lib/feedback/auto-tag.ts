@@ -54,6 +54,9 @@ const RULES: TagRule[] = [
       'user experience', 'hard to find', 'not obvious', 'difficult to',
       'hard to understand', 'not clear', 'weird flow', 'bad ux', 'poor ux',
       'no button', 'missing button', 'hard to navigate',
+      // Submit-form dropdown wording
+      'unclear how to start', 'too many steps before', 'felt unclear',
+      'harder than it should',
     ],
   },
   {
@@ -61,6 +64,7 @@ const RULES: TagRule[] = [
     keywords: [
       'mobile', 'phone', 'tablet', 'responsive', 'small screen', 'touch',
       'ios', 'android', 'iphone', 'ipad', 'smartphone',
+      'broke or lagged on mobile',
     ],
     signal: (ctx) =>
       ctx?.device_type === 'mobile' || ctx?.device_type === 'tablet',
@@ -71,7 +75,7 @@ const RULES: TagRule[] = [
       'slow', 'lag', 'lagging', 'freeze', 'freezing', 'loading', 'buffering',
       'takes forever', 'too long', 'delayed', 'latency', 'timeout', 'hung',
       'hang', 'not fast', 'takes a while', 'taking long', 'loading spinner',
-      'load time', 'page load',
+      'load time', 'page load', 'lagged',
     ],
   },
   {
@@ -85,6 +89,7 @@ const RULES: TagRule[] = [
       'hallucin', 'makes no sense', 'nonsense question', 'bad ai',
       'ai error', 'model wrong', 'question unrelated', 'not relevant',
       'poor quality question', 'question quality',
+      'score was missing', 'looked wrong', 'wrong or missing score',
     ],
   },
   {
@@ -94,6 +99,8 @@ const RULES: TagRule[] = [
       'echo', 'silent', 'no sound', "can't speak", 'cant speak',
       'speech recognition', 'listening', 'volume', 'muted', 'mute',
       'mic not working', 'audio not working', 'mic issue', 'mic problem',
+      'microphone did not work', 'audio or playback glitched',
+      'mic or voice setup was confusing', 'voice setup',
     ],
     signal: (ctx) =>
       ctx?.mic_permission_status === 'denied' ||
@@ -115,7 +122,7 @@ const RULES: TagRule[] = [
       'payment', 'paid', 'charge', 'charged', 'billing', 'credit card',
       'subscription', 'pricing', 'invoice', 'refund', 'transaction',
       'stripe', 'purchased', 'double charge', 'overcharged', 'money',
-      'billed',
+      'billed', 'plans, or pricing',
     ],
   },
   {
@@ -125,7 +132,7 @@ const RULES: TagRule[] = [
       'password', 'authentication', 'oauth', 'session expired',
       'logged out', "can't access account", 'cant log', 'cannot log',
       'forgot password', 'reset password', 'google login', 'login failed',
-      'sign in failed', 'not logged',
+      'sign in failed', 'not logged', 'login or account issue',
     ],
   },
   {
@@ -135,6 +142,7 @@ const RULES: TagRule[] = [
       'ran out of', 'used up', 'credit limit', 'quota', 'out of credits',
       'credit count', 'no credits', 'credits gone', 'credit not',
       'credits not', 'free credits', 'how many credits',
+      'credits, plans, or pricing were unclear',
     ],
   },
   {
@@ -154,6 +162,7 @@ const RULES: TagRule[] = [
       'interview ended', 'session ended', 'ended early', 'abruptly ended',
       'timed out', 'interview stopped', 'interview crashed',
       'lost my interview', 'interview lost', 'lost connection',
+      'session froze or got stuck', 'session stuck',
     ],
   },
 ];

@@ -42,5 +42,19 @@ export async function resolvePostAuthDestination(
     .eq('id', userId)
     .single();
 
+  if (profile?.plan_tier === 'campus_admin') {
+    return '/college/dashboard';
+  }
+
+  const { data: hiringOrg } = await service
+    .from('hiring_organizations')
+    .select('id')
+    .eq('admin_user_id', userId)
+    .maybeSingle();
+
+  if (hiringOrg) {
+    return '/hiring/dashboard';
+  }
+
   return resolveDestinationFromTier(profile?.plan_tier, params);
 }

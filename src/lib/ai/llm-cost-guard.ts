@@ -12,7 +12,7 @@
  * - Reusable: call checkLLMCostGuard before any LLM operation.
  */
 
-import getRedis from '@/lib/redis/client';
+import getRedis, { isRedisConfigured } from '@/lib/redis/client';
 import { getPlanLimits } from '@/lib/quota/plan-limits';
 import { getTokenBudget, type AiOperation } from '@/lib/ai/token-budget';
 import { getEstimatedInputTokens } from '@/lib/ai/operation-registry';
@@ -75,7 +75,7 @@ export async function checkLLMCostGuard(
   const limitUSD  = limits.max_llm_cost_per_month_usd;
 
   // Free plan with $0.00 limit means quota system not configured — allow.
-  if (limitUSD <= 0) {
+  if (limitUSD <= 0 || !isRedisConfigured()) {
     return { allowed: true, currentSpendUSD: 0, limitUSD };
   }
 
@@ -119,6 +119,7 @@ export async function checkLLMCostGuard(
  * TTL is set to end-of-month + 1 day so counters auto-expire.
  */
 export async function recordLLMSpend(userId: string, costUSD: number): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     const key   = monthKey(userId);

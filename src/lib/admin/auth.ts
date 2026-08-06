@@ -14,11 +14,16 @@ export type AdminResult =
   | { admin: PlatformAdmin; error: null }
   | { admin: null; error: NextResponse };
 
+/**
+ * Always-allowed founder accounts (in addition to ADMIN_EMAILS / platform_role).
+ * Keeps solo-founder workspace switching working even if env is missing on a host.
+ */
+export const BUILTIN_PLATFORM_ADMIN_EMAILS = ['rakesh.kr2604@gmail.com'] as const;
+
 function getPlatformAdminEmails(): Set<string> {
   const raw = process.env.ADMIN_EMAILS ?? '';
-  return new Set(
-    raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
-  );
+  const fromEnv = raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return new Set([...fromEnv, ...BUILTIN_PLATFORM_ADMIN_EMAILS.map((e) => e.toLowerCase())]);
 }
 
 export function isPlatformAdmin(email: string): boolean {
@@ -39,7 +44,7 @@ async function isPlatformRoleAdmin(userId: string): Promise<boolean> {
   }
 }
 
-/** True when user is in ADMIN_EMAILS or has platform_role = admin. */
+/** True when user is in ADMIN_EMAILS / builtin founder list or has platform_role = admin. */
 export async function isPlatformAdminUser(
   userId: string,
   email: string | null | undefined,

@@ -19,6 +19,14 @@ export const HERO_BULLETS = [
 export const HERO_PRICE_LINE =
   '₹799/student/year · min 50 seats · unlimited mocks per campus seat' as const;
 
+/** Rotating emphasis in the campus hero H1 — keep phrases short for a clean 1-line swap. */
+export const HERO_ROTATING_PHRASES = [
+  'placement outcomes',
+  'student readiness',
+  'batch performance',
+  'Day-1 confidence',
+] as const;
+
 /** Before / after — sharp, no fake logos or testimonials */
 export const BEFORE_AFTER = {
   title: 'What actually changes after InterviewEra',

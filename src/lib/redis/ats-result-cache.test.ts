@@ -6,6 +6,7 @@ const mockSet = vi.fn();
 
 vi.mock('./client', () => ({
   default: () => ({ get: mockGet, set: mockSet }),
+  isRedisConfigured: () => true,
 }));
 
 const SAMPLE: AtsResultV2 = {

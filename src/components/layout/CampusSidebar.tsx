@@ -14,12 +14,14 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from './ThemeToggle'
 import { performClientLogout } from '@/lib/supabase/client-logout'
+import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher'
 
 interface CampusSidebarProps {
   orgName: string
   seatCount: number
   seatsUsed: number
   onNavigate?: () => void
+  showWorkspaceSwitcher?: boolean
 }
 
 const NAV_SECTIONS = [
@@ -126,6 +128,7 @@ export function CampusSidebar({
   seatCount,
   seatsUsed,
   onNavigate,
+  showWorkspaceSwitcher = false,
 }: CampusSidebarProps) {
   const [logoutHovered, setLogoutHovered] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
@@ -225,29 +228,32 @@ export function CampusSidebar({
         ))}
       </nav>
 
-      {/* Bottom: Student Mode + Theme + Logout */}
+      {/* Bottom: Workspaces / Student Mode + Theme + Logout */}
       <div
         className="border-t px-3 pt-4 space-y-2"
         style={{ borderColor: 'var(--card-border)', paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))' }}
       >
-        {/* Student Mode quick link */}
-        <Link
-          href="/dashboard"
-          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none"
-          style={{ color: 'var(--text-muted)' }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background =
-              'color-mix(in srgb, var(--accent-primary) 10%, transparent)'
-            e.currentTarget.style.color = 'var(--accent-primary)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.color = 'var(--text-muted)'
-          }}
-        >
-          <LayoutGrid size={16} strokeWidth={2} />
-          Student Mode
-        </Link>
+        {showWorkspaceSwitcher ? (
+          <WorkspaceSwitcher current="campus" onNavigate={onNavigate} className="pb-1" />
+        ) : (
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition-none"
+            style={{ color: 'var(--text-muted)' }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background =
+                'color-mix(in srgb, var(--accent-primary) 10%, transparent)'
+              e.currentTarget.style.color = 'var(--accent-primary)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent'
+              e.currentTarget.style.color = 'var(--text-muted)'
+            }}
+          >
+            <LayoutGrid size={16} strokeWidth={2} />
+            Student Mode
+          </Link>
+        )}
 
         {/* Theme toggle row */}
         <div className="flex items-center justify-between px-2">

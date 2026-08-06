@@ -33,7 +33,7 @@ function resolveAuthenticated(explicit?: boolean): boolean {
   return cachedAuthenticated ?? false;
 }
 
-/** Fire landing_cta_clicked to GA4 + product-events (client only). */
+/** Fire landing_cta_clicked to GA4 + client product-event + durable product_events beacon. */
 export function trackLandingCtaClicked(params: {
   ctaKey: CtaKey;
   ctaText: string;
@@ -65,4 +65,19 @@ export function trackLandingCtaClicked(params: {
   const { event_name: _en, ...productProps } = standardized;
   trackProductEventClient(EVENT_NAME, productProps);
   trackEvent(EVENT_NAME, standardized);
+
+  void fetch('/api/analytics/cta-click', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    keepalive: true,
+    body: JSON.stringify({
+      cta_key: productProps.cta_key,
+      cta_text: productProps.cta_text,
+      page: productProps.page,
+      section: productProps.section,
+    }),
+  }).catch(() => {
+    /* best-effort durable store */
+  });
 }

@@ -18,7 +18,7 @@ const TRUST_ITEMS = [
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
   return (
     <section
-      className="landing-hero-section relative overflow-hidden pt-[30px] pb-4 sm:pb-6"
+      className="landing-hero-section relative overflow-hidden pt-6 pb-4 sm:pt-[30px] sm:pb-6"
       aria-labelledby="landing-hero-heading"
     >
       <div
@@ -36,12 +36,12 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
 
       <div className={cn(LANDING_HOME_INNER, 'relative z-[1]')}>
         <div
-          className="hero-grid-responsive grid items-start gap-10 lg:gap-12"
+          className="hero-grid-responsive grid items-start gap-8 sm:gap-10 lg:gap-12"
           style={{ gridTemplateColumns: 'clamp(300px,46%,500px) 1fr' }}
         >
           <div className="hero-copy-col min-w-0">
             <div
-              className="mb-5 inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-semibold sm:mb-6"
+              className="mb-3.5 inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold leading-snug sm:mb-6 sm:px-3.5 sm:py-1.5 sm:text-xs"
               style={{
                 background: T.accdim,
                 border: `1px solid ${T.accbrd}`,
@@ -53,38 +53,37 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                 className="block size-1.5 shrink-0 rounded-full"
                 style={{ background: T.ok }}
               />
-              {countPill}
+              <span className="min-w-0 text-pretty">{countPill}</span>
             </div>
 
             <h1
               id="landing-hero-heading"
-              className="mb-4 text-balance sm:mb-5"
+              className="hero-copy-heading mb-3.5 text-pretty sm:mb-5"
               style={{
                 fontFamily: "'Bricolage Grotesque', sans-serif",
-                fontSize: 'clamp(36px, 4.4vw, 58px)',
                 fontWeight: 800,
-                lineHeight: 1.04,
                 letterSpacing: '-0.03em',
                 color: T.text,
               }}
             >
-              Mock Interview practice
-              <br />
-              <em className="v3-hero-gradient-text" style={{ fontStyle: 'normal' }}>
+              <span className="hero-copy-heading__lead block">
+                Mock Interview practice
+              </span>
+              <em className="v3-hero-gradient-text hero-copy-heading__accent block" style={{ fontStyle: 'normal' }}>
                 built for campus placements.
               </em>
             </h1>
 
-            <div className="mb-7 max-w-[30rem] sm:mb-8">
+            <div className="hero-copy-body mb-5 max-w-[30rem] sm:mb-8">
               <p
-                className="text-[15px] leading-[1.65] sm:text-base sm:leading-[1.7]"
+                className="hero-copy-body__lead text-[14px] leading-[1.55] sm:text-base sm:leading-[1.7]"
                 style={{ color: T.text, fontWeight: 500 }}
               >
                 InterviewEra is voice-first Mock Interview practice for Indian campus placements,
                 internships, and early-career hiring.
               </p>
               <p
-                className="mt-2.5 text-[13.5px] leading-[1.65] sm:text-[14px] sm:leading-[1.7]"
+                className="hero-copy-body__offer mt-2 text-[13px] leading-[1.5] sm:mt-2.5 sm:text-[14px] sm:leading-[1.7]"
                 style={{ color: T.text2 }}
               >
                 Upload your resume once. Three free Mock Interviews to start — no card required.
@@ -94,18 +93,18 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
             <LandingHeroCtaIsland
               trustStrip={
                 <ul
-                  className="hero-trust-strip flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-[12.5px] leading-none"
+                  className="hero-trust-strip grid list-none grid-cols-1 gap-2 p-0 text-[12.5px] leading-snug sm:flex sm:flex-wrap sm:gap-x-4 sm:gap-y-2 sm:leading-none"
                   style={{ color: T.text2 }}
                   aria-label="Trust indicators"
                 >
                   {TRUST_ITEMS.map((item) => (
-                    <li key={item.label} className="flex items-center gap-1.5">
+                    <li key={item.label} className="flex items-start gap-1.5 sm:items-center">
                       <span
                         aria-hidden
-                        className="block size-[5px] shrink-0 rounded-full"
+                        className="mt-1.5 block size-[5px] shrink-0 rounded-full sm:mt-0"
                         style={{ background: item.dot }}
                       />
-                      {item.label}
+                      <span className="min-w-0 text-pretty">{item.label}</span>
                     </li>
                   ))}
                 </ul>

@@ -201,6 +201,12 @@ export const BLOG_POST_ROUTES: SitemapSourceEntry[] = [
     priority: 0.87,
     lastModified: '2026-05-31',
   },
+  {
+    path: '/blog/amazon-sde-intern-interview-experience-2026',
+    changeFrequency: 'monthly',
+    priority: 0.88,
+    lastModified: '2026-08-05',
+  },
 ];
 
 const origin = getCanonicalSiteOrigin();

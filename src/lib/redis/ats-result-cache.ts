@@ -3,7 +3,7 @@
  * Cost optimization — fail open on Redis errors (same pattern as question-cache).
  */
 
-import getRedis from './client';
+import getRedis, { isRedisConfigured } from './client';
 import type { AtsResultV2 } from '@/lib/ats/types';
 
 const TTL_SECONDS = 60 * 60; // 1 hour — matches prior in-memory TTL
@@ -26,7 +26,7 @@ function cacheReadsEnabled(): boolean {
 }
 
 export async function getCachedAtsResult(cacheKey: string): Promise<AtsResultV2 | null> {
-  if (!cacheReadsEnabled()) return null;
+  if (!cacheReadsEnabled() || !isRedisConfigured()) return null;
   try {
     const redis = getRedis();
     const cached = await redis.get<AtsResultV2>(`${KEY_PREFIX}${cacheKey}`);
@@ -41,6 +41,7 @@ export async function setCachedAtsResult(
   cacheKey: string,
   result: AtsResultV2,
 ): Promise<void> {
+  if (!isRedisConfigured()) return;
   try {
     const redis = getRedis();
     await redis.set(`${KEY_PREFIX}${cacheKey}`, result, { ex: TTL_SECONDS });

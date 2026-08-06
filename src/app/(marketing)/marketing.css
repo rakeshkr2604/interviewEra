@@ -162,6 +162,34 @@ html[data-theme="dark"] .landing-hero-dot-grid {
   contain: layout style;
 }
 
+/* Mobile-first hero typography — clearer line breaks + denser rhythm */
+.hero-copy-heading {
+  font-size: clamp(1.875rem, 8.2vw, 2.375rem);
+  line-height: 1.12;
+}
+
+.hero-copy-heading__lead {
+  max-width: 12.5ch;
+}
+
+.hero-copy-heading__accent {
+  margin-top: 0.12em;
+  max-width: 14ch;
+}
+
+@media (min-width: 640px) {
+  .hero-copy-heading {
+    font-size: clamp(36px, 4.4vw, 58px);
+    line-height: 1.04;
+  }
+
+  .hero-copy-heading__lead,
+  .hero-copy-heading__accent {
+    max-width: none;
+  }
+}
+
+
 /* Below-fold How It Works — skip offscreen paint until near viewport */
 .landing-how-it-works {
   content-visibility: auto;

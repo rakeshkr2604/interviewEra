@@ -3,7 +3,7 @@
  *
  * Real service health check: pings DB, Redis, and reads in-process
  * provider intelligence.
- * Cached in-process for 60 seconds — avoids pinging ElevenLabs on every load.
+ * Cached in-process for 60 seconds — avoids pinging ElevenLabs / Deepgram on every load.
  *
  * Secured: platform admin (ADMIN_EMAILS) only.
  */
@@ -15,6 +15,7 @@ import { getIntelligenceSummary } from '@/lib/ai/provider-intelligence';
 import getRedis from '@/lib/redis/client';
 import { getCached, setCached } from '@/lib/admin/cache';
 import { checkElevenLabsHealth } from '@/lib/voice/elevenlabs-health';
+import { checkDeepgramHealth } from '@/lib/voice/deepgram-admin-health';
 
 const CACHE_KEY = 'admin:system';
 const CACHE_TTL = 60_000; // 60 seconds
@@ -78,6 +79,10 @@ async function checkElevenLabs() {
   return checkElevenLabsHealth();
 }
 
+async function checkDeepgram() {
+  return checkDeepgramHealth();
+}
+
 export async function GET(request: Request) {
   const { admin, error } = await requirePlatformAdmin();
   if (error) return error;
@@ -89,10 +94,11 @@ export async function GET(request: Request) {
     if (cached) return NextResponse.json(cached);
   }
 
-  const [db, redis, elevenlabs] = await Promise.all([
+  const [db, redis, elevenlabs, deepgram] = await Promise.all([
     checkDatabase(),
     checkRedis(),
     checkElevenLabs(),
+    checkDeepgram(),
   ]);
 
   const intelligence = getIntelligenceSummary();
@@ -133,6 +139,11 @@ export async function GET(request: Request) {
         latency_ms: elevenlabs.latency_ms,
         reason:     elevenlabs.reason,
         quota_remaining_pct: elevenlabs.quota_remaining_pct,
+      },
+      deepgram: {
+        status:     deepgram.status,
+        latency_ms: deepgram.latency_ms,
+        reason:     deepgram.reason,
       },
     },
     checked_at: new Date().toISOString(),

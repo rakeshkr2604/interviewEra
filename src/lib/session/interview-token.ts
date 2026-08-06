@@ -25,7 +25,7 @@
  */
 
 import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
-import getRedis from '@/lib/redis/client';
+import getRedis, { isRedisConfigured } from '@/lib/redis/client';
 
 export type AllowedOperation = 'stt' | 'tts' | 'voice';
 
@@ -146,6 +146,8 @@ export async function consumeSessionToken(
 ): Promise<boolean> {
   const key = `st:used:${sid}:${operation}`;
   const ttl = Math.max(0, expSeconds - Math.floor(Date.now() / 1000));
+
+  if (!isRedisConfigured()) return true;
 
   try {
     const redis = getRedis();

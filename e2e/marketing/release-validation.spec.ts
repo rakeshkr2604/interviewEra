@@ -1,6 +1,12 @@
 import { test, expect, type Page } from '@playwright/test';
 import { HOME_HERO_HEADING } from '../helpers/marketing-home';
-import { gotoMarketingPage, waitForMainNav } from '../helpers/marketing-nav';
+import {
+  NAV_PRICING_LINK,
+  NAV_PRODUCT_MENU,
+  NAV_SIGN_IN,
+  gotoMarketingPage,
+  waitForMainNav,
+} from '../helpers/marketing-nav';
 
 const OUT_DIR = 'validation-results/screenshots';
 
@@ -102,8 +108,10 @@ test.describe('Release validation — homepage', () => {
     await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
-    await expect(nav.getByRole('link', { name: 'For Teams' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Campus' })).toBeVisible();
+    await expect(page.getByRole('button', { name: NAV_PRODUCT_MENU })).toBeVisible();
+    await expect(nav.getByRole('link', { name: NAV_PRICING_LINK })).toBeVisible();
+    await expect(nav.getByRole('link', { name: NAV_SIGN_IN })).toBeVisible();
+    await expect(nav.getByRole('link', { name: 'For Teams' })).toHaveCount(0);
 
     await page.getByRole('link', { name: /See Sample Interview Report/i }).first().click();
     await expect(page.locator('#interview-report')).toBeInViewport();

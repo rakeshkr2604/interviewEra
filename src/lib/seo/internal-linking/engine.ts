@@ -175,6 +175,13 @@ const TARGETED_BLOG_POSTS: readonly BlogEntry[] = [
     roleCategories: ['engineering'],
     companyTiers: ['mnc', 'product'],
   },
+  {
+    href: '/blog/amazon-sde-intern-interview-experience-2026',
+    label: 'Amazon SDE Intern interview guide',
+    fresherOnly: true,
+    roleCategories: ['engineering'],
+    companyTiers: ['mnc', 'product'],
+  },
 ]
 
 // ─── STAR behavioral theme clusters ──────────────────────────────────────────

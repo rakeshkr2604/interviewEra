@@ -5,7 +5,7 @@ import {
   HOME_CTA_START_FREE,
   HOME_HERO_HEADING,
 } from '../helpers/marketing-home';
-import { gotoMarketingPage } from '../helpers/marketing-nav';
+import { NAV_SIGN_UP, gotoMarketingPage } from '../helpers/marketing-nav';
 
 type CtaEvent = { cta_key?: string; section?: string; event_name?: string };
 
@@ -98,43 +98,28 @@ test.describe('Marketing CTA analytics', () => {
     expect(events[0]?.cta_key).toBe('see_sample_report');
   });
 
-  test('navbar For Teams fires once', async ({ page }) => {
+  test('navbar Sign up fires once', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await gotoMarketingPage(page, '/');
     await installCtaSpy(page);
     await clickTrackedCta(
       page,
-      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'For Teams' }),
+      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: NAV_SIGN_UP }),
     );
     const events = await getCtaEvents(page);
     expect(events).toHaveLength(1);
-    expect(events[0]?.cta_key).toBe('for_teams');
-  });
-
-  test('teams page cards fire once each', async ({ page }) => {
-    await gotoMarketingPage(page, '/teams', { heading: /choose your path/i });
-    await installCtaSpy(page);
-    await clickTrackedCta(page, page.getByRole('link', { name: /Hiring Teams/i }).first());
-    expect((await getCtaEvents(page))[0]?.cta_key).toBe('audience_hiring_teams');
-
-    await gotoMarketingPage(page, '/teams', { heading: /choose your path/i });
-    await installCtaSpy(page);
-    await clickTrackedCta(page, page.getByRole('link', { name: /For Colleges/i }).first());
-    expect((await getCtaEvents(page)).some((e) => e.cta_key === 'campus_workspace')).toBe(true);
-
-    await gotoMarketingPage(page, '/teams', { heading: /choose your path/i });
-    await installCtaSpy(page);
-    await clickTrackedCta(page, page.getByRole('link', { name: /^Students/i }).first());
-    expect((await getCtaEvents(page)).some((e) => e.cta_key === 'audience_students')).toBe(true);
+    expect(events[0]?.cta_key).toBe('sign_up');
   });
 
   test('campus bridge Set up Campus Workspace fires once', async ({ page }) => {
     await gotoMarketingPage(page, '/campus', { heading: /placement outcomes/i });
     await installCtaSpy(page);
-    const bridge = page.locator('#campus-workspace-bridge-heading').locator('..').getByRole('link', {
-      name: 'Set up Campus Workspace',
-      exact: true,
-    });
+    const bridge = page
+      .locator('section[aria-labelledby="campus-workspace-bridge-heading"]')
+      .getByRole('link', {
+        name: 'Set up Campus Workspace',
+        exact: true,
+      });
     await bridge.scrollIntoViewIfNeeded();
     await clickTrackedCta(page, bridge);
     expect((await getCtaEvents(page)).some((e) => e.cta_key === 'campus_workspace')).toBe(true);

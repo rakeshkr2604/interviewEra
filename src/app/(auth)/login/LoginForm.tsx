@@ -87,6 +87,17 @@ export function LoginForm({ next, email: initialEmail, reason }: LoginFormProps)
           next,
           inviteToken,
         });
+
+        if (!next || next === '/dashboard') {
+          const { data: hiringOrg } = await supabase
+            .from('hiring_organizations')
+            .select('id')
+            .eq('admin_user_id', loggedInUser.id)
+            .maybeSingle();
+          if (hiringOrg) {
+            destination = '/hiring/dashboard';
+          }
+        }
       }
 
       trackLoginCompleted({
@@ -114,7 +125,15 @@ export function LoginForm({ next, email: initialEmail, reason }: LoginFormProps)
   }
 
   const isDisabled = loading || oauthLoading;
-  const signupHref = next ? `/signup?next=${encodeURIComponent(next)}` : '/signup';
+  const signupHref = (() => {
+    const params = new URLSearchParams();
+    if (next?.startsWith('/hiring')) {
+      params.set('intent', 'business');
+    }
+    if (next) params.set('next', next);
+    const qs = params.toString();
+    return qs ? `/signup?${qs}` : '/signup';
+  })();
 
   return (
     <>

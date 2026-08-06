@@ -1,9 +1,11 @@
 /**
  * PATCH /api/admin/feedback/[id]
+ * DELETE /api/admin/feedback/[id]
  *
- * Triage mutations for a single feedback row.
- * Allowed fields: is_read, is_resolved, is_archived, is_pinned, notes, assigned_to.
+ * Triage mutations + hard-delete for a single feedback row.
+ * PATCH allowed fields: is_read, is_resolved, is_archived, is_pinned, notes, assigned_to.
  * Immutable fields (rating, email, user_id, etc.) are rejected if present in body.
+ * DELETE permanently removes the row (for clearing test submissions).
  *
  * Secured: platform admin only.
  */
@@ -23,6 +25,15 @@ const ALLOWED_KEYS = new Set([
   'assigned_to',
 ]);
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function parseFeedbackId(id: string | undefined): string | null {
+  if (!id || typeof id !== 'string') return null;
+  const trimmed = id.trim();
+  return UUID_RE.test(trimmed) ? trimmed : null;
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -30,10 +41,9 @@ export async function PATCH(
   const { error } = await requirePlatformAdmin();
   if (error) return error;
 
-  const { id } = await params;
-
-  if (!id || typeof id !== 'string') {
-    return NextResponse.json({ error: 'Missing feedback ID.' }, { status: 400 });
+  const id = parseFeedbackId((await params).id);
+  if (!id) {
+    return NextResponse.json({ error: 'Invalid feedback ID.' }, { status: 400 });
   }
 
   let body: Record<string, unknown>;
@@ -85,4 +95,37 @@ export async function PATCH(
   }
 
   return NextResponse.json({ ok: true, row: data });
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+): Promise<NextResponse> {
+  const { error } = await requirePlatformAdmin();
+  if (error) return error;
+
+  const id = parseFeedbackId((await params).id);
+  if (!id) {
+    return NextResponse.json({ error: 'Invalid feedback ID.' }, { status: 400 });
+  }
+
+  const service = createServiceClient();
+
+  const { data, error: deleteError } = await service
+    .from('feedbacks')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+
+  if (deleteError) {
+    console.error('[admin/feedback/[id]] Delete error:', deleteError.message);
+    return NextResponse.json({ error: 'Delete failed.' }, { status: 500 });
+  }
+
+  if (!data) {
+    return NextResponse.json({ error: 'Feedback not found.' }, { status: 404 });
+  }
+
+  return NextResponse.json({ ok: true, id: data.id });
 }
