@@ -50,7 +50,6 @@ async function getPdfPageCountViaPdfJs(bytes: Uint8Array): Promise<number> {
     data,
     useSystemFonts: false,
     disableFontFace: true,
-    isEvalSupported: false,
     verbosity: 0,
   };
   const doc = await pdfjs.getDocument(opts).promise;

@@ -103,7 +103,6 @@ export async function inspectPdfLayout(
       data: bytes,
       useSystemFonts: false,
       disableFontFace: true,
-      isEvalSupported: false,
       verbosity: 0,
     };
     if (assets) {

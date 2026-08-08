@@ -361,7 +361,6 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
       data: bytes,
       useSystemFonts: false,
       disableFontFace: true,
-      isEvalSupported: false,
       verbosity: 0,
       ...assets,
       cMapPacked: true,
@@ -411,7 +410,6 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
         data: bytes,
         useSystemFonts: false,
         disableFontFace: true,
-        isEvalSupported: false,
         verbosity: 0,
       });
 
