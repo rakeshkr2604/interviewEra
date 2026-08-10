@@ -126,11 +126,12 @@ export class DeepgramSessionController {
     this.pageHideHandler = null
   }
 
-  private releaseQuotaLease(opts?: { beacon?: boolean }): void {
+  private releaseQuotaLease(opts?: { beacon?: boolean }, preCapturedDurationMs?: number | null): void {
     const leaseId = this.sessionLeaseId
     if (!leaseId) return
 
-    const durationMs = this.getHealth().session_duration_ms
+    const durationMs =
+      preCapturedDurationMs !== undefined ? preCapturedDurationMs : this.getHealth().session_duration_ms
     const durationSeconds =
       durationMs != null && durationMs > 0 ? Math.ceil(durationMs / 1000) : undefined
 
@@ -210,13 +211,14 @@ export class DeepgramSessionController {
         duration_ms: duration,
       })
     }
-    this.health.markSessionEnded()
-    this.health.setConnectionState('idle', null)
 
     if (releaseQuota) {
-      this.releaseQuotaLease({ beacon: opts?.beacon })
+      this.releaseQuotaLease({ beacon: opts?.beacon }, duration)
       this.removePageHideRelease()
     }
+
+    this.health.markSessionEnded()
+    this.health.setConnectionState('idle', null)
   }
 
   scheduleTokenRefresh(expiresInSeconds: number): void {

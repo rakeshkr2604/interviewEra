@@ -53,22 +53,32 @@ export function persistProductEventAsync(
   const cleanProps = sanitizeProps(rest);
 
   void (async () => {
-    try {
-      const svc = getServiceClient();
-      if (!svc) return;
-      const { error } = await svc.from('product_events').insert({
-        event_name: eventName,
-        user_id: userId,
-        props: cleanProps,
-      });
-      if (error) {
-        console.warn('[product-events-store] insert failed:', error.message);
+    const svc = getServiceClient();
+    if (!svc) return;
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const { error } = await svc.from('product_events').insert({
+          event_name: eventName,
+          user_id: userId,
+          props: cleanProps,
+        });
+        if (!error) return; // success
+        if (attempt === 0) {
+          console.warn('[product-events-store] insert failed (will retry):', error.message);
+          await new Promise((r) => setTimeout(r, 1000));
+        } else {
+          console.warn('[product-events-store] insert failed after retry:', error.message);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (attempt === 0) {
+          console.warn('[product-events-store] persist error (will retry):', msg);
+          await new Promise((r) => setTimeout(r, 1000));
+        } else {
+          console.warn('[product-events-store] persist error after retry:', msg);
+        }
       }
-    } catch (err) {
-      console.warn(
-        '[product-events-store] persist error:',
-        err instanceof Error ? err.message : String(err),
-      );
     }
   })();
 }

@@ -31,7 +31,6 @@ export async function GET() {
             display: 'flex',
             alignItems: 'center',
             gap: 14,
-            zIndex: 1,
           }}
         >
           <div
@@ -66,7 +65,6 @@ export async function GET() {
           style={{
             display: 'flex',
             flexDirection: 'column',
-            zIndex: 1,
             marginTop: 24,
           }}
         >
@@ -100,7 +98,6 @@ export async function GET() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            zIndex: 1,
             paddingTop: 32,
             borderTop: '1px solid rgba(15, 23, 42, 0.08)',
           }}
