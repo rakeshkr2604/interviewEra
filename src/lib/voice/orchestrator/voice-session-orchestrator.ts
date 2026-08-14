@@ -325,7 +325,25 @@ export class VoiceSessionOrchestrator {
     try {
       this.bus.emit('LLMStarted', { kind: 'score' }, { ctx })
       const t0 = Date.now()
-      const score = await this.cfg.conversation.scoreAnswer({ ctx, answerText })
+      let streamDispatchedFirstAudio = false
+
+      const score = await this.cfg.conversation.scoreAnswer({
+        ctx,
+        answerText,
+        onSentence: (sentence, index) => {
+          if (myTurn !== this.turnSeq) return
+          this.logger.info('llm_sentence_streamed', ctx, { index, length: sentence.length })
+          if (index === 0) {
+            streamDispatchedFirstAudio = true
+          }
+          void this.cfg.tts.speak(sentence, this.cfg.voiceOptions, {
+            onFallback: () => {
+              this.ttsDegraded = true
+            },
+          })
+        },
+      })
+
       if (myTurn !== this.turnSeq) return
       this.lastScore = score
       this.bus.emit('LLMCompleted', { kind: 'score', latencyMs: Date.now() - t0, ok: true }, { ctx })
@@ -353,6 +371,15 @@ export class VoiceSessionOrchestrator {
         return
       }
 
+      if (streamDispatchedFirstAudio && next.question.isFollowUp) {
+        this.currentQuestion = next.question
+        if (this.fsm.getState() === 'generating_response') {
+          this.fsm.send('RESPONSE_READY', ctx)
+        }
+        await this.beginListeningWhenAudioFinishes(myTurn)
+        return
+      }
+
       await this.enterSpeaking(next.question, 'RESPONSE_READY')
     } catch (err) {
       if (myTurn !== this.turnSeq) return
@@ -360,6 +387,19 @@ export class VoiceSessionOrchestrator {
       if (err instanceof DOMException && err.name === 'AbortError') return
       this.fail(err instanceof Error ? err.message : String(err))
     }
+  }
+
+  private async beginListeningWhenAudioFinishes(myTurn: number): Promise<void> {
+    while (
+      (this.cfg.tts as unknown as { isSpeaking?: () => boolean }).isSpeaking?.() &&
+      myTurn === this.turnSeq &&
+      this.fsm.getState() === 'interviewer_speaking'
+    ) {
+      await new Promise((r) => setTimeout(r, 50))
+    }
+    if (myTurn !== this.turnSeq) return
+    if (this.fsm.getState() !== 'interviewer_speaking') return
+    await this.beginListening(myTurn)
   }
 
   private startProcessingWatchdog(myTurn: number): void {

@@ -26,5 +26,15 @@ export function createElevenLabsSynthesizer(): TtsSynthesizer {
         throw err
       }
     },
+    async speakStream(text: string, options: TTSOptions, signal: AbortSignal): Promise<Response> {
+      try {
+        return await client.speakStream(text, options, signal)
+      } catch (err) {
+        if (err instanceof TTSFallbackToBrowserError) {
+          throw new TtsFallbackError(err.message, err.httpStatus)
+        }
+        throw err
+      }
+    },
   }
 }

@@ -36,7 +36,9 @@ Operator script `scripts/backfill-resume-storage-path.ts` recovers `storage_path
 
 ## Interview lifecycle — dual-agent conversation
 
-**Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Meera/Rohan, ids `priya`/`arjun`) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).
+**Production mock path (v2.1 script engine):** `POST /api/interview/script/turn` generates each interviewer turn from SCRIPT_H / SCRIPT_T / SCRIPT_M. Adaptive follow-ups are the same LLM call (`is_follow_up: true`, max 2 per parent core question, do not consume `question_count`). Candidate-answer context is recovered in `follow-up-context.ts` so acknowledgment auto-advance cannot replace the answer with ack speech. No extra classification LLM call. Optional LLM→TTS first-sentence SSE (`script-turn-stream.ts` / `script-turn-sse-client.ts`) is gated by `VOICE_LLM_TTS_STREAMING` — unset means JSON-only turns (see [docs/FLAGS.md](FLAGS.md)).
+
+**Legacy v1 path** (not SCRIPT_H/T/M): **Agent 1** ("Interviewer" persona, `interviewer-personas.ts` — Meera/Rohan, ids `priya`/`arjun`) asks questions and generates follow-ups. **Agent 2** ("Silent Evaluator", `src/lib/ai/agent-evaluator.ts::analyzeAnswer`) scores each answer on confidence/technical_depth/specificity/communication_clarity and recommends a follow-up type, which Agent 1's `followup-generator.ts` consumes (template-first, deterministic; LLM only for "challenge" follow-ups).
 
 Flow: `api/interview/start` creates `interviews`/`questions` rows → `api/interview/process-answer` calls `interview-orchestrator.ts::processAnswer` (load/create `conversation_states` → `analyzeAnswer` → recompute difficulty/rapport → generate follow-up or move on) → `suggestNextQuestion` picks the next bank question scaled to difficulty → `api/interview/complete` backfills any missing evaluations with neutral 5/10 scores before calling `aggregateReport`. State-table failures are explicitly treated as non-fatal — the interview must not break because of dual-agent bookkeeping.
 
@@ -44,7 +46,9 @@ Tables: `conversation_states`, `answer_analyses`, `followup_questions` (migratio
 
 ## Evaluation pipeline
 
-`src/lib/openai/evaluate-answer.ts` (OpenRouter-routed), LLM-only scoring across 5 weighted dimensions: `communication_clarity: 0.2, technical_depth: 0.25, answer_structure: 0.2, confidence: 0.15, relevance: 0.2`. Parsing: Zod fast-path, then a self-healing `coerceEvaluation()` that defaults any missing dimension to neutral 5 (logged). `api/interview/answer` inserts an all-5 fallback evaluation with a 2-attempt retry on any exception — the dominant design principle here is **never let an AI/parse failure produce a null score** (see [CLAUDE.md Critical Invariant #4](../CLAUDE.md#critical-invariants)).
+**Script engine (v2.1, production mock path):** `src/lib/interview/answer-score/` (`score-v1.6`) scores each approved answer in one LLM call across relevance / content_accuracy / communication_clarity / structure / specificity. Structure is semantic (STAR meaning or technical arc of the answer given) — not keyword/label matching. Missing the asked scenario is relevance, not a structure-zero. Optional textbook extras must not be treated as required. Overall is computed in app code. A live regex strip (`live-answer-structure.ts`) is provisional UI only.
+
+**Legacy path:** `src/lib/openai/evaluate-answer.ts` (OpenRouter-routed), LLM-only scoring across 5 weighted dimensions: `communication_clarity: 0.2, technical_depth: 0.25, answer_structure: 0.2, confidence: 0.15, relevance: 0.2`. Parsing: Zod fast-path, then a self-healing `coerceEvaluation()` that defaults any missing dimension to neutral 5 (logged). `api/interview/answer` inserts an all-5 fallback evaluation with a 2-attempt retry on any exception — the dominant design principle here is **never let an AI/parse failure produce a null score** (see [CLAUDE.md Critical Invariant #4](../CLAUDE.md#critical-invariants)).
 
 ## Report generation
 

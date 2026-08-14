@@ -183,8 +183,11 @@ export async function completeInterviewChat(options: {
       });
     }
 
-    // json_object rejected by some routers — one plain-text attempt (same model, same deadline)
-    if (jsonMode) {
+    // json_object rejected by some routers — one plain-text attempt (same model, same deadline).
+    // Do NOT retry after a timeout: the operation budget is already spent, and a second
+    // attempt only races the outer AbortSignal (observed as AbortError after answer_score
+    // already logged "timed out (13000ms)").
+    if (jsonMode && !isTimeout) {
       if (signal?.aborted) throw e;
       const t1 = Date.now();
       try {
@@ -225,5 +228,47 @@ export async function completeInterviewChat(options: {
       e instanceof Error ? e.message : e,
     );
     throw e instanceof Error ? e : new Error('Interview AI completion failed');
+  }
+}
+
+export async function* completeInterviewChatStream(options: {
+  messages: OpenAI.Chat.ChatCompletionMessageParam[];
+  temperature: number;
+  maxTokens?: number;
+  operation?: string;
+  signal?: AbortSignal;
+  /**
+   * Optional JSON-object response format. Default false preserves existing
+   * plain-text streaming callers (e.g. follow-up generation).
+   */
+  jsonMode?: boolean;
+}): AsyncGenerator<string, void, unknown> {
+  const client = createOpenRouterClient();
+  if (!client) {
+    throw new Error('[interview-ai] OpenRouter is not configured');
+  }
+  const opName = options.operation ?? 'unknown';
+  const model = getOpenRouterModelForOperation(opName === 'unknown' ? undefined : opName);
+  const useJson =
+    options.jsonMode === true && !modelPrefersPlainJson(model);
+
+  const stream = await client.chat.completions.create(
+    {
+      model,
+      messages: options.messages,
+      temperature: options.temperature,
+      max_tokens: options.maxTokens,
+      stream: true,
+      ...(useJson ? { response_format: { type: 'json_object' as const } } : {}),
+    },
+    { signal: options.signal },
+  );
+
+  for await (const chunk of stream) {
+    if (options.signal?.aborted) break;
+    const delta = chunk.choices[0]?.delta?.content;
+    if (delta) {
+      yield delta;
+    }
   }
 }

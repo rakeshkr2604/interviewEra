@@ -37,6 +37,7 @@ export class BrowserAudioDriver implements AudioDriver {
   private captureStream: MediaStream | null = null
   private captureContext: AudioContext | null = null
   private activeSource: AudioBufferSourceNode | null = null
+  private activeMediaAudio: HTMLAudioElement | null = null
   private visibilityHandler: (() => void) | null = null
 
   unlock(): void {
@@ -194,6 +195,157 @@ export class BrowserAudioDriver implements AudioDriver {
     }
   }
 
+  async playStream(stream: ReadableStream<Uint8Array>, callbacks: AudioPlaybackCallbacks): Promise<PlaybackHandle> {
+    const ctx = getSharedInterviewAudioContext()
+    if (!ctx) {
+      callbacks.onPlaybackFailed?.('Audio context unavailable.')
+      throw new Error('Audio context unavailable.')
+    }
+
+    if (
+      typeof window !== 'undefined' &&
+      'MediaSource' in window &&
+      typeof MediaSource.isTypeSupported === 'function' &&
+      MediaSource.isTypeSupported('audio/mpeg')
+    ) {
+      return this.playMediaSourceStream(stream, callbacks)
+    }
+
+    throw new Error('MediaSource audio/mpeg unsupported')
+  }
+
+  private playMediaSourceStream(
+    stream: ReadableStream<Uint8Array>,
+    callbacks: AudioPlaybackCallbacks,
+  ): Promise<PlaybackHandle> {
+    const mediaSource = new MediaSource()
+    const audio = new Audio()
+    audio.src = URL.createObjectURL(mediaSource)
+
+    let active = true
+    let started = false
+    let ended = false
+
+    const cleanup = () => {
+      active = false
+      audio.onplaying = null
+      audio.onended = null
+      audio.onerror = null
+      if (this.activeMediaAudio === audio) this.activeMediaAudio = null
+      try {
+        audio.pause()
+        if (audio.src) {
+          URL.revokeObjectURL(audio.src)
+          audio.src = ''
+        }
+      } catch {
+        /* */
+      }
+      try {
+        if (mediaSource.readyState === 'open') {
+          mediaSource.endOfStream()
+        }
+      } catch {
+        /* */
+      }
+    }
+
+    this.stopActiveSource()
+    this.activeMediaAudio = audio
+
+    return new Promise<PlaybackHandle>((resolve, reject) => {
+      const onOpen = async () => {
+        let sourceBuffer: SourceBuffer
+        try {
+          sourceBuffer = mediaSource.addSourceBuffer('audio/mpeg')
+        } catch (err) {
+          cleanup()
+          reject(err instanceof Error ? err : new Error(String(err)))
+          return
+        }
+
+        audio.onplaying = () => {
+          if (!started) {
+            started = true
+            callbacks.onPlaybackStarted?.()
+            log.info('stream_playback_started', null, {})
+          }
+        }
+
+        audio.onended = () => {
+          if (!ended) {
+            ended = true
+            cleanup()
+            callbacks.onPlaybackComplete?.()
+          }
+        }
+
+        audio.onerror = () => {
+          if (!ended) {
+            ended = true
+            cleanup()
+            callbacks.onPlaybackFailed?.('MediaSource audio playback error')
+          }
+        }
+
+        const reader = stream.getReader()
+        const queue: Uint8Array[] = []
+        let appending = false
+
+        const processQueue = () => {
+          if (!active || appending || queue.length === 0 || sourceBuffer.updating) return
+          appending = true
+          const next = queue.shift()!
+          try {
+            sourceBuffer.appendBuffer(new Uint8Array(next))
+          } catch {
+            /* buffer full or closed */
+          }
+        }
+
+        sourceBuffer.addEventListener('updateend', () => {
+          appending = false
+          processQueue()
+        })
+
+        void audio.play().catch(() => {
+          /* browser autoplay handling */
+        })
+
+        resolve({
+          durationSec: null,
+          stop: () => {
+            cleanup()
+          },
+        })
+
+        try {
+          while (active) {
+            const { done, value } = await reader.read()
+            if (!active) break
+            if (done) {
+              if (mediaSource.readyState === 'open' && !sourceBuffer.updating) {
+                try { mediaSource.endOfStream() } catch {}
+              }
+              break
+            }
+            if (value) {
+              queue.push(value)
+              processQueue()
+            }
+          }
+        } catch (err) {
+          if (active) {
+            cleanup()
+            callbacks.onPlaybackFailed?.(err instanceof Error ? err.message : String(err))
+          }
+        }
+      }
+
+      mediaSource.addEventListener('sourceopen', onOpen, { once: true })
+    })
+  }
+
   private stopActiveSource(): void {
     const source = this.activeSource
     this.activeSource = null
@@ -201,6 +353,22 @@ export class BrowserAudioDriver implements AudioDriver {
       try {
         source.onended = null
         source.stop()
+      } catch {
+        /* */
+      }
+    }
+    const mediaAudio = this.activeMediaAudio
+    this.activeMediaAudio = null
+    if (mediaAudio) {
+      try {
+        mediaAudio.onplaying = null
+        mediaAudio.onended = null
+        mediaAudio.onerror = null
+        mediaAudio.pause()
+        if (mediaAudio.src) {
+          URL.revokeObjectURL(mediaAudio.src)
+          mediaAudio.src = ''
+        }
       } catch {
         /* */
       }

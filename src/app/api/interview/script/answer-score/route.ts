@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
+import { getTokenBudget } from '@/lib/ai/token-budget';
+import { getContextLimits, getOperationTimeoutMs } from '@/lib/ai/operation-registry';
 import {
   ANSWER_SCORE_PROMPT_VERSION,
   subRubricForQuestionType,
@@ -15,9 +17,9 @@ import {
 } from '@/lib/interview/answer-score/prompt';
 import { resolveQuestionType } from '@/lib/interview/answer-score/question-type';
 import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation';
+import { clampText } from '@/lib/ai/context-hygiene';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 
-const LLM_TIMEOUT_MS = 15_000;
 const MIN_SCOREABLE_WORDS = 5;
 /**
  * Deepgram final-segment confidence below this marks the transcript
@@ -207,12 +209,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     const expectedSubRubric = subRubricForQuestionType(resolvedType);
 
     const systemPrompt = buildAnswerScoreSystemPrompt(resolvedType);
+    const inputBudget = getContextLimits('answer_score').maxInputChars;
+    // Keep the full rubric; only clamp the candidate transcript to remaining budget.
+    const transcriptBudget = Math.max(500, inputBudget - systemPrompt.length - 400);
+    const clampedTranscript = clampText(transcript, transcriptBudget);
     const userPrompt = buildAnswerScoreUserPrompt({
       question: displayQuestion,
       questionType: resolvedType,
       targetRole,
-      transcript,
+      transcript: clampedTranscript,
     });
+    const maxTokens = getTokenBudget('answer_score');
+    const promptChars = systemPrompt.length + userPrompt.length;
+    const llmTimeoutMs = getOperationTimeoutMs('answer_score');
 
     const rawOutputs: string[] = [];
     let validated: ValidatedAnswerScore | null = null;
@@ -233,17 +242,47 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
 
       let content: string;
+      const attemptStarted = Date.now();
       try {
         const completion = await completeInterviewChat({
           messages,
           temperature: 0.2,
           operation: 'answer_score',
           jsonMode: true,
-          signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+          maxTokens,
+          signal: AbortSignal.timeout(llmTimeoutMs),
         });
         content = completion.content;
         modelUsed = completion.model;
+        console.info(
+          JSON.stringify({
+            event: 'answer_score_llm_ok',
+            interviewId,
+            turnIndex,
+            attempt: attempt + 1,
+            model: modelUsed,
+            prompt_chars: promptChars,
+            max_tokens: maxTokens,
+            prompt_tokens: completion.usage?.prompt_tokens ?? null,
+            completion_tokens: completion.usage?.completion_tokens ?? null,
+            latency_ms: Date.now() - attemptStarted,
+            timeout_ms: llmTimeoutMs,
+          }),
+        );
       } catch (llmError) {
+        console.error(
+          JSON.stringify({
+            event: 'answer_score_llm_failed',
+            interviewId,
+            turnIndex,
+            attempt: attempt + 1,
+            prompt_chars: promptChars,
+            max_tokens: maxTokens,
+            latency_ms: Date.now() - attemptStarted,
+            timeout_ms: llmTimeoutMs,
+            timeout: isTimeoutError(llmError),
+          }),
+        );
         if (isTimeoutError(llmError)) {
           console.error(
             `[interview/script/answer-score] LLM timeout (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}):`,
@@ -269,6 +308,23 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
 
       const result = validateAnswerScoreOutput(parsed, expectedSubRubric, { lowSttConfidence });
+      const returnedSubRubric =
+        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>).sub_rubric
+          : undefined;
+      console.info(
+        JSON.stringify({
+          event: 'answer_score_validation',
+          interviewId,
+          turnIndex,
+          attempt: attempt + 1,
+          question_type: resolvedType,
+          authoritative_sub_rubric: expectedSubRubric,
+          returned_sub_rubric: returnedSubRubric ?? null,
+          validation_ok: result.ok,
+          latency_ms: Date.now() - attemptStarted,
+        }),
+      );
       if (result.ok) {
         validated = result.value;
       } else {

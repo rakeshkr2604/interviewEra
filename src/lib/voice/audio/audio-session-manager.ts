@@ -229,6 +229,84 @@ export class AudioSessionManager {
     }
   }
 
+  /**
+   * Play interviewer audio progressively from a ReadableStream.
+   * Falls back gracefully to buffering + playAudio if stream playback is unsupported.
+   */
+  async playAudioStream(
+    stream: ReadableStream<Uint8Array>,
+    callbacks: AudioPlaybackCallbacks = {},
+  ): Promise<void> {
+    if (this.status !== 'ready') {
+      callbacks.onPlaybackFailed?.('Audio session not ready.')
+      return
+    }
+    const mySeq = ++this.playSeq
+    this.stopActiveHandle()
+
+    const resumed = await this.driver.resumePlayback()
+    if (mySeq !== this.playSeq) return
+    if (!resumed) {
+      callbacks.onPlaybackFailed?.('Audio playback is blocked. Tap Retry Audio.')
+      return
+    }
+
+    const guarded: AudioPlaybackCallbacks = {
+      onPlaybackStarted: () => {
+        if (mySeq !== this.playSeq) return
+        this.bus?.emit('PlaybackStarted', { durationSec: this.playbackHandle?.durationSec ?? null }, { ctx: this.ctx })
+        callbacks.onPlaybackStarted?.()
+      },
+      onPlaybackComplete: () => {
+        if (mySeq !== this.playSeq) return
+        if (this.playbackHandle) this.playbackHandle = null
+        this.bus?.emit('PlaybackCompleted', { reason: 'ended' }, { ctx: this.ctx })
+        callbacks.onPlaybackComplete?.()
+      },
+      onPlaybackFailed: (msg) => {
+        if (mySeq !== this.playSeq) return
+        callbacks.onPlaybackFailed?.(msg)
+      },
+    }
+
+    if (this.driver.playStream) {
+      try {
+        const handle = await this.driver.playStream(stream, guarded)
+        if (mySeq !== this.playSeq || this.status !== 'ready') {
+          handle.stop()
+          return
+        }
+        this.playbackHandle = handle
+        return
+      } catch {
+        /* fallback to stream buffering */
+      }
+    }
+
+    // Fallback: drain stream into ArrayBuffer then play
+    try {
+      const reader = stream.getReader()
+      const chunks: Uint8Array[] = []
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value) chunks.push(value)
+      }
+      const totalLen = chunks.reduce((acc, c) => acc + c.byteLength, 0)
+      const merged = new Uint8Array(totalLen)
+      let offset = 0
+      for (const c of chunks) {
+        merged.set(c, offset)
+        offset += c.byteLength
+      }
+      if (mySeq !== this.playSeq) return
+      return this.playAudio(merged.buffer, callbacks)
+    } catch (err) {
+      if (mySeq !== this.playSeq) return
+      callbacks.onPlaybackFailed?.(err instanceof Error ? err.message : 'Stream playback failed.')
+    }
+  }
+
   /** Cancel interviewer audio immediately. */
   stopAudio(): void {
     this.playSeq++ // invalidate any in-flight play() awaiting decode

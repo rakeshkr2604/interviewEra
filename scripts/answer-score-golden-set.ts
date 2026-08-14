@@ -40,6 +40,7 @@ import {
   type DimensionKey,
   type QuestionType,
 } from '../src/lib/interview/answer-score/rubric';
+import { MANUAL_REVIEW_FIXTURES } from '../src/lib/interview/answer-score/semantic-structure.fixtures';
 
 type GoldenSample = {
   id: string;
@@ -270,6 +271,22 @@ const GOLDEN_SET: GoldenSample[] = [
     expectedOverall: [0, 6],
     expectDim: { content_accuracy: { max: 4 } },
   },
+
+  // ── Manual localhost review (2026-08-13): semantic STAR + required vs optional ──
+  ...MANUAL_REVIEW_FIXTURES.map((f) => ({
+    id: f.id,
+    category:
+      f.id === 'manual-q3-no-disagreement-pivot'
+        ? ('mediocre' as const)
+        : f.id === 'beh-missing-result'
+          ? ('mediocre' as const)
+          : ('strong' as const),
+    questionType: f.questionType,
+    question: f.question,
+    transcript: f.transcript,
+    expectedOverall: f.expectedOverall,
+    expectDim: f.expectDim,
+  })),
 ];
 
 type RunResult = {

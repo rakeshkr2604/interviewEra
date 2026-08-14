@@ -13,10 +13,12 @@ import {
   spacingNeedsFix,
   suggestParagraphBreaks,
 } from '@/lib/interview/transcript-readability'
+import { buildHighlightRenderSegments } from '@/lib/interview/review-highlight-render'
+import type { ReviewCorrectionReason } from '@/lib/interview/review-correction-source'
 
 type Props = {
   value: string
-  onChange: (next: string) => void
+  onChange: (next: string, reason?: ReviewCorrectionReason) => void
   correctedTranscript: string | null
   autoFocus?: boolean
   placeholder?: string
@@ -95,6 +97,13 @@ export function ReviewAnswerHighlightEditor({
     [ops],
   )
 
+  // Render model sliced from the CURRENT value — visible text must equal the
+  // editor value exactly (whitespace/newlines included), never a token re-join.
+  const renderSegments = useMemo(
+    () => buildHighlightRenderSegments(value, ops),
+    [value, ops],
+  )
+
   const activeReplace =
     activeOpIndex !== null && ops[activeOpIndex]?.type === 'replace'
       ? (ops[activeOpIndex] as ReplaceOp)
@@ -160,7 +169,11 @@ export function ReviewAnswerHighlightEditor({
   const acceptReplace = (op: ReplaceOp, replacement?: string) => {
     const next = (replacement ?? op.suggestion).trim()
     if (!next) return
-    onChange(applyReplaceSuggestion(value, op, next))
+    // Exact suggestion → remaining STT chips can stay. A custom spelling
+    // makes this span the candidate's — lock so it cannot be re-highlighted.
+    const reason: ReviewCorrectionReason =
+      next === op.suggestion.trim() ? 'accept' : 'edit'
+    onChange(applyReplaceSuggestion(value, op, next), reason)
     closeChip()
   }
 
@@ -179,42 +192,47 @@ export function ReviewAnswerHighlightEditor({
 
   const applyAllParagraphs = () => {
     closeChip()
-    onChange(applyParagraphBreaks(value, paragraphBreaks))
+    onChange(applyParagraphBreaks(value, paragraphBreaks), 'format')
   }
 
   const applyOneParagraph = (insertAt: number) => {
     closeChip()
-    onChange(applyParagraphBreaks(value, [{ insertAt }]))
+    onChange(applyParagraphBreaks(value, [{ insertAt }]), 'format')
   }
 
   const applySpacingFix = () => {
     closeChip()
-    onChange(normalizeSpeechSpacing(value))
+    onChange(normalizeSpeechSpacing(value), 'format')
   }
 
   const readabilityActions =
     needsSpacing || paragraphBreaks.length > 0 ? (
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        {needsSpacing && (
-          <button
-            type="button"
-            data-stt-suggest
-            onClick={applySpacingFix}
-            className="min-h-[36px] touch-manipulation rounded-lg border border-(--card-border) bg-(--bg-secondary) px-2.5 text-[11px] font-medium text-(--text-primary) hover:border-(--accent-primary)/40"
-          >
-            Fix spacing
-          </button>
-        )}
-        {paragraphBreaks.length > 0 && (
-          <button
-            type="button"
-            data-stt-suggest
-            onClick={applyAllParagraphs}
-            className="min-h-[36px] touch-manipulation rounded-lg border border-(--card-border) bg-(--bg-secondary) px-2.5 text-[11px] font-medium text-(--text-primary) hover:border-(--accent-primary)/40"
-          >
-            Add paragraph breaks ({paragraphBreaks.length})
-          </button>
-        )}
+      <div className="flex shrink-0 flex-col gap-1">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+          Formatting
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {paragraphBreaks.length > 0 && (
+            <button
+              type="button"
+              data-stt-suggest
+              onClick={applyAllParagraphs}
+              className="min-h-[36px] touch-manipulation rounded-lg border border-(--card-border) bg-(--bg-secondary) px-2.5 text-[11px] font-medium text-(--text-primary) hover:border-(--accent-primary)/40"
+            >
+              Add paragraph breaks ({paragraphBreaks.length})
+            </button>
+          )}
+          {needsSpacing && (
+            <button
+              type="button"
+              data-stt-suggest
+              onClick={applySpacingFix}
+              className="min-h-[36px] touch-manipulation rounded-lg border border-(--card-border) bg-(--bg-secondary) px-2.5 text-[11px] font-medium text-(--text-primary) hover:border-(--accent-primary)/40"
+            >
+              Fix spacing
+            </button>
+          )}
+        </div>
       </div>
     ) : null
 
@@ -229,7 +247,7 @@ export function ReviewAnswerHighlightEditor({
           ref={textareaRef}
           data-clarity-mask="true"
           value={value}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(e.target.value, 'edit')}
           onBlur={() => setMode('review')}
           placeholder={placeholder}
           autoFocus={autoFocus || mode === 'edit'}
@@ -355,7 +373,7 @@ export function ReviewAnswerHighlightEditor({
           onKeyDown={(e) => {
             if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
               e.preventDefault()
-              onChange(value + e.key)
+              onChange(value + e.key, 'edit')
               enterEdit()
             } else if (e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Delete') {
               e.preventDefault()
@@ -367,27 +385,24 @@ export function ReviewAnswerHighlightEditor({
           aria-label="Your answer transcript"
           tabIndex={0}
         >
-          {ops.map((op, index) => {
-            if (op.type === 'insert') return null
-
+          {renderSegments.map((seg, i) => {
             const leadingBreak =
-              breakAtSet.has(op.rawStart) ? breakMarker(op.rawStart) : null
+              breakAtSet.has(seg.start) ? breakMarker(seg.start) : null
 
-            if (op.type === 'equal') {
+            if (seg.kind === 'text') {
               return (
-                <span key={`eq-${index}-${op.rawStart}`}>
+                <span key={`txt-${i}-${seg.start}`}>
                   {leadingBreak}
-                  {index > 0 && !leadingBreak ? ' ' : ''}
-                  {op.rawText}
+                  {seg.text}
                 </span>
               )
             }
-            if (op.type === 'replace') {
-              const isActive = activeOpIndex === index
+            if (seg.kind === 'replace') {
+              const opIndex = seg.opIndex
+              const isActive = activeOpIndex === opIndex
               return (
-                <span key={`rep-${index}-${op.rawStart}`}>
+                <span key={`rep-${i}-${seg.start}`}>
                   {leadingBreak}
-                  {index > 0 && !leadingBreak ? ' ' : ''}
                   <button
                     type="button"
                     data-stt-suggest
@@ -401,35 +416,32 @@ export function ReviewAnswerHighlightEditor({
                       const btn = e.currentTarget
                       activeBtnRef.current = btn
                       setChipPos(chipPosFromRect(btn.getBoundingClientRect()))
-                      setManualEdit(op.rawText)
-                      setActiveOpIndex(index)
+                      setManualEdit(seg.text)
+                      setActiveOpIndex(opIndex)
                     }}
                     className={`inline-flex min-h-[44px] min-w-[44px] items-center rounded-md px-1.5 py-1 text-left align-baseline font-medium underline decoration-2 underline-offset-4 touch-manipulation transition-colors ${
                       isActive
                         ? 'bg-(--accent-primary)/20 text-(--accent-primary) decoration-(--accent-primary)'
                         : 'bg-amber-500/15 text-(--text-primary) decoration-amber-600/70 hover:bg-amber-500/25'
                     }`}
-                    aria-label={`Suggested correction: ${op.suggestion}`}
+                    aria-label={`Suggested correction: ${seg.suggestion}`}
                     aria-expanded={isActive}
                   >
-                    {op.rawText}
+                    {seg.text}
                   </button>
                 </span>
               )
             }
-            if (op.type === 'delete') {
-              return (
-                <span
-                  key={`del-${index}-${op.rawStart}`}
-                  className="bg-red-500/10 text-(--text-secondary) line-through"
-                >
-                  {leadingBreak}
-                  {index > 0 && !leadingBreak ? ' ' : ''}
-                  {op.rawText}
-                </span>
-              )
-            }
-            return null
+            // delete — struck-through span the correction would remove
+            return (
+              <span
+                key={`del-${i}-${seg.start}`}
+                className="bg-red-500/10 text-(--text-secondary) line-through"
+              >
+                {leadingBreak}
+                {seg.text}
+              </span>
+            )
           })}
         </div>
         {readabilityActions}

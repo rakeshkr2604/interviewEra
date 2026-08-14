@@ -18,8 +18,14 @@ import { z } from 'zod';
 // rule; STAR/logical_flow 0-vs-3 and 3-vs-5 boundaries made countable; the
 // relevance-0 ⇒ specificity-0 rule is now ALSO enforced in code (the prompt-only
 // hard rule was violated by the model — see validateAnswerScoreOutput).
+// v1.6 (2026-08-13): STAR structure 0 must not mean "requested incident absent"
+// (that's relevance). Prompt is primary; code floors structure 0→5 when
+// relevance > 0 on the star rubric.
 // Audit rows carry this so old-rubric and new-rubric scores are distinguishable.
-export const ANSWER_SCORE_PROMPT_VERSION = 'score-v1.2';
+export const ANSWER_SCORE_PROMPT_VERSION = 'score-v1.6';
+
+/** STAR structure floor when the model zeros structure despite on-topic speech. */
+export const STAR_STRUCTURE_RELEVANCE_FLOOR = 5;
 
 export type QuestionType = 'technical' | 'behavioral';
 export type SubRubric = 'star' | 'logical_flow';
@@ -62,7 +68,9 @@ const dimensionOutputSchema = z.object({
 });
 
 export const answerScoreLlmSchema = z.object({
-  sub_rubric: z.enum(['star', 'logical_flow']),
+  // Optional: application injects the authoritative rubric before validate.
+  // The LLM must not own routing — wrong/missing values are overwritten.
+  sub_rubric: z.enum(['star', 'logical_flow']).optional(),
   dimensions: z.object({
     relevance: dimensionOutputSchema,
     content_accuracy: dimensionOutputSchema,
@@ -234,7 +242,7 @@ export function findContradictions(
 /**
  * Validates the parsed LLM JSON against score-v1:
  *   - structural/range check (Zod: 0–10, multiples of 0.5)
- *   - sub_rubric must match what was routed into the prompt
+ *   - sub_rubric is application-owned (wrong/missing values are overwritten)
  *   - contradiction check → score_suspect (score still returned)
  */
 export function validateAnswerScoreOutput(
@@ -242,7 +250,14 @@ export function validateAnswerScoreOutput(
   expectedSubRubric: SubRubric,
   opts?: { lowSttConfidence?: boolean },
 ): AnswerScoreValidation {
-  const result = answerScoreLlmSchema.safeParse(parsed);
+  // APPLICATION DECIDES RUBRIC. Strip/overwrite any LLM-chosen sub_rubric so a
+  // wrong enum never rejects an otherwise-valid score (or reach the UI).
+  const withAuthoritativeRubric =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? { ...(parsed as Record<string, unknown>), sub_rubric: expectedSubRubric }
+      : parsed;
+
+  const result = answerScoreLlmSchema.safeParse(withAuthoritativeRubric);
   if (!result.success) {
     const errors = result.error.issues.map(
       (i) => `${i.path.join('.') || '(root)'}: ${i.message}`,
@@ -250,13 +265,21 @@ export function validateAnswerScoreOutput(
     return { ok: false, errors };
   }
 
-  if (result.data.sub_rubric !== expectedSubRubric) {
-    return {
-      ok: false,
-      errors: [
-        `sub_rubric: expected "${expectedSubRubric}" (routed by question type), received "${result.data.sub_rubric}"`,
-      ],
-    };
+  const returnedSubRubric =
+    parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>).sub_rubric
+      : undefined;
+  if (
+    typeof returnedSubRubric === 'string' &&
+    returnedSubRubric !== expectedSubRubric
+  ) {
+    console.info(
+      JSON.stringify({
+        event: 'answer_score_sub_rubric_normalized',
+        expected: expectedSubRubric,
+        received: returnedSubRubric,
+      }),
+    );
   }
 
   const dimensions = result.data.dimensions;
@@ -276,6 +299,24 @@ export function validateAnswerScoreOutput(
       score: 0,
       note: `${dimensions.specificity.note} [auto-clamped to 0 because relevance is 0]`.slice(0, 500),
     };
+  }
+
+  // STAR structure 0 historically meant "no matching incident" — that is
+  // relevance, not organization. Floor only the collapse-to-zero case; do not
+  // invent STAR elements or raise a genuinely thin arc.
+  if (
+    expectedSubRubric === 'star' &&
+    dimensions.structure.score === 0 &&
+    dimensions.relevance.score > 0
+  ) {
+    dimensions.structure = {
+      score: STAR_STRUCTURE_RELEVANCE_FLOOR,
+      note: `${dimensions.structure.note} [auto-floored to ${STAR_STRUCTURE_RELEVANCE_FLOOR}: missing scenario is relevance, not structure]`.slice(
+        0,
+        500,
+      ),
+    };
+    suspectReasons.push('structure_floored_independent_of_relevance');
   }
   if (opts?.lowSttConfidence) {
     suspectReasons.push('low_stt_confidence');

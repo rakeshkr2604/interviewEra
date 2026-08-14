@@ -12,10 +12,12 @@
  */
 export interface ChunkOptions {
   minChars?: number
+  firstChunkMinChars?: number
   maxChars?: number
 }
 
 const DEFAULT_MIN = 60
+const DEFAULT_FIRST_MIN = 35
 const DEFAULT_MAX = 280
 
 export function splitIntoSpeechChunks(input: string, opts?: ChunkOptions): string[] {
@@ -23,6 +25,7 @@ export function splitIntoSpeechChunks(input: string, opts?: ChunkOptions): strin
   if (!text) return []
 
   const minChars = opts?.minChars ?? DEFAULT_MIN
+  const firstMinChars = opts?.firstChunkMinChars ?? DEFAULT_FIRST_MIN
   const maxChars = opts?.maxChars ?? DEFAULT_MAX
 
   // Split keeping the terminator attached to the preceding sentence.
@@ -41,9 +44,11 @@ export function splitIntoSpeechChunks(input: string, opts?: ChunkOptions): strin
     const sentence = raw.trim()
     if (!sentence) continue
 
+    const targetMin = chunks.length === 0 ? firstMinChars : minChars
+
     if (!buffer) {
       buffer = sentence
-    } else if (buffer.length < minChars) {
+    } else if (buffer.length < targetMin) {
       // Only coalesce while the buffer is still too short — keep chunks small
       // so the first audio plays fast (streaming), not greedily filled.
       buffer = `${buffer} ${sentence}`

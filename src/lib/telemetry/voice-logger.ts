@@ -13,6 +13,10 @@ export interface TTSLogEntry {
   tts_model: string;
   tts_voice_id?: string;   // first 8 chars only — do not log full voice ID
   latency_ms?: number;
+  auth_ms?: number;
+  preflight_ms?: number;
+  quota_ms?: number;
+  elevenlabs_ttfb_ms?: number;
   success: boolean;
   error_category?: string;
   ip?: string;

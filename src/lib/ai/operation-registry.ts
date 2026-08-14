@@ -245,35 +245,41 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     },
     estimatedInputTokens: 4_000,
   },
+  // auto-structure-v2.2: budget must fit long corrected_transcript + coaching.
+  // QA: max_tokens=450 with ~1k-char answers hit completion_tokens=450 and
+  // truncated JSON → invalid_json 502. Cap is a ceiling; route sizes per answer.
   auto_structure: {
     requestClass:         'lightweight_parse',
-    temperature:          0.3,
-    maxOutputTokens:      1_000,
+    temperature:          0.2,
+    maxOutputTokens:      900,
+    llmAttemptTimeoutMs:    14_000,
+    timeoutMs:            18_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        4_500,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 700,
+  },
+  // v2.1 per-answer 5-dimension scoring (score-v1). Client starts this on
+  // Approve (not raced with auto_structure on review-open). QA (2026-08-12):
+  // ~8.9k-char rubric + gpt-4.1-mini via OpenRouter routinely exceeds 13s even
+  // when not contended — align budgets with auto_structure-class work.
+  answer_score: {
+    requestClass:         'structured_evaluation',
+    temperature:          0.2,
+    maxOutputTokens:      400,
     llmAttemptTimeoutMs:    18_000,
     timeoutMs:            22_000,
     responseFormat:       'json',
     context: {
+      // score-v1.4 system rubric is compact; leave headroom for the transcript.
       maxInputChars:        6_000,
       maxHistoryTurns:      0,
       maxHistoryTurnChars:  0,
     },
-    estimatedInputTokens: 800,
-  },
-  // v2.1 per-answer 5-dimension scoring (score-v1). Runs concurrently with
-  // auto_structure while the candidate reviews — moderate deadline, small JSON.
-  answer_score: {
-    requestClass:         'structured_evaluation',
-    temperature:          0.2,
-    maxOutputTokens:      600,
-    llmAttemptTimeoutMs:    13_000,
-    timeoutMs:            15_000,
-    responseFormat:       'json',
-    context: {
-      maxInputChars:        8_000,
-      maxHistoryTurns:      0,
-      maxHistoryTurnChars:  0,
-    },
-    estimatedInputTokens: 1_100,
+    estimatedInputTokens: 900,
   },
   // v2.1 end-of-interview narrative synthesis over score-v1.2 aggregates.
   // One call per report; stacks under /api/interview/script/report maxDuration.

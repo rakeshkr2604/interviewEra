@@ -106,6 +106,28 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 - **Planned removal criteria**: N/A while both engines coexist. Revisit only after v1 routes are intentionally retired in a separate, explicit task.
 - **Rollback**: set `NEXT_PUBLIC_INTERVIEW_ENGINE_DEFAULT=v1` in Vercel → redeploy (or wait for next deploy). Primary CTAs return to `/onboarding`. Confirm with one dashboard "Start Interview" click.
 
+## `VOICE_LLM_TTS_STREAMING` / `NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING`
+
+- **Location (server)**: `src/lib/interview/script-turn-stream.ts::isLlmTtsStreamingEnabled()` / `wantsScriptTurnSse()` — also gates legacy `src/app/api/interview/process-answer/route.ts` and `src/lib/voice/conversation/http-conversation-engine.ts`.
+- **Location (client)**: `src/lib/interview/script-turn-sse-client.ts::isClientLlmTtsStreamingEnabled()` — only `NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING` is inlined into the browser bundle.
+- **Default state**: unset → **off** (JSON `/turn` responses; no SSE first-sentence path).
+- **Purpose**: when `true`, script engine `POST /api/interview/script/turn` may emit SSE (`event: sentence` then `complete`) so TTS can start on the first natural speech sentence while the LLM finishes. Same flag also enables SSE on the legacy `/api/interview/process-answer` path. Server flag is authoritative; the client `NEXT_PUBLIC_` value only prefers `Accept: text/event-stream` when early TTS is desired — a missing/stale client value must not permanently disable server-side streaming when the operator has the server flag on.
+- **Owner**: Unknown — not verified (solo founder de facto).
+- **Category**: Permanent operational toggle (latency / UX lever for LLM→TTS pipeline).
+- **Planned removal criteria**: N/A while SSE and JSON fallback coexist. Revisit only after JSON-only fallback is intentionally retired.
+- **Rollback**: unset both vars in Vercel (or set to anything other than the literal string `true`) → redeploy. Turns fall back to non-streaming JSON.
+- **See also**: [docs/VOICE.md](VOICE.md) LLM→TTS SSE note; [docs/AI_PIPELINE.md](AI_PIPELINE.md) script-engine turn path.
+
+## `ELEVENLABS_OPTIMIZE_LATENCY`
+
+- **Location**: `src/app/api/tts/route.ts` — appended as `?optimize_streaming_latency=` on the ElevenLabs stream URL when non-empty and not `'0'`.
+- **Default state**: unset → **`'3'`** (ElevenLabs max optimize level for streaming).
+- **Purpose**: tunes ElevenLabs streaming latency vs. quality. Set to `0` (or empty after an explicit override that disables the query) to omit the optimize param.
+- **Owner**: Unknown — not verified.
+- **Category**: Permanent operational tuning knob (TTS latency).
+- **Planned removal criteria**: N/A.
+- **Rollback**: set `ELEVENLABS_OPTIMIZE_LATENCY=0` (or a lower level `1`/`2`) in Vercel → redeploy if streaming audio quality regressions appear.
+
 ## `ANALYZE` (build tooling, not a product feature flag)
 
 - **Location**: `next.config.ts` — `process.env.ANALYZE === "true"`, wired to the `npm run analyze` script.
@@ -116,4 +138,4 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 
 ## Summary: what this registry makes visible for the first time
 
-Of 14 product-behavior flags inventoried, **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable). `CAMPUS_WORKSPACE_AUTO_APPROVE` now has a Vercel-production hard-stop in `org-verification.ts` (see that flag's section above).
+Of the product-behavior flags inventoried (including `VOICE_LLM_TTS_STREAMING` / `NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING` and `ELEVENLABS_OPTIMIZE_LATENCY` added for the script-engine SSE/TTS release), **exactly one has any written exit intent** (`NEXT_PUBLIC_AUTH_V2`, and even that isn't measurable). `CAMPUS_WORKSPACE_AUTO_APPROVE` now has a Vercel-production hard-stop in `org-verification.ts` (see that flag's section above).

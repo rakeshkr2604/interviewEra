@@ -94,6 +94,9 @@ logs/
 *.log
 failed-emails.csv
 /screenshots/
+# Local headed-Chrome QA harness outputs (screenshots, creds.json, run artifacts).
+# Never commit — may contain session/user identifiers from local provisioning.
+/tmp-lh/
 /lighthouse*.json
 .lighthouse-out/
 /audit-phase1*.png

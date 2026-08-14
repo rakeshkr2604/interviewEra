@@ -13,6 +13,8 @@ Two parallel STT engines, mutually exclusive via a **singleton mic-ownership gat
 
 Supporting layer: `mic-device-monitor.ts` (Bluetooth/device-swap detection), `mic-permission-monitor.ts` (Permissions API revoke detection), `mic-pipeline-telemetry.ts` + `voice-pipeline-diagnostics.ts` (structured metrics + a rule-based failure classifier producing categories like `ZERO_PCM`, `WS_NOT_CONNECTED`), `lifecycle-log.ts` (shared structured logger), `audio-gesture.ts` (mobile audio-context unlock).
 
+**LLM→TTS first-sentence SSE (script engine + legacy dual-agent):** gated by `VOICE_LLM_TTS_STREAMING` / `NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING` (see [docs/FLAGS.md](FLAGS.md)). Server `isLlmTtsStreamingEnabled()` in `src/lib/interview/script-turn-stream.ts` is authoritative for `POST /api/interview/script/turn` and also gates legacy `/api/interview/process-answer`. Client `isClientLlmTtsStreamingEnabled()` only prefers `Accept: text/event-stream`. Unset → JSON fallback (safe default). `/api/tts` passes `ELEVENLABS_OPTIMIZE_LATENCY` (unset → `'3'`) as ElevenLabs `optimize_streaming_latency`.
+
 A newer `core/`/`orchestrator/`/`conversation/`/`tts/` architecture also exists in `src/lib/voice/` alongside the legacy pipeline above, but is not the actively-modified path per current git status — a consolidation decision is pending once the current hardening pass stabilizes.
 
 Certification status: [VOICE_PIPELINE_CERTIFICATION.md](VOICE_PIPELINE_CERTIFICATION.md) — 98/100, "GO (with manual mobile smoke post-deploy)". Chrome desktop is automated-verified; Edge/Firefox/Safari desktop and all mobile browsers are flagged **manual, not run in CI**.

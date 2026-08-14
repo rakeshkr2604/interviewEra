@@ -1,22 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  _resetBootEarlySentencesForTests,
   _resetBootTurnApplyClaimsForTests,
   _resetBootTurnRegistryForTests,
+  claimBootEarlySentence,
   claimBootTurnApply,
-  clearBootTurnFetch,
   decideBootTurnFetch,
+  getBootEarlySentence,
   getBootTurnPromise,
   getBootTurnResult,
   hasBootTurnApplyClaim,
   registerBootTurnFetch,
   releaseBootTurnApplyClaim,
   resolveBootTurnSource,
+  shouldAbortTurnFetchOnUnmount,
   shouldFallbackLoadFirstTurn,
+  shouldRetryBootTurnAfterAbort,
 } from './script-boot-guard'
 
 afterEach(() => {
   _resetBootTurnApplyClaimsForTests()
   _resetBootTurnRegistryForTests()
+  _resetBootEarlySentencesForTests()
 })
 
 describe('decideBootTurnFetch', () => {
@@ -35,6 +40,16 @@ describe('decideBootTurnFetch', () => {
   it('skips re-entry when boot already called (router/effect churn)', () => {
     expect(
       decideBootTurnFetch({ needsUnlock: false, bootAlreadyCalled: true }),
+    ).toEqual({ action: 'skip_already_booted' })
+  })
+
+  it('skips [NONE] refetch after apply even when remount reset bootCalledRef', () => {
+    expect(
+      decideBootTurnFetch({
+        needsUnlock: false,
+        bootAlreadyCalled: false,
+        alreadyApplied: true,
+      }),
     ).toEqual({ action: 'skip_already_booted' })
   })
 })
@@ -100,6 +115,16 @@ describe('resolveBootTurnSource', () => {
     ).toBe('start_fetch')
   })
 
+  it('joins existing promise even when mount thinks it is a cold fetch', () => {
+    expect(
+      resolveBootTurnSource({
+        decision: { action: 'fetch_first_turn' },
+        interviewId: 'i1',
+        hasRegisteredPromise: true,
+      }),
+    ).toBe('join_existing')
+  })
+
   it('joins existing promise on skip_already_booted when registered', () => {
     expect(
       resolveBootTurnSource({
@@ -121,6 +146,60 @@ describe('resolveBootTurnSource', () => {
   })
 })
 
+describe('claimBootEarlySentence', () => {
+  it('allows only one early TTS claim per interview', () => {
+    expect(claimBootEarlySentence('e1', 'Hello there')).toBe(true)
+    expect(claimBootEarlySentence('e1', 'Hello again')).toBe(false)
+    expect(getBootEarlySentence('e1')).toBe('Hello there')
+  })
+})
+
+describe('shouldAbortTurnFetchOnUnmount', () => {
+  it('does not abort while a boot registry promise is in flight', () => {
+    expect(shouldAbortTurnFetchOnUnmount({ hasBootRegistryPromise: true })).toBe(false)
+  })
+
+  it('aborts when there is no boot registry owner (later turns / real leave)', () => {
+    expect(shouldAbortTurnFetchOnUnmount({ hasBootRegistryPromise: false })).toBe(true)
+  })
+})
+
+describe('shouldRetryBootTurnAfterAbort', () => {
+  it('retries once on abort for the surviving mount', () => {
+    expect(
+      shouldRetryBootTurnAfterAbort({
+        aborted: true,
+        cancelled: false,
+        alreadyRetried: false,
+      }),
+    ).toBe(true)
+  })
+
+  it('does not retry when cancelled, already retried, or not aborted', () => {
+    expect(
+      shouldRetryBootTurnAfterAbort({
+        aborted: true,
+        cancelled: true,
+        alreadyRetried: false,
+      }),
+    ).toBe(false)
+    expect(
+      shouldRetryBootTurnAfterAbort({
+        aborted: true,
+        cancelled: false,
+        alreadyRetried: true,
+      }),
+    ).toBe(false)
+    expect(
+      shouldRetryBootTurnAfterAbort({
+        aborted: false,
+        cancelled: false,
+        alreadyRetried: false,
+      }),
+    ).toBe(false)
+  })
+})
+
 describe('boot turn registry — Strict Mode hang fix', () => {
   it('shares one fetch across concurrent callers (no duplicate startFetch)', async () => {
     const startFetch = vi.fn(async () => ({ turnIndex: 1, speech: 'Hello' }))
@@ -129,6 +208,17 @@ describe('boot turn registry — Strict Mode hang fix', () => {
     expect(p1).toBe(p2)
     expect(startFetch).toHaveBeenCalledTimes(1)
     await expect(p1).resolves.toEqual({ turnIndex: 1, speech: 'Hello' })
+  })
+
+  it('exposes the registry promise before startFetch runs', async () => {
+    let seenDuringStart: Promise<unknown> | null = null
+    const startFetch = vi.fn(async () => {
+      seenDuringStart = getBootTurnPromise('race-0')
+      return { turnIndex: 1 }
+    })
+    const registered = registerBootTurnFetch('race-0', startFetch)
+    expect(seenDuringStart).toBe(registered)
+    await expect(registered).resolves.toEqual({ turnIndex: 1 })
   })
 
   it('keeps the settled result after the first await so a remount can still consume it', async () => {
@@ -179,7 +269,7 @@ describe('boot turn registry — Strict Mode hang fix', () => {
     const applyCalls: unknown[] = []
     const applyOnce = (data: unknown) => {
       if (!claimBootTurnApply('race-3')) return false
-      clearBootTurnFetch('race-3')
+      // Keep the registry so a remount can hydrate without a second [NONE] fetch.
       applyCalls.push(data)
       return true
     }
@@ -212,7 +302,8 @@ describe('boot turn registry — Strict Mode hang fix', () => {
     expect(applyCalls).toHaveLength(1)
     expect(applyCalls[0]).toEqual(payload)
     expect(hasBootTurnApplyClaim('race-3')).toBe(true)
-    expect(getBootTurnPromise('race-3')).toBeNull()
+    expect(getBootTurnPromise('race-3')).not.toBeNull()
+    expect(getBootTurnResult('race-3')).toEqual(payload)
   })
 
   it('clears registry on rejection so a retry can start a new fetch', async () => {

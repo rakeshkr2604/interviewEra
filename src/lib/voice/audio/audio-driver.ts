@@ -59,6 +59,12 @@ export interface AudioDriver {
    */
   play(buffer: ArrayBuffer, callbacks: AudioPlaybackCallbacks): Promise<PlaybackHandle>
 
+  /**
+   * Stream `stream` progressively and begin playback. Resolves once playback has STARTED.
+   * Falls back to buffered decode if stream playback is unsupported.
+   */
+  playStream?(stream: ReadableStream<Uint8Array>, callbacks: AudioPlaybackCallbacks): Promise<PlaybackHandle>
+
   /** Tear down every context/stream/node owned by the driver. Idempotent. */
   dispose(): Promise<void>
 }

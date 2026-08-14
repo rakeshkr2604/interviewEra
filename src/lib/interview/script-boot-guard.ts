@@ -22,8 +22,11 @@ export type BootTurnFetchDecision =
 export function decideBootTurnFetch(opts: {
   needsUnlock: boolean
   bootAlreadyCalled: boolean
+  /** True after claimBootTurnApply — remount must not POST [NONE] again. */
+  alreadyApplied?: boolean
 }): BootTurnFetchDecision {
   if (opts.needsUnlock) return { action: 'skip_await_unlock' }
+  if (opts.alreadyApplied) return { action: 'skip_already_booted' }
   if (opts.bootAlreadyCalled) return { action: 'skip_already_booted' }
   return { action: 'fetch_first_turn' }
 }
@@ -107,28 +110,58 @@ export function registerBootTurnFetch<T>(
   const existing = bootTurnRegistry.get(interviewId)
   if (existing) return existing.promise as Promise<T>
 
-  const promise = startFetch()
+  // Insert the placeholder *before* startFetch so a Strict Mode remount
+  // (or a concurrent caller) joins instead of starting a second request.
+  // startFetch itself may call getBootTurnPromise() to decide whether to abort.
+  let settle!: (value: T) => void
+  let fail!: (reason: unknown) => void
+  const promise = new Promise<T>((resolve, reject) => {
+    settle = resolve
+    fail = reject
+  })
   const entry: BootTurnEntry<T> = { promise, result: null, rejected: false }
   bootTurnRegistry.set(interviewId, entry as BootTurnEntry<unknown>)
 
-  void promise.then(
+  void startFetch().then(
     (value) => {
       const current = bootTurnRegistry.get(interviewId)
       if (current && current.promise === promise) {
         current.result = value
       }
+      settle(value)
     },
-    () => {
+    (reason: unknown) => {
       const current = bootTurnRegistry.get(interviewId)
       if (current && current.promise === promise) {
         current.rejected = true
         // Allow a deliberate retry after failure.
         bootTurnRegistry.delete(interviewId)
       }
+      fail(reason)
     },
   )
 
   return promise
+}
+
+/**
+ * Unmount must NOT abort an in-flight boot `[NONE]` /turn.
+ * React Strict Mode remounts the page: cleanup abort was cancelling the
+ * request before it reached the server (zero POST /turn, "signal is aborted").
+ */
+export function shouldAbortTurnFetchOnUnmount(opts: {
+  hasBootRegistryPromise: boolean
+}): boolean {
+  return !opts.hasBootRegistryPromise
+}
+
+/** Surviving mount should retry once when the first boot fetch was aborted. */
+export function shouldRetryBootTurnAfterAbort(opts: {
+  aborted: boolean
+  cancelled: boolean
+  alreadyRetried: boolean
+}): boolean {
+  return opts.aborted && !opts.cancelled && !opts.alreadyRetried
 }
 
 /** Drop the registry entry after apply (or on hard failure / retry reset). */
@@ -151,8 +184,39 @@ export function resolveBootTurnSource(opts: {
   hasRegisteredPromise: boolean
 }): 'start_fetch' | 'join_existing' | 'none' {
   if (opts.decision.action === 'skip_await_unlock') return 'none'
-  if (opts.decision.action === 'fetch_first_turn') return 'start_fetch'
-  // skip_already_booted
+  // Prefer joining an in-flight/settled registry promise even when the mount
+  // thinks it is a cold fetch (Strict Mode remount resets bootCalledRef).
   if (opts.hasRegisteredPromise) return 'join_existing'
+  if (opts.decision.action === 'fetch_first_turn') return 'start_fetch'
   return 'none'
+}
+
+// ── Boot early-TTS (SSE sentence-0) — survives Strict Mode remount ───────────
+
+type BootEarlyEntry = { sentence: string }
+
+const bootEarlyByInterview = new Map<string, BootEarlyEntry>()
+
+/**
+ * Record the first SSE sentence for a boot turn. Returns true when this caller
+ * should start TTS; false when sentence-0 was already claimed (skip re-speak).
+ */
+export function claimBootEarlySentence(interviewId: string, sentence: string): boolean {
+  if (!interviewId || !sentence.trim()) return false
+  if (bootEarlyByInterview.has(interviewId)) return false
+  bootEarlyByInterview.set(interviewId, { sentence })
+  return true
+}
+
+export function getBootEarlySentence(interviewId: string): string | null {
+  return bootEarlyByInterview.get(interviewId)?.sentence ?? null
+}
+
+export function clearBootEarlySentence(interviewId: string): void {
+  bootEarlyByInterview.delete(interviewId)
+}
+
+/** Test helper — clears early-TTS claims. */
+export function _resetBootEarlySentencesForTests(): void {
+  bootEarlyByInterview.clear()
 }

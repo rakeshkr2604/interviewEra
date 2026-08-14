@@ -16,6 +16,7 @@ import {
   readCameraInterviewModeEnabled,
   writeCameraInterviewModeEnabled,
 } from '@/lib/settings/client-preferences'
+import { stashScriptInterviewerId } from '@/lib/config/interviewers'
 
 /**
  * Production v2.1 script interview setup (goal → role → resume → start).
@@ -396,7 +397,8 @@ export default function ScriptInterviewStartPage() {
     void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
 
     stashStartupClickMeta(result.interviewId)
-    router.push(`/interview/script/${result.interviewId}`)
+    stashScriptInterviewerId(result.interviewId, interviewerId)
+    router.push(`/interview/script/${result.interviewId}?i=${interviewerId}`)
     setSubmitting(false)
   }, [
     resumeId,

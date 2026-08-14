@@ -8,6 +8,7 @@
 
 import { analyzeAnswer } from '@/lib/interview/agent-evaluator';
 import { generateFollowUp, buildAcknowledgment } from '@/lib/interview/followup-generator';
+import { generateFollowUpStream } from '@/lib/interview/followup-stream';
 import {
   updateConversationState,
   getConversationState,
@@ -171,6 +172,129 @@ export async function processAnswer(
     return {
       type: 'acknowledgment',
       text: 'I see. Let me ask you another question.',
+      analysis: fallbackAnalysis(),
+      should_continue: true,
+      state_updated: false,
+    };
+  }
+}
+
+export async function processAnswerStream(
+  interviewId: string,
+  question: string,
+  answer: string,
+  context: InterviewContext,
+  interviewerId: InterviewerId | null = null,
+  mode: InterviewMode = 'mixed',
+  onSentence?: (sentence: string, index: number) => void,
+  signal?: AbortSignal,
+): Promise<InterviewResponse> {
+  try {
+    let state: ConversationState | null = null;
+    try {
+      state = await getConversationState(interviewId);
+      if (!state) {
+        state = await initializeConversationState(interviewId, context);
+      }
+    } catch (stateErr) {
+      console.warn('[orchestrator] Conversation state unavailable (non-fatal):', stateErr);
+    }
+
+    const previousAnalyses = state?.answers_received.map((t) => t.analysis) ?? [];
+    const analysis = await analyzeAnswer(question, answer, context, previousAnalyses);
+
+    const turn: ConversationTurn = {
+      question,
+      answer,
+      analysis,
+      timestamp: new Date().toISOString(),
+      question_type: state?.needs_followup ? 'followup' : 'initial',
+    };
+
+    let updatedState: ConversationState | null = state;
+    let stateUpdated = false;
+    if (state) {
+      try {
+        updatedState = await updateConversationState(state.id, turn);
+        stateUpdated = true;
+      } catch (updateErr) {
+        console.warn('[orchestrator] State update failed (non-fatal):', updateErr);
+      }
+    }
+
+    const recentAnalyses = updatedState?.answers_received.slice(-3).map((t) => t.analysis) ?? [analysis];
+    const rapportLevel = updatedState?.rapport_level ?? 5;
+    const tone = selectTone(rapportLevel, recentAnalyses);
+    const voiceMetadata: VoiceMetadata = {
+      tone,
+      rapportLevel,
+      shouldUseVoice: true,
+    };
+
+    if (updatedState?.needs_followup && updatedState.followup_context) {
+      const followUpQuestion = await generateFollowUpStream(
+        question,
+        answer,
+        analysis,
+        context,
+        updatedState.dialogue_history,
+        interviewerId,
+        mode,
+        onSentence,
+        signal,
+      );
+
+      if (followUpQuestion.trim()) {
+        if (updatedState?.id) {
+          void persistFollowUpQuestion({
+            conversationStateId: updatedState.id,
+            originalQuestion: question,
+            originalAnswer: answer,
+            followupQuestion: followUpQuestion,
+            followupType: analysis.recommended_followup_type,
+          });
+        }
+        trackInterviewEvent('followup_generated', {
+          interviewId,
+          followupType: analysis.recommended_followup_type,
+        });
+
+        return {
+          type: 'followup',
+          text: followUpQuestion,
+          analysis,
+          should_continue: true,
+          state_updated: stateUpdated,
+          voice_metadata: voiceMetadata,
+        };
+      }
+    }
+
+    const acknowledgment = buildAcknowledgment(analysis);
+    if (onSentence) {
+      onSentence(acknowledgment, 0);
+    }
+
+    return {
+      type: 'acknowledgment',
+      text: acknowledgment,
+      analysis,
+      should_continue: true,
+      state_updated: stateUpdated,
+      voice_metadata: voiceMetadata,
+    };
+  } catch (error) {
+    if (signal?.aborted) throw error;
+    console.error('[orchestrator] Process answer stream failed:', error);
+
+    const fallbackText = 'I see. Let me ask you another question.';
+    if (onSentence) {
+      onSentence(fallbackText, 0);
+    }
+
+    return {
+      type: 'acknowledgment',
+      text: fallbackText,
       analysis: fallbackAnalysis(),
       should_continue: true,
       state_updated: false,

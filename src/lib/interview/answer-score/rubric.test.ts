@@ -219,10 +219,25 @@ describe('validateAnswerScoreOutput', () => {
     if (!result.ok) expect(result.errors.join(' ')).toMatch(/multiple of 0\.5/);
   });
 
-  it('rejects sub_rubric mismatch against routed question type', () => {
+  it('normalizes wrong sub_rubric to the authoritative route (does not reject)', () => {
     const result = validateAnswerScoreOutput(llmOutput({ sub_rubric: 'star' }), 'logical_flow');
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors[0]).toMatch(/sub_rubric/);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.overall).toBeGreaterThan(0);
+  });
+
+  it('accepts missing sub_rubric by injecting the authoritative value', () => {
+    const raw = llmOutput({ sub_rubric: 'logical_flow' }) as Record<string, unknown>;
+    delete raw.sub_rubric;
+    const result = validateAnswerScoreOutput(raw, 'star');
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts behavioral/STAR when model wrongly returned logical_flow', () => {
+    const result = validateAnswerScoreOutput(
+      llmOutput({ sub_rubric: 'logical_flow' }),
+      'star',
+    );
+    expect(result.ok).toBe(true);
   });
 
   it('rejects structurally malformed output', () => {
@@ -269,6 +284,71 @@ describe('validateAnswerScoreOutput', () => {
     );
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.dimensions.specificity.score).toBe(5);
+  });
+
+  it('floors STAR structure 0 when relevance > 0 (missing scenario ≠ unstructured)', () => {
+    const result = validateAnswerScoreOutput(
+      llmOutput({
+        scores: {
+          relevance: 3,
+          structure: 0,
+          communication_clarity: 7,
+          content_accuracy: 7,
+          specificity: 5,
+        },
+        notes: {
+          relevance: 'honest pivot; requested disagreement not shown',
+          structure: 'No incident of disagreement is presented, so STAR elements are not applicable.',
+        },
+      }),
+      'star',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.dimensions.structure.score).toBe(5);
+      expect(result.value.dimensions.relevance.score).toBe(3);
+      expect(result.value.suspect_reasons).toContain(
+        'structure_floored_independent_of_relevance',
+      );
+      expect(result.value.dimensions.structure.note).toMatch(/auto-floored/);
+    }
+  });
+
+  it('does not floor STAR structure 0 when relevance is 0 (off-topic)', () => {
+    const result = validateAnswerScoreOutput(
+      llmOutput({
+        scores: { relevance: 0, structure: 0, specificity: 0 },
+        notes: {
+          relevance: 'entirely off-topic; never engages the question',
+          structure: 'unorganized fragments with no followable arc',
+          specificity: 'no on-topic specifics',
+        },
+      }),
+      'star',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.dimensions.structure.score).toBe(0);
+  });
+
+  it('does not floor logical_flow structure 0 (disconnected facts stay 0)', () => {
+    const result = validateAnswerScoreOutput(
+      llmOutput({
+        scores: { relevance: 7, structure: 0 },
+        notes: { structure: 'disconnected facts with no reasoning path' },
+      }),
+      'logical_flow',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.dimensions.structure.score).toBe(0);
+  });
+
+  it('does not raise a non-zero STAR structure score', () => {
+    const result = validateAnswerScoreOutput(
+      llmOutput({ scores: { relevance: 3, structure: 3 } }),
+      'star',
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.dimensions.structure.score).toBe(3);
   });
 
   it('appends low_stt_confidence to suspect reasons when flagged', () => {

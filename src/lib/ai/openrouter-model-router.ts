@@ -3,9 +3,13 @@
  *
  * Business rule (2026 MVP):
  *   - Cheap/fast: openai/gpt-4.1-mini — parsing, summaries, tooling, analyzer agent.
- *   - Higher quality: openai/gpt-4.1 — live interview paths (questions, follow-ups, scoring).
+ *   - Higher quality: openai/gpt-4.1 — live interview paths (questions, follow-ups).
+ *   - Fast structured JSON: google/gemini-2.5-flash — question gen, per-answer score-v1,
+ *     and auto_structure (review-step coaching; mini uncapped output hit 6–14s).
  *
- * Overrides: OPENROUTER_SMART_MODEL, OPENROUTER_CHEAP_MODEL (optional, ops-only).
+ * Overrides: OPENROUTER_SMART_MODEL, OPENROUTER_CHEAP_MODEL,
+ * OPENROUTER_QUESTION_GEN_MODEL / OPENROUTER_SCORE_MODEL /
+ * OPENROUTER_AUTO_STRUCTURE_MODEL (optional, ops-only).
  */
 
 import type { AiOperation } from '@/lib/ai/operation-registry';
@@ -18,8 +22,12 @@ const SMART_OPERATIONS = new Set<AiOperation>([
   'followup_generation',
 ]);
 
-/** Fast JSON generation — quality comes from resume/JD context, not a heavy model. */
-const FAST_GENERATION_OPERATIONS = new Set<AiOperation>(['question_generation']);
+/** Fast JSON generation — latency-sensitive structured ops. */
+const FAST_GENERATION_OPERATIONS = new Set<AiOperation>([
+  'question_generation',
+  'answer_score',
+  'auto_structure',
+]);
 
 const DEFAULT_QUESTION_GEN_MODEL = 'google/gemini-2.5-flash';
 
@@ -37,6 +45,20 @@ export function getOpenRouterModelForOperation(operation: string | undefined): s
   const op = operation as AiOperation;
 
   if (FAST_GENERATION_OPERATIONS.has(op)) {
+    if (op === 'answer_score') {
+      return (
+        process.env.OPENROUTER_SCORE_MODEL?.trim() ??
+        process.env.OPENROUTER_QUESTION_GEN_MODEL?.trim() ??
+        DEFAULT_QUESTION_GEN_MODEL
+      );
+    }
+    if (op === 'auto_structure') {
+      return (
+        process.env.OPENROUTER_AUTO_STRUCTURE_MODEL?.trim() ??
+        process.env.OPENROUTER_QUESTION_GEN_MODEL?.trim() ??
+        DEFAULT_QUESTION_GEN_MODEL
+      );
+    }
     return (
       process.env.OPENROUTER_QUESTION_GEN_MODEL?.trim() ??
       envCheap ??

@@ -184,27 +184,52 @@ export async function fetchSTTTokenWithRetry(
   interviewId: string,
   opts?: FetchSTTTokenWithRetryOptions,
 ): Promise<STTTokenResponse> {
-  if (!opts?.bypassCache && !opts?.prefetchOnly) {
-    const cached = takeCachedSTTToken(interviewId, {
-      refreshLeaseId: opts?.refreshLeaseId,
-    })
-    if (cached) return cached
+  // Join any in-flight mint (including prefetchOnly). Previously prefetchOnly
+  // bypassed this and could stampede /api/stt/token during StrictMode / warmup.
+  if (!opts?.bypassCache) {
+    if (opts?.prefetchOnly) {
+      const peeked = peekCachedSTTToken(interviewId)
+      if (
+        peeked &&
+        (!opts.refreshLeaseId ||
+          !peeked.session_lease_id ||
+          peeked.session_lease_id === opts.refreshLeaseId)
+      ) {
+        return peeked
+      }
+    } else {
+      const cached = takeCachedSTTToken(interviewId, {
+        refreshLeaseId: opts?.refreshLeaseId,
+      })
+      if (cached) return cached
+    }
 
     const inFlight = inFlightByInterview.get(interviewId)
     if (inFlight) {
       const data = await inFlight
-      // Prefer consuming the just-finished prefetch from cache.
-      const fromCache = takeCachedSTTToken(interviewId, {
-        refreshLeaseId: opts?.refreshLeaseId,
-      })
-      if (fromCache) return fromCache
-      // Prefetch consumed elsewhere or lease mismatch — fall through to mint.
-      if (
-        !opts?.refreshLeaseId ||
-        !data.session_lease_id ||
-        data.session_lease_id === opts.refreshLeaseId
-      ) {
-        return data
+      if (opts?.prefetchOnly) {
+        const peeked = peekCachedSTTToken(interviewId)
+        if (peeked) return peeked
+        if (
+          !opts.refreshLeaseId ||
+          !data.session_lease_id ||
+          data.session_lease_id === opts.refreshLeaseId
+        ) {
+          return data
+        }
+      } else {
+        // Prefer consuming the just-finished prefetch from cache.
+        const fromCache = takeCachedSTTToken(interviewId, {
+          refreshLeaseId: opts?.refreshLeaseId,
+        })
+        if (fromCache) return fromCache
+        if (
+          !opts?.refreshLeaseId ||
+          !data.session_lease_id ||
+          data.session_lease_id === opts.refreshLeaseId
+        ) {
+          return data
+        }
       }
     }
   }
@@ -250,17 +275,36 @@ export async function fetchSTTTokenWithRetry(
     throw lastError ?? new STTTokenError('Could not start voice recording.', 502)
   }
 
-  const pending = run()
-  if (opts?.prefetchOnly || !opts?.bypassCache) {
+  // Register the in-flight promise BEFORE starting async work so a synchronous
+  // second caller (StrictMode / parallel prefetch) joins instead of double-minting.
+  if (!opts?.bypassCache) {
+    const raced = inFlightByInterview.get(interviewId)
+    if (raced) {
+      const data = await raced
+      if (opts?.prefetchOnly) {
+        const peeked = peekCachedSTTToken(interviewId)
+        if (peeked) return peeked
+        return data
+      }
+      const fromCache = takeCachedSTTToken(interviewId, {
+        refreshLeaseId: opts?.refreshLeaseId,
+      })
+      if (fromCache) return fromCache
+      return data
+    }
+
+    const pending = run()
     inFlightByInterview.set(interviewId, pending)
-  }
-  try {
-    return await pending
-  } finally {
-    if (inFlightByInterview.get(interviewId) === pending) {
-      inFlightByInterview.delete(interviewId)
+    try {
+      return await pending
+    } finally {
+      if (inFlightByInterview.get(interviewId) === pending) {
+        inFlightByInterview.delete(interviewId)
+      }
     }
   }
+
+  return run()
 }
 
 export function is429Error(err: unknown): boolean {

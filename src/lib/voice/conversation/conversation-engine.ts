@@ -13,6 +13,7 @@ import type { TurnContext } from '@/lib/voice/core/ids'
 export interface ScoreAnswerInput {
   ctx: TurnContext
   answerText: string
+  onSentence?: (sentence: string, index: number) => void
 }
 
 /** Opaque, UI-facing score payload for the just-submitted answer. */

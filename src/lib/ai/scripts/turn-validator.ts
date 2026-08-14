@@ -15,6 +15,12 @@ const VALID_PHASES = ['warmup', 'self_intro', 'core', 'candidate_questions', 'cl
 const VALID_DIFFICULTIES = ['easy', 'medium', 'hard'] as const
 const VALID_EMOTIONS = ['neutral', 'warm', 'curious', 'challenging'] as const
 const VALID_QUESTION_TYPES = ['technical', 'behavioral'] as const
+const VALID_CANDIDATE_QUESTION_ACTIONS = [
+  'invite',
+  'guidance',
+  'answer',
+  'follow_up',
+] as const
 
 export type ScriptTurnOutput = {
   speech: string
@@ -32,6 +38,11 @@ export type ScriptTurnOutput = {
   question_difficulty: (typeof VALID_DIFFICULTIES)[number] | null
   interviewer_emotion: (typeof VALID_EMOTIONS)[number]
   question_type?: (typeof VALID_QUESTION_TYPES)[number] | null // SCRIPT_M only
+  /**
+   * Dedicated candidate-question lifecycle marker. This is intentionally
+   * separate from core `is_follow_up`, scoring, and SCRIPT_M alternation.
+   */
+  candidate_question_action?: (typeof VALID_CANDIDATE_QUESTION_ACTIONS)[number] | null
 }
 
 function fail(field: string, received: unknown, expectation: string): never {
@@ -81,6 +92,21 @@ export function validateTurnOutput(raw: unknown, scriptType: ScriptType): Script
   const allow_skip = requireBoolean(obj, 'allow_skip')
   const show_auto_structure = requireBoolean(obj, 'show_auto_structure')
   const is_question = requireBoolean(obj, 'is_question')
+
+  const rawCandidateQuestionAction = obj['candidate_question_action'] ?? null
+  if (
+    rawCandidateQuestionAction !== null &&
+    (typeof rawCandidateQuestionAction !== 'string' ||
+      !(VALID_CANDIDATE_QUESTION_ACTIONS as readonly string[]).includes(
+        rawCandidateQuestionAction,
+      ))
+  ) {
+    fail(
+      'candidate_question_action',
+      rawCandidateQuestionAction,
+      `must be one of ${VALID_CANDIDATE_QUESTION_ACTIONS.join(' | ')} or null`,
+    )
+  }
 
   // Default false when omitted — older model outputs / canned overrides may lack it.
   const rawFollowUp = obj['is_follow_up']
@@ -145,14 +171,19 @@ export function validateTurnOutput(raw: unknown, scriptType: ScriptType): Script
   }
 
   const wordCount = speech.trim().split(/\s+/).filter(Boolean).length
-  if (wordCount > 35) {
-    console.warn(`[turn-validator] speech exceeds 35 words (${wordCount} words): "${speech}"`)
+  // Soft cap: optional spoken bridge before display_question is allowed.
+  if (wordCount > 55) {
+    console.warn(`[turn-validator] speech exceeds 55 words (${wordCount} words): "${speech}"`)
   }
   if (!is_question && display_question !== null) {
     console.warn(
       `[turn-validator] display_question should be null when is_question is false (received: ${JSON.stringify(display_question)})`
     )
   }
+
+  // Speech ↔ display_question wording is normalized in turn-authority
+  // (canonicalizeTurnSpeech) after this schema check. Do NOT 422 here on
+  // paraphrase — that discarded turns after SSE sentence-0.
 
   const result: ScriptTurnOutput = {
     speech,
@@ -171,6 +202,10 @@ export function validateTurnOutput(raw: unknown, scriptType: ScriptType): Script
   }
   if (question_type !== undefined) {
     result.question_type = question_type
+  }
+  if (rawCandidateQuestionAction !== null) {
+    result.candidate_question_action =
+      rawCandidateQuestionAction as ScriptTurnOutput['candidate_question_action']
   }
   return result
 }

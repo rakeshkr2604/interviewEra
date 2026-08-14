@@ -36,6 +36,8 @@ export class TtsFallbackError extends Error {
 export interface TtsSynthesizer {
   /** Synthesize one chunk. Must honor the abort signal. */
   speak(text: string, options: TTSOptions, signal: AbortSignal): Promise<ArrayBuffer>
+  /** Progressive stream synthesis for chunk 0. */
+  speakStream?(text: string, options: TTSOptions, signal: AbortSignal): Promise<Response>
 }
 
 /** Audible fallback when ElevenLabs returns a soft failure. */
@@ -47,6 +49,7 @@ export interface TtsFallbackSpeaker {
 
 export interface TtsAudioSink {
   playAudio(buffer: ArrayBuffer, callbacks: AudioPlaybackCallbacks): Promise<void>
+  playAudioStream?(stream: ReadableStream<Uint8Array>, callbacks: AudioPlaybackCallbacks): Promise<void>
   stopAudio(): void
 }
 
@@ -135,10 +138,29 @@ export class TtsPipeline {
     callbacks.onStart?.()
 
     try {
-      let prefetch: Promise<ArrayBuffer> | null =
-        chunks.length > 0 ? this.synthesizer.speak(chunks[0], options, controller.signal) : null
+      let prefetch: Promise<ArrayBuffer> | null = null
 
       for (let i = 0; i < chunks.length; i++) {
+        // Attempt progressive stream playback for chunk 0 if both synthesizer and sink support it
+        if (i === 0 && this.synthesizer.speakStream && this.sink.playAudioStream) {
+          try {
+            const streamRes = await this.synthesizer.speakStream(chunks[0], options, controller.signal)
+            if (myGen !== this.generation) return
+            if (streamRes.body) {
+              if (i + 1 < chunks.length) {
+                prefetch = this.synthesizer.speak(chunks[i + 1], options, controller.signal)
+                prefetch.catch(() => {})
+              }
+              await this.playStreamChunk(streamRes.body, myGen)
+              if (myGen !== this.generation) return
+              continue
+            }
+          } catch (err) {
+            if (err instanceof TtsFallbackError) throw err
+            // Non-fatal stream error fallback: proceed to standard speak()
+          }
+        }
+
         const bufferPromise = prefetch ?? this.synthesizer.speak(chunks[i], options, controller.signal)
         prefetch = null
 
@@ -197,6 +219,25 @@ export class TtsPipeline {
       this.bus?.emit('Error', { scope: 'tts', message }, { ctx: this.ctx })
       callbacks.onError?.(message)
     }
+  }
+
+  private playStreamChunk(stream: ReadableStream<Uint8Array>, myGen: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      if (myGen !== this.generation) {
+        resolve()
+        return
+      }
+      if (this.sink.playAudioStream) {
+        void this.sink
+          .playAudioStream(stream, {
+            onPlaybackComplete: () => resolve(),
+            onPlaybackFailed: () => resolve(),
+          })
+          .then(resolve)
+      } else {
+        resolve()
+      }
+    })
   }
 
   private playChunk(buffer: ArrayBuffer, myGen: number): Promise<void> {

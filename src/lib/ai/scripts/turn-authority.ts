@@ -1,4 +1,19 @@
 import type { ScriptTurnOutput } from './turn-validator'
+import { canonicalizeTurnSpeech } from './speech-display-question'
+import {
+  followUpAbandonsParentTopic,
+  followUpConflictsWithParentType,
+  isAnaphoricFollowUpProbe,
+  scriptMFollowUpIsDuplicateOf,
+  speechContainsQuestionMark,
+} from './follow-up-guards'
+import {
+  cannedScriptMNextCoreTurn,
+  nextScriptMCoreQuestionType,
+  repeatsAlreadyAskedQuestion,
+  scriptMFollowUpCanBecomeNextCore,
+} from './script-m-progression'
+import type { ScriptType } from './script-loader'
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
@@ -9,17 +24,19 @@ export const TURN_CAP: Record<Difficulty, number> = {
   hard: 25,
 }
 
-/**
- * Max interviewer invitations in candidate_questions (each invite + candidate
- * response ≈ one exchange). Tunable — not a product lock.
- */
+/** Exactly one initial candidate-question invitation. */
 export const MAX_CANDIDATE_QUESTION_EXCHANGES = 1
+
+/** At most two genuinely useful CQ clarifications; this is not a quota. */
+export const MAX_CANDIDATE_QUESTION_FOLLOW_UPS = 2
 
 export type ScriptTurnRow = {
   turn_index: number
   phase: string
   is_question: boolean
   llm_output: unknown
+  /** Present when loaded from script_turns for follow-up context recovery. */
+  answer_text?: string | null
 }
 
 function llmOutputRecord(llm_output: unknown): Record<string, unknown> | null {
@@ -32,6 +49,24 @@ function llmOutputRecord(llm_output: unknown): Record<string, unknown> | null {
 /** Legacy turns without `is_follow_up` count as non-follow-ups. */
 export function turnIsFollowUp(llm_output: unknown): boolean {
   return llmOutputRecord(llm_output)?.is_follow_up === true
+}
+
+export type CandidateQuestionAction =
+  | 'invite'
+  | 'guidance'
+  | 'answer'
+  | 'follow_up'
+
+export function candidateQuestionAction(
+  llm_output: unknown,
+): CandidateQuestionAction | null {
+  const action = llmOutputRecord(llm_output)?.candidate_question_action
+  return action === 'invite' ||
+    action === 'guidance' ||
+    action === 'answer' ||
+    action === 'follow_up'
+    ? action
+    : null
 }
 
 /**
@@ -70,11 +105,13 @@ export function countFollowUpsSinceLastCoreQuestion(turns: ScriptTurnRow[]): num
 }
 
 /**
- * Warmup invites (is_question=true). After 2, force leave warmup.
- * Scripts define exactly two warmup turns; without this the model can loop forever
+ * Warmup invites (is_question=true). After 1, force leave warmup.
+ * Product contract: warmup is exactly ONE conversational interaction —
+ * greeting → candidate reply → self_intro (or core entry). The scripted
+ * "Ready?" second invite is not generated; without this cap the model loops
  * once the client stopped independently advancing phase (Phase 1).
  */
-export const MAX_WARMUP_QUESTIONS = 2
+export const MAX_WARMUP_QUESTIONS = 1
 
 /**
  * Self-intro invites (is_question=true). Scripts define exactly one ask + one
@@ -129,13 +166,45 @@ export function lastTurnWasSelfIntroBridge(turns: ScriptTurnRow[]): boolean {
  * (phase=candidate_questions + is_question=true).
  */
 export function countCandidateQuestionsExchanges(turns: ScriptTurnRow[]): number {
-  return turns.filter((t) => t.phase === 'candidate_questions' && t.is_question).length
+  return turns.filter((t) => {
+    if (t.phase !== 'candidate_questions') return false
+    const action = candidateQuestionAction(t.llm_output)
+    // Legacy persisted CQ invites predate candidate_question_action.
+    return action === 'invite' || (action === null && t.is_question)
+  }).length
+}
+
+export function countCandidateQuestionGuidanceTurns(turns: ScriptTurnRow[]): number {
+  return turns.filter(
+    (t) =>
+      t.phase === 'candidate_questions' &&
+      candidateQuestionAction(t.llm_output) === 'guidance',
+  ).length
+}
+
+export function countCandidateQuestionFollowUps(turns: ScriptTurnRow[]): number {
+  return turns.filter(
+    (t) =>
+      t.phase === 'candidate_questions' &&
+      candidateQuestionAction(t.llm_output) === 'follow_up' &&
+      t.is_question,
+  ).length
 }
 
 /** True when the most recent turn was a CQ interviewer answer/bridge (not an invite). */
 export function lastTurnWasCandidateQuestionsAnswer(turns: ScriptTurnRow[]): boolean {
   const last = turns[turns.length - 1]
-  return Boolean(last && last.phase === 'candidate_questions' && !last.is_question)
+  if (!last || last.phase !== 'candidate_questions') return false
+  const action = candidateQuestionAction(last.llm_output)
+  return action === 'answer' || (action === null && !last.is_question)
+}
+
+export function lastCandidateQuestionAction(
+  turns: ScriptTurnRow[],
+): CandidateQuestionAction | null {
+  const last = turns[turns.length - 1]
+  if (!last || last.phase !== 'candidate_questions') return null
+  return candidateQuestionAction(last.llm_output)
 }
 
 /** Last N acknowledgment speeches (is_question=false, phase=core), most-recent-first. */
@@ -160,26 +229,93 @@ export function resolveTurnCap(difficulty: string): number {
 }
 
 /**
- * True when the candidate declined to ask questions (skip / timeout / short "no").
- * Used to exit candidate_questions immediately instead of waiting for a second exchange.
+ * Runaway turn-cap exhaustion: never skip candidate_questions when cores
+ * are done. Remaining cores (true runaway) still close.
+ */
+export function resolveTurnCapExhaustion(opts: {
+  coreQuestionsAsked: number
+  totalQuestions: number
+  candidateQuestionsExchanges: number
+}): 'candidate_questions' | 'closing' {
+  if (
+    opts.coreQuestionsAsked >= opts.totalQuestions &&
+    opts.candidateQuestionsExchanges === 0
+  ) {
+    return 'candidate_questions'
+  }
+  return 'closing'
+}
+
+/** Trailing filler that carries no decline meaning ("... right now", "... thanks"). */
+const DECLINE_TRAILING_FILLER =
+  /\s+(right now|for now|at the moment|at this time|as of now|currently|now|today|thanks|thank you|please)$/
+
+/** Leading refusal token; may stand alone or precede a decline body. */
+const DECLINE_LEAD = /^(no|nope|nah|not really|nothing|none)\b[\s,]*/
+
+/**
+ * Decline bodies after the optional lead. Anchored so a real question that
+ * merely starts with "no" (e.g. "no wait, what is the stack?") is not matched.
+ */
+const DECLINE_BODIES: readonly RegExp[] = [
+  /^(thanks|thank you)$/,
+  /^i (do not|dont|don't) have (any ?)?(thing|questions?|queries|query)?( to ask| for you| for me)?$/,
+  /^i have no (questions?|queries)$/,
+  /^(no )?questions?( (for|from) (you|me|my side))?$/,
+  /^nothing( (from (me|my side|my end)|to ask|else))?$/,
+  /^from (me|my side|my end)$/,
+  /^(to ask|else)$/,
+  /^i('m| am)? (good|fine|all set|okay|ok|done)$/,
+  /^all (good|set)$/,
+  /^that('s| is) (all|it|fine|okay|ok)$/,
+  /^((let's|lets|we can) )?(finish|wrap up)$/,
+  /^i('d| would) like to (finish|wrap up)$/,
+  /^please (finish|wrap up)$/,
+]
+
+/**
+ * True when the candidate declined to ask questions (skip / timeout / "no").
+ *
+ * Real speech puts the refusal and the reason in one utterance
+ * ("No, I don't have any questions right now"), so a flat whole-string
+ * alternation misses the most common phrasing. Normalize, drop the trailing
+ * time qualifier, strip the optional lead, then match the remaining body.
  */
 export function isNoQuestionsAnswer(lastAnswer: string): boolean {
   if (lastAnswer === '[SKIPPED]' || lastAnswer === '[TIMEOUT]') return true
-  const t = lastAnswer.trim().toLowerCase()
-  if (t.length === 0) return true
-  if (t.length > 48) return false
-  return /^(no|nope|nah|nothing|none|no thanks|no thank you|no questions?|i('m| am)? (good|fine|all set|okay|ok)|that('s| is) (all|it|fine|okay|ok)|i don'?t have (any(thing| questions?)?)?( to ask)?|nothing from me)\.?$/.test(
-    t,
-  )
+
+  let text = lastAnswer
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9'\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (text.length === 0) return true
+  if (text.length > 80) return false
+
+  let stripped = text.replace(DECLINE_TRAILING_FILLER, '')
+  while (stripped !== text) {
+    text = stripped
+    stripped = text.replace(DECLINE_TRAILING_FILLER, '')
+  }
+  if (text.length === 0) return true
+
+  const hadLead = DECLINE_LEAD.test(text)
+  const body = hadLead ? text.replace(DECLINE_LEAD, '').trim() : text
+  if (hadLead && body.length === 0) return true
+
+  return DECLINE_BODIES.some((pattern) => pattern.test(body))
 }
 
 /** Deterministic candidate_questions transition (no extra LLM call). */
 export function cannedCandidateQuestionsTurn(
   emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
 ): ScriptTurnOutput {
+  const display_question = 'Do you have any questions for me?'
   return {
-    speech: "That covers what I wanted to go through. Any questions for me about the role?",
-    display_question: 'Do you have any questions for me?',
+    speech: `That covers what I wanted to go through. ${display_question}`,
+    display_question,
     tip: null,
     timer_seconds: 60,
     reading_buffer_seconds: 3,
@@ -189,6 +325,7 @@ export function cannedCandidateQuestionsTurn(
     phase: 'candidate_questions',
     is_question: true,
     is_follow_up: false,
+    candidate_question_action: 'invite',
     question_difficulty: null,
     interviewer_emotion: emotion,
   }
@@ -198,7 +335,8 @@ export function cannedClosingTurn(
   emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
 ): ScriptTurnOutput {
   return {
-    speech: "That's all we have time for today. Your report will be ready shortly.",
+    speech:
+      'Thanks for your time today. It was great speaking with you. Good luck with your interviews!',
     display_question: null,
     tip: null,
     timer_seconds: 0,
@@ -209,6 +347,29 @@ export function cannedClosingTurn(
     phase: 'closing',
     is_question: false,
     is_follow_up: false,
+    question_difficulty: null,
+    interviewer_emotion: emotion,
+  }
+}
+
+/** Graceful fallback when the CQ model tries to close without answering. */
+export function cannedCandidateQuestionAnswerTurn(
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  return {
+    speech:
+      'I can only answer from the context available in this practice interview. In a real interview, the team can give you the most accurate details about that.',
+    display_question: null,
+    tip: null,
+    timer_seconds: 0,
+    reading_buffer_seconds: 0,
+    auto_submit: false,
+    allow_skip: false,
+    show_auto_structure: false,
+    phase: 'candidate_questions',
+    is_question: false,
+    is_follow_up: false,
+    candidate_question_action: 'answer',
     question_difficulty: null,
     interviewer_emotion: emotion,
   }
@@ -236,10 +397,191 @@ export function cannedCoreEntryTurn(
 }
 
 /**
+ * Cap fallback: do not promote the rejected follow-up into a new core
+ * question. Client auto-advances; next /turn generates the next planned
+ * question. Recovers candidate answer via follow-up-context.
+ */
+export function cannedMoveOnTurn(
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  return {
+    speech: "Thanks. Let's keep going.",
+    display_question: null,
+    tip: null,
+    timer_seconds: 0,
+    reading_buffer_seconds: 0,
+    auto_submit: false,
+    allow_skip: false,
+    show_auto_structure: false,
+    phase: 'core',
+    is_question: false,
+    is_follow_up: false,
+    question_difficulty: null,
+    interviewer_emotion: emotion,
+  }
+}
+
+const MOVE_ON_SPEECH = cannedMoveOnTurn().speech
+
+/**
+ * Score-authoritative fallback when the model fails to emit an owed probe.
+ * This must itself be an answerable question. The old acknowledgment bridge
+ * required another LLM turn and could chain into the client's consecutive
+ * non-question recovery error.
+ */
+export function cannedRequiredFollowUpTurn(opts: {
+  questionType: 'technical' | 'behavioral'
+  emotion?: ScriptTurnOutput['interviewer_emotion']
+}): ScriptTurnOutput {
+  const display_question =
+    opts.questionType === 'technical'
+      ? 'Can you go deeper into how you approached that, including the key technical decision or trade-off?'
+      : 'Can you go deeper into what you personally did and what outcome it led to?'
+  return {
+    speech: `Before we move on, ${display_question}`,
+    display_question,
+    tip: null,
+    timer_seconds: 90,
+    reading_buffer_seconds: 3,
+    auto_submit: false,
+    allow_skip: true,
+    show_auto_structure: true,
+    phase: 'core',
+    is_question: true,
+    is_follow_up: true,
+    question_type: opts.questionType,
+    question_difficulty: 'medium',
+    interviewer_emotion: opts.emotion ?? 'neutral',
+  }
+}
+
+/**
+ * Answerable next-core fallback when a second consecutive core
+ * acknowledgment would otherwise persist. SCRIPT_M keeps alternation;
+ * H/T use a single unused template of the script's type.
+ */
+export function cannedNextCoreQuestionTurn(opts: {
+  scriptType?: ScriptType
+  lastQuestionType?: 'technical' | 'behavioral' | null
+  parentQuestionType?: 'technical' | 'behavioral' | null
+  alreadyAsked: string[]
+  emotion?: ScriptTurnOutput['interviewer_emotion']
+}): ScriptTurnOutput {
+  if (opts.scriptType === 'SCRIPT_M') {
+    const nextType = nextScriptMCoreQuestionType(
+      opts.lastQuestionType ?? opts.parentQuestionType,
+    )
+    return cannedScriptMNextCoreTurn(nextType, opts.alreadyAsked, opts.emotion)
+  }
+
+  const technical = opts.scriptType === 'SCRIPT_T'
+  const display_question = technical
+    ? 'Walk me through how you would approach this problem end to end, including the main trade-off you would make.'
+    : 'Tell me about a time you faced a setback or disagreement at work or in a project. What did you do, and what was the outcome?'
+  return {
+    speech: `Let's keep going. ${display_question}`,
+    display_question,
+    tip: null,
+    timer_seconds: technical ? 180 : 150,
+    reading_buffer_seconds: 4,
+    auto_submit: false,
+    allow_skip: true,
+    show_auto_structure: true,
+    phase: 'core',
+    is_question: true,
+    is_follow_up: false,
+    question_type: technical ? 'technical' : 'behavioral',
+    question_difficulty: 'medium',
+    interviewer_emotion: opts.emotion ?? 'neutral',
+  }
+}
+
+/** Deterministic self_intro invite used by every warmup exit. */
+export function cannedSelfIntroTurn(
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  const display_question = 'Walk me through your background relevant to this role.'
+  return {
+    speech: `Quick background first — ${display_question}`,
+    display_question,
+    tip: null,
+    timer_seconds: 120,
+    reading_buffer_seconds: 4,
+    auto_submit: false,
+    allow_skip: false,
+    show_auto_structure: true,
+    phase: 'self_intro',
+    is_question: true,
+    is_follow_up: false,
+    question_difficulty: 'easy',
+    interviewer_emotion: emotion,
+  }
+}
+
+const NO_ANSWER_VALUES = new Set(['[SKIPPED]', '[TIMEOUT]', '[NONE]'])
+
+/**
+ * Whether a same-topic probe is *mandatory* for this turn.
+ *
+ * The cap of 2 bounds how many probes may happen; the score decides whether
+ * one must. `answer_probe_needed === false` already blocks a follow-up, but
+ * `true` was only ever permissive — the model could still move on from a weak
+ * answer, which reads as an arbitrary quota rather than an adaptive rule.
+ *
+ * `unknown` (missing/failed score) stays permissive and defers to the LLM.
+ */
+export function probeIsRequired(opts: {
+  requestPhase: string
+  followUpEnabled: boolean
+  followUpsThisQuestion: number
+  maxFollowUpsPerQuestion?: number
+  hasValidParentCoreQuestion?: boolean
+  answerProbeNeeded?: boolean | 'unknown'
+  lastAnswer: string
+}): boolean {
+  if (opts.requestPhase !== 'core') return false
+  if (!opts.followUpEnabled) return false
+  if (opts.answerProbeNeeded !== true) return false
+  if (opts.hasValidParentCoreQuestion !== true) return false
+  if (NO_ANSWER_VALUES.has(opts.lastAnswer.trim())) return false
+  const max = opts.maxFollowUpsPerQuestion ?? 2
+  return opts.followUpsThisQuestion < max
+}
+
+/**
+ * Off-topic / type-mismatch fallback: stay on the parent question as a
+ * same-topic follow-up (no extra LLM call, no ack auto-advance loop).
+ * Do not use for Adaptive OFF or SCRIPT_M hijack/duplicate — that restates
+ * the parent as a follow-up and consumes a FU slot.
+ */
+export function cannedParentRedirectTurn(
+  parentQuestion: string,
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  const q = parentQuestion.trim() || 'Can you answer the question I asked?'
+  return {
+    speech: `Let's come back to what I asked. ${q}`,
+    display_question: q,
+    tip: null,
+    timer_seconds: 90,
+    reading_buffer_seconds: 3,
+    auto_submit: false,
+    allow_skip: false,
+    show_auto_structure: true,
+    phase: 'core',
+    is_question: true,
+    is_follow_up: true,
+    question_difficulty: null,
+    interviewer_emotion: emotion,
+  }
+}
+
+/**
  * Server authority: clamp follow-ups, force core → candidate_questions when the
  * question budget is spent, force candidate_questions → closing when the
  * CQ exchange cap is hit (or the candidate declines to ask), force
- * warmup/self_intro exits, and reject phase regressions.
+ * warmup/self_intro exits, reject phase regressions, and canonicalize
+ * speech to optional-bridge + exact display_question (H/T/M).
  */
 export function applyTurnAuthorityOverrides(opts: {
   turn: ScriptTurnOutput
@@ -249,48 +591,79 @@ export function applyTurnAuthorityOverrides(opts: {
   followUpEnabled: boolean
   candidateQuestionsExchanges: number
   maxCandidateQuestionsExchanges?: number
+  candidateQuestionFollowUps?: number
+  maxCandidateQuestionFollowUps?: number
   /** Client phase for the request that produced this turn. */
   requestPhase: string
   lastAnswer: string
+  /**
+   * True when a prior core question exists and a real candidate answer is
+   * available for a follow-up decision. Undefined keeps prior test behavior
+   * (does not strip follow-ups for missing parent).
+   */
+  hasValidParentCoreQuestion?: boolean
+  /** SCRIPT_M: copy onto a follow-up when the model omits question_type. */
+  parentQuestionType?: 'technical' | 'behavioral' | null
+  parentQuestion?: string
+  lastCandidateAnswer?: string
+  lastFollowUpQuestion?: string
+  alreadyAskedQuestions?: string[]
+  /** SCRIPT_M: last persisted non-follow-up core type (alternation). */
+  lastQuestionType?: 'technical' | 'behavioral' | null
+  scriptType?: ScriptType
   warmupQuestionsAsked?: number
   warmupTurns?: number
   selfIntroEnabled?: boolean
   selfIntroQuestionsAsked?: number
   selfIntroTurns?: number
+  /**
+   * Score-derived probe gate. false → reject is_follow_up (move on / CQ).
+   * true | unknown | undefined → existing LLM + cap behavior.
+   */
+  answerProbeNeeded?: boolean | 'unknown'
+  /** True when the previous persisted core turn had is_question=false. */
+  previousTurnWasAcknowledgment?: boolean
 }): ScriptTurnOutput {
+  return canonicalizeTurnSpeech(resolveTurnAuthorityOverrides(opts))
+}
+
+function resolveTurnAuthorityOverrides(
+  opts: Parameters<typeof applyTurnAuthorityOverrides>[0],
+): ScriptTurnOutput {
   let turn: ScriptTurnOutput = { ...opts.turn, is_follow_up: opts.turn.is_follow_up ?? false }
   const maxFollowUps = opts.followUpEnabled ? 2 : 0
-  const maxCq =
-    opts.maxCandidateQuestionsExchanges ?? MAX_CANDIDATE_QUESTION_EXCHANGES
+  const cqFollowUps = opts.candidateQuestionFollowUps ?? 0
+  const maxCqFollowUps =
+    opts.maxCandidateQuestionFollowUps ?? MAX_CANDIDATE_QUESTION_FOLLOW_UPS
   const warmupAsked = opts.warmupQuestionsAsked ?? 0
   const warmupTurns = opts.warmupTurns ?? warmupAsked
   const selfIntroEnabled = opts.selfIntroEnabled ?? true
   const selfIntroQs = opts.selfIntroQuestionsAsked ?? 0
   const selfIntroTurns = opts.selfIntroTurns ?? 0
 
-  // Leave warmup after the scripted two invites (or any two warmup rows).
+  // Leave warmup after the single scripted invite (or any warmup row).
   if (
     turn.phase === 'warmup' &&
     (warmupAsked >= MAX_WARMUP_QUESTIONS || warmupTurns >= MAX_WARMUP_QUESTIONS)
   ) {
     if (selfIntroEnabled) {
-      return {
-        speech: 'Quick background first — walk me through your experience. Two minutes.',
-        display_question: 'Walk me through your background relevant to this role.',
-        tip: null,
-        timer_seconds: 120,
-        reading_buffer_seconds: 4,
-        auto_submit: false,
-        allow_skip: false,
-        show_auto_structure: true,
-        phase: 'self_intro',
-        is_question: true,
-        is_follow_up: false,
-        question_difficulty: 'easy',
-        interviewer_emotion: turn.interviewer_emotion,
-      }
+      return cannedSelfIntroTurn(turn.interviewer_emotion)
     }
     return cannedCoreEntryTurn(turn.interviewer_emotion)
+  }
+
+  // The model sometimes answers the self_intro prompt with a core question,
+  // skipping the intro the candidate switched on. The warmup/self_intro exits
+  // above key off the phase the model emitted, so a straight jump to core
+  // passes through unchecked.
+  if (
+    selfIntroEnabled &&
+    selfIntroQs === 0 &&
+    opts.coreQuestionsAsked === 0 &&
+    warmupTurns >= MAX_WARMUP_QUESTIONS &&
+    phaseRank(turn.phase) >= phaseRank('core')
+  ) {
+    return cannedSelfIntroTurn(turn.interviewer_emotion)
   }
 
   // Leave self_intro after 1 invite, or after question+bridge (2 turns).
@@ -306,38 +679,343 @@ export function applyTurnAuthorityOverrides(opts: {
     }
   }
 
-  if (turn.is_follow_up) {
-    if (opts.followUpsThisQuestion >= maxFollowUps) {
-      if (opts.coreQuestionsAsked >= opts.totalQuestions) {
-        return cannedCandidateQuestionsTurn(turn.interviewer_emotion)
-      }
-      // Budget remains — recategorize as a new core question (acceptable tradeoff).
-      turn = { ...turn, is_follow_up: false }
+  const nonCorePhase = turn.phase !== 'core' || opts.requestPhase !== 'core'
+  const lastWasMoveOn = opts.lastAnswer.trim() === MOVE_ON_SPEECH
+  const requiredProbeQuestionType: 'technical' | 'behavioral' =
+    opts.parentQuestionType ??
+    (opts.scriptType === 'SCRIPT_T' ? 'technical' : 'behavioral')
+  const requiredProbeFallback = () =>
+    cannedRequiredFollowUpTurn({
+      questionType: requiredProbeQuestionType,
+      emotion: turn.interviewer_emotion,
+    })
+  const asked = [
+    ...(opts.alreadyAskedQuestions ?? []),
+    opts.parentQuestion ?? '',
+    opts.lastFollowUpQuestion ?? '',
+  ].filter((q) => q.trim())
+  const followUpText = turn.display_question || turn.speech
+  const candidateQuestion = (turn.display_question ?? '').trim() || followUpText
+
+  const rejectAdaptiveOffViolation = (): ScriptTurnOutput => {
+    if (opts.scriptType === 'SCRIPT_M' && lastWasMoveOn) {
+      const nextType = nextScriptMCoreQuestionType(
+        opts.lastQuestionType ?? opts.parentQuestionType,
+      )
+      return cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion)
+    }
+    return cannedMoveOnTurn(turn.interviewer_emotion)
+  }
+
+  // Adaptive OFF: do not trust is_follow_up. Core-only — warmup/self_intro unchanged.
+  if (!opts.followUpEnabled && !nonCorePhase) {
+    const topicHijack =
+      (opts.scriptType === 'SCRIPT_T' || opts.scriptType === 'SCRIPT_M') &&
+      followUpAbandonsParentTopic({
+        parentQuestion: opts.parentQuestion ?? '',
+        candidateAnswer: opts.lastCandidateAnswer ?? '',
+        followUpQuestion: followUpText,
+      })
+    const offViolation =
+      turn.is_follow_up ||
+      (!turn.is_question && speechContainsQuestionMark(turn.speech)) ||
+      (turn.is_question && isAnaphoricFollowUpProbe(followUpText)) ||
+      (turn.is_question && topicHijack)
+    if (offViolation) {
+      return rejectAdaptiveOffViolation()
     }
   }
 
-  if (turn.phase === 'core' && opts.coreQuestionsAsked >= opts.totalQuestions) {
+  if (turn.is_follow_up) {
+    const specialNoFollowUp =
+      opts.lastAnswer === '[SKIPPED]' ||
+      opts.lastAnswer === '[TIMEOUT]' ||
+      opts.lastAnswer === '[NONE]'
+    const noParent = opts.hasValidParentCoreQuestion === false
+    const overCap = opts.followUpsThisQuestion >= maxFollowUps
+    const probeNotNeeded = opts.answerProbeNeeded === false
+    const typeConflict = followUpConflictsWithParentType({
+      parentQuestionType: opts.parentQuestionType ?? null,
+      modelQuestionType: turn.question_type ?? null,
+      followUpQuestion: followUpText,
+    })
+    const topicHijack =
+      (opts.scriptType === 'SCRIPT_T' || opts.scriptType === 'SCRIPT_M') &&
+      followUpAbandonsParentTopic({
+        parentQuestion: opts.parentQuestion ?? '',
+        candidateAnswer: opts.lastCandidateAnswer ?? '',
+        followUpQuestion: followUpText,
+      })
+    // SCRIPT_M only: a follow-up that restates the parent (or prior FU) is
+    // invalid. Do not convert it into a core and do not spend a FU slot.
+    const parentDuplicate =
+      scriptMFollowUpIsDuplicateOf({
+        scriptType: opts.scriptType,
+        followUpQuestion: candidateQuestion,
+        priorQuestion: opts.parentQuestion,
+      }) ||
+      scriptMFollowUpIsDuplicateOf({
+        scriptType: opts.scriptType,
+        followUpQuestion: followUpText,
+        priorQuestion: opts.parentQuestion,
+      })
+    const priorFuDuplicate =
+      scriptMFollowUpIsDuplicateOf({
+        scriptType: opts.scriptType,
+        followUpQuestion: candidateQuestion,
+        priorQuestion: opts.lastFollowUpQuestion,
+      }) ||
+      scriptMFollowUpIsDuplicateOf({
+        scriptType: opts.scriptType,
+        followUpQuestion: followUpText,
+        priorQuestion: opts.lastFollowUpQuestion,
+      })
+    const blocked =
+      !opts.followUpEnabled ||
+      overCap ||
+      probeNotNeeded ||
+      nonCorePhase ||
+      noParent ||
+      specialNoFollowUp ||
+      typeConflict ||
+      topicHijack ||
+      parentDuplicate ||
+      priorFuDuplicate
+
+    if (blocked) {
+      if (
+        probeIsRequired({
+          requestPhase: opts.requestPhase,
+          followUpEnabled: opts.followUpEnabled,
+          followUpsThisQuestion: opts.followUpsThisQuestion,
+          maxFollowUpsPerQuestion: maxFollowUps,
+          hasValidParentCoreQuestion: opts.hasValidParentCoreQuestion,
+          answerProbeNeeded: opts.answerProbeNeeded,
+          lastAnswer: opts.lastAnswer,
+        })
+      ) {
+        return requiredProbeFallback()
+      }
+
+      if (
+        (overCap || probeNotNeeded) &&
+        opts.coreQuestionsAsked >= opts.totalQuestions
+      ) {
+        return cannedCandidateQuestionsTurn(turn.interviewer_emotion)
+      }
+
+      const scriptMEscalateToNextCore = () => {
+        const nextType = nextScriptMCoreQuestionType(
+          opts.lastQuestionType ?? opts.parentQuestionType,
+        )
+        return cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion)
+      }
+
+      // Adaptive OFF core already returned above. Non-core: drop flag, keep speech.
+      if (!opts.followUpEnabled) {
+        turn = { ...turn, is_follow_up: false }
+      } else if (overCap) {
+        // True cap (>=2): next alternate core. Never promote the rejected FU.
+        if (opts.scriptType === 'SCRIPT_M') {
+          const nextType = nextScriptMCoreQuestionType(
+            opts.lastQuestionType ?? opts.parentQuestionType,
+          )
+          if (
+            scriptMFollowUpCanBecomeNextCore({
+              questionText: followUpText,
+              modelQuestionType: turn.question_type ?? null,
+              nextType,
+              alreadyAsked: asked,
+            })
+          ) {
+            turn = { ...turn, is_follow_up: false, question_type: nextType }
+          } else {
+            return scriptMEscalateToNextCore()
+          }
+        } else if (lastWasMoveOn) {
+          // H/T: a *new* wrongly-flagged question may proceed; repeats must not.
+          if (repeatsAlreadyAskedQuestion(followUpText, asked)) {
+            return cannedMoveOnTurn(turn.interviewer_emotion)
+          }
+          turn = { ...turn, is_follow_up: false }
+        } else {
+          return cannedMoveOnTurn(turn.interviewer_emotion)
+        }
+      } else if (probeNotNeeded) {
+        if (opts.scriptType === 'SCRIPT_M') {
+          return scriptMEscalateToNextCore()
+        }
+        if (lastWasMoveOn) {
+          if (repeatsAlreadyAskedQuestion(followUpText, asked)) {
+            return cannedMoveOnTurn(turn.interviewer_emotion)
+          }
+          turn = { ...turn, is_follow_up: false }
+        } else {
+          return cannedMoveOnTurn(turn.interviewer_emotion)
+        }
+      } else if (parentDuplicate || priorFuDuplicate || typeConflict || topicHijack) {
+        // Rejected FU does not consume a slot and must not be spoken as a
+        // parent-copy. Auto-advance after move-on still accepts a *valid* FU2
+        // (this branch is not taken). A second invalid after move-on must
+        // escalate — another cannedMoveOn loops the client with no question.
+        if (lastWasMoveOn) {
+          if (opts.scriptType === 'SCRIPT_M') {
+            return scriptMEscalateToNextCore()
+          }
+          return cannedNextCoreQuestionTurn({
+            scriptType: opts.scriptType,
+            lastQuestionType: opts.lastQuestionType,
+            parentQuestionType: opts.parentQuestionType,
+            alreadyAsked: asked,
+            emotion: turn.interviewer_emotion,
+          })
+        }
+        return cannedMoveOnTurn(turn.interviewer_emotion)
+      } else if (specialNoFollowUp || noParent) {
+        return cannedMoveOnTurn(turn.interviewer_emotion)
+      } else {
+        // Non-core phase: drop the flag, keep speech.
+        turn = { ...turn, is_follow_up: false }
+      }
+    } else if (
+      turn.phase === 'core' &&
+      turn.question_type == null &&
+      (opts.parentQuestionType === 'technical' || opts.parentQuestionType === 'behavioral')
+    ) {
+      turn = { ...turn, question_type: opts.parentQuestionType }
+    }
+  }
+
+  // A weak scored answer makes the probe mandatory. If the model moves on,
+  // replace that output with an answerable same-topic fallback immediately —
+  // never insert an acknowledgment-only hop.
+  if (
+    !turn.is_follow_up &&
+    probeIsRequired({
+      requestPhase: opts.requestPhase,
+      followUpEnabled: opts.followUpEnabled,
+      followUpsThisQuestion: opts.followUpsThisQuestion,
+      maxFollowUpsPerQuestion: maxFollowUps,
+      hasValidParentCoreQuestion: opts.hasValidParentCoreQuestion,
+      answerProbeNeeded: opts.answerProbeNeeded,
+      lastAnswer: opts.lastAnswer,
+    })
+  ) {
+    return requiredProbeFallback()
+  }
+
+  // A core acknowledgment may exist once (skip / timeout / intro bridge). A
+  // second consecutive one has nothing for the candidate to answer and trips
+  // the client's recovery error. Replace it with an answerable question.
+  if (
+    !turn.is_question &&
+    turn.phase === 'core' &&
+    (opts.previousTurnWasAcknowledgment === true || lastWasMoveOn)
+  ) {
+    if (
+      probeIsRequired({
+        requestPhase: opts.requestPhase,
+        followUpEnabled: opts.followUpEnabled,
+        followUpsThisQuestion: opts.followUpsThisQuestion,
+        maxFollowUpsPerQuestion: maxFollowUps,
+        hasValidParentCoreQuestion: opts.hasValidParentCoreQuestion,
+        answerProbeNeeded: opts.answerProbeNeeded,
+        lastAnswer: opts.lastAnswer,
+      })
+    ) {
+      return requiredProbeFallback()
+    }
+    return cannedNextCoreQuestionTurn({
+      scriptType: opts.scriptType,
+      lastQuestionType: opts.lastQuestionType,
+      parentQuestionType: opts.parentQuestionType,
+      alreadyAsked: asked,
+      emotion: turn.interviewer_emotion,
+    })
+  }
+
+  // Follow-ups do not consume question_count — allow them on the last parent.
+  if (
+    turn.phase === 'core' &&
+    opts.coreQuestionsAsked >= opts.totalQuestions &&
+    !turn.is_follow_up
+  ) {
     return cannedCandidateQuestionsTurn(turn.interviewer_emotion)
   }
 
-  // Candidate declined to ask (skip / "no") while in candidate_questions → close now.
+  // The final core may legitimately decline another probe even when the
+  // score gate allowed one. Any attempted jump into CQ/closing must still
+  // emit the explicit server-owned invitation first.
   if (
-    opts.requestPhase === 'candidate_questions' &&
-    isNoQuestionsAnswer(opts.lastAnswer) &&
-    turn.phase !== 'closing'
+    opts.requestPhase !== 'candidate_questions' &&
+    opts.coreQuestionsAsked >= opts.totalQuestions &&
+    opts.candidateQuestionsExchanges === 0 &&
+    phaseRank(turn.phase) >= phaseRank('candidate_questions')
   ) {
-    return cannedClosingTurn(turn.interviewer_emotion)
+    return cannedCandidateQuestionsTurn(turn.interviewer_emotion)
   }
 
-  // Cap CQ invites: if we've already issued the max and the model tries another
-  // invite (is_question=true), force closing. Allow one answer turn after the
-  // final invite (is_question=false) so the last candidate question still gets a reply.
-  if (
-    turn.phase === 'candidate_questions' &&
-    turn.is_question &&
-    opts.candidateQuestionsExchanges >= maxCq
-  ) {
-    return cannedClosingTurn(turn.interviewer_emotion)
+  if (opts.requestPhase === 'candidate_questions' && turn.phase === 'closing') {
+    // The real closing is emitted by the pre-LLM lifecycle guard after an
+    // accepted CQ answer. A model call in CQ always owes the candidate an answer.
+    return cannedCandidateQuestionAnswerTurn(turn.interviewer_emotion)
+  }
+
+  if (opts.requestPhase === 'candidate_questions') {
+    const action = turn.candidate_question_action
+
+    // Core adaptive-FU state must never leak into CQ.
+    turn = { ...turn, is_follow_up: false, question_type: null }
+
+    if (action === 'follow_up') {
+      const validFollowUp =
+        turn.is_question &&
+        !isNoQuestionsAnswer(opts.lastAnswer) &&
+        cqFollowUps < maxCqFollowUps
+
+      if (!validFollowUp) {
+        // Preserve any useful answer prefix while removing the rejected
+        // clarification question. If none remains, close cleanly.
+        const question = turn.display_question?.trim() ?? ''
+        const answerPrefix = question
+          ? turn.speech.replace(question, '').replace(/[\s—:-]+$/g, '').trim()
+          : ''
+        if (!answerPrefix) return cannedClosingTurn(turn.interviewer_emotion)
+        turn = {
+          ...turn,
+          speech: answerPrefix,
+          display_question: null,
+          timer_seconds: 0,
+          reading_buffer_seconds: 0,
+          auto_submit: false,
+          allow_skip: false,
+          show_auto_structure: false,
+          is_question: false,
+          candidate_question_action: 'answer',
+        }
+      }
+    } else if (action === 'answer') {
+      turn = {
+        ...turn,
+        display_question: null,
+        timer_seconds: 0,
+        reading_buffer_seconds: 0,
+        auto_submit: false,
+        allow_skip: false,
+        show_auto_structure: false,
+        is_question: false,
+      }
+    } else if (action === 'invite' || action === 'guidance') {
+      // Invite/guidance are server-generated before the LLM path. If the model
+      // emits either here, it failed to answer the candidate.
+      return cannedCandidateQuestionAnswerTurn(turn.interviewer_emotion)
+    } else if (action == null) {
+      // Backward-compatible interpretation for model output during rollout.
+      turn = {
+        ...turn,
+        candidate_question_action: turn.is_question ? 'follow_up' : 'answer',
+      }
+    }
   }
 
   // Never allow moving backward in the phase order (e.g. core → warmup).
@@ -373,16 +1051,22 @@ export function resolvePromptPhase(
     candidateQuestionsExchanges?: number
     maxCandidateQuestionsExchanges?: number
     lastTurnWasCqAnswer?: boolean
+    candidateQuestionGuidanceTurns?: number
     warmupQuestionsAsked?: number
     warmupTurns?: number
     selfIntroEnabled?: boolean
     selfIntroQuestionsAsked?: number
     selfIntroTurns?: number
     lastTurnWasSelfIntroBridge?: boolean
+    /** Stay in core after the last planned question when a follow-up is still allowed. */
+    followUpEnabled?: boolean
+    followUpsThisQuestion?: number
+    maxFollowUpsPerQuestion?: number
+    hasValidParentCoreQuestion?: boolean
+    /** false → do not stay in core for a follow-up after the last planned question. */
+    answerProbeNeeded?: boolean | 'unknown'
   },
 ): string {
-  const exchanges = opts?.candidateQuestionsExchanges ?? 0
-  const maxCq = opts?.maxCandidateQuestionsExchanges ?? MAX_CANDIDATE_QUESTION_EXCHANGES
   const lastWasAnswer = opts?.lastTurnWasCqAnswer ?? false
   const warmupAsked = opts?.warmupQuestionsAsked ?? 0
   const warmupTurns = opts?.warmupTurns ?? warmupAsked
@@ -406,9 +1090,9 @@ export function resolvePromptPhase(
     }
   }
 
-  // After the final invite was answered, steer to closing (no more invites).
+  // A completed interviewer answer auto-advances to closing. Guidance and CQ
+  // follow-ups remain in candidate_questions for one more candidate response.
   if (
-    exchanges >= maxCq &&
     lastWasAnswer &&
     clientPhase === 'candidate_questions'
   ) {
@@ -418,7 +1102,16 @@ export function resolvePromptPhase(
     coreQuestionsAsked >= totalQuestions &&
     (clientPhase === 'core' || clientPhase === 'self_intro')
   ) {
-    return 'candidate_questions'
+    const maxFu = opts?.maxFollowUpsPerQuestion ?? (opts?.followUpEnabled ? 2 : 0)
+    const stayInCoreForFollowUp =
+      clientPhase === 'core' &&
+      opts?.followUpEnabled === true &&
+      opts?.hasValidParentCoreQuestion === true &&
+      (opts?.followUpsThisQuestion ?? 0) < maxFu &&
+      opts?.answerProbeNeeded !== false
+    if (!stayInCoreForFollowUp) {
+      return 'candidate_questions'
+    }
   }
   return clientPhase
 }
@@ -433,17 +1126,52 @@ export function shouldForceClosingBeforeLlm(opts: {
   lastAnswer: string
   candidateQuestionsExchanges: number
   lastTurnWasCqAnswer: boolean
+  candidateQuestionGuidanceTurns?: number
   maxCandidateQuestionsExchanges?: number
 }): boolean {
-  const maxCq =
-    opts.maxCandidateQuestionsExchanges ?? MAX_CANDIDATE_QUESTION_EXCHANGES
   if (opts.requestPhase !== 'candidate_questions') return false
-  if (isNoQuestionsAnswer(opts.lastAnswer)) return true
-  // After answering under the final invite, don't let the model invite again.
-  if (opts.candidateQuestionsExchanges >= maxCq && opts.lastTurnWasCqAnswer) {
+  if (
+    isNoQuestionsAnswer(opts.lastAnswer) &&
+    (opts.candidateQuestionGuidanceTurns ?? 0) > 0
+  ) {
     return true
   }
-  return false
+  return opts.lastTurnWasCqAnswer
+}
+
+/** First generic decline gets concise guidance; a second decline closes. */
+export function shouldShowCandidateQuestionGuidance(opts: {
+  requestPhase: string
+  lastAnswer: string
+  candidateQuestionsExchanges: number
+  candidateQuestionGuidanceTurns: number
+}): boolean {
+  return (
+    opts.requestPhase === 'candidate_questions' &&
+    opts.candidateQuestionsExchanges > 0 &&
+    opts.candidateQuestionGuidanceTurns === 0 &&
+    isNoQuestionsAnswer(opts.lastAnswer)
+  )
+}
+
+/**
+ * Warmup budget spent and self_intro off → canned core entry, no LLM.
+ * Prevents SSE sentence-0 from a discarded warmup-repeat before authority
+ * replaces speech with cannedCoreEntryTurn.
+ */
+export function shouldForceCoreEntryBeforeLlm(opts: {
+  requestPhase: string
+  warmupQuestionsAsked: number
+  warmupTurns: number
+  selfIntroEnabled: boolean
+}): boolean {
+  if (opts.requestPhase === 'self_intro' && !opts.selfIntroEnabled) return true
+  if (opts.requestPhase !== 'warmup') return false
+  if (opts.selfIntroEnabled) return false
+  return (
+    opts.warmupQuestionsAsked >= MAX_WARMUP_QUESTIONS ||
+    opts.warmupTurns >= MAX_WARMUP_QUESTIONS
+  )
 }
 
 /**
@@ -466,5 +1194,18 @@ export function existingNextTurnIndexAfterAnswer(opts: {
   if (opts.lastAnswer === '[NONE]') return null
   const expectedNext = opts.prevTurnIndex + 1
   if (opts.currentTurnIndex >= expectedNext) return expectedNext
+  return null
+}
+
+/**
+ * Boot `[NONE]` idempotency: if a prior /turn already advanced the interview,
+ * return that turn index instead of minting another warmup (duplicate greetings).
+ */
+export function bootResumeTurnIndex(opts: {
+  lastAnswer: string
+  currentTurnIndex: number
+}): number | null {
+  if (opts.lastAnswer !== '[NONE]') return null
+  if (opts.currentTurnIndex >= 1) return opts.currentTurnIndex
   return null
 }

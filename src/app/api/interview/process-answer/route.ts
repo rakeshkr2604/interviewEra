@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
-import { processAnswer } from '@/lib/interview/interview-orchestrator';
+import { processAnswer, processAnswerStream } from '@/lib/interview/interview-orchestrator';
+
+function isLlmTtsStreamingEnabled(): boolean {
+  return (
+    process.env.VOICE_LLM_TTS_STREAMING === 'true' ||
+    process.env.NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING === 'true'
+  );
+}
 import type { InterviewContext } from '@/lib/interview/types';
 import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
 import { normalizeInterviewMode } from '@/lib/interview/interview-mode';
@@ -107,6 +114,49 @@ export async function POST(request: NextRequest) {
     const validInterviewerId: InterviewerId | null = getInterviewerById(interviewer_id)
       ? (interviewer_id as InterviewerId)
       : null;
+
+    const acceptHeader = request.headers.get('accept') ?? '';
+    const wantsSse = acceptHeader.includes('text/event-stream') && isLlmTtsStreamingEnabled();
+
+    if (wantsSse) {
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            const response = await processAnswerStream(
+              interview_id,
+              sanitizedQuestion,
+              sanitizedAnswer,
+              context,
+              validInterviewerId,
+              lockedMode,
+              (sentence, index) => {
+                const data = JSON.stringify({ index, text: sentence });
+                controller.enqueue(encoder.encode(`event: sentence\ndata: ${data}\n\n`));
+              },
+              request.signal,
+            );
+            const completeData = JSON.stringify(response);
+            controller.enqueue(encoder.encode(`event: complete\ndata: ${completeData}\n\n`));
+            controller.close();
+          } catch (err) {
+            if (!request.signal.aborted) {
+              const errData = JSON.stringify({ error: err instanceof Error ? err.message : String(err) });
+              controller.enqueue(encoder.encode(`event: error\ndata: ${errData}\n\n`));
+            }
+            controller.close();
+          }
+        },
+      });
+
+      return new NextResponse(stream, {
+        headers: {
+          'Content-Type': 'text/event-stream',
+          'Cache-Control': 'no-cache, no-transform',
+          Connection: 'keep-alive',
+        },
+      });
+    }
 
     const response = await processAnswer(
       interview_id,

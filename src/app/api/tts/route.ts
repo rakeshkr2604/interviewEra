@@ -60,9 +60,21 @@ export async function POST(request: NextRequest) {
       { status: 401 },
     );
   }
+  const tAuthMs = Date.now() - t0;
+  const t1 = Date.now();
 
-  // ── 2. Abuse gate ────────────────────────────────────────────────────────────
-  const abuse = await abuseGate(user.id, ip);
+  // ── 2. Parallel Pre-flight (Abuse Gate + User Plan Tier) ──────────────────────
+  const serviceClient = createServiceClient();
+  const [abuse, userResult] = await Promise.all([
+    abuseGate(user.id, ip),
+    serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .maybeSingle(),
+  ]);
+  const tPreflightMs = Date.now() - t1;
+
   if (!abuse.allowed) {
     return NextResponse.json(
       {
@@ -73,16 +85,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── 3. Resolve plan tier ─────────────────────────────────────────────────────
-  const serviceClient = createServiceClient();
-  const { data: userData } = await serviceClient
-    .from('users')
-    .select('plan_tier')
-    .eq('id', user.id)
-    .maybeSingle();
-  const planTier = userData?.plan_tier ?? 'free';
+  const planTier = userResult.data?.plan_tier ?? 'free';
 
-  // ── 4. Parse body ────────────────────────────────────────────────────────────
+  // ── 3. Parse body ────────────────────────────────────────────────────────────
   let body: unknown;
   try { body = await request.json(); } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
@@ -96,21 +101,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   }
 
-  // ── 5. Per-request hard ceiling (absolute max, plan-independent) ──────────────
+  // ── 4. Per-request hard ceiling & limit checks ────────────────────────────────
   const truncatedText = text.slice(0, ABSOLUTE_MAX_CHARS);
   if (text.length > ABSOLUTE_MAX_CHARS) {
     console.warn(`[TTS] Text truncated: ${text.length} → ${ABSOLUTE_MAX_CHARS} chars (user: ${user.id})`);
   }
 
-  // ── 6. Per-interview TTS ceiling (plan-dependent) ────────────────────────────
   const { clamped: clampedChars, was_clamped } = enforcePerInterviewTTSLimit(
     truncatedText.length,
     planTier,
   );
   const finalText = was_clamped ? truncatedText.slice(0, clampedChars) : truncatedText;
 
-  // ── 7. Monthly TTS quota check ───────────────────────────────────────────────
+  // ── 5. Monthly TTS quota check ───────────────────────────────────────────────
+  const t2 = Date.now();
   const quota = await checkTTSQuota(user.id, planTier, finalText.length);
+  const tQuotaMs = Date.now() - t2;
+
   if (!quota.allowed) {
     return NextResponse.json(
       {
@@ -144,12 +151,18 @@ export async function POST(request: NextRequest) {
     model_id: ttsModelId,
   }));
 
-  // ── 8. ElevenLabs call (streaming endpoint) ───────────────────────────────────
+  // ── 6. ElevenLabs call (streaming endpoint) ───────────────────────────────────
   let errorCategory: string | undefined;
+  const t3 = Date.now();
 
   try {
+    const latencyParam = process.env.ELEVENLABS_OPTIMIZE_LATENCY ?? '3';
+    const streamUrl = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream${
+      latencyParam && latencyParam !== '0' ? `?optimize_streaming_latency=${latencyParam}` : ''
+    }`;
+
     const upstream = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/stream`,
+      streamUrl,
       {
         method: 'POST',
         headers: {
@@ -167,9 +180,8 @@ export async function POST(request: NextRequest) {
       },
     );
 
-    // Time-to-first-byte from ElevenLabs — the metric that actually matters now
-    // that we forward the stream instead of buffering the full response.
-    const ttfbMs = Date.now() - t0;
+    const ttfbMs = Date.now() - t3;
+    const totalMs = Date.now() - t0;
 
     if (!upstream.ok) {
       const errBody = await upstream.text().catch(() => upstream.statusText);
@@ -178,44 +190,52 @@ export async function POST(request: NextRequest) {
       void logTTSCall({
         user_id: user.id, interview_id: interview_id ?? undefined,
         tts_chars: spokenText.length, tts_model: ttsModelId,
-        tts_voice_id: voiceId, latency_ms: ttfbMs,
+        tts_voice_id: voiceId, latency_ms: totalMs,
+        auth_ms: tAuthMs, preflight_ms: tPreflightMs, quota_ms: tQuotaMs, elevenlabs_ttfb_ms: ttfbMs,
         success: false, error_category: errorCategory, ip,
       });
       return NextResponse.json({ error: `ElevenLabs ${upstream.status}: ${errBody}`, fallback: 'browser_tts' }, { status: upstream.status });
     }
 
-    // ── 9. Post-success: record usage + telemetry (non-blocking) ───────────────
+    // ── 7. Post-success: record usage + telemetry (non-blocking) ───────────────
     void recordTTSUsage(user.id, spokenText.length);
     void logTTSCall({
       user_id: user.id, interview_id: interview_id ?? undefined,
       tts_chars: spokenText.length, tts_model: ttsModelId,
-      tts_voice_id: voiceId, latency_ms: ttfbMs,
+      tts_voice_id: voiceId, latency_ms: totalMs,
+      auth_ms: tAuthMs, preflight_ms: tPreflightMs, quota_ms: tQuotaMs, elevenlabs_ttfb_ms: ttfbMs,
       success: true, ip,
     });
 
-    // Structured stdout event for log aggregators (mirrors stt_token_issued pattern)
     console.log(JSON.stringify({
       ts:            new Date().toISOString(),
       event:         'tts_call_success',
       provider:      'elevenlabs',
       model:         ttsModelId,
-      latency_ms:    ttfbMs,
+      latency_ms:    totalMs,
+      auth_ms:       tAuthMs,
+      preflight_ms:  tPreflightMs,
+      quota_ms:      tQuotaMs,
+      ttfb_ms:       ttfbMs,
       chars:         spokenText.length,
       plan_tier:     planTier,
       quota_warning: quota.warning,
       streamed:      Boolean(upstream.body),
     }));
 
-    const responseHeaders: Record<string, string> = { 'Content-Type': 'audio/mpeg' };
+    const responseHeaders: Record<string, string> = {
+      'Content-Type': 'audio/mpeg',
+      'X-TTS-Auth-Ms': String(tAuthMs),
+      'X-TTS-Preflight-Ms': String(tPreflightMs),
+      'X-TTS-Quota-Ms': String(tQuotaMs),
+      'X-TTS-TTFB-Ms': String(ttfbMs),
+      'Server-Timing': `auth;dur=${tAuthMs}, preflight;dur=${tPreflightMs}, quota;dur=${tQuotaMs}, ttfb;dur=${ttfbMs}`,
+    };
     if (quota.warning === 'warning' || quota.warning === 'critical') {
       responseHeaders['X-TTS-Quota-Warning'] = quota.warning;
       responseHeaders['X-TTS-Quota-Remaining'] = String(quota.remaining_chars);
     }
 
-    // Forward the upstream stream body directly — no server-side buffering, so
-    // the client can start decoding/playing before generation finishes. Falls
-    // back to a buffered response only if the runtime doesn't expose a body
-    // stream (defensive; not expected under `runtime = 'nodejs'`).
     if (!upstream.body) {
       const audio = await upstream.arrayBuffer();
       return new NextResponse(audio, { headers: responseHeaders });

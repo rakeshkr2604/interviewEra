@@ -57,6 +57,36 @@ describe('STT token client cache', () => {
     expect(peekCachedSTTToken('i1')).toBeNull()
   })
 
+  it('Q/R: concurrent prefetchOnly joins one in-flight mint (no stampede)', async () => {
+    let resolveFetch!: (v: Response) => void
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveFetch = resolve
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const a = fetchSTTTokenWithRetry('i1', { prefetchOnly: true, maxAttempts: 1 })
+    const b = fetchSTTTokenWithRetry('i1', { prefetchOnly: true, maxAttempts: 1 })
+
+    // Allow both callers to reach the in-flight map join.
+    await Promise.resolve()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolveFetch(
+      new Response(JSON.stringify(token({ token: 'shared' })), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+
+    const [ra, rb] = await Promise.all([a, b])
+    expect(ra.token).toBe('shared')
+    expect(rb.token).toBe('shared')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
   it('takeCachedSTTToken rejects expired tokens', () => {
     putCachedSTTToken(
       'i1',

@@ -83,6 +83,7 @@ export interface ConversationApiClient {
   postProcessAnswer(
     body: ProcessAnswerApiBody,
     signal?: AbortSignal,
+    onSentence?: (sentence: string, index: number) => void,
   ): Promise<ProcessAnswerApiResponse | null>
   postComplete(body: { interviewId: string }, signal?: AbortSignal): Promise<CompleteApiResponse>
 }
@@ -179,6 +180,7 @@ export class HttpConversationEngine implements ConversationEngine {
           },
         },
         signal,
+        input.onSentence,
       )
       .catch((err) => {
         if (signal.aborted || this.isStale(generation)) return null
@@ -288,7 +290,70 @@ export function createHttpConversationApi(): ConversationApiClient {
 
   return {
     postAnswer: (body, signal) => postJson<AnswerApiResponse>('/api/interview/answer', body, signal),
-    postProcessAnswer: async (body, signal) => {
+    postProcessAnswer: async (body, signal, onSentence) => {
+      const isStreamingEnabled =
+        typeof process.env.NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING !== 'undefined'
+          ? process.env.NEXT_PUBLIC_VOICE_LLM_TTS_STREAMING === 'true'
+          : process.env.VOICE_LLM_TTS_STREAMING === 'true'
+
+      if (onSentence && isStreamingEnabled && typeof fetch !== 'undefined') {
+        try {
+          const res = await fetch('/api/interview/process-answer', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream',
+            },
+            body: JSON.stringify(body),
+            signal,
+          })
+
+          if (res.ok && res.body) {
+            const reader = res.body.getReader()
+            const decoder = new TextDecoder()
+            let buffer = ''
+            let completePayload: ProcessAnswerApiResponse | null = null
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+              buffer += decoder.decode(value, { stream: true })
+
+              const blocks = buffer.split('\n\n')
+              buffer = blocks.pop() ?? ''
+
+              for (const block of blocks) {
+                const lines = block.split('\n')
+                let event = ''
+                let data = ''
+                for (const line of lines) {
+                  if (line.startsWith('event: ')) event = line.slice(7).trim()
+                  else if (line.startsWith('data: ')) data = line.slice(6).trim()
+                }
+                if (event === 'sentence' && data) {
+                  try {
+                    const parsed = JSON.parse(data) as { index: number; text: string }
+                    if (parsed.text) onSentence(parsed.text, parsed.index)
+                  } catch {
+                    /* ignore JSON parse errors */
+                  }
+                } else if (event === 'complete' && data) {
+                  try {
+                    completePayload = JSON.parse(data) as ProcessAnswerApiResponse
+                  } catch {
+                    /* ignore JSON parse errors */
+                  }
+                }
+              }
+            }
+
+            if (completePayload) return completePayload
+          }
+        } catch {
+          /* fallback to standard JSON post */
+        }
+      }
+
       try {
         return await postJson<ProcessAnswerApiResponse>(
           '/api/interview/process-answer',

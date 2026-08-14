@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import {
   applyTurnAuthorityOverrides,
   cannedCandidateQuestionsTurn,
-  cannedClosingTurn,
   isNoQuestionsAnswer,
   MAX_CANDIDATE_QUESTION_EXCHANGES,
   shouldForceClosingBeforeLlm,
@@ -10,9 +9,8 @@ import {
 import type { ScriptTurnOutput } from './turn-validator'
 
 /**
- * Locks Phase 1b CQ → closing authority:
- * - invite cap forces closing on a further invite
- * - skip / short "no" forces closing
+ * Legacy CQ authority coverage. The current lifecycle gives a first decline
+ * one guidance turn and closes only after a second decline.
  */
 describe('Phase 1b — candidate_questions exit authority', () => {
   const baseTurn = (over: Partial<ScriptTurnOutput> = {}): ScriptTurnOutput => ({
@@ -41,19 +39,20 @@ describe('Phase 1b — candidate_questions exit authority', () => {
     lastAnswer: 'What does success look like in the first 90 days?',
   }
 
-  it('overrides LLM candidate_questions invite to closing when invite cap is reached', () => {
+  it('overrides an LLM re-invite with a safe CQ answer fallback', () => {
     const llmInvite = baseTurn({
       speech: 'Anything else you want to ask?',
       is_question: true,
+      candidate_question_action: 'invite',
     })
     const result = applyTurnAuthorityOverrides({
       ...opts,
       turn: llmInvite,
       candidateQuestionsExchanges: MAX_CANDIDATE_QUESTION_EXCHANGES,
     })
-    expect(result.phase).toBe('closing')
+    expect(result.phase).toBe('candidate_questions')
     expect(result.is_question).toBe(false)
-    expect(result).toEqual(cannedClosingTurn('neutral'))
+    expect(result.candidate_question_action).toBe('answer')
   })
 
   it('still allows an answer turn under the final invite (is_question=false)', () => {
@@ -75,27 +74,29 @@ describe('Phase 1b — candidate_questions exit authority', () => {
     expect(result.is_question).toBe(false)
   })
 
-  it('forces closing when candidate skips candidate_questions', () => {
+  it('does not let a model re-invite after a skipped candidate response', () => {
     const result = applyTurnAuthorityOverrides({
       ...opts,
       turn: cannedCandidateQuestionsTurn(),
       candidateQuestionsExchanges: 0,
       lastAnswer: '[SKIPPED]',
     })
-    expect(result.phase).toBe('closing')
+    expect(result.phase).toBe('candidate_questions')
+    expect(result.candidate_question_action).toBe('answer')
   })
 
-  it('forces closing when candidate times out on candidate_questions', () => {
+  it('does not let a model re-invite after a timed-out candidate response', () => {
     const result = applyTurnAuthorityOverrides({
       ...opts,
       turn: cannedCandidateQuestionsTurn(),
       candidateQuestionsExchanges: 1,
       lastAnswer: '[TIMEOUT]',
     })
-    expect(result.phase).toBe('closing')
+    expect(result.phase).toBe('candidate_questions')
+    expect(result.candidate_question_action).toBe('answer')
   })
 
-  it('forces closing on short no-questions answers', () => {
+  it('does not let a model re-invite on short no-questions answers', () => {
     expect(isNoQuestionsAnswer('no')).toBe(true)
     expect(isNoQuestionsAnswer('no questions')).toBe(true)
     const result = applyTurnAuthorityOverrides({
@@ -104,16 +105,28 @@ describe('Phase 1b — candidate_questions exit authority', () => {
       candidateQuestionsExchanges: 0,
       lastAnswer: 'no questions',
     })
-    expect(result.phase).toBe('closing')
+    expect(result.phase).toBe('candidate_questions')
+    expect(result.candidate_question_action).toBe('answer')
   })
 
-  it('shouldForceClosingBeforeLlm: skip path and post-final-answer path', () => {
+  it('shouldForceClosingBeforeLlm: second decline and completed-answer paths', () => {
     expect(
       shouldForceClosingBeforeLlm({
         requestPhase: 'candidate_questions',
         lastAnswer: '[SKIPPED]',
         candidateQuestionsExchanges: 0,
         lastTurnWasCqAnswer: false,
+        candidateQuestionGuidanceTurns: 0,
+      }),
+    ).toBe(false)
+
+    expect(
+      shouldForceClosingBeforeLlm({
+        requestPhase: 'candidate_questions',
+        lastAnswer: '[SKIPPED]',
+        candidateQuestionsExchanges: 1,
+        lastTurnWasCqAnswer: false,
+        candidateQuestionGuidanceTurns: 1,
       }),
     ).toBe(true)
 

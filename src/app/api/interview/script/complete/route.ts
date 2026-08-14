@@ -94,7 +94,11 @@ export async function PATCH(request: Request): Promise<NextResponse> {
           { status: 200 },
         );
       }
-      return NextResponse.json({ error: 'Interview already completed' }, { status: 400 });
+      // Turn-route completion is source of truth; client repair PATCH is not an error.
+      return NextResponse.json(
+        { success: true, alreadyCompleted: true },
+        { status: 200 },
+      );
     }
 
     // Step 3 — mark complete
