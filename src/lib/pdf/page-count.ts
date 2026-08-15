@@ -52,7 +52,8 @@ async function getPdfPageCountViaPdfJs(bytes: Uint8Array): Promise<number> {
     disableFontFace: true,
     verbosity: 0,
   };
-  const doc = await pdfjs.getDocument(opts).promise;
+  const loadingTask = pdfjs.getDocument(opts);
+  const doc = await loadingTask.promise;
   try {
     const n = doc.numPages;
     if (typeof n !== 'number' || n < 1) {
@@ -61,7 +62,7 @@ async function getPdfPageCountViaPdfJs(bytes: Uint8Array): Promise<number> {
     return n;
   } finally {
     try {
-      await doc.destroy();
+      await loadingTask.destroy();
     } catch {
       /* ignore */
     }

@@ -319,18 +319,17 @@ async function extractWithPdfParse(bytes: Uint8Array): Promise<string> {
   return text.trim();
 }
 
-type PdfJsDocument = {
-  numPages: number;
+type PdfJsLoadingTask = {
   destroy: () => Promise<void>;
-  getPage: (i: number) => Promise<{ getTextContent: () => Promise<{ items: unknown[] }> }>;
 };
 
 async function runPdfJsTextExtract(
   bytes: Uint8Array,
   opts: Record<string, unknown>,
-): Promise<{ text: string; doc: PdfJsDocument }> {
+): Promise<{ text: string; loadingTask: PdfJsLoadingTask }> {
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const loadedDoc = (await pdfjs.getDocument(opts).promise) as PdfJsDocument;
+  const loadingTask = pdfjs.getDocument(opts);
+  const loadedDoc = await loadingTask.promise;
   let text = '';
   for (let i = 1; i <= loadedDoc.numPages; i++) {
     const page = await loadedDoc.getPage(i);
@@ -340,13 +339,13 @@ async function runPdfJsTextExtract(
       .join(' ');
     text += pageText + '\n';
   }
-  return { text: text.trim(), doc: loadedDoc };
+  return { text: text.trim(), loadingTask };
 }
 
-async function drainPdfJsDocument(doc: PdfJsDocument | null): Promise<void> {
-  if (!doc) return;
+async function drainPdfJsDocument(loadingTask: PdfJsLoadingTask | null): Promise<void> {
+  if (!loadingTask) return;
   try {
-    await doc.destroy();
+    await loadingTask.destroy();
   } catch {
     /* ignore destroy errors */
   }
@@ -367,11 +366,11 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
     });
 
     if (primary.text.length >= MIN_USEFUL_CHARS) {
-      await drainPdfJsDocument(primary.doc);
+      await drainPdfJsDocument(primary.loadingTask);
       return primary.text;
     }
 
-    await drainPdfJsDocument(primary.doc);
+    await drainPdfJsDocument(primary.loadingTask);
     const ocrPrimary = await tryOcrFallback(bytes);
     if (ocrPrimary) return ocrPrimary;
     throw new PDFScannedNoTextError();
@@ -414,7 +413,7 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
       });
 
       if (retry.text.length >= MIN_USEFUL_CHARS) {
-        await drainPdfJsDocument(retry.doc);
+        await drainPdfJsDocument(retry.loadingTask);
         return retry.text;
       }
 
@@ -423,7 +422,7 @@ async function extractWithPdfJsPrimary(bytes: Uint8Array): Promise<string> {
         new Error(`retry got ${retry.text.length} chars`),
         { bytes: bytes.byteLength, text_len: retry.text.length },
       );
-      await drainPdfJsDocument(retry.doc);
+      await drainPdfJsDocument(retry.loadingTask);
     } catch (retryErr) {
       logPdfParseDiag('pdfjs_retry_without_assets_failed', retryErr, { bytes: bytes.byteLength });
     }

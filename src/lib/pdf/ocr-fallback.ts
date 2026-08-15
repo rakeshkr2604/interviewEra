@@ -50,12 +50,13 @@ async function renderPagesToPngBuffers(bytes: Uint8Array, maxPages: number): Pro
 
   const createCanvas = await loadCreateCanvas();
   const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
-  const doc = await pdfjs.getDocument({
+  const loadingTask = pdfjs.getDocument({
     data: bytes,
     useSystemFonts: false,
     disableFontFace: true,
     verbosity: 0,
-  }).promise;
+  });
+  const doc = await loadingTask.promise;
 
   const pageCount = Math.min(doc.numPages, maxPages);
   const buffers: Buffer[] = [];
@@ -73,7 +74,7 @@ async function renderPagesToPngBuffers(bytes: Uint8Array, maxPages: number): Pro
     }
   } finally {
     try {
-      await doc.destroy();
+      await loadingTask.destroy();
     } catch {
       /* ignore */
     }

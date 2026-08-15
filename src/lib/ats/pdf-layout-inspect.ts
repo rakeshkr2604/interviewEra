@@ -91,11 +91,14 @@ export async function inspectPdfLayout(
   };
   type PdfJsDoc = {
     numPages: number;
-    destroy: () => Promise<void>;
     getPage: (i: number) => Promise<PdfJsPage>;
   };
 
   let doc: PdfJsDoc | null = null;
+  let loadingTask: {
+    destroy: () => Promise<void>;
+    promise: Promise<PdfJsDoc>;
+  } | null = null;
 
   try {
     const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -111,7 +114,8 @@ export async function inspectPdfLayout(
       opts.cMapPacked = true;
     }
 
-    doc = (await pdfjs.getDocument(opts).promise) as unknown as PdfJsDoc;
+    loadingTask = pdfjs.getDocument(opts);
+    doc = await loadingTask.promise;
     const items: LayoutTextItem[] = [];
     let totalChars = 0;
 
@@ -153,9 +157,9 @@ export async function inspectPdfLayout(
       totalChars: 0,
     };
   } finally {
-    if (doc) {
+    if (loadingTask) {
       try {
-        await doc.destroy();
+        await loadingTask.destroy();
       } catch {
         /* ignore */
       }

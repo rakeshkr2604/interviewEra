@@ -1,5 +1,5 @@
 /**
- * Regression test: pdfjs-dist v5.x fake-worker resolution.
+ * Regression test: pdfjs-dist fake-worker resolution.
  *
  * Reproduces the Vercel production error:
  *   "Setting up fake worker failed: Cannot find module
@@ -19,7 +19,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-describe('pdfjs-dist v5 fake-worker resolution', () => {
+describe('pdfjs-dist fake-worker resolution', () => {
   const pdfEntry = require.resolve('pdfjs-dist/legacy/build/pdf.mjs');
   const pdfDir = dirname(pdfEntry);
   const workerPath = join(pdfDir, 'pdf.worker.mjs');
@@ -56,14 +56,15 @@ startxref
 `;
     const bytes = new Uint8Array(Buffer.from(minimalPdf, 'utf8'));
 
-    const doc = await pdfjs.getDocument({
+    const loadingTask = pdfjs.getDocument({
       data: bytes,
       useSystemFonts: false,
       disableFontFace: true,
       verbosity: 0,
-    }).promise;
+    });
+    const doc = await loadingTask.promise;
 
     expect(doc.numPages).toBe(1);
-    await doc.destroy();
+    await loadingTask.destroy();
   }, 15_000);
 });
