@@ -10,7 +10,7 @@ Everything is verified from the repository as of 2026-07-05; unverifiable items 
 
 | Area | Current reality | Evidence |
 |---|---|---|
-| CI | One workflow, `ci.yml`: push to **any** branch → quality (lint→tsc→vitest) → e2e_auth (Playwright chromium, placeholder Supabase) ∥ pdf_extract ∥ audit (critical-only) → build. Concurrency-cancel. Node 22, npm cache, Next build cache. | `.github/workflows/ci.yml` |
+| CI | One workflow, `ci.yml`: push to **any** branch → quality (lint→tsc→vitest) → e2e_auth (Playwright chromium, placeholder Supabase) ∥ pdf_extract ∥ audit (critical-only) → build. Concurrency-cancel. Node 24, npm cache, Next build cache. | `.github/workflows/ci.yml` |
 | CI ↔ deploy relationship | **CI gates nothing.** Vercel's Git integration deploys on push independently and in parallel; a red CI run does not stop a production deploy. The only gate that can actually stop a bad deploy is `npm run build` itself failing — which includes `scripts/noindex-audit.ts` (SEO) — inside Vercel's build. | ci.yml comment "Real values live in Vercel — Vercel handles the actual deployment"; `package.json` build script; vercel.json has no deployment gating |
 | Second workflow | `e2e-integration.yml`: manual-dispatch only, real-Supabase resume integration test — a pre-release ritual, not automated. | `.github/workflows/e2e-integration.yml` |
 | Deployment | Vercel-native, push-to-deploy, no Dockerfile. `vercel.json`: 5 crons, 4 `maxDuration:60` routes, www/http redirects. Production branch presumed `main`. Deployment protection / required checks in Vercel: **Unknown — not verified from repository** (dashboard config). | vercel.json |
