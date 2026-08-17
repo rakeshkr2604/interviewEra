@@ -93,11 +93,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      # npm cache intentionally disabled: Free Actions storage is 0.5 GB; a single
+      # setup-node npm cache entry is ~0.45–0.60 GB and multiplies per ref/key.
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -126,7 +127,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -172,15 +172,15 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
 
+      # Key on lockfile + Next config only — hashing all src/** created a new
+      # ~70 MB cache entry on nearly every code change (Free storage risk).
       - name: Cache Next.js build
         uses: actions/cache@v6
         with:
           path: .next/cache
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-${{ hashFiles('src/**/*.ts', 'src/**/*.tsx') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json', 'next.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('package-lock.json') }}-
             ${{ runner.os }}-nextjs-
 
       - name: Install dependencies
@@ -230,7 +230,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
@@ -251,22 +250,10 @@ jobs:
           test -d public
           echo "BUILD_ID=$(cat .next/BUILD_ID)"
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v6
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
+      # Playwright Actions cache removed: ~253 MB/entry × refs/keys exhausted
+      # Free Actions storage (see docs/investigations/github-actions-storage-audit.md).
       - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium --with-deps
-
-      - name: Install Playwright OS deps
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
 
       - name: E2E tests
         run: npm run test:e2e
@@ -290,7 +277,6 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
