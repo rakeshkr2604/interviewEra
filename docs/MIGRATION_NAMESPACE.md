@@ -37,7 +37,16 @@ are applied by `089_reconcile_historical_migration_order.sql` after 079.
 | `20260817224413` | `091_domain_pack_rls_security_remediation.sql` |
 | (new) | `092_p0_email_service_role_grants_without_default_privileges.sql` |
 | (new) | `093_drop_domain_pack_public_read_keep_policies.sql` |
-| `20260708174431` (Production Dashboard/MCP apply; never a git file) | `094_interview_turns.sql` |
+| (new) | `095_pricing_campaigns.sql` |
+| `20260818170059` (Staging MCP apply) / `20260818170126` (Production MCP apply) | `095_pricing_campaigns.sql` |
+| (new) | `096_stale_active_interview_start.sql` |
+| `20260818171838` (Staging MCP apply) / `20260818171756` (Production MCP apply) | `096_stale_active_interview_start.sql` |
+| (new) | `097_pricing_campaigns_overlap_and_rls.sql` |
+| `20260818170109` (Staging MCP apply) / `20260818170137` (Production MCP apply) | `097_pricing_campaigns_overlap_and_rls.sql` |
+| (new) | `098_one_active_interview_unique_index.sql` |
+| `20260818171846` (Staging MCP apply) / `20260818171804` (Production MCP apply) | `098_one_active_interview_unique_index.sql` |
+| (new) | `099_abandoned_interview_one_resume.sql` |
+| `20260818175417` (Staging MCP apply) / `20260818175417` (Production MCP apply) | `099_abandoned_interview_one_resume.sql` |
 
 `20260708161102` (`user_activity_grants`) is the same work as serial `054`.
 

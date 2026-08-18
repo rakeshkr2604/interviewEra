@@ -90,6 +90,7 @@ vi.mock('@/lib/analytics/milestone-events-store', () => ({
 }));
 
 import { POST } from '@/app/api/interview/script/start/route';
+import { ActiveInterviewExistsError } from '@/lib/interview/active-interview-policy';
 
 function request(): Request {
   return new Request('http://localhost/api/interview/script/start', {
@@ -152,5 +153,90 @@ describe('script interview start credit ownership', () => {
       deduped: true,
     });
     expect(mocks.createInterviewWithCredit).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for a genuine active interview without creating another debit', async () => {
+    mocks.createInterviewWithCredit.mockRejectedValue(
+      new ActiveInterviewExistsError(INTERVIEW_ID, 'in_progress', 'v2.1', '2026-08-18T10:00:00.000Z'),
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'active_interview',
+      interviewId: INTERVIEW_ID,
+      resumeUrl: `/interview/script/${INTERVIEW_ID}`,
+    });
+    expect(mocks.createInterviewWithCredit).toHaveBeenCalledOnce();
+  });
+
+  it('returns 409, not 500, when the helper still wraps the RPC conflict string', async () => {
+    mocks.createInterviewWithCredit.mockRejectedValue(
+      new Error('Interview creation and credit deduction failed: Another interview is already active'),
+    );
+
+    const response = await POST(request());
+    const body = await response.json() as { error?: string };
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe('active_interview');
+    expect(JSON.stringify(body)).not.toContain('Interview creation and credit deduction failed');
+  });
+
+  it('returns 402 when the RPC reports no credits', async () => {
+    mocks.createInterviewWithCredit.mockResolvedValue({
+      success: false,
+      remaining: 0,
+      reason: 'no_credits',
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(402);
+    await expect(response.json()).resolves.toMatchObject({ error: 'no_credits' });
+  });
+
+  it('returns 500 for unexpected infrastructure errors, not 409', async () => {
+    mocks.createInterviewWithCredit.mockRejectedValue(new Error('connection refused'));
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(500);
+    await expect(response.json()).resolves.toEqual({ error: 'Internal server error' });
+  });
+
+  it('returns 201 with a single debit when the RPC creates the interview', async () => {
+    mocks.createInterviewWithCredit.mockResolvedValue({
+      success: true,
+      remaining: 1,
+      interviewId: INTERVIEW_ID,
+      creditTransactionId: '44444444-4444-4444-8444-444444444444',
+      created: true,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(201);
+    expect(mocks.createInterviewWithCredit).toHaveBeenCalledOnce();
+  });
+
+  it('returns the existing interview when the RPC dedupes a concurrent retry', async () => {
+    mocks.createInterviewWithCredit.mockResolvedValue({
+      success: true,
+      remaining: 2,
+      interviewId: INTERVIEW_ID,
+      creditTransactionId: '44444444-4444-4444-8444-444444444444',
+      created: false,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      interviewId: INTERVIEW_ID,
+      deduped: true,
+    });
+    expect(mocks.createInterviewWithCredit).toHaveBeenCalledOnce();
   });
 });

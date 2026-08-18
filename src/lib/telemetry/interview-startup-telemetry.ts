@@ -244,8 +244,20 @@ export async function runStartInterviewWithTelemetry(opts: {
   track?: TrackFn
   interviewIdPlaceholder?: string
   unlockAudio: () => void
-  createSession: () => Promise<{ ok: boolean; interviewId?: string; error?: string; preparing?: boolean }>
-}): Promise<{ ok: boolean; interviewId?: string; error?: string; preparing?: boolean }> {
+  createSession: () => Promise<{
+    ok: boolean
+    interviewId?: string
+    error?: string
+    preparing?: boolean
+    resumeUrl?: string
+  }>
+}): Promise<{
+  ok: boolean
+  interviewId?: string
+  error?: string
+  preparing?: boolean
+  resumeUrl?: string
+}> {
   const timeline = new InterviewStartupTimeline()
   const placeholder = opts.interviewIdPlaceholder ?? 'pending'
   if (opts.track) timeline.bind(placeholder, opts.track)

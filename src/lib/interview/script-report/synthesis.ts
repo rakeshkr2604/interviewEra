@@ -253,7 +253,7 @@ const JSON_SHAPE_EXAMPLE = `{
     }
   ],
   "model_answer_fillins": [
-    { "turn_index": 1, "lines": ["Situation: ...", "Task: ...", "Action: ...", "Result: ..."] }
+    { "turn_index": 1, "lines": ["In that situation, ...", "I owned ...", "I personally ...", "As a result, ..."] }
   ]
 }`;
 
@@ -266,7 +266,7 @@ Hard rules:
 - NEVER invent percentiles, population ranks, or "top X%" claims — we have no verified peer dataset.
 - NEVER claim a hire decision or job guarantee. Placement language must stay score-band scoped ("on this session").
 - Base the 30-day roadmap on the weakest dimensions listed — concrete weekly practice, not generic filler.
-- model_answer_fillins: only for turns listed as missing_model_answer; 3–5 short STAR or logical-flow lines. Use [] if none missing.
+- model_answer_fillins: only for turns listed as missing_model_answer; 3–4 full spoken paragraphs matching a complete interview answer (STAR flow for HR, logical flow for technical). No Situation:/Task: headings. Same length as a real spoken answer, not stubs. Use [] if none missing.
 - Return ONE JSON object only. No markdown fences.
 
 CRITICAL — exact types (do not invent alternate shapes):

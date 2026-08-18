@@ -1,6 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { createInterviewWithCredit, refundCredit } from '@/lib/utils/credits';
+import {
+  activeInterviewAgeMs,
+  activeInterviewConflictBody,
+  asActiveInterviewConflict,
+} from '@/lib/interview/active-interview-policy';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
 import { computeJdFingerprint } from '@/lib/redis/question-cache';
@@ -15,6 +20,7 @@ import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-stor
 import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
 
 export async function POST(request: Request): Promise<NextResponse> {
+  let userId: string | undefined;
   try {
     const supabase = await createClient();
     const {
@@ -25,6 +31,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    userId = user.id;
 
     const rateLimit = await checkRateLimit(`start:${user.id}`, 60, 5, { failClosed: true });
     const blocked = buildRateLimitHttpResponse(
@@ -136,7 +143,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // ── Duplicate prevention ─────────────────────────────────────────────────
     // 1) Reuse a just-created pending interview (double-click / retry) — no extra credit.
     const recentCutoff = new Date(Date.now() - 90_000).toISOString();
-    const { data: recentPending } = await serviceClient
+    const { data: recentPending, error: recentError } = await serviceClient
       .from('interviews')
       .select('id, status, created_at')
       .eq('user_id', user.id)
@@ -148,7 +155,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       .limit(1)
       .maybeSingle();
 
-    if (recentPending?.id) {
+    if (recentError) {
+      console.error('[interview/start] recent-pending lookup failed', {
+        userId: user.id,
+        code: recentError.code,
+        message: recentError.message,
+      });
+    } else if (recentPending?.id) {
       trackInterviewEvent('interview_created', {
         userId: user.id,
         interviewId: recentPending.id,
@@ -160,28 +173,6 @@ export async function POST(request: Request): Promise<NextResponse> {
         phase: 'generating_questions',
         deduped: true,
       });
-    }
-
-    // 2) Block a second concurrent session — resume the active one instead.
-    const { data: activeInterview } = await serviceClient
-      .from('interviews')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'in_progress'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (activeInterview?.id) {
-      return NextResponse.json(
-        {
-          error: 'active_interview',
-          interviewId: activeInterview.id,
-          status: activeInterview.status,
-          resumeUrl: `/interview/session/${activeInterview.id}`,
-        },
-        { status: 409 },
-      );
     }
 
     type QuestionPayload = {
@@ -345,7 +336,19 @@ export async function POST(request: Request): Promise<NextResponse> {
       creditsRemaining: creditResult.remaining,
     });
   } catch (err) {
-    console.error('[interview/start] Unexpected error:', err);
+    const conflict = asActiveInterviewConflict(err);
+    if (conflict) {
+      console.info('[interview/start]', {
+        event: 'active_interview_conflict',
+        userId: userId ?? 'unknown',
+        existingActiveInterviewId: conflict.interviewId,
+        existingActiveInterviewStatus: conflict.status,
+        existingActiveInterviewEngine: conflict.engine,
+        existingActiveInterviewAgeMs: activeInterviewAgeMs(conflict.startedAt),
+      });
+      return NextResponse.json(activeInterviewConflictBody(conflict), { status: 409 });
+    }
+    console.error(`[interview/start] Unexpected error (userId=${userId ?? 'unknown'}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -7,6 +7,7 @@ import { PricingPlanGrid, type PromoPlanQuote } from '@/components/pricing/Prici
 import type { PlanTier } from '@/types/app.types';
 import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+import { pickBetterDisplayQuote } from '@/lib/pricing/display-quote';
 import { trackCouponEntered } from '@/lib/analytics/funnel-ga4-bridge';
 
 interface PricingSectionProps {
@@ -16,6 +17,7 @@ interface PricingSectionProps {
   planStatus?: string | null;
   selectedPlan?: PaidPlanId;
   initialCode?: string;
+  initialCampaignQuotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
 }
 
 type PreviewJson = {
@@ -56,12 +58,15 @@ export function PricingSection({
   planStatus,
   selectedPlan,
   initialCode,
+  initialCampaignQuotes,
 }: PricingSectionProps) {
   const router = useRouter();
   const [codeOpen, setCodeOpen] = useState(false);
   const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
-  const [quotes, setQuotes] = useState<Partial<Record<PaidPlanId, PromoPlanQuote>>>({});
+  const [quotes, setQuotes] = useState<Partial<Record<PaidPlanId, PromoPlanQuote>>>(
+    initialCampaignQuotes ?? {},
+  );
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const inputId = useId();
@@ -123,7 +128,10 @@ export function PricingSection({
 
       if (Object.keys(nextQuotes).length > 0) {
         setAppliedCode(code);
-        setQuotes(nextQuotes);
+        setQuotes({
+          starter: pickBetterDisplayQuote(nextQuotes.starter, initialCampaignQuotes?.starter),
+          pro: pickBetterDisplayQuote(nextQuotes.pro, initialCampaignQuotes?.pro),
+        });
         setCodeOpen(false);
         return;
       }
@@ -135,14 +143,14 @@ export function PricingSection({
 
       if (hard && !hard.ok && hard.code !== 'CODE_NOT_APPLICABLE') {
         setAppliedCode(undefined);
-        setQuotes({});
+        setQuotes(initialCampaignQuotes ?? {});
         setInlineError(hard.error ?? 'Invalid code');
         return;
       }
 
-      // Applicable at checkout for at least one plan — keep code, no card-level quote yet.
+      // Applicable at checkout for at least one plan — keep code, keep campaign quotes.
       setAppliedCode(code);
-      setQuotes({});
+      setQuotes(initialCampaignQuotes ?? {});
       setCodeOpen(false);
     } catch {
       setInlineError('Could not validate code. Try again.');
@@ -159,10 +167,15 @@ export function PricingSection({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialCode]);
 
+  useEffect(() => {
+    if (appliedCode) return;
+    setQuotes(initialCampaignQuotes ?? {});
+  }, [appliedCode, initialCampaignQuotes]);
+
   function clearCode() {
     setCodeDraft('');
     setAppliedCode(undefined);
-    setQuotes({});
+    setQuotes(initialCampaignQuotes ?? {});
     setInlineError(null);
     setCodeOpen(true);
   }

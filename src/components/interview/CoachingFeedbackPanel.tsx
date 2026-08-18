@@ -262,25 +262,15 @@ export function CoachingFeedbackPanel({
             {vm.hasStrongerExample ? (
               <section>
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                  Stronger example
+                  Sample answer
                 </p>
                 <p className="mb-2 text-[11px] text-(--text-muted)">
-                  Reference only — adapt to your real experience; do not copy word-for-word.
-                  {vm.strongerExampleNote ? ` ${vm.strongerExampleNote}` : ''}
+                  A 10/10 rewrite of your answer — adapt it, don&apos;t memorize.
                 </p>
-                <div className="space-y-2.5 rounded-xl border border-(--card-border)/70 bg-(--bg-secondary)/50 p-3">
-                  {vm.strongerExample.map((section, i) => (
-                    <div key={`${section.label}-${i}`}>
-                      {section.label !== 'Example' ? (
-                        <p className="mb-0.5 text-[11px] font-semibold text-(--accent-primary)">
-                          {section.label}
-                        </p>
-                      ) : null}
-                      <p className="text-[13px] leading-relaxed text-(--text-secondary)">
-                        {section.text}
-                      </p>
-                    </div>
-                  ))}
+                <div className="min-h-[7.5rem] rounded-xl border border-(--card-border)/70 bg-(--bg-secondary)/50 p-3">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--text-primary) sm:text-[15px]">
+                    {vm.sampleAnswerParagraphs.join('\n\n')}
+                  </p>
                 </div>
               </section>
             ) : null}

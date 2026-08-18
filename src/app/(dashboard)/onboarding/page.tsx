@@ -30,6 +30,7 @@ import {
   runStartInterviewWithTelemetry,
   stashStartupClickMeta,
 } from '@/lib/telemetry/interview-startup-telemetry'
+import { userFacingInterviewStartError } from '@/lib/interview/active-interview-policy'
 
 const STEP_LABELS = ['You & goal', 'Resume & start']
 const TOTAL_STEPS = 2
@@ -824,16 +825,32 @@ export default function OnboardingPage() {
             interviewId?: string
             error?: string
             preparing?: boolean
+            resumeUrl?: string
           } | null
 
           if (response.status === 405) {
             return { ok: false, error: 'Internal API mismatch. Please contact support.' }
           }
 
+          if (response.status === 409 && responseData?.error === 'active_interview') {
+            if (responseData.interviewId || (responseData.resumeUrl && responseData.resumeUrl !== '/dashboard')) {
+              return {
+                ok: true,
+                interviewId: responseData.interviewId,
+                preparing: responseData.preparing ?? false,
+                resumeUrl: responseData.resumeUrl,
+              }
+            }
+            return { ok: false, error: userFacingInterviewStartError(409, responseData.error) }
+          }
+
           if (!response.ok || !responseData?.interviewId) {
             return {
               ok: false,
-              error: responseData?.error ?? 'Failed to start interview. Please try again.',
+              error: userFacingInterviewStartError(
+                response.status,
+                responseData?.error,
+              ),
             }
           }
 
@@ -856,13 +873,26 @@ export default function OnboardingPage() {
       return
     }
 
+    const dest =
+      result.resumeUrl?.trim() ||
+      (result.interviewId
+        ? `/interview/session/${result.interviewId}?interviewer=${data.interviewerId}`
+        : '')
+    if (!dest || dest === '/dashboard') {
+      setStartError('You already have an active interview. Open it from your dashboard.')
+      setStartLoading(false)
+      return
+    }
+
     void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
 
-    stashStartupClickMeta(result.interviewId!)
-    const prepQ = result.preparing ? '&preparing=1' : ''
-    router.push(
-      `/interview/session/${result.interviewId}?interviewer=${data.interviewerId}${prepQ}`,
-    )
+    if (result.interviewId) stashStartupClickMeta(result.interviewId)
+    const prepQ = result.preparing
+      ? dest.includes('?')
+        ? '&preparing=1'
+        : '?preparing=1'
+      : ''
+    router.push(`${dest}${prepQ}`)
     setStartLoading(false)
   }
 

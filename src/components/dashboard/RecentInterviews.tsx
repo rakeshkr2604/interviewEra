@@ -1,8 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
-import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
+import { isResumableInterviewStatus, shouldOfferHistoryContinue } from '@/lib/interview/interview-status'
+import { requestInterviewResume } from '@/lib/interview/request-interview-resume'
 
 interface Interview {
   id: string
@@ -16,6 +19,8 @@ interface Interview {
   reportHref?: string | null
   continueHref?: string | null
   score?: number | null
+  abandonedResumeUsed?: boolean
+  creditDeducted?: boolean
 }
 
 interface RecentInterviewsProps {
@@ -26,6 +31,9 @@ const actionBtnClass =
   'inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50 active:opacity-90 sm:px-4 sm:text-sm'
 
 export function RecentInterviews({ interviews }: RecentInterviewsProps) {
+  const router = useRouter()
+  const [busyId, setBusyId] = useState<string | null>(null)
+
   if (interviews.length === 0) {
     return (
       <div
@@ -44,6 +52,11 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
       {interviews.map((interview) => {
         const isCompleted = interview.status === 'completed'
         const isResumable = isResumableInterviewStatus(interview.status)
+        const canContinue = shouldOfferHistoryContinue({
+          status: interview.status,
+          abandonedResumeUsed: interview.abandonedResumeUsed,
+          creditDeducted: interview.creditDeducted,
+        })
         const date = formatInterviewDateEnIn(interview.started_at, interview.completed_at)
         const continueHref =
           interview.continueHref ??
@@ -92,7 +105,8 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
                 </span>
               </div>
 
-              {isResumable ? (
+              {canContinue ? (
+                isResumable ? (
                 <Link
                   href={continueHref}
                   className={actionBtnClass}
@@ -100,6 +114,39 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
                 >
                   Continue
                 </Link>
+                ) : (
+                <button
+                  type="button"
+                  disabled={busyId === interview.id}
+                  className={actionBtnClass}
+                  style={{ background: 'var(--accent-primary)' }}
+                  onClick={() => {
+                    if (
+                      !window.confirm(
+                        'This is your one continue on this credit. Same questions. Leave again and the session ends for good.',
+                      )
+                    ) {
+                      return
+                    }
+                    setBusyId(interview.id)
+                    void (async () => {
+                      const result = await requestInterviewResume(interview.id)
+                      if (!result.ok) {
+                        if (result.resumeUrl) {
+                          router.push(result.resumeUrl)
+                          return
+                        }
+                        setBusyId(null)
+                        window.alert(result.message)
+                        return
+                      }
+                      router.push(result.resumeUrl)
+                    })()
+                  }}
+                >
+                  {busyId === interview.id ? 'Opening…' : 'Continue'}
+                </button>
+                )
               ) : reportHref ? (
                 <Link
                   href={reportHref}

@@ -7,6 +7,11 @@ import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
+import {
+  activeInterviewAgeMs,
+  activeInterviewConflictBody,
+  asActiveInterviewConflict,
+} from '@/lib/interview/active-interview-policy';
 
 const scriptStartSchema = z.object({
   resumeId: z.string().uuid(),
@@ -132,8 +137,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // Step 5 — duplicate prevention. A retry reuses the just-created script
     // interview and never reaches the transactional debit helper.
+    // Stale vs genuine-active is decided inside create_interview_with_credit;
+    // do not 409 here on every pending/in_progress row.
     const recentCutoff = new Date(Date.now() - 90_000).toISOString();
-    const { data: recentInterview } = await serviceClient
+    const { data: recentInterview, error: recentError } = await serviceClient
       .from('interviews')
       .select('id')
       .eq('user_id', user.id)
@@ -146,34 +153,24 @@ export async function POST(request: Request): Promise<NextResponse> {
       .limit(1)
       .maybeSingle();
 
-    if (recentInterview?.id) {
+    if (recentError) {
+      console.error('[interview/script/start] recent-interview lookup failed', {
+        userId: user.id,
+        code: recentError.code,
+        message: recentError.message,
+      });
+    } else if (recentInterview?.id) {
+      console.info('[interview/script/start]', {
+        event: 'deduped_recent',
+        userId: user.id,
+        existingActiveInterviewId: recentInterview.id,
+      });
       return NextResponse.json({
         interviewId: recentInterview.id,
         scriptType,
         resumeSnapshotId: null,
         deduped: true,
       });
-    }
-
-    const { data: activeInterview } = await serviceClient
-      .from('interviews')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .in('status', ['pending', 'in_progress'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (activeInterview?.id) {
-      return NextResponse.json(
-        {
-          error: 'active_interview',
-          interviewId: activeInterview.id,
-          status: activeInterview.status,
-          resumeUrl: `/interview/script/${activeInterview.id}`,
-        },
-        { status: 409 },
-      );
     }
 
     // Step 6 — returning user: any prior completed interview
@@ -217,9 +214,21 @@ export async function POST(request: Request): Promise<NextResponse> {
       currentTurnIndex: 0,
     });
     if (!creditResult.success || !creditResult.interviewId) {
+      console.info('[interview/script/start]', {
+        event: 'no_credits',
+        userId: user.id,
+      });
       return NextResponse.json({ error: 'no_credits', upgradeUrl: '/upgrade' }, { status: 402 });
     }
     const interviewId = creditResult.interviewId;
+
+    console.info('[interview/script/start]', {
+      event: creditResult.created === false ? 'reused_active' : 'created',
+      userId: user.id,
+      newInterviewId: interviewId,
+      created: creditResult.created !== false,
+      creditTransactionId: creditResult.creditTransactionId,
+    });
 
     if (creditResult.created === false) {
       return NextResponse.json({
@@ -275,6 +284,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       { status: 201 },
     );
   } catch (err) {
+    const conflict = asActiveInterviewConflict(err);
+    if (conflict) {
+      console.info('[interview/script/start]', {
+        event: 'active_interview_conflict',
+        userId: userId ?? 'unknown',
+        existingActiveInterviewId: conflict.interviewId,
+        existingActiveInterviewStatus: conflict.status,
+        existingActiveInterviewEngine: conflict.engine,
+        existingActiveInterviewAgeMs: activeInterviewAgeMs(conflict.startedAt),
+      });
+      return NextResponse.json(activeInterviewConflictBody(conflict), { status: 409 });
+    }
     console.error(`[interview/script/start] Unexpected error (userId=${userId ?? 'unknown'}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

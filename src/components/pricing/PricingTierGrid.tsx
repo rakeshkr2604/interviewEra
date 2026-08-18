@@ -113,6 +113,55 @@ function PlanPrice({ plan, quote }: { plan: PaidPlanId; quote?: PromoPlanQuote }
   );
 }
 
+function discountedQuotePlans(
+  quotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>,
+): PaidPlanId[] {
+  return (['starter', 'pro'] as const).filter((plan) => {
+    const quote = quotes?.[plan];
+    return Boolean(
+      quote &&
+        quote.isActive !== false &&
+        quote.final_amount_paise > 0 &&
+        quote.final_amount_paise < quote.list_amount_paise,
+    );
+  });
+}
+
+function displayDiscountPercent(quote: PromoPlanQuote): number | null {
+  if (quote.discountPercent != null && quote.discountPercent > 0) {
+    return quote.discountPercent;
+  }
+  if (quote.list_amount_paise > 0 && quote.discount_paise > 0) {
+    return Math.round((quote.discount_paise / quote.list_amount_paise) * 100);
+  }
+  return null;
+}
+
+function campaignSaveCopy(quotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>): {
+  headline: string;
+  showNoCoupon: boolean;
+} | null {
+  const plans = discountedQuotePlans(quotes);
+  if (plans.length === 0) return null;
+
+  const percents = plans
+    .map((plan) => displayDiscountPercent(quotes![plan]!))
+    .filter((value): value is number => value != null && value > 0);
+  const uniquePercents = [...new Set(percents)];
+  const planLabel =
+    plans.length === 2
+      ? 'Starter & Pro'
+      : plans[0] === 'starter'
+        ? 'Starter'
+        : 'Pro';
+  const headline =
+    uniquePercents.length === 1
+      ? `Save ${uniquePercents[0]}% on ${planLabel}`
+      : `Save on ${planLabel}`;
+  const showNoCoupon = plans.every((plan) => !quotes?.[plan]?.campaignCodeId);
+  return { headline, showNoCoupon };
+}
+
 function CampaignOffer({
   quotes,
   onExpired,
@@ -122,25 +171,45 @@ function CampaignOffer({
 }) {
   const quote = quotes?.starter ?? quotes?.pro;
   if (!quote?.expiresAt || !quote.serverNow || quote.isActive === false) return null;
+  const save = campaignSaveCopy(quotes);
 
   return (
     <div
-      className="mb-6 flex flex-col items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-center sm:flex-row sm:text-left"
+      className="mb-6 grid grid-cols-1 items-center gap-3 rounded-2xl border px-4 py-4 text-center sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:text-left"
       style={{
         borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))',
         background: 'color-mix(in srgb, var(--accent-primary) 8%, var(--card-bg))',
       }}
       role="status"
     >
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--accent-primary)' }}>
-          Limited-time offer
-        </p>
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-          Campaign pricing is applied from the server quote.
-        </p>
+      <p
+        className="text-[10px] font-bold uppercase tracking-[0.16em] sm:justify-self-start"
+        style={{ color: 'var(--accent-primary)' }}
+      >
+        {quote.label ?? 'Limited-time offer'}
+      </p>
+      {save ? (
+        <div className="min-w-0 sm:justify-self-center sm:text-center">
+          <p className="text-base font-bold leading-tight sm:text-lg" style={{ color: 'var(--text-primary)' }}>
+            {save.headline}
+          </p>
+          {save.showNoCoupon ? (
+            <p className="mt-0.5 text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
+              No coupon code needed.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="hidden sm:block" aria-hidden />
+      )}
+      <div className="sm:justify-self-end">
+        <CampaignCountdown
+          expiresAt={quote.expiresAt}
+          serverNow={quote.serverNow}
+          onExpired={onExpired}
+          size="hero"
+        />
       </div>
-      <CampaignCountdown expiresAt={quote.expiresAt} serverNow={quote.serverNow} onExpired={onExpired} />
     </div>
   );
 }
@@ -368,6 +437,15 @@ export function PricingPlanGrid(props: PricingGridProps) {
                   <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                     {PAID_PLANS[plan].credits} interview credits · {PAID_PLANS[plan].durationDays}-day access
                   </p>
+                  {quote?.expiresAt && quote.serverNow && quote.isActive !== false ? (
+                    <div className="mt-2">
+                      <CampaignCountdown
+                        expiresAt={quote.expiresAt}
+                        serverNow={quote.serverNow}
+                        onExpired={props.onCampaignExpired}
+                      />
+                    </div>
+                  ) : null}
                 </div>
                 <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
                   {PLAN_POSITIONING[plan].title}

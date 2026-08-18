@@ -4,6 +4,7 @@ import {
   normalizeSpeechSpacing,
   spacingNeedsFix,
   suggestParagraphBreaks,
+  withSuggestedParagraphBreaks,
 } from './transcript-readability'
 
 const WALL = [
@@ -40,6 +41,13 @@ describe('suggestParagraphBreaks', () => {
     const next = applyParagraphBreaks(WALL, breaks)
     expect(next.replace(/\s+/g, ' ').trim()).toBe(WALL.replace(/\s+/g, ' ').trim())
     expect(next).toContain('\n\n')
+  })
+
+  it('withSuggestedParagraphBreaks is idempotent so auto-apply cannot loop', () => {
+    const once = withSuggestedParagraphBreaks(WALL)
+    expect(once).toContain('\n\n')
+    expect(withSuggestedParagraphBreaks(once)).toBe(once)
+    expect(suggestParagraphBreaks(once)).toEqual([])
   })
 })
 

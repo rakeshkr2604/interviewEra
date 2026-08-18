@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 
 export const metadata = privatePageMetadata({
@@ -16,6 +16,11 @@ import type { PlanTier, RadarDataPoint } from '@/types/app.types';
 import { isPaidPlanId } from '@/lib/pricing/plans';
 import { formatPlanExpiryEnIn } from '@/lib/pricing/copy';
 import { normalizePricingCampaignCode } from '@/lib/pricing/plan-intent';
+import {
+  getPublicPricingSnapshot,
+  publicSnapshotToPromoQuotes,
+} from '@/lib/pricing/effective-price';
+import type { PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
 
 export default async function UpgradePage({
   searchParams,
@@ -81,6 +86,14 @@ export default async function UpgradePage({
 
   const isExhausted = creditsRemaining === 0;
 
+  let initialCampaignQuotes: Partial<Record<'starter' | 'pro', PromoPlanQuote>> | undefined;
+  try {
+    const snapshot = await getPublicPricingSnapshot(createServiceClient());
+    initialCampaignQuotes = publicSnapshotToPromoQuotes(snapshot);
+  } catch (error) {
+    console.warn('[upgrade] global campaign snapshot unavailable', error);
+  }
+
   return (
     <div className="space-y-8">
       <DashboardPageHeader
@@ -137,6 +150,7 @@ export default async function UpgradePage({
         planStatus={planStatus}
         selectedPlan={selectedPlan}
         initialCode={initialCode}
+        initialCampaignQuotes={initialCampaignQuotes}
       />
 
       <CommunityCTA

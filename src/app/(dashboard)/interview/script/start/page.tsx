@@ -17,6 +17,7 @@ import {
   writeCameraInterviewModeEnabled,
 } from '@/lib/settings/client-preferences'
 import { stashScriptInterviewerId } from '@/lib/config/interviewers'
+import { userFacingInterviewStartError } from '@/lib/interview/active-interview-policy'
 
 /**
  * Production v2.1 script interview setup (goal → role → resume → start).
@@ -105,6 +106,7 @@ export default function ScriptInterviewStartPage() {
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const [submitting, setSubmitting] = useState<boolean>(false)
+  const startInFlightRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
 
   // Resume upload (Step 2)
@@ -322,6 +324,7 @@ export default function ScriptInterviewStartPage() {
   }, [])
 
   const handleStart = useCallback(async () => {
+    if (startInFlightRef.current) return
     setError(null)
     if (!resumeId) {
       setError('No resume found on your account. Upload a resume via onboarding first.')
@@ -331,6 +334,7 @@ export default function ScriptInterviewStartPage() {
       setError('Select an interview goal before starting.')
       return
     }
+    startInFlightRef.current = true
     setSubmitting(true)
 
     const result = await runStartInterviewWithTelemetry({
@@ -359,16 +363,33 @@ export default function ScriptInterviewStartPage() {
           const body = (await res.json().catch(() => null)) as {
             interviewId?: string
             error?: string
+            resumeUrl?: string
           } | null
+
+          if (res.status === 409 && body?.error === 'active_interview') {
+            if (body.interviewId || (body.resumeUrl && body.resumeUrl !== '/dashboard')) {
+              return { ok: true as const, interviewId: body.interviewId, resumeUrl: body.resumeUrl }
+            }
+            return {
+              ok: false as const,
+              error: userFacingInterviewStartError(409, body.error),
+            }
+          }
+          if (res.status === 402) {
+            return {
+              ok: false as const,
+              error: userFacingInterviewStartError(402, body?.error),
+            }
+          }
 
           if (!res.ok || !body?.interviewId) {
             return {
               ok: false as const,
-              error: body?.error || `Failed to start interview (status ${res.status}).`,
+              error: userFacingInterviewStartError(res.status, body?.error),
             }
           }
 
-          return { ok: true as const, interviewId: body.interviewId }
+          return { ok: true as const, interviewId: body.interviewId, resumeUrl: body.resumeUrl }
         } catch (err) {
           return {
             ok: false as const,
@@ -378,14 +399,25 @@ export default function ScriptInterviewStartPage() {
       },
     })
 
-    if (!result.ok || !result.interviewId) {
+    if (!result.ok) {
       setError(result.error ?? 'Failed to start interview.')
+      startInFlightRef.current = false
+      setSubmitting(false)
+      return
+    }
+
+    const resumeUrl =
+      result.resumeUrl?.trim() ||
+      (result.interviewId ? `/interview/script/${result.interviewId}` : '')
+    if (!resumeUrl || resumeUrl === '/dashboard') {
+      setError(result.error ?? 'You already have an active interview. Open it from your dashboard.')
+      startInFlightRef.current = false
       setSubmitting(false)
       return
     }
 
     trackInterviewEventClient('interview_created', {
-      interviewId: result.interviewId,
+      interviewId: result.interviewId ?? resumeUrl,
       engine: 'v2.1',
       role,
       difficulty,
@@ -396,9 +428,15 @@ export default function ScriptInterviewStartPage() {
     // Match v1: clear persisted setup draft so the next visit is clean.
     void fetch('/api/onboarding/state', { method: 'DELETE', credentials: 'include' })
 
-    stashStartupClickMeta(result.interviewId)
-    stashScriptInterviewerId(result.interviewId, interviewerId)
-    router.push(`/interview/script/${result.interviewId}?i=${interviewerId}`)
+    if (result.interviewId) stashStartupClickMeta(result.interviewId)
+    if (result.interviewId) stashScriptInterviewerId(result.interviewId, interviewerId)
+    const separator = resumeUrl.includes('?') ? '&' : '?'
+    router.push(
+      resumeUrl.startsWith('/interview/script/')
+        ? `${resumeUrl}${separator}i=${interviewerId}`
+        : resumeUrl,
+    )
+    startInFlightRef.current = false
     setSubmitting(false)
   }, [
     resumeId,

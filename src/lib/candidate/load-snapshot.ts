@@ -49,6 +49,8 @@ export const CANDIDATE_DASHBOARD_INTERVIEWS_SELECT = `
   completed_at,
   started_at,
   engine,
+  credit_deducted,
+  abandoned_resume_used,
   reports (
     id,
     overall_score,
@@ -253,7 +255,8 @@ export async function loadCandidateSnapshot(
   }
 
   const completedInterviews = (interviews ?? []).filter((i) => i.status === 'completed');
-  // Only pending/in_progress are resumable server-side — abandoned is terminal.
+  // Live session CTA: pending/in_progress only. Abandoned continue is a
+  // history/dashboard action that must reopen via resume_abandoned_interview.
   const inProgress =
     (interviews ?? []).find((i) => isResumableInterviewStatus(i.status)) ?? null;
 

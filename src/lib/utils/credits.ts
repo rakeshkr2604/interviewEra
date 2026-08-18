@@ -1,8 +1,15 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import {
+  ActiveInterviewExistsError,
+  activeInterviewConflictFromRpc,
+  isActiveInterviewConflictError,
+} from '@/lib/interview/active-interview-policy';
 import type {
   InterviewDifficulty,
   InterviewStatus,
 } from '@/types/app.types';
+
+export { ActiveInterviewExistsError } from '@/lib/interview/active-interview-policy';
 
 export interface CreditResult {
   success: boolean;
@@ -66,6 +73,36 @@ export async function createInterviewWithCredit(
   });
 
   if (error) {
+    if (isActiveInterviewConflictError(error)) {
+      const conflict = activeInterviewConflictFromRpc(error);
+      if (conflict.interviewId !== 'unknown') {
+        throw conflict;
+      }
+
+      try {
+        const { data: existing } = await supabase
+          .from('interviews')
+          .select('id, status, engine, started_at')
+          .eq('user_id', input.userId)
+          .in('status', ['pending', 'in_progress'])
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existing?.id) {
+          throw new ActiveInterviewExistsError(
+            existing.id,
+            existing.status ?? undefined,
+            existing.engine ?? undefined,
+            existing.started_at ?? null,
+          );
+        }
+      } catch (lookupErr) {
+        if (lookupErr instanceof ActiveInterviewExistsError) throw lookupErr;
+      }
+
+      throw conflict;
+    }
     throw new Error(`Interview creation and credit deduction failed: ${error.message}`);
   }
 

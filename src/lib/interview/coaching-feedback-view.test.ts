@@ -278,6 +278,26 @@ describe('coaching-feedback-view', () => {
     expect(vm.hasStrongerExample).toBe(true)
     expect(vm.strongerExample.map((s) => s.label)).toEqual(['Situation', 'Action'])
     expect(vm.strongerExampleNote).toMatch(/don't invent missing STAR/i)
+    expect(vm.sampleAnswerParagraphs).toEqual([
+      'Organic acquisition was a bottleneck.',
+      'I built programmatic SEO pages.',
+    ])
+  })
+
+  it('logical-flow stronger example is complete when all four labels exist', () => {
+    const complete = parseStrongerExampleLines([
+      'Problem: Score-only ATS output was not actionable.',
+      'Approach: Add explainable field-extraction checks.',
+      'Reasoning: Candidates need to know which fields failed.',
+      'Conclusion: The checker returned useful feedback instead of a number.',
+    ])
+    expect(strongerExampleEvidenceNote('logical_flow', complete)).toBeNull()
+    expect(complete.map((s) => s.label)).toEqual([
+      'Problem',
+      'Approach',
+      'Reasoning',
+      'Conclusion',
+    ])
   })
 
   it('high score + praise one_line_summary + no missing_elements → not an improvement', () => {

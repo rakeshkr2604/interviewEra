@@ -5,7 +5,33 @@ const { rpcMock } = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/supabase/server', () => ({
-  createServiceClient: () => ({ rpc: rpcMock }),
+  createServiceClient: () => ({
+    rpc: rpcMock,
+    from: (table: string) => ({
+      select: () => ({
+        eq: () => ({
+          in: () => ({
+            order: () => ({
+              limit: () => ({
+                maybeSingle: async () =>
+                  table === 'interviews'
+                    ? {
+                        data: {
+                          id: '33333333-3333-4333-8333-333333333333',
+                          status: 'in_progress',
+                          engine: 'v2.1',
+                          started_at: '2026-08-18T10:00:00.000Z',
+                        },
+                        error: null,
+                      }
+                    : { data: null, error: null },
+              }),
+            }),
+          }),
+        }),
+      }),
+    }),
+  }),
 }));
 
 import {
@@ -130,6 +156,44 @@ describe('interview credit ownership helpers', () => {
     await expect(createInterviewWithCredit(input)).rejects.toThrow(
       'Interview creation and credit deduction failed',
     );
+  });
+
+  it('maps an active-interview RPC conflict to a typed error instead of wrapping it', async () => {
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: 'P0001',
+        message: 'Another interview is already active',
+        hint: '33333333-3333-4333-8333-333333333333',
+        details: JSON.stringify({
+          interview_id: '33333333-3333-4333-8333-333333333333',
+          status: 'in_progress',
+          engine: 'v2.1',
+          started_at: '2026-08-18T10:00:00.000Z',
+        }),
+      },
+    });
+
+    await expect(createInterviewWithCredit(input)).rejects.toMatchObject({
+      name: 'ActiveInterviewExistsError',
+      code: 'active_interview',
+      interviewId: '33333333-3333-4333-8333-333333333333',
+    });
+  });
+
+  it('maps a unique-index race to the same typed conflict', async () => {
+    rpcMock.mockResolvedValue({
+      data: null,
+      error: {
+        code: '23505',
+        message: 'duplicate key value violates unique constraint "uq_interviews_one_active_per_user"',
+      },
+    });
+
+    await expect(createInterviewWithCredit(input)).rejects.toMatchObject({
+      name: 'ActiveInterviewExistsError',
+      interviewId: '33333333-3333-4333-8333-333333333333',
+    });
   });
 
   it('links start-failure refunds to the same user and interview', async () => {

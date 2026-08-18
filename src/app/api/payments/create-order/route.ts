@@ -20,6 +20,11 @@ import {
   type CampaignDiscountErrorCode,
 } from '@/lib/campaign-codes';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
+import {
+  chooseCheckoutAmount,
+  getEffectivePlanPrice,
+  type EffectivePlanPrice,
+} from '@/lib/pricing/effective-price';
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -137,8 +142,23 @@ export async function POST(request: Request): Promise<NextResponse> {
   let campaignCodeId: string | null = null;
   let redemptionId: string | null = null;
   let ownsNewReservation = false;
+  let pricingCampaignId: string | null = null;
 
   const service = createServiceClient();
+  let campaignPrice: EffectivePlanPrice;
+  try {
+    campaignPrice = await getEffectivePlanPrice({ svc: service, plan });
+  } catch (error) {
+    paymentError('create-order', 'pricing_campaign_load_failed', {
+      user_id: user.id,
+      plan,
+      error: error instanceof Error ? error.message : 'unknown',
+    });
+    return NextResponse.json(
+      { error: 'Failed to calculate price. Please try again.' },
+      { status: 500 },
+    );
+  }
 
   if (code) {
     const reserved = await reserveCampaignCode(service, {
@@ -237,6 +257,35 @@ export async function POST(request: Request): Promise<NextResponse> {
         reused: true,
       });
     }
+
+    const decision = chooseCheckoutAmount({
+      listAmountPaise,
+      campaign: campaignPrice,
+      coupon: {
+        final_amount_paise: reserved.final_amount_paise,
+        discount_paise: reserved.discount_paise,
+      },
+    });
+    if (decision.source === 'campaign') {
+      if (ownsNewReservation && redemptionId) {
+        await releaseCampaignReservation(service, redemptionId);
+      }
+      ownsNewReservation = false;
+      redemptionId = null;
+      campaignCodeId = null;
+      finalAmountPaise = decision.finalAmountPaise;
+      discountPaise = decision.discountPaise;
+      pricingCampaignId = decision.pricingCampaignId;
+    }
+  } else {
+    const decision = chooseCheckoutAmount({
+      listAmountPaise,
+      campaign: campaignPrice,
+      coupon: null,
+    });
+    finalAmountPaise = decision.finalAmountPaise;
+    discountPaise = decision.discountPaise;
+    pricingCampaignId = decision.pricingCampaignId;
   }
 
   paymentLog('create-order', 'create_order_start', {
@@ -287,6 +336,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         campaign_redemption_id: redemptionId,
         list_amount_paise: listAmountPaise,
         discount_paise: discountPaise,
+        ...(pricingCampaignId ? { pricing_campaign_id: pricingCampaignId } : {}),
       });
 
       if (insertErr) {
@@ -316,6 +366,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       order_id: order.order_id,
       amount: order.amount,
       campaign_code_id: campaignCodeId ?? undefined,
+      pricing_campaign_id: pricingCampaignId ?? undefined,
       discount_paise: discountPaise,
       final_amount_paise: order.amount,
       source: 'create_order',

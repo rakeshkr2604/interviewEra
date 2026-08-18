@@ -22,7 +22,8 @@ Dual-path idempotent activation: both the checkout-verify route and the Razorpay
 | `src/lib/razorpay/activation-api-response.ts` | Maps internal result → `activated` / `alreadyActivated` / `activationFailed` |
 | `src/app/api/payments/verify/route.ts` | Validates Razorpay payload → calls `activatePlanAfterPayment()` |
 | `src/app/api/payments/webhook/route.ts` | Validates webhook signature → calls `activatePlanAfterPayment()` on `payment.captured`/`order.paid` |
-| `src/app/api/payments/create-order/route.ts` | Auth + per-user rate limit (5/60s, fail-closed) + `auditRazorpayConfig()` before creating an order |
+| `src/app/api/payments/create-order/route.ts` | Auth + per-user rate limit (5/60s, fail-closed) + `auditRazorpayConfig()` before creating an order. Amount is always server-calculated from `PAID_PLANS` ± live `pricing_campaigns` ± coupon (best of, never stacked). Never trust client `amount` / `price` / `campaignId`. |
+| `src/lib/pricing/effective-price.ts` | Global sale quote: `starts_at <= now < ends_at` even if `is_active` was left true after expiry. |
 | `src/lib/razorpay/payment-log.ts` | Structured `[payment:*]` logs (order_id, payment_id, user_id) — grep-able in Vercel logs |
 | `src/lib/pricing/plans.ts` | Plan tiers: `starter` (₹299 list, ₹149 promo floor/30 days/8 credits), `pro` (₹799 list, ₹399 promo floor/30 days/25 credits) |
 | `src/lib/razorpay/activate-plan.test.ts` | 11 documented concurrency/idempotency scenarios |

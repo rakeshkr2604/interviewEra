@@ -24,6 +24,7 @@ import {
   validateScriptReportSynthesis,
   type ScriptReportSynthesis,
 } from '@/lib/interview/script-report/synthesis';
+import { toSampleAnswerParagraphs } from '@/lib/interview/auto-structure/normalize';
 
 const SYNTHESIS_TIMEOUT_MS = 22_000;
 /** Stale generating claim — another request may take over. */
@@ -107,7 +108,9 @@ function extractModelAnswerLines(structured: unknown): string[] {
     .coaching_reference;
   const lines = coaching?.restructured_example;
   if (!Array.isArray(lines)) return [];
-  return lines.filter((l): l is string => typeof l === 'string' && l.trim().length > 0).slice(0, 8);
+  return toSampleAnswerParagraphs(
+    lines.filter((l): l is string => typeof l === 'string'),
+  ).slice(0, 6);
 }
 
 function parseDimensions(
@@ -473,7 +476,7 @@ function mergeModelAnswers(
     if (q.modelAnswerLines.length > 0) return q;
     const fill = fillByTurn.get(q.turnIndex);
     if (!fill?.length) return q;
-    return { ...q, modelAnswerLines: fill };
+    return { ...q, modelAnswerLines: toSampleAnswerParagraphs(fill).slice(0, 6) };
   });
 }
 

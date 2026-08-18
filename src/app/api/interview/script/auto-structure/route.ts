@@ -14,6 +14,7 @@ import {
 } from '@/lib/interview/auto-structure/prompt';
 import { normalizeAutoStructureOutput } from '@/lib/interview/auto-structure/normalize';
 import type { NormalizedAutoStructure } from '@/lib/interview/auto-structure/normalize';
+import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 
 const autoStructureSchema = z.object({
   interviewId: z.string().uuid(),
@@ -83,7 +84,15 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { interviewId, turnIndex, rawTranscript, displayQuestion, targetRole } = validation.data;
+    const {
+      interviewId,
+      turnIndex,
+      rawTranscript,
+      displayQuestion,
+      targetRole,
+      scriptType,
+      questionType,
+    } = validation.data;
     interviewIdForLog = interviewId;
 
     const serviceClient = createServiceClient();
@@ -118,6 +127,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       displayQuestion: clampedQuestion,
       targetRole: clampedRole,
       rawTranscript: clampedTranscript,
+      questionType: questionType ?? questionTypeFromScript(scriptType) ?? 'behavioral',
     });
     const registryCap = getTokenBudget('auto_structure');
     const maxTokens = resolveAutoStructureMaxTokens(clampedTranscript.length, registryCap);

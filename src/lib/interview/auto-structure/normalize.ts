@@ -18,9 +18,24 @@ export type NormalizedAutoStructure = {
 const FALLBACK_FEEDBACK =
   'Solid answer. Keep practicing the same clarity on the next question.';
 
-const MAX_RESTRUCTURED = 2;
-const MAX_RESTRUCTURED_WORDS = 25;
+const MAX_RESTRUCTURED = 6;
+const MAX_RESTRUCTURED_WORDS = 80;
 const MAX_FEEDBACK_WORDS = 40;
+
+const FRAMEWORK_PREFIX_RE =
+  /^(situation|task|action|result|problem|approach|reasoning|conclusion)\s*[:\-–—]\s*/i;
+
+/** Drop STAR/logical-flow headings so stored lines are spoken paragraphs. */
+export function stripFrameworkPrefix(text: string): string {
+  return text.replace(FRAMEWORK_PREFIX_RE, '').trim();
+}
+
+export function toSampleAnswerParagraphs(lines: string[]): string[] {
+  return lines
+    .flatMap((s) => s.split(/\n\s*\n/))
+    .map(stripFrameworkPrefix)
+    .filter((s) => s.length > 0);
+}
 const MAX_TECH_TERMS = 3;
 const MAX_DEFINITION_WORDS = 12;
 const MAX_MISSING = 2;
@@ -116,7 +131,7 @@ export function normalizeAutoStructureOutput(
       coaching_reference: {
         feedback: clampWords(feedbackRaw, MAX_FEEDBACK_WORDS),
         restructured_example: capStringList(
-          restructuredRaw,
+          toSampleAnswerParagraphs(restructuredRaw),
           MAX_RESTRUCTURED,
           MAX_RESTRUCTURED_WORDS,
         ),
@@ -165,7 +180,7 @@ export function normalizeAutoStructureOutput(
     coaching_reference: {
       feedback,
       restructured_example: capStringList(
-        structured_points,
+        toSampleAnswerParagraphs(structured_points),
         MAX_RESTRUCTURED,
         MAX_RESTRUCTURED_WORDS,
       ),

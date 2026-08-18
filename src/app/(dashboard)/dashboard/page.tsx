@@ -146,7 +146,8 @@ export default async function DashboardPage() {
     userData && typeof userData.avatar_path === 'string' ? userData.avatar_path : null
   const oauthPictureUrl = resolveOAuthPictureUrl(user.user_metadata)
 
-  // Only pending/in_progress are resumable server-side — abandoned is terminal.
+  // Live session CTA: pending/in_progress only. Abandoned continue is offered
+  // on the recent-interview list after resume_abandoned_interview reopens it.
   const inProgressInterview =
     rows.find((row) => isResumableInterviewStatus(row.status)) ?? null
 

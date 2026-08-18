@@ -7,6 +7,8 @@ export type InterviewWithReportsRow = {
   completed_at: string | null
   started_at: string | null
   engine?: string | null
+  credit_deducted?: boolean | null
+  abandoned_resume_used?: boolean | null
   reports: { id: string; overall_score: number | null; generated_at: string | null }[] | null
   script_interview_reports?:
     | { id: string; overall: number | null; generated_at: string | null; status: string }[]

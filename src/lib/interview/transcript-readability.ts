@@ -66,6 +66,11 @@ export function applyParagraphBreaks(
   return out
 }
 
+/** Insert suggested paragraph breaks, or return the original string. */
+export function withSuggestedParagraphBreaks(text: string): string {
+  return applyParagraphBreaks(text, suggestParagraphBreaks(text))
+}
+
 /**
  * Fix common STT/spacing glitches without touching words:
  * "API ,system" → "API, system"; ".Currently" → ". Currently"

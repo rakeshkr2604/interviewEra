@@ -11,6 +11,11 @@ import { createServiceClient } from '@/lib/supabase/server';
 import { quoteCampaignDiscount } from '@/lib/campaign-codes';
 import type { PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
 import { normalizePricingCampaignCode } from '@/lib/pricing/plan-intent';
+import {
+  getPublicPricingSnapshot,
+  publicSnapshotToPromoQuotes,
+  type PromoDisplayQuote,
+} from '@/lib/pricing/effective-price';
 
 export const metadata: Metadata = generateMetadata({
   title: 'Pricing',
@@ -34,6 +39,26 @@ const PRICING_BREADCRUMB_LD = breadcrumbListJsonLd(
   ],
   ORIGIN,
 );
+
+function toPromoQuote(quote: PromoDisplayQuote): PromoPlanQuote {
+  return quote;
+}
+
+async function loadGlobalPricingQuotes(): Promise<
+  Partial<Record<PaidPlanId, PromoPlanQuote>> | undefined
+> {
+  try {
+    const snapshot = await getPublicPricingSnapshot(createServiceClient());
+    const quotes = publicSnapshotToPromoQuotes(snapshot);
+    if (!quotes) return undefined;
+    return Object.fromEntries(
+      Object.entries(quotes).map(([plan, quote]) => [plan, toPromoQuote(quote)]),
+    ) as Partial<Record<PaidPlanId, PromoPlanQuote>>;
+  } catch (error) {
+    console.warn('[pricing] global campaign snapshot unavailable', error);
+    return undefined;
+  }
+}
 
 async function loadCampaignQuotes(
   code: string | undefined,
@@ -83,7 +108,8 @@ export default async function PricingPage({
 }) {
   const params = await searchParams;
   const campaignCode = normalizePricingCampaignCode(params.code);
-  const quotes = await loadCampaignQuotes(campaignCode);
+  const codeQuotes = await loadCampaignQuotes(campaignCode);
+  const quotes = codeQuotes ?? (await loadGlobalPricingQuotes());
   return (
     <>
       <JsonLdScript id="pricing-faq-ld" data={PRICING_FAQ_LD} />

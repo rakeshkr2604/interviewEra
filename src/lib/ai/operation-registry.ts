@@ -245,7 +245,7 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
     },
     estimatedInputTokens: 4_000,
   },
-  // auto-structure-v2.2: budget must fit long corrected_transcript + coaching.
+  // auto-structure-v2.6: budget must fit long corrected_transcript + full sample answer.
   // QA: max_tokens=450 with ~1k-char answers hit completion_tokens=450 and
   // truncated JSON → invalid_json 502. Cap is a ceiling; route sizes per answer.
   auto_structure: {

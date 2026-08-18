@@ -9,6 +9,7 @@ const createPlanOrder = vi.fn();
 const paymentInsert = vi.fn();
 const existingPaymentMaybeSingle = vi.fn();
 const trackProductEventServer = vi.fn();
+const getEffectivePlanPrice = vi.fn();
 
 vi.mock('@/lib/supabase/server', () => ({
   createClient: async () => ({
@@ -72,6 +73,14 @@ vi.mock('@/lib/campaign-codes', async (importOriginal) => {
   };
 });
 
+vi.mock('@/lib/pricing/effective-price', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/pricing/effective-price')>();
+  return {
+    ...actual,
+    getEffectivePlanPrice: (...args: unknown[]) => getEffectivePlanPrice(...args),
+  };
+});
+
 import { POST } from './route';
 
 function request(body: unknown): Request {
@@ -104,6 +113,22 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       key: 'rzp_test_key',
       plan,
     }));
+    getEffectivePlanPrice.mockImplementation(async ({ plan }: { plan: 'starter' | 'pro' }) => {
+      const amount = plan === 'pro' ? 79900 : 29900;
+      return {
+        basePrice: amount,
+        finalPrice: amount,
+        discountAmount: 0,
+        discountPercent: 0,
+        campaignId: null,
+        campaignName: null,
+        displayLabel: null,
+        displayBadge: null,
+        startsAt: null,
+        endsAt: null,
+        serverNow: '2026-08-18T12:00:00.000Z',
+      };
+    });
   });
 
   it('ignores client-supplied amount and charges the canonical list price', async () => {
@@ -122,6 +147,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
         discount_paise: 0,
       }),
     );
+    expect(paymentInsert.mock.calls[0]?.[0]).not.toHaveProperty('pricing_campaign_id');
     expect(trackProductEventServer).toHaveBeenCalledWith(
       expect.objectContaining({
         event_name: 'checkout_started',
@@ -283,5 +309,105 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
     expect(createPlanOrder).not.toHaveBeenCalled();
     expect(paymentInsert).not.toHaveBeenCalled();
     expect(trackProductEventServer).not.toHaveBeenCalled();
+  });
+
+  it('charges the server-calculated global campaign price and ignores client amount', async () => {
+    getEffectivePlanPrice.mockResolvedValue({
+      basePrice: 29900,
+      finalPrice: 23900,
+      discountAmount: 6000,
+      discountPercent: 20,
+      campaignId: 'global-1',
+      campaignName: 'Limited Time Offer',
+      displayLabel: '20% OFF',
+      displayBadge: 'LIMITED TIME OFFER',
+      startsAt: '2026-08-18T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z',
+      serverNow: '2026-08-18T12:00:00.000Z',
+    });
+
+    const response = await POST(
+      request({ plan: 'starter', amount: 1, price: 1, campaignId: 'client-fake' }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(createPlanOrder).toHaveBeenCalledWith({
+      userId: 'user-1',
+      plan: 'starter',
+      amountPaise: 23900,
+    });
+    expect(paymentInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        amount: 23900,
+        list_amount_paise: 29900,
+        discount_paise: 6000,
+        pricing_campaign_id: 'global-1',
+      }),
+    );
+    expect(reserveCampaignCode).not.toHaveBeenCalled();
+  });
+
+  it('does not stack a weaker coupon on top of a better global campaign', async () => {
+    getEffectivePlanPrice.mockResolvedValue({
+      basePrice: 29900,
+      finalPrice: 23900,
+      discountAmount: 6000,
+      discountPercent: 20,
+      campaignId: 'global-1',
+      campaignName: 'Limited Time Offer',
+      displayLabel: '20% OFF',
+      displayBadge: null,
+      startsAt: '2026-08-18T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z',
+      serverNow: '2026-08-18T12:00:00.000Z',
+    });
+    reserveCampaignCode.mockResolvedValue({
+      ok: true,
+      error_code: null,
+      redemption_id: 'redemption-1',
+      campaign_code_id: 'campaign-1',
+      discount_paise: 3000,
+      final_amount_paise: 26900,
+      reservation_created: true,
+      order_id: null,
+    });
+
+    const response = await POST(request({ plan: 'starter', code: 'WEAK10' }));
+
+    expect(response.status).toBe(200);
+    expect(releaseCampaignReservation).toHaveBeenCalledWith(expect.anything(), 'redemption-1');
+    expect(createPlanOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ amountPaise: 23900 }),
+    );
+    expect(attachCampaignOrder).not.toHaveBeenCalled();
+  });
+
+  it('keeps rejecting an invalid coupon even when a global campaign is live', async () => {
+    getEffectivePlanPrice.mockResolvedValue({
+      basePrice: 29900,
+      finalPrice: 23900,
+      discountAmount: 6000,
+      discountPercent: 20,
+      campaignId: 'global-1',
+      campaignName: 'Limited Time Offer',
+      displayLabel: '20% OFF',
+      displayBadge: null,
+      startsAt: '2026-08-18T00:00:00.000Z',
+      endsAt: '2026-08-20T00:00:00.000Z',
+      serverNow: '2026-08-18T12:00:00.000Z',
+    });
+    reserveCampaignCode.mockResolvedValue({
+      ok: false,
+      error_code: 'CODE_INVALID',
+      redemption_id: null,
+      campaign_code_id: null,
+      discount_paise: 0,
+      final_amount_paise: 29900,
+    });
+
+    const response = await POST(request({ plan: 'starter', code: 'NOPE' }));
+
+    expect(response.status).toBe(400);
+    expect(createPlanOrder).not.toHaveBeenCalled();
   });
 });

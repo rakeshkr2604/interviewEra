@@ -4,15 +4,35 @@
  * The server write paths (answer, process-answer, checkpoint) only accept
  * interviews in `pending`/`in_progress`; `completed`/`abandoned` are terminal
  * (checkpoint returns 409, answer routes return 400). Any UI that offers to
- * open or continue a session MUST use these predicates — deriving "resumable"
- * from `status !== 'completed'` treats abandoned sessions as continuable and
- * sends candidates into a session where no answer can be saved.
+ * open a session as-is MUST use `isResumableInterviewStatus`. Abandoned
+ * interviews may be offered one history-continue only after
+ * `resume_abandoned_interview` reopens the same row to `in_progress`.
  */
 
 export type TerminalInterviewStatus = 'completed' | 'abandoned';
 
 export function isResumableInterviewStatus(status: string | null | undefined): boolean {
   return status === 'pending' || status === 'in_progress';
+}
+
+export function isAbandonedContinueEligible(opts: {
+  status: string | null | undefined;
+  abandonedResumeUsed?: boolean | null;
+  creditDeducted?: boolean | null;
+}): boolean {
+  return (
+    opts.status === 'abandoned' &&
+    opts.abandonedResumeUsed !== true &&
+    opts.creditDeducted === true
+  );
+}
+
+export function shouldOfferHistoryContinue(opts: {
+  status: string | null | undefined;
+  abandonedResumeUsed?: boolean | null;
+  creditDeducted?: boolean | null;
+}): boolean {
+  return isResumableInterviewStatus(opts.status) || isAbandonedContinueEligible(opts);
 }
 
 export function isTerminalInterviewStatus(

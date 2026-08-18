@@ -1,11 +1,13 @@
 /**
  * Pure view-model for post-answer coaching UI.
  * Assembles card + modal content from existing auto-structure / answer-score
- * fields only — no LLM, no invented Action/Result, no fabricated weaknesses.
+ * fields only — no LLM. Action/Result come from coaching restructured_example
+ * (transcript rewrite); we do not fabricate a different incident.
  */
 
 import type { AutoStructureCoaching } from '@/lib/interview/fetch-auto-structure'
 import type { AnswerScore } from '@/components/interview/AnswerScoreCard'
+import { toSampleAnswerParagraphs } from '@/lib/interview/auto-structure/normalize'
 
 export type ImprovementPoint = {
   title: string
@@ -13,7 +15,16 @@ export type ImprovementPoint = {
 }
 
 export type StrongerExampleSection = {
-  label: 'Situation' | 'Task' | 'Action' | 'Result' | 'Example'
+  label:
+    | 'Situation'
+    | 'Task'
+    | 'Action'
+    | 'Result'
+    | 'Problem'
+    | 'Approach'
+    | 'Reasoning'
+    | 'Conclusion'
+    | 'Example'
   text: string
 }
 
@@ -27,7 +38,9 @@ export type CoachingFeedbackViewModel = {
   interviewerWants: string[]
   missingFromAnswer: string[]
   strongerExample: StrongerExampleSection[]
-  /** Shown when the stronger example omits STAR/flow sections we refused to invent. */
+  /** Unlabeled spoken paragraphs for the sample-answer box and report. */
+  sampleAnswerParagraphs: string[]
+  /** Kept for tests; coaching UI no longer shows this note. */
   strongerExampleNote: string | null
   quickTip: string | null
   hasStrongerExample: boolean
@@ -49,6 +62,13 @@ const STAR_SECTION_LABELS: StrongerExampleSection['label'][] = [
   'Task',
   'Action',
   'Result',
+]
+
+const LOGICAL_FLOW_SECTION_LABELS: StrongerExampleSection['label'][] = [
+  'Problem',
+  'Approach',
+  'Reasoning',
+  'Conclusion',
 ]
 
 /**
@@ -76,12 +96,14 @@ export function strongerExampleEvidenceNote(
   sections: StrongerExampleSection[],
 ): string | null {
   if (sections.length === 0) return null
+  const labels = new Set(sections.map((s) => s.label))
   if (framework === 'star') {
-    const labels = new Set(sections.map((s) => s.label))
     const complete = STAR_SECTION_LABELS.every((l) => labels.has(l))
     if (complete) return null
     return "Only sections supported by your actual answer are shown. We don't invent missing STAR details."
   }
+  const complete = LOGICAL_FLOW_SECTION_LABELS.every((l) => labels.has(l))
+  if (complete) return null
   return "Only sections supported by your actual answer are shown. We don't invent missing details."
 }
 
@@ -134,7 +156,10 @@ export function parseStrongerExampleLines(lines: string[]): StrongerExampleSecti
   for (const raw of lines) {
     const line = raw.trim()
     if (!line) continue
-    const m = /^(situation|task|action|result)\s*[:\-–—]\s*(.+)$/i.exec(line)
+    const m =
+      /^(situation|task|action|result|problem|approach|reasoning|conclusion)\s*[:\-–—]\s*(.+)$/i.exec(
+        line,
+      )
     if (m) {
       const label =
         m[1]!.charAt(0).toUpperCase() + m[1]!.slice(1).toLowerCase()
@@ -245,6 +270,9 @@ export function buildCoachingFeedbackViewModel(args: {
   const strongerExample = parseStrongerExampleLines(
     coaching?.restructured_example ?? [],
   )
+  const sampleAnswerParagraphs = toSampleAnswerParagraphs(
+    coaching?.restructured_example ?? [],
+  )
 
   const quickTip =
     summary ||
@@ -259,8 +287,9 @@ export function buildCoachingFeedbackViewModel(args: {
     interviewerWants: framework === 'star' ? STAR_WANTS : LOGICAL_FLOW_WANTS,
     missingFromAnswer: missing,
     strongerExample,
+    sampleAnswerParagraphs,
     strongerExampleNote: strongerExampleEvidenceNote(framework, strongerExample),
     quickTip,
-    hasStrongerExample: strongerExample.length > 0,
+    hasStrongerExample: sampleAnswerParagraphs.length > 0,
   }
 }

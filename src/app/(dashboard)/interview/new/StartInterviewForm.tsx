@@ -17,6 +17,7 @@ import {
   runStartInterviewWithTelemetry,
   stashStartupClickMeta,
 } from '@/lib/telemetry/interview-startup-telemetry';
+import { userFacingInterviewStartError } from '@/lib/interview/active-interview-policy';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
@@ -127,15 +128,19 @@ export function StartInterviewForm({
           };
 
           if (!res.ok) {
-            if (res.status === 409 && data.error === 'active_interview' && data.interviewId) {
-              return {
-                ok: true,
-                interviewId: data.interviewId,
-                preparing: data.resumeUrl?.includes('preparing') ?? false,
-              };
+            if (res.status === 409 && data.error === 'active_interview') {
+              if (data.interviewId || (data.resumeUrl && data.resumeUrl !== '/dashboard')) {
+                return {
+                  ok: true,
+                  interviewId: data.interviewId,
+                  preparing: data.preparing ?? false,
+                  resumeUrl: data.resumeUrl,
+                };
+              }
+              return { ok: false, error: userFacingInterviewStartError(409, data.error) };
             }
             if (res.status === 402) {
-              return { ok: false, error: 'No credits remaining. Please upgrade your plan.' };
+              return { ok: false, error: userFacingInterviewStartError(402, data.error) };
             }
             if (res.status === 503) {
               return {
@@ -143,7 +148,7 @@ export function StartInterviewForm({
                 error: data.error ?? 'AI is temporarily unavailable. Try again in 30 seconds.',
               };
             }
-            return { ok: false, error: data.error ?? 'Failed to start interview. Please try again.' };
+            return { ok: false, error: userFacingInterviewStartError(res.status, data.error) };
           }
 
           if (!data.interviewId) {
@@ -167,9 +172,21 @@ export function StartInterviewForm({
       return;
     }
 
-    stashStartupClickMeta(result.interviewId!);
-    const prep = result.preparing ? '?preparing=1' : '';
-    router.push(`/interview/session/${result.interviewId!}${prep}`);
+    const dest =
+      result.resumeUrl?.trim() ||
+      (result.interviewId
+        ? `/interview/session/${result.interviewId}${result.preparing ? '?preparing=1' : ''}`
+        : '');
+    if (!dest || dest === '/dashboard') {
+      setError('You already have an active interview. Open it from your dashboard.');
+      setLoading(false);
+      return;
+    }
+
+    if (result.interviewId) stashStartupClickMeta(result.interviewId);
+    const needsPrep = result.preparing && !dest.includes('preparing=1');
+    const separator = dest.includes('?') ? '&' : '?';
+    router.push(needsPrep ? `${dest}${separator}preparing=1` : dest);
   }
 
   return (

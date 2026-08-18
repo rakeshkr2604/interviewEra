@@ -19,7 +19,7 @@ export default async function HistoryPage() {
 
   const { data: interviews } = await supabase
     .from('interviews')
-    .select('id, role, difficulty, status, started_at, completed_at, question_count, engine')
+    .select('id, role, difficulty, status, started_at, completed_at, question_count, engine, credit_deducted, abandoned_resume_used')
     .eq('user_id', user.id)
     .order('started_at', { ascending: false })
 
@@ -94,6 +94,8 @@ export default async function HistoryPage() {
       reportHref,
       continueHref,
       score,
+      abandonedResumeUsed: Boolean(interview.abandoned_resume_used),
+      creditDeducted: interview.credit_deducted === true,
     }
   })
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Ticket } from 'lucide-react';
@@ -17,6 +17,54 @@ import { Reveal } from '@/components/landing/landing-home-shared';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+
+type PublicPricingJson = {
+  plans?: Partial<
+    Record<
+      PaidPlanId,
+      {
+        basePricePaise?: number;
+        finalPricePaise?: number;
+        discountAmountPaise?: number;
+        discountPercent?: number;
+      }
+    >
+  >;
+  campaign?: {
+    active?: boolean;
+    name?: string | null;
+    label?: string | null;
+    startsAt?: string | null;
+    endsAt?: string | null;
+  };
+  serverNow?: string;
+};
+
+function quotesFromPublicPricing(
+  json: PublicPricingJson,
+): Partial<Record<PaidPlanId, PromoPlanQuote>> | undefined {
+  if (!json.campaign?.active) return undefined;
+  const quotes: Partial<Record<PaidPlanId, PromoPlanQuote>> = {};
+  for (const plan of ['starter', 'pro'] as const) {
+    const row = json.plans?.[plan];
+    if (!row?.basePricePaise || !row.finalPricePaise || row.finalPricePaise >= row.basePricePaise) {
+      continue;
+    }
+    quotes[plan] = {
+      list_amount_paise: row.basePricePaise,
+      discount_paise: row.discountAmountPaise ?? row.basePricePaise - row.finalPricePaise,
+      final_amount_paise: row.finalPricePaise,
+      label: json.campaign.label ?? json.campaign.name ?? null,
+      discountPercent: row.discountPercent && row.discountPercent > 0 ? row.discountPercent : null,
+      startsAt: json.campaign.startsAt ?? null,
+      expiresAt: json.campaign.endsAt ?? null,
+      serverNow: json.serverNow ?? null,
+      isActive: true,
+      campaignCodeId: null,
+    };
+  }
+  return Object.keys(quotes).length ? quotes : undefined;
+}
 
 const PICK_HINTS = [
   {
@@ -100,10 +148,33 @@ export function PricingPageClient({
 }) {
   const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
+
+  useEffect(() => {
+    setQuotes(initialQuotes);
+  }, [initialQuotes]);
+
   const handleExpired = useCallback(() => {
-    setQuotes(undefined);
-    router.refresh();
-  }, [router]);
+    if (campaignCode) {
+      setQuotes(undefined);
+      router.refresh();
+      return;
+    }
+    void (async () => {
+      try {
+        const res = await fetch('/api/pricing/public', { cache: 'no-store' });
+        if (!res.ok) {
+          setQuotes(undefined);
+          router.refresh();
+          return;
+        }
+        const json = (await res.json()) as PublicPricingJson;
+        setQuotes(quotesFromPublicPricing(json));
+      } catch {
+        setQuotes(undefined);
+      }
+      router.refresh();
+    })();
+  }, [campaignCode, router]);
 
   return (
     <main

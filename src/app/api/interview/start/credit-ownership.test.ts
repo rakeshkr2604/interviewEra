@@ -98,6 +98,7 @@ vi.mock('@/lib/resume/interview-snapshot', () => ({
 }));
 
 import { POST } from '@/app/api/interview/start/route';
+import { ActiveInterviewExistsError } from '@/lib/interview/active-interview-policy';
 
 function request(): Request {
   return new Request('http://localhost/api/interview/start', {
@@ -149,5 +150,33 @@ describe('legacy interview start credit ownership', () => {
       deduped: true,
     });
     expect(mocks.createInterviewWithCredit).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 for a genuine active interview without another debit', async () => {
+    mocks.createInterviewWithCredit.mockRejectedValue(
+      new ActiveInterviewExistsError(INTERVIEW_ID, 'pending', 'v1', null),
+    );
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'active_interview',
+      interviewId: INTERVIEW_ID,
+      resumeUrl: `/interview/session/${INTERVIEW_ID}`,
+    });
+  });
+
+  it('returns 409, not 500, when the helper still wraps the RPC conflict string', async () => {
+    mocks.createInterviewWithCredit.mockRejectedValue(
+      new Error('Interview creation and credit deduction failed: Another interview is already active'),
+    );
+
+    const response = await POST(request());
+    const body = await response.json() as { error?: string };
+
+    expect(response.status).toBe(409);
+    expect(body.error).toBe('active_interview');
+    expect(JSON.stringify(body)).not.toContain('Interview creation and credit deduction failed');
   });
 });

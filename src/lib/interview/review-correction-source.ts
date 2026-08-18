@@ -12,9 +12,13 @@
  *              suggestions from the SAME frozen source may still show
  *   locked   — user manually edited or applied formatting; STT highlights
  *              are suppressed so a late payload cannot re-flag spans
+ *
+ * Auto-inserted paragraph breaks (`paragraph-auto`) do not lock: they only
+ * insert `\n\n` between existing sentences. Token alignment still matches
+ * the STT correction source, so highlights must remain available.
  */
 
-export type ReviewCorrectionReason = 'accept' | 'edit' | 'format'
+export type ReviewCorrectionReason = 'accept' | 'edit' | 'format' | 'paragraph-auto'
 
 export type ReviewCorrectionPhase = 'idle' | 'pending' | 'accepted' | 'locked'
 
@@ -65,6 +69,9 @@ export function applyReviewValueChange(
   state: ReviewCorrectionState,
   reason: ReviewCorrectionReason,
 ): ReviewCorrectionState {
+  if (reason === 'paragraph-auto') {
+    return state
+  }
   if (reason === 'edit' || reason === 'format') {
     return { ...state, phase: 'locked' }
   }

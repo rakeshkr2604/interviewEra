@@ -12,6 +12,7 @@ import {
   normalizeSpeechSpacing,
   spacingNeedsFix,
   suggestParagraphBreaks,
+  withSuggestedParagraphBreaks,
 } from '@/lib/interview/transcript-readability'
 import { buildHighlightRenderSegments } from '@/lib/interview/review-highlight-render'
 import type { ReviewCorrectionReason } from '@/lib/interview/review-correction-source'
@@ -189,6 +190,27 @@ export function ReviewAnswerHighlightEditor({
     () => new Set(paragraphBreaks.map((b) => b.insertAt)),
     [paragraphBreaks],
   )
+
+  const onChangeRef = useRef(onChange)
+  useLayoutEffect(() => {
+    onChangeRef.current = onChange
+  })
+  // Auto-apply once per wall-of-text. If the candidate later removes the
+  // blank lines, the same normalized key is skipped so we do not fight them.
+  const autoParagraphKeyRef = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const key = value.replace(/\s+/g, ' ').trim()
+    if (!key) return
+    if (paragraphBreaks.length === 0) {
+      if (/\n\s*\n/.test(value)) autoParagraphKeyRef.current = key
+      return
+    }
+    if (autoParagraphKeyRef.current === key) return
+    const next = withSuggestedParagraphBreaks(value)
+    autoParagraphKeyRef.current = key
+    if (next === value) return
+    onChangeRef.current(next, 'paragraph-auto')
+  }, [paragraphBreaks, value])
 
   const applyAllParagraphs = () => {
     closeChip()

@@ -10,10 +10,12 @@ import {
   Copy,
   Check,
   Calculator,
+  Tag,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { computeCampaignDiscountQuote } from '@/lib/campaign-codes';
 import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
+import { GlobalOffersPanel } from '@/components/admin/GlobalOffersPanel';
 
 const cardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -22,7 +24,7 @@ const cardStyle: React.CSSProperties = {
   boxShadow: 'var(--card-shadow)',
 };
 
-type Tab = 'codes' | 'referrals' | 'manual' | 'activity';
+type Tab = 'offers' | 'codes' | 'referrals' | 'manual' | 'activity';
 
 interface CampaignCode {
   id: string;
@@ -411,6 +413,7 @@ export default function PlatformRewardsPage() {
   }
 
   const tabs: { id: Tab; label: string; icon: typeof Gift }[] = [
+    { id: 'offers', label: 'Global offers', icon: Tag },
     { id: 'codes', label: 'Codes', icon: Ticket },
     { id: 'referrals', label: 'Referrals', icon: Users },
     { id: 'manual', label: 'Manual credit', icon: Gift },
@@ -432,7 +435,7 @@ export default function PlatformRewardsPage() {
             Rewards
           </h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-            Promo codes, sponsorships, referrals, and manual credit grants
+            Promo codes, sponsorships, global sale campaigns, referrals, and manual credit grants
           </p>
         </div>
         <button
@@ -480,6 +483,8 @@ export default function PlatformRewardsPage() {
           </button>
         ))}
       </div>
+
+      {tab === 'offers' && <GlobalOffersPanel />}
 
       {tab === 'codes' && (
         <div className="space-y-5">

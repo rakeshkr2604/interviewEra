@@ -127,6 +127,7 @@ import {
   initialReviewCorrectionState,
   type ReviewCorrectionReason,
 } from '@/lib/interview/review-correction-source'
+import { withSuggestedParagraphBreaks } from '@/lib/interview/transcript-readability'
 
 // ── iOS browser detection ──────────────────────────────────────────────────────
 // Apple forces all iOS browsers (CriOS/Chrome, FxiOS/Firefox, OPiOS/Opera, etc.)
@@ -2076,7 +2077,7 @@ export default function ScriptInterviewPage() {
         setReviewOpen(true)
         setReviewStep('transcript')
         setUiPhase('review')
-        setEditedRaw(rawAnswer)
+        setEditedRaw(withSuggestedParagraphBreaks(rawAnswer))
         setReviewStructured(null)
         reviewStructuredRef.current = null
         setReviewStructuredBind(null)
@@ -2402,10 +2403,20 @@ export default function ScriptInterviewPage() {
   }, [submitAnswer])
 
   const handleRestart = useCallback(() => {
-    if (window.confirm('Restart this interview? Your progress will be lost.')) {
+    if (!window.confirm('Restart this interview? Your progress will be lost.')) return
+    void (async () => {
+      try {
+        await fetch(`/api/interview/${interviewId}/abandon`, {
+          method: 'POST',
+          credentials: 'include',
+          keepalive: true,
+        })
+      } catch {
+        // User confirmed leave; still navigate if abandon is unreachable.
+      }
       router.push('/dashboard')
-    }
-  }, [router])
+    })()
+  }, [interviewId, router])
 
   // iOS Safari unlock CTA — tap unlocks AudioContext, then runs turn ∥ mic warm.
   const handleUnlockAudio = useCallback(() => {
@@ -3616,7 +3627,7 @@ export default function ScriptInterviewPage() {
                   <p className="mb-2 shrink-0 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
                     Your answer{' '}
                     <span className="ml-2 normal-case font-normal">
-                      (highlighted words = possible STT errors · Formatting buttons below do not change wording · or click to edit)
+                      (highlighted words = possible STT errors · paragraphs apply automatically · click to edit)
                     </span>
                   </p>
                   <ReviewAnswerHighlightEditor

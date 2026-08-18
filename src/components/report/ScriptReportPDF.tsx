@@ -167,9 +167,9 @@ export function ScriptReportPDF({
               {includeModelAnswers && q.modelAnswerLines.length > 0 && (
                 <>
                   <Text style={s.muted}>Model answer example</Text>
-                  {q.modelAnswerLines.slice(0, 4).map((line, i) => (
+                  {q.modelAnswerLines.slice(0, 6).map((line, i) => (
                     <Text key={i} style={s.body}>
-                      • {line}
+                      {line}
                     </Text>
                   ))}
                 </>

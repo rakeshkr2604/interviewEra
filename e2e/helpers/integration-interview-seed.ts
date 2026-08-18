@@ -109,7 +109,24 @@ export async function seedResumableInterview(userId: string): Promise<SeededInte
     throw new Error(`Failed to seed resume: ${resumeError?.message ?? 'unknown'}`);
   }
 
-  const { data: interview, error: interviewError } = await admin
+    const { data: existingActive } = await admin
+      .from('interviews')
+      .select('id')
+      .eq('user_id', userId)
+      .in('status', ['pending', 'in_progress']);
+
+    if (existingActive && existingActive.length > 0) {
+      const { error: abandonError } = await admin
+        .from('interviews')
+        .update({ status: 'abandoned', completed_at: new Date().toISOString() })
+        .eq('user_id', userId)
+        .in('status', ['pending', 'in_progress']);
+      if (abandonError) {
+        throw new Error(`Failed to clear active interviews before seed: ${abandonError.message}`);
+      }
+    }
+
+    const { data: interview, error: interviewError } = await admin
     .from('interviews')
     .insert({
       user_id: userId,

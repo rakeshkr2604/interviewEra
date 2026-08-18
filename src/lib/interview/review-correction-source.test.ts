@@ -126,6 +126,14 @@ describe('review correction three-state model', () => {
     expect(correctionSourceForHighlights(state)).toBeNull()
   })
 
+  it('auto-applied paragraph breaks do not lock STT highlights', () => {
+    let state = initialReviewCorrectionState()
+    state = applyIncomingCorrection(state, 'I use super base for auth')
+    state = applyReviewValueChange(state, 'paragraph-auto')
+    expect(state.phase).toBe('pending')
+    expect(correctionSourceForHighlights(state)).toBe('I use super base for auth')
+  })
+
   it('idle has no highlight source even if source is somehow set', () => {
     expect(
       correctionSourceForHighlights({ phase: 'idle', source: 'should not show' }),

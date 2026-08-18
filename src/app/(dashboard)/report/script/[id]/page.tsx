@@ -835,15 +835,13 @@ export default async function ScriptReportPage({ params }: PageProps) {
                     upgradeLabel="Upgrade to Pro to see model answer comparisons"
                   >
                     {q.modelAnswerLines.length > 0 ? (
-                      <ul
-                        className="mt-1 list-disc space-y-1 pl-5 text-sm leading-relaxed"
+                      <p
+                        className="mt-1 whitespace-pre-wrap text-sm leading-relaxed"
                         data-testid="script-report-model-answer"
                         style={{ color: 'var(--text-secondary)' }}
                       >
-                        {q.modelAnswerLines.map((line, i) => (
-                          <li key={i}>{line}</li>
-                        ))}
-                      </ul>
+                        {q.modelAnswerLines.join('\n\n')}
+                      </p>
                     ) : (
                       <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
                         No example available for this turn.
