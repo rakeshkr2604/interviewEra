@@ -1,6 +1,7 @@
 import { FileText } from 'lucide-react';
 import type { LegalDocumentMeta } from './types';
 import { COMPANY_ADDRESS } from './privacy-content';
+import { PAID_PLANS } from '@/lib/pricing/plans';
 
 /**
  * Terms & Conditions — production content (founder-reviewed July 2026).
@@ -60,7 +61,7 @@ export const termsDocument: LegalDocumentMeta = {
         },
         {
           sub: 'Paid Plans (One-Time)',
-          text: 'Starter (₹149) and Pro (₹399) are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. Pricing is in Indian Rupees (INR) and includes applicable GST unless stated otherwise at checkout. Plans do not auto-renew — renew manually whenever you need continued access.',
+          text: `Starter (₹${PAID_PLANS.starter.amountInr}) and Pro (₹${PAID_PLANS.pro.amountInr}) are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. Pricing is in Indian Rupees (INR) and includes applicable GST unless stated otherwise at checkout. Plans do not auto-renew — renew manually whenever you need continued access.`,
         },
         {
           sub: 'Payment Processing',
@@ -68,7 +69,7 @@ export const termsDocument: LegalDocumentMeta = {
         },
         {
           sub: 'No Auto-Renewal',
-          text: 'Paid plans do not renew automatically. When your 30-day access period ends, your account returns to the free tier unless you make another one-time payment. You may renew early from Settings to extend access from your current expiry date.',
+          text: 'Paid plans do not renew automatically. When your 30-day access period ends, your account returns to the free tier unless you make another one-time payment. You may renew early from Settings to extend access from your current expiry date; renewal adds the new plan\'s credits to your remaining balance.',
         },
       ],
     },

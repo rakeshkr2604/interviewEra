@@ -35,6 +35,28 @@ import type {
 import type { RetryResultRow } from '@/app/api/admin/feedback-retry/route';
 import type { FeedbackSessionContext } from '@/lib/feedback/collect-context';
 import { ALL_LABELS, type FeedbackLabel } from '@/lib/feedback/auto-tag';
+import {
+  TECHNICAL_FAILURE_CATEGORY_LABELS,
+  type TechnicalFailureStatus,
+} from '@/lib/technical-failures/types';
+import {
+  exceededTechnicalFailureTarget,
+  technicalFailureResolutionHours,
+} from '@/lib/technical-failures/sla';
+import {
+  TECHNICAL_FAILURE_STATUS_LABELS,
+  technicalCreditRestorationLabel,
+} from '@/lib/technical-failures/status';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 
 // ─── Shared card style (matches analytics page) ───────────────────────────────
 
@@ -101,7 +123,14 @@ function SeverityBadge({ severity }: { severity: string | null }) {
   );
 }
 
-function RatingStars({ rating }: { rating: number }) {
+function RatingStars({ rating }: { rating: number | null }) {
+  if (rating === null || !Number.isFinite(Number(rating))) {
+    return (
+      <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+        No rating
+      </span>
+    );
+  }
   const value = Number(rating);
   const label = Number.isInteger(value) ? `${value}` : value.toFixed(1);
   return (
@@ -510,6 +539,7 @@ function FeedbackCard({
   onPatch,
   onSaveNotes,
   onDelete,
+  onTechnicalAction,
 }: {
   row:            FeedbackRow;
   expanded:       boolean;
@@ -518,8 +548,20 @@ function FeedbackCard({
   onPatch:        (patch: Partial<FeedbackRow>) => Promise<void>;
   onSaveNotes:    (notes: string) => void;
   onDelete:       () => Promise<void>;
+  onTechnicalAction: (
+    action: 'investigate' | 'approve' | 'reject' | 'service_recovery',
+    reason?: string,
+  ) => Promise<void>;
 }) {
   const [notes, setNotes] = useState(row.notes ?? '');
+  const [decisionDialog, setDecisionDialog] = useState<null | {
+    action: 'approve' | 'reject' | 'service_recovery';
+    title: string;
+    description: string;
+    confirmLabel: string;
+  }>(null);
+  const [decisionReason, setDecisionReason] = useState('');
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   const notesTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Sync notes if the row updates externally
@@ -539,9 +581,47 @@ function FeedbackCard({
     notesTimer.current = setTimeout(() => onSaveNotes(val), 600);
   }
 
+  function openDecisionDialog(action: 'approve' | 'reject' | 'service_recovery') {
+    const config = {
+      approve: {
+        title: 'Approve technical failure',
+        description: 'Approve this technical failure and restore exactly 1 interview credit.',
+        confirmLabel: 'Approve and restore 1 interview credit',
+      },
+      reject: {
+        title: 'Reject technical-failure restoration',
+        description: 'Reject credit restoration for this technical-failure case. The user will not receive a restored credit.',
+        confirmLabel: 'Reject restoration',
+      },
+      service_recovery: {
+        title: 'Grant complimentary credit',
+        description: 'Grant exactly 1 complimentary service-recovery credit. This does not change the restored interview credit.',
+        confirmLabel: 'Grant 1 complimentary credit',
+      },
+    }[action];
+    setDecisionReason('');
+    setDecisionError(null);
+    setDecisionDialog({ action, ...config });
+  }
+
+  async function submitDecisionDialog() {
+    if (!decisionDialog) return;
+    const reason = decisionReason.trim();
+    if (reason.length < 3) {
+      setDecisionError('Enter a concise reason (at least 3 characters).');
+      return;
+    }
+    await onTechnicalAction(decisionDialog.action, reason);
+    setDecisionDialog(null);
+    setDecisionReason('');
+    setDecisionError(null);
+  }
+
   const ctx = row.session_context as unknown as FeedbackSessionContext | null;
   const hasSession = ctx && (ctx.interview_role || ctx.session_id);
   const hasDevice  = ctx && (ctx.browser_name || ctx.os || ctx.device_type);
+  const technicalCase = row.technical_failure_case ?? null;
+  const isTechnicalIssue = Boolean(technicalCase);
 
   // Text preview: structured liked / confusion / bugs (dropdown answers)
   const likedPreview = row.liked_text?.trim() ?? '';
@@ -552,6 +632,29 @@ function FeedbackCard({
   // Affected page: prefer session_context.current_page, fall back to page_url
   const affectedPage = (ctx?.current_page as string | undefined) || row.page_url || '';
   const pagePath = affectedPage ? new URL(affectedPage, 'https://x').pathname : '';
+  const technicalStatus = technicalCase?.status as TechnicalFailureStatus | undefined;
+  const resolutionHours = technicalCase
+    ? technicalFailureResolutionHours(technicalCase.submitted_at, technicalCase.resolved_at)
+    : null;
+  const serviceRecoveryEligible = technicalCase
+    ? exceededTechnicalFailureTarget(technicalCase.submitted_at, technicalCase.resolved_at)
+    : false;
+  const creditRestoration = technicalCase
+    ? technicalCreditRestorationLabel({
+        status: technicalCase.status as TechnicalFailureStatus,
+        originalDebitPresent: Boolean(technicalCase.original_debit),
+        restorationPresent: Boolean(technicalCase.restoration_transaction_id),
+      })
+    : null;
+  const interviewRef = technicalCase?.interview
+    ? [
+        technicalCase.interview.role,
+        technicalCase.interview.difficulty,
+        technicalCase.interview.status,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : null;
 
   return (
     <div
@@ -562,7 +665,9 @@ function FeedbackCard({
           ? 'var(--accent-primary)'
           : row.severity === 'critical'
             ? '#fca5a5'
-            : 'var(--card-border)',
+            : technicalCase
+              ? '#fde68a'
+              : 'var(--card-border)',
         opacity: row.is_archived ? 0.65 : 1,
       }}
     >
@@ -594,6 +699,14 @@ function FeedbackCard({
             <div className="flex flex-wrap items-center gap-2">
               <SeverityBadge severity={row.severity} />
               <RatingStars rating={row.rating} />
+              {isTechnicalIssue && (
+                <span
+                  className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}
+                >
+                  Interview technical issue
+                </span>
+              )}
               {!row.is_resolved && (
                 <span className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
                   style={{ borderColor: '#fde68a', background: '#fffbeb', color: '#b45309' }}>
@@ -616,6 +729,33 @@ function FeedbackCard({
                 </span>
               )}
             </div>
+
+            {technicalCase && technicalStatus && creditRestoration && (
+              <div className="flex flex-wrap gap-1.5">
+                <Chip style={{ background: '#fffbeb', color: '#b45309' }}>
+                  Technical failure case · {TECHNICAL_FAILURE_STATUS_LABELS[technicalStatus]}
+                </Chip>
+                {interviewRef ? <Chip>Interview: {interviewRef}</Chip> : null}
+                <Chip
+                  style={{
+                    background:
+                      creditRestoration === 'Restored'
+                        ? '#f0fdf4'
+                        : creditRestoration === 'Not eligible' || creditRestoration === 'Not restored'
+                          ? '#fef2f2'
+                          : '#eff6ff',
+                    color:
+                      creditRestoration === 'Restored'
+                        ? '#15803d'
+                        : creditRestoration === 'Not eligible' || creditRestoration === 'Not restored'
+                          ? '#b91c1c'
+                          : '#1d4ed8',
+                  }}
+                >
+                  Credit restoration: {creditRestoration}
+                </Chip>
+              </div>
+            )}
 
             {/* Row 1b: auto-detected labels */}
             {row.labels?.length > 0 && (
@@ -659,9 +799,11 @@ function FeedbackCard({
                 ) : null}
                 {bugsPreview ? (
                   <p className="line-clamp-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>Bugs · </span>
+                    <span className="font-semibold" style={{ color: 'var(--text-muted)' }}>
+                      {isTechnicalIssue ? 'Interview technical issue · ' : 'Bugs · '}
+                    </span>
                     {bugsPreview}
-                    {isPositiveFeedbackNote(bugsPreview) ? (
+                    {!isTechnicalIssue && isPositiveFeedbackNote(bugsPreview) ? (
                       <span
                         className="ml-1.5 inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                         style={{ background: '#dcfce7', color: '#15803d' }}
@@ -752,7 +894,7 @@ function FeedbackCard({
           loading={mutating}
           onClick={(e) => { e.stopPropagation(); void onPatch({ is_archived: !row.is_archived }); }}
         />
-        <ActionBtn
+        {!technicalCase && <ActionBtn
           icon={<Trash2 className="h-3.5 w-3.5" />}
           label="Delete"
           active
@@ -769,7 +911,7 @@ function FeedbackCard({
             }
             void onDelete();
           }}
-        />
+        />}
         <FeedbackReplyButton row={row} />
       </div>
 
@@ -781,7 +923,10 @@ function FeedbackCard({
             {[
               { label: 'What did you like?', text: row.liked_text },
               { label: 'What confused you?', text: row.confusion_text },
-              { label: 'Bugs or issues?', text: row.bugs_text },
+              {
+                label: isTechnicalIssue ? 'Interview technical issue' : 'Bugs or issues?',
+                text: row.bugs_text,
+              },
             ].map(({ label, text }) => text?.trim() ? (
               <div key={label}>
                 <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -813,6 +958,136 @@ function FeedbackCard({
             )}
           </div>
 
+          {technicalCase && (
+            <div className="space-y-4 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                    Technical failure case
+                  </p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {technicalStatus
+                      ? TECHNICAL_FAILURE_STATUS_LABELS[technicalStatus]
+                      : 'Unknown'}
+                  </p>
+                </div>
+                <span
+                  className="rounded-full border px-2.5 py-1 text-xs font-semibold"
+                  style={{
+                    borderColor: technicalStatus === 'approved' ? '#86efac' : technicalStatus === 'rejected' ? '#fca5a5' : '#fde68a',
+                    background: technicalStatus === 'approved' ? '#f0fdf4' : technicalStatus === 'rejected' ? '#fef2f2' : '#fffbeb',
+                    color: technicalStatus === 'approved' ? '#15803d' : technicalStatus === 'rejected' ? '#b91c1c' : '#b45309',
+                  }}
+                >
+                  {TECHNICAL_FAILURE_CATEGORY_LABELS[technicalCase.failure_category]}
+                </span>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Interview
+                  </p>
+                  <p className="mt-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {technicalCase.interview?.role ?? 'Unknown interview'}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {technicalCase.interview?.difficulty ?? '—'} · {technicalCase.interview?.status ?? '—'} · {technicalCase.interview?.engine ?? '—'}
+                  </p>
+                </div>
+                <div className="rounded-xl p-3" style={{ background: 'var(--bg-secondary)' }}>
+                  <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                    Credit evidence
+                  </p>
+                  {technicalCase.original_debit ? (
+                    <p className="mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      Debit confirmed · {technicalCase.original_debit.reason ?? 'interview_start'}
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs font-medium" style={{ color: '#b91c1c' }}>
+                      Credit restoration unavailable — no verifiable interview credit debit.
+                    </p>
+                  )}
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Credit restoration: {creditRestoration ?? '—'}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Service recovery: {technicalCase.service_recovery_transaction_id ? 'Granted' : 'Not granted'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                Submitted {new Date(technicalCase.submitted_at).toLocaleString('en-IN')}
+                {technicalCase.review_started_at
+                  ? ` · Review started ${new Date(technicalCase.review_started_at).toLocaleString('en-IN')}`
+                  : ''}
+                {resolutionHours !== null ? ` · Resolved in ${resolutionHours.toFixed(1)}h` : ''}
+              </div>
+
+              {technicalCase.decision_reason && (
+                <p className="rounded-xl p-3 text-sm" style={{ background: 'var(--bg-secondary)', color: 'var(--text-primary)' }}>
+                  <span className="font-semibold">Decision: </span>{technicalCase.decision_reason}
+                  {technicalCase.reviewed_by_email ? ` — ${technicalCase.reviewed_by_email}` : ''}
+                </p>
+              )}
+
+              <div className="flex flex-wrap gap-2">
+                {technicalStatus === 'submitted' && (
+                  <button
+                    type="button"
+                    disabled={mutating}
+                    onClick={() => void onTechnicalAction('investigate')}
+                    className="rounded-xl border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                    style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+                  >
+                    Begin Review
+                  </button>
+                )}
+                {(technicalStatus === 'submitted' || technicalStatus === 'investigating') && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={mutating || !technicalCase.original_debit}
+                      onClick={() => openDecisionDialog('approve')}
+                      className="rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                      style={{ background: '#15803d' }}
+                      title={
+                        technicalCase.original_debit
+                          ? undefined
+                          : 'Credit restoration unavailable — no verifiable interview credit debit.'
+                      }
+                    >
+                      Approve technical failure and restore 1 interview credit
+                    </button>
+                    <button
+                      type="button"
+                      disabled={mutating}
+                      onClick={() => openDecisionDialog('reject')}
+                      className="rounded-xl px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
+                      style={{ background: '#b91c1c' }}
+                    >
+                      Reject technical-failure restoration
+                    </button>
+                  </>
+                )}
+                {technicalStatus === 'approved' &&
+                  serviceRecoveryEligible &&
+                  !technicalCase.service_recovery_transaction_id && (
+                    <button
+                      type="button"
+                      disabled={mutating}
+                      onClick={() => openDecisionDialog('service_recovery')}
+                      className="rounded-xl border px-3 py-2 text-xs font-semibold disabled:opacity-50"
+                      style={{ borderColor: '#a78bfa', color: '#6d28d9' }}
+                    >
+                      Grant 1 complimentary credit
+                    </button>
+                  )}
+              </div>
+            </div>
+          )}
+
           {/* Screenshot */}
           {row.screenshot_url && (
             <div className="p-4 sm:p-5">
@@ -831,7 +1106,7 @@ function FeedbackCard({
                     src={row.screenshot_url}
                     alt="User-submitted screenshot"
                     fill
-                    className="object-cover"
+                    className="object-contain"
                     sizes="(max-width: 640px) 100vw, 512px"
                   />
                 </span>
@@ -943,6 +1218,71 @@ function FeedbackCard({
           </div>
         </div>
       )}
+
+      <Dialog
+        open={decisionDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDecisionDialog(null);
+            setDecisionReason('');
+            setDecisionError(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{decisionDialog?.title}</DialogTitle>
+            <DialogDescription>{decisionDialog?.description}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label htmlFor={`tf-reason-${row.id}`} className="text-sm font-medium">
+              Reason (required)
+            </label>
+            <Textarea
+              id={`tf-reason-${row.id}`}
+              value={decisionReason}
+              onChange={(e) => {
+                setDecisionReason(e.target.value);
+                if (decisionError) setDecisionError(null);
+              }}
+              rows={4}
+              maxLength={500}
+              placeholder="Add a concise review reason for the audit trail…"
+              aria-invalid={Boolean(decisionError)}
+              aria-describedby={decisionError ? `tf-reason-error-${row.id}` : undefined}
+            />
+            {decisionError ? (
+              <p id={`tf-reason-error-${row.id}`} className="text-xs font-medium text-red-600">
+                {decisionError}
+              </p>
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Whitespace-only reasons are rejected. Users do not see this note.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDecisionDialog(null);
+                setDecisionReason('');
+                setDecisionError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={mutating}
+              onClick={() => void submitDecisionDialog()}
+            >
+              {decisionDialog?.confirmLabel ?? 'Confirm'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1157,6 +1497,41 @@ export default function PlatformFeedbackPage() {
       void fetchData();
     } finally {
       setMutating(m => ({ ...m, [id]: false }));
+    }
+  }
+
+  async function technicalFailureAction(
+    feedbackId: string,
+    caseId: string,
+    action: 'investigate' | 'approve' | 'reject' | 'service_recovery',
+    reason?: string,
+  ) {
+    setMutating((current) => ({ ...current, [feedbackId]: true }));
+    try {
+      const res = await fetch(`/api/admin/technical-failures/${caseId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...(reason ? { reason } : {}) }),
+      });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) {
+        toast.error(data?.error || 'Technical failure action failed.');
+        return;
+      }
+      toast.success(
+        action === 'approve'
+          ? 'Approved. One interview credit was restored.'
+          : action === 'reject'
+            ? 'Technical failure case rejected.'
+            : action === 'service_recovery'
+              ? 'One service-recovery credit was granted.'
+              : 'Investigation started.',
+      );
+      await fetchData();
+    } catch {
+      toast.error('Technical failure action failed.');
+    } finally {
+      setMutating((current) => ({ ...current, [feedbackId]: false }));
     }
   }
 
@@ -1412,6 +1787,14 @@ export default function PlatformFeedbackPage() {
               onPatch={(patch) => patchItem(row.id, patch)}
               onSaveNotes={(notes) => saveNotes(row.id, notes)}
               onDelete={() => deleteItem(row.id)}
+              onTechnicalAction={(action, reason) =>
+                technicalFailureAction(
+                  row.id,
+                  row.technical_failure_case!.id,
+                  action,
+                  reason,
+                )
+              }
             />
           ))}
         </div>

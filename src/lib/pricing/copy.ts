@@ -16,6 +16,7 @@ export const PAYMENT_TRUST_BULLETS = [
   'Payments secured by Razorpay',
 ] as const;
 
+/** Rendered as a highlighted list by <PaymentMethodsLabel />. */
 export const PAYMENT_METHOD_KEYWORDS = [
   'UPI',
   'Google Pay',
@@ -26,14 +27,11 @@ export const PAYMENT_METHOD_KEYWORDS = [
   'wallets',
 ] as const;
 
-/** @deprecated Use PaymentMethodsLabel component for highlighted rendering */
-export const PAYMENT_METHODS_LABEL = 'Supports UPI, Google Pay, PhonePe, Paytm, cards, net banking & wallets';
-
 export const UPGRADE_PAGE_FOOTER =
   'Payments processed securely by Razorpay. No auto-renewal. Renew whenever you need.';
 
 export const BILLING_PAYMENT_METHODS_NOTE =
-  'One-time payments via Razorpay — UPI, PhonePe, Google Pay, cards, net banking, and wallets. Credits deduct when an interview starts.';
+  'One-time payments via Razorpay. Available payment methods are shown at checkout. Credits deduct when an interview starts.';
 
 export const PAYMENT_FAILED_USER_MESSAGE = 'Payment failed. Please try again.';
 
@@ -66,12 +64,12 @@ export function planPriceLine(plan: PaidPlanId): string {
 /**
  * Approximate USD hint for marketing pricing cards (international clarity).
  * Rate used: ~₹83 = US$1 (mid-2026 ballpark). Rounded to whole dollars — not FX-precise.
- *   Starter ₹149 → ~$1.80 → ~$2
- *   Pro     ₹399 → ~$4.81 → ~$5
+ *   Starter ₹299 → ~$3.60 → ~$4
+ *   Pro     ₹799 → ~$9.63 → ~$10
  */
 export const PLAN_USD_APPROX: Record<PaidPlanId, string> = {
-  starter: '~$2',
-  pro: '~$5',
+  starter: '~$4',
+  pro: '~$10',
 } as const;
 
 export function planUsdApproxHint(plan: PaidPlanId): string {
@@ -128,5 +126,5 @@ export function planExpiresCopy(iso: string, isActive: boolean): string {
 
 export function renewConfirmBody(planExpiresAt: string): string {
   const formatted = formatPlanExpiryEnIn(planExpiresAt);
-  return `Your remaining days will NOT be lost.\n\nIf your current plan expires on ${formatted}, your renewal will extend from that date.`;
+  return `Your remaining days will NOT be lost.\n\nIf your current plan expires on ${formatted}, your renewal will extend from that date.\n\nRenewal adds the new plan's credits to your remaining balance.`;
 }

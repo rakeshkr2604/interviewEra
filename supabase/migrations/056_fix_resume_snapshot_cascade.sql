@@ -1,3 +1,11 @@
+-- Historical migration 056 was manually applied to production before being
+-- added to version control (commit 9fb0864). Its target table was introduced
+-- by timestamped migration 20260718000001, which runs later in a fresh CLI
+-- replay. It must therefore be a no-op here; the intended FK reconciliation
+-- is applied after all dependencies by 20260817162058.
+--
+-- Original body retained as commented historical evidence:
+/*
 -- Fix: resume_interview_snapshots.resume_id FK should cascade deletes
 -- to prevent FK blocks during user hard-deletes.
 --
@@ -24,4 +32,5 @@ ALTER TABLE public.resume_interview_snapshots
   ON DELETE CASCADE;
 
 COMMIT;
+*/
 

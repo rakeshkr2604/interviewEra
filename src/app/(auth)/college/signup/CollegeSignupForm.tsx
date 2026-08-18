@@ -2,8 +2,16 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import {
+  CAMPUS_SETUP_PATH,
+  campusVerificationPendingPath,
+  saveCampusSignupDraft,
+} from '@/lib/college/signup-continuation';
+import { authPasswordSchema } from '@/lib/validations/schemas';
 
 export function CollegeSignupForm() {
+  const router = useRouter();
   const [collegeName, setCollegeName] = useState('');
   const [officerName, setOfficerName] = useState('');
   const [email, setEmail] = useState('');
@@ -45,8 +53,12 @@ export function CollegeSignupForm() {
         setFeedback({ kind: 'error', text: 'Please enter estimated student count.' });
         return;
       }
-      if (password.length < 8) {
-        setFeedback({ kind: 'error', text: 'Password must be at least 8 characters.' });
+      const passwordCheck = authPasswordSchema.safeParse(password);
+      if (!passwordCheck.success) {
+        setFeedback({
+          kind: 'error',
+          text: passwordCheck.error.issues[0]?.message ?? 'Password does not meet requirements.',
+        });
         return;
       }
 
@@ -57,7 +69,7 @@ export function CollegeSignupForm() {
           email,
           password,
           name: officerName,
-          next: '/college/dashboard',
+          next: CAMPUS_SETUP_PATH,
           metadata: { role: 'college_admin' },
         }),
       });
@@ -78,36 +90,15 @@ export function CollegeSignupForm() {
         return;
       }
 
-      const response = await fetch('/api/college/create-org', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: signupBody.userId,
-          collegeName,
-          studentCount: parseInt(studentCount),
-        }),
+      saveCampusSignupDraft({
+        collegeName: collegeName.trim(),
+        studentCount: parseInt(studentCount, 10),
       });
-
-      const orgBody = (await response.json()) as {
-        error?: string;
-        status?: string;
-        message?: string;
-      };
-
-      if (!response.ok) {
-        setFeedback({ kind: 'error', text: orgBody.error || 'Failed to create organization.' });
-        return;
-      }
-
       setFeedback({
         kind: 'success',
-        text:
-          orgBody.status === 'pending_verification'
-            ? (orgBody.message ??
-              'Application received. Our team will verify your campus workspace within 1–2 business days.')
-            : (signupBody.message ??
-              'Account created! Check your email to verify before signing in.'),
+        text: signupBody.message ?? 'Account created! Check your email to verify before continuing.',
       });
+      router.push(campusVerificationPendingPath(email));
     } catch (err) {
       setFeedback({
         kind: 'error',
@@ -256,7 +247,7 @@ export function CollegeSignupForm() {
           className="mt-6 inline-flex h-10 w-full items-center justify-center rounded-lg px-4 text-sm font-semibold text-white transition-opacity hover:opacity-90 disabled:pointer-events-none disabled:opacity-60"
           style={{ background: 'var(--accent-primary)' }}
         >
-          {loading ? 'Creating account…' : 'Create Account'}
+          {loading ? 'Creating account…' : 'Create account and verify email'}
         </button>
 
         <p className="text-center text-sm" style={{ color: 'var(--text-secondary)' }}>

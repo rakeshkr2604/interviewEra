@@ -36,7 +36,7 @@ export const refundDocument: LegalDocumentMeta = {
         },
         {
           sub: 'Credit Refunds',
-          text: 'Credits are generally non-refundable once consumed. However, if a session fails to generate questions or encounters a critical technical error on our side (e.g., AI service outage, data loss), we will restore the credit to your account upon verification. To request a credit refund, email support@interviewera.com with your account email and the session date, or use /contact.',
+          text: 'Credits are generally non-refundable once consumed. If a technical issue prevents your interview from being completed, report it through Feedback → Interview technical issue with details. Screenshots are optional but can help investigation. If the issue is confirmed after review, the interview credit may be restored. Payment billing errors remain a separate refund process via support@interviewera.com or /contact.',
         },
         {
           sub: 'Free Credits',
@@ -59,7 +59,7 @@ export const refundDocument: LegalDocumentMeta = {
         },
         {
           sub: 'Early Renewal',
-          text: 'You may renew before your current period ends from Settings → Billing. A new payment extends your access from your existing expiry date and refreshes your plan credits.',
+          text: 'You may renew before your current period ends from Settings → Billing. A new payment extends your access from your existing expiry date. Renewal adds the new plan\'s credits to your remaining balance.',
         },
         {
           sub: 'Refund Eligibility',
@@ -97,12 +97,11 @@ export const refundDocument: LegalDocumentMeta = {
     {
       id: 'technical',
       title: '5. Refunds for Technical Issues',
-      text: 'If you experience a billing error (e.g., charged twice, wrong amount), or if the Service is unavailable for more than 24 consecutive hours within a billing period due to issues on our end, you are entitled to a refund or credit equivalent to the affected period. Please contact us within 30 days of the issue.',
+      text: 'If you experience a billing error (e.g., charged twice, wrong amount), contact us within 30 days of the issue. If a technical issue prevents your interview from being completed, report it through Feedback → Interview technical issue. If the issue is confirmed after review, the interview credit may be restored.',
       bullets: [
         'Duplicate charge: full refund of the duplicate amount actually paid',
         'Wrong amount charged vs authorised order: correction or refund of the difference after verification',
-        'Service outage > 24 hours: pro-rated credit for the outage duration',
-        'Failed session due to our AI system error: credit restored to your account',
+        'Confirmed technical interview failure: interview credit may be restored after review',
       ],
     },
     {

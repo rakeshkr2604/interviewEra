@@ -28,6 +28,11 @@ import type {
 } from '@/types/app.types';
 import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
 import { ExecutiveSummaryPanel } from '@/components/report/ExecutiveSummaryPanel';
+import {
+  canExportScriptReportPdf,
+  canSeeScriptReportDetails,
+  canSeeScriptReportPro,
+} from '@/lib/interview/script-report/access';
 import { generateInsights } from '@/lib/report/insight-engine';
 import type { PerQuestionInsightData } from '@/lib/report/insight-engine';
 import { radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
@@ -113,7 +118,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
   }
 
   const planTier = (profile?.plan_tier ?? 'free') as PlanTier;
-  const canSeeDetails = planTier === 'pro' || planTier === 'campus';
+  const seeDetails = canSeeScriptReportDetails(planTier);
+  const seePro = canSeeScriptReportPro(planTier);
+  const canPdf = canExportScriptReportPdf(planTier);
 
   const { data: sessionQualityRow } = await supabase
     .from('session_quality_log')
@@ -192,7 +199,9 @@ export default async function ReportPage({ params }: ReportPageProps) {
     const j = d?.score_justification;
     return j && typeof j.why_this_score === 'string' && j.why_this_score.trim() ? [j] : [];
   });
-  const reportScoreJustification = aggregateScoreJustifications(perAnswerJustifications);
+  const reportScoreJustification = seeDetails
+    ? aggregateScoreJustifications(perAnswerJustifications)
+    : null;
 
   // ── Speech analytics ────────────────────────────────────────────────────
   // Read the deterministic summary persisted at report generation time.
@@ -235,15 +244,15 @@ export default async function ReportPage({ params }: ReportPageProps) {
             overall_score: rawEval.overall_score as number,
             feedback_text: rawEval.feedback_text as string,
             // Redact detailed_analysis server-side for non-Pro users
-            detailed_analysis: canSeeDetails ? rawDetailedAnalysis : null,
+            detailed_analysis: seeDetails ? rawDetailedAnalysis : null,
           }
         : null,
       keywords: {
         // Only expose full arrays to Pro; non-Pro gets empty arrays (content hidden behind blur)
-        used: canSeeDetails
+        used: seePro
           ? idealKeywords.filter((k) => !keywordsMissingRaw.includes(k))
           : [],
-        missing: canSeeDetails ? keywordsMissingRaw : [],
+        missing: seePro ? keywordsMissingRaw : [],
         missingCount: keywordsMissingRaw.length, // Always available for upgrade label
       },
     };
@@ -331,7 +340,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
         backHref="/history"
         backLabel="Interview history"
         action={
-          canSeeDetails ? (
+          canPdf ? (
             <a
               href={`/api/report/export-pdf?reportId=${id}`}
               download
@@ -381,7 +390,15 @@ export default async function ReportPage({ params }: ReportPageProps) {
         >
           <RadarChart data={radarData} />
         </ReportPanel>
-        <ExecutiveSummaryPanel insights={insights} className="lg:col-span-12" />
+        <div className="lg:col-span-12">
+          <BlurredSection
+            userTier={planTier}
+            requiredTier="starter"
+            upgradeLabel="Upgrade to Starter to unlock recruiter assessment and hiring signals"
+          >
+            <ExecutiveSummaryPanel insights={insights} />
+          </BlurredSection>
+        </div>
       </section>
 
       {trendData && trendData.length >= 2 && (
@@ -475,7 +492,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
         )}
       </ReportPanel>
 
-      {/* AI Candidate Intelligence — Pro-gated */}
+      {/* AI Candidate Intelligence — Starter+ */}
       <ReportPanel
         id="ai-intelligence"
         eyebrow="Intelligence"
@@ -484,8 +501,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
       >
         <BlurredSection
           userTier={planTier}
-          requiredTier="pro"
-          upgradeLabel="Upgrade to Pro to unlock AI hiring intelligence"
+          requiredTier="starter"
+          upgradeLabel="Upgrade to Starter to unlock AI hiring intelligence"
         >
           <div className="space-y-8">
             {insights.behavioral_patterns.length > 0 && (
@@ -731,8 +748,8 @@ export default async function ReportPage({ params }: ReportPageProps) {
                 {item.evaluation && (
                   <BlurredSection
                     userTier={planTier}
-                    requiredTier="pro"
-                    upgradeLabel="Upgrade to Pro to unlock detailed analysis"
+                    requiredTier="starter"
+                    upgradeLabel="Upgrade to Starter to unlock detailed analysis"
                   >
                     <div className="space-y-4 text-sm">
                       {item.evaluation.detailed_analysis ? (
@@ -827,7 +844,7 @@ export default async function ReportPage({ params }: ReportPageProps) {
                       <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
                         Keyword analysis
                       </p>
-                      {canSeeDetails ? (
+                      {seePro ? (
                         <>
                           <div className="flex flex-wrap gap-1.5">
                             {item.keywords.used.map((k) => (
@@ -893,12 +910,12 @@ export default async function ReportPage({ params }: ReportPageProps) {
         ))}
       </section>
 
-      {/* Improvement Roadmap — Pro-gated */}
+      {/* Improvement Roadmap — Starter+ */}
       <ReportPanel id="improvement-roadmap" eyebrow="Growth plan" title="Your 30-day improvement roadmap" contentClassName="space-y-5">
         <BlurredSection
           userTier={planTier}
-          requiredTier="pro"
-          upgradeLabel="Upgrade to Pro to unlock your personalized improvement roadmap"
+          requiredTier="starter"
+          upgradeLabel="Upgrade to Starter to unlock your personalized improvement roadmap"
         >
           <div className="space-y-5">
             <div>

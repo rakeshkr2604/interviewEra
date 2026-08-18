@@ -1,5 +1,7 @@
 /** Homepage & marketing copy — placement-outcome framing, single source for landing */
 
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
+
 /** Bad answer split for red “vague / no structure” highlights */
 export const TRANSFORMATION_BAD_SEGMENTS = [
   { text: 'Yeah so basically in my project we had some issues and I worked with my team. ', flaw: 'vague' as const },
@@ -176,21 +178,104 @@ export const EVALUATION_DIMENSIONS = [
   { name: 'Relevance', weight: '20%', detail: 'Stays on the question' },
 ] as const;
 
-export const PRICING_FAQ = [
+export type PricingFaqItem = { q: string; a: string };
+
+export type PricingFaqCategory = {
+  id: string;
+  label: string;
+  items: readonly PricingFaqItem[];
+};
+
+export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
   {
-    q: 'What is a credit?',
-    a: 'One credit starts one mock interview session. Paid Starter and Pro plans include credits for each 30-day access period; Free includes 3 lifetime credits.',
+    id: 'credits',
+    label: 'Credits & Free Plan',
+    items: [
+      {
+        q: 'What is an interview credit?',
+        a: `One interview credit starts one mock interview session with a report. Free includes ${FREE_PLAN.credits} credits; Starter includes ${PAID_PLANS.starter.credits}, and Pro includes ${PAID_PLANS.pro.credits}.`,
+      },
+      {
+        q: 'Does the free plan require payment?',
+        a: `No. New accounts receive ${FREE_PLAN.credits} free interview credits. No card or payment method is required.`,
+      },
+      {
+        q: 'When is an interview credit deducted?',
+        a: 'One credit is deducted when a mock interview starts, not when it finishes. A session that is started but left incomplete still uses that credit.',
+      },
+      {
+        q: 'Do my free interview credits expire?',
+        a: 'No. The 3 credits included with a new free account are lifetime credits and do not expire. They cannot be transferred to another account.',
+      },
+    ],
   },
   {
-    q: 'Do I need a card for the free tier?',
-    a: 'No. Sign up, upload your resume, and use your free credits without adding a payment method.',
+    id: 'plans',
+    label: 'Plans & Access',
+    items: [
+      {
+        q: 'How long does Starter or Pro access last?',
+        a: `Each Starter or Pro purchase gives ${PAID_PLANS.starter.durationDays} days of plan access. Both are one-time purchases and do not auto-renew.`,
+      },
+      {
+        q: 'Can I renew after my plan expires?',
+        a: 'Yes. You can make another one-time purchase whenever you need more preparation. You can also renew early; remaining access days are preserved by extending from your current expiry date, and renewal adds the new plan\'s credits to your remaining balance.',
+      },
+      {
+        q: 'What is included in Starter?',
+        a: `Starter includes ${PAID_PLANS.starter.credits} interview credits, ${PAID_PLANS.starter.durationDays}-day access, full answer feedback, dimension notes, a 30-day improvement roadmap, progress tracking, and a post-interview report by email.`,
+      },
+      {
+        q: 'What is included in Pro?',
+        a: `Pro includes ${PAID_PLANS.pro.credits} interview credits, ${PAID_PLANS.pro.durationDays}-day access, deeper feedback and analysis, advanced scoring and score guide, model-answer comparison, progress tracking, and PDF report export.`,
+      },
+    ],
   },
   {
-    q: 'Is this only for software roles?',
-    a: 'No — questions adapt to your resume and target role, including core, consulting-style, and HR-heavy tracks.',
+    id: 'payments',
+    label: 'Payments & Offers',
+    items: [
+      {
+        q: 'Are payments auto-renewing?',
+        a: 'No. Starter and Pro are one-time Razorpay payments. Your account returns to the Free plan after paid access expires unless you choose to purchase again.',
+      },
+      {
+        q: 'Which payment methods can I use?',
+        a: 'Razorpay supports UPI, cards, net banking, wallets, and other methods shown during checkout. InterviewEra does not store your card or bank account details.',
+      },
+      {
+        q: 'Can I use a promo code?',
+        a: 'Yes. Signed-in users can expand “Have a promo code?” on the pricing page. The server validates eligibility and shows the final amount before checkout.',
+      },
+      {
+        q: 'What if payment succeeds but my plan does not update?',
+        a: 'Plan activation is normally automatic after Razorpay confirms payment. If your plan still does not update, contact support@interviewera.com with your registered email and Razorpay payment ID so the payment can be investigated.',
+      },
+    ],
   },
   {
-    q: 'How is this different from asking ChatGPT?',
-    a: 'ChatGPT won’t run a scored, multi-question session with the same answer feedback model every time. InterviewEra is built as a practice system, not a chat.',
+    id: 'support',
+    label: 'Support & Refunds',
+    items: [
+      {
+        q: 'What happens if a technical issue interrupts my interview?',
+        a: 'If a technical issue prevents your interview from being completed, report it through Feedback → Interview technical issue so the team can investigate. If the issue is confirmed after review, the interview credit may be restored.',
+      },
+      {
+        q: 'How do I report an interview technical issue?',
+        a: 'Open Feedback, choose “Interview technical issue,” select the affected interview and issue type, and describe what happened. The target resolution time is 48–72 hours.',
+      },
+      {
+        q: 'Are plan payments or unused credits refundable?',
+        a: 'One-time plan payments are generally non-refundable after access is granted, except where required by law or for verified billing errors. Unused credits within an active paid period are not refunded separately.',
+      },
+      {
+        q: 'How do I report a billing error or duplicate charge?',
+        a: 'Email support@interviewera.com or use the Contact page with your registered email, Razorpay order or payment ID, and a description of the issue. Verified billing errors are handled under the Refund Policy.',
+      },
+    ],
   },
 ] as const;
+
+/** Flat list keeps visible FAQ copy and FAQPage JSON-LD in the same order. */
+export const PRICING_FAQ = PRICING_FAQ_CATEGORIES.flatMap((category) => category.items);

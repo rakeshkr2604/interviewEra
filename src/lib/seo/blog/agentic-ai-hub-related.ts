@@ -174,7 +174,7 @@ export const AGENTIC_CHAPTER_RELATED: Record<string, readonly AgenticRelatedGuid
     {
       href: '/pricing',
       label: 'Pricing',
-      teaser: 'Plans for unlimited mock interviews and feedback.',
+      teaser: 'One-time plans with interview credits, detailed feedback, and Pro export options.',
     },
   ],
 }

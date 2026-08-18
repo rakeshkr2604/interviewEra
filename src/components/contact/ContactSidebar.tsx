@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { SUPPORT_EMAIL } from '@/lib/contact/constants';
+import { TECHNICAL_ISSUE_FEEDBACK_HREF } from '@/lib/technical-failures/ux';
 import {
   IE_MARKETING_CTA_SECONDARY_CLASS,
   IE_MARKETING_CTA_SECONDARY_STYLE,
@@ -95,7 +96,16 @@ export function ContactSidebar() {
               Real humans read every message
             </p>
             <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Billing, account access, interview bugs, or product questions — we&apos;ll get back to you by email.
+              Billing, account access, or product questions — we&apos;ll get back to you by email.
+              Interview technical issues should be reported through{' '}
+              <Link
+                href={TECHNICAL_ISSUE_FEEDBACK_HREF}
+                className="font-semibold underline underline-offset-2"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                Feedback → Interview technical issue
+              </Link>
+              .
             </p>
           </div>
         </div>

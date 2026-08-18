@@ -2,21 +2,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/server';
-import { displayNameSchema } from '@/lib/validations/schemas';
+import { authPasswordSchema, displayNameSchema } from '@/lib/validations/schemas';
 import { sendSignupVerificationEmail } from '@/lib/email/lifecycle/send-verification';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { sanitizeNext } from '@/lib/auth/auth-params';
 import { captureReferralFromCode } from '@/lib/referral/capture-referral';
 
+const GENERIC_SIGNUP_SUCCESS =
+  'If this address can be registered, check your inbox for a verification email.';
+
 const bodySchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters.')
-    .regex(/[A-Z]/, 'Password must include an uppercase letter.')
-    .regex(/[a-z]/, 'Password must include a lowercase letter.')
-    .regex(/[0-9]/, 'Password must include a number.')
-    .regex(/[^A-Za-z0-9\s]/, 'Password must include a special character.'),
+  password: authPasswordSchema,
   name: displayNameSchema,
   next: z.string().optional(),
   placementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -84,13 +81,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (createError) {
     const msg = createError.message.toLowerCase();
     if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
-      return NextResponse.json(
-        { error: 'An account with this email already exists. Try signing in instead.' },
-        { status: 409 },
-      );
+      return NextResponse.json({
+        ok: true,
+        needsVerification: true,
+        message: GENERIC_SIGNUP_SUCCESS,
+      });
     }
     console.error('[auth/signup] createUser failed', createError.message);
-    return NextResponse.json({ error: createError.message }, { status: 400 });
+    return NextResponse.json(
+      { error: 'Account creation failed. Check your details and try again.' },
+      { status: 400 },
+    );
   }
 
   const userId = created.user?.id;
@@ -136,6 +137,6 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     ok: true,
     userId,
     needsVerification: true,
-    message: 'Account created! Check your email to verify before signing in.',
+    message: GENERIC_SIGNUP_SUCCESS,
   });
 }

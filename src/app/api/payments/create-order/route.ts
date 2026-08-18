@@ -13,11 +13,13 @@ import { paymentCreateOrderSchema } from '@/lib/validations/schemas';
 import type { PlanTier } from '@/types/app.types';
 import { paymentError, paymentLog } from '@/lib/razorpay/payment-log';
 import {
+  attachCampaignOrder,
   CAMPAIGN_DISCOUNT_USER_MESSAGES,
   releaseCampaignReservation,
   reserveCampaignCode,
   type CampaignDiscountErrorCode,
 } from '@/lib/campaign-codes';
+import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -134,6 +136,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   let discountPaise = 0;
   let campaignCodeId: string | null = null;
   let redemptionId: string | null = null;
+  let ownsNewReservation = false;
 
   const service = createServiceClient();
 
@@ -143,6 +146,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       code,
       plan,
       listAmountPaise,
+      promoFloorPaise: planConfig.promoFloorPaise,
     });
     if (!reserved.ok || !reserved.redemption_id) {
       const errCode = (reserved.error_code ?? 'CODE_INVALID') as CampaignDiscountErrorCode;
@@ -151,13 +155,88 @@ export async function POST(request: Request): Promise<NextResponse> {
           error: CAMPAIGN_DISCOUNT_USER_MESSAGES[errCode] ?? 'Invalid code.',
           code: errCode,
         },
-        { status: 400 },
+        { status: errCode === 'CHECKOUT_INITIALIZING' ? 409 : 400 },
       );
     }
     finalAmountPaise = reserved.final_amount_paise;
     discountPaise = reserved.discount_paise;
     campaignCodeId = reserved.campaign_code_id;
     redemptionId = reserved.redemption_id;
+    ownsNewReservation = reserved.reservation_created;
+
+    if (!reserved.reservation_created) {
+      if (!reserved.order_id) {
+        return NextResponse.json(
+          {
+            error: CAMPAIGN_DISCOUNT_USER_MESSAGES.CHECKOUT_INITIALIZING,
+            code: 'CHECKOUT_INITIALIZING',
+          },
+          { status: 409 },
+        );
+      }
+
+      const { data: existingPayment, error: existingPaymentError } = await service
+        .from('payments')
+        .select('order_id, amount, currency, plan, status, campaign_redemption_id')
+        .eq('order_id', reserved.order_id)
+        .eq('user_id', user.id)
+        .eq('campaign_redemption_id', reserved.redemption_id)
+        .maybeSingle();
+
+      if (
+        existingPaymentError ||
+        !existingPayment ||
+        existingPayment.amount !== reserved.final_amount_paise ||
+        existingPayment.plan !== plan
+      ) {
+        paymentError('create-order', 'existing_campaign_order_mismatch', {
+          user_id: user.id,
+          order_id: reserved.order_id,
+          redemption_id: reserved.redemption_id,
+          code: existingPaymentError?.code,
+        });
+        return NextResponse.json(
+          { error: 'Unable to resume this checkout. Please contact support.' },
+          { status: 409 },
+        );
+      }
+
+      if (existingPayment.status === 'paid') {
+        return NextResponse.json(
+          { error: 'This payment has already been completed.' },
+          { status: 409 },
+        );
+      }
+
+      paymentLog('create-order', 'existing_campaign_order_reused', {
+        user_id: user.id,
+        order_id: existingPayment.order_id,
+        redemption_id: reserved.redemption_id,
+      });
+
+      trackProductEventServer({
+        event_name: 'checkout_started',
+        user_id: user.id,
+        plan: existingPayment.plan,
+        order_id: existingPayment.order_id,
+        amount: existingPayment.amount,
+        campaign_code_id: campaignCodeId ?? undefined,
+        discount_paise: discountPaise,
+        final_amount_paise: existingPayment.amount,
+        source: 'create_order_reused',
+      });
+
+      return NextResponse.json({
+        order_id: existingPayment.order_id,
+        amount: existingPayment.amount,
+        currency: existingPayment.currency,
+        key: process.env.RAZORPAY_KEY_ID,
+        plan: existingPayment.plan,
+        list_amount_paise: listAmountPaise,
+        discount_paise: discountPaise,
+        reused: true,
+      });
+    }
   }
 
   paymentLog('create-order', 'create_order_start', {
@@ -172,42 +251,55 @@ export async function POST(request: Request): Promise<NextResponse> {
       userId: user.id,
       plan,
       amountPaise: finalAmountPaise,
+      ...(redemptionId ? { redemptionId } : {}),
     });
 
     if (redemptionId) {
-      await service
-        .from('campaign_code_redemptions')
-        .update({ order_id: order.order_id, updated_at: new Date().toISOString() })
-        .eq('id', redemptionId);
-    }
+      const attached = await attachCampaignOrder(service, {
+        redemptionId,
+        userId: user.id,
+        orderId: order.order_id,
+        currency: order.currency,
+      });
 
-    const { error: insertErr } = await service.from('payments').insert({
-      user_id: user.id,
-      order_id: order.order_id,
-      amount: finalAmountPaise,
-      currency: 'INR',
-      status: 'created',
-      plan,
-      gateway: 'razorpay',
-      campaign_code_id: campaignCodeId,
-      campaign_redemption_id: redemptionId,
-      list_amount_paise: listAmountPaise,
-      discount_paise: discountPaise,
-    });
-
-    if (insertErr) {
-      if (redemptionId) {
+      if (!attached) {
         await releaseCampaignReservation(service, redemptionId);
+        paymentError('create-order', 'campaign_order_attach_failed', {
+          user_id: user.id,
+          order_id: order.order_id,
+          redemption_id: redemptionId,
+        });
+        return NextResponse.json(
+          { error: 'Failed to initialize payment. Please try again.' },
+          { status: 500 },
+        );
       }
-      paymentError('create-order', 'payment_row_insert_failed', {
+    } else {
+      const { error: insertErr } = await service.from('payments').insert({
         user_id: user.id,
         order_id: order.order_id,
-        code: insertErr.code,
+        amount: finalAmountPaise,
+        currency: 'INR',
+        status: 'created',
+        plan,
+        gateway: 'razorpay',
+        campaign_code_id: campaignCodeId,
+        campaign_redemption_id: redemptionId,
+        list_amount_paise: listAmountPaise,
+        discount_paise: discountPaise,
       });
-      return NextResponse.json(
-        { error: 'Failed to initialize payment. Please try again.' },
-        { status: 500 },
-      );
+
+      if (insertErr) {
+        paymentError('create-order', 'payment_row_insert_failed', {
+          user_id: user.id,
+          order_id: order.order_id,
+          code: insertErr.code,
+        });
+        return NextResponse.json(
+          { error: 'Failed to initialize payment. Please try again.' },
+          { status: 500 },
+        );
+      }
     }
 
     paymentLog('create-order', 'create_order_done', {
@@ -215,6 +307,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       order_id: order.order_id,
       plan,
       amount: finalAmountPaise,
+    });
+
+    trackProductEventServer({
+      event_name: 'checkout_started',
+      user_id: user.id,
+      plan: order.plan,
+      order_id: order.order_id,
+      amount: order.amount,
+      campaign_code_id: campaignCodeId ?? undefined,
+      discount_paise: discountPaise,
+      final_amount_paise: order.amount,
+      source: 'create_order',
     });
 
     return NextResponse.json({
@@ -227,7 +331,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       discount_paise: discountPaise,
     });
   } catch (err) {
-    if (redemptionId) {
+    if (redemptionId && ownsNewReservation) {
       await releaseCampaignReservation(service, redemptionId);
     }
     const message = err instanceof Error ? err.message : 'unknown';

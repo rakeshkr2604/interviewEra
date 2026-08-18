@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
+import { createInterviewWithCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
@@ -130,7 +130,53 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Step 5 — returning user: any prior completed interview
+    // Step 5 — duplicate prevention. A retry reuses the just-created script
+    // interview and never reaches the transactional debit helper.
+    const recentCutoff = new Date(Date.now() - 90_000).toISOString();
+    const { data: recentInterview } = await serviceClient
+      .from('interviews')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('resume_id', resumeId)
+      .eq('role', role)
+      .eq('engine', 'v2.1')
+      .eq('status', 'in_progress')
+      .gte('created_at', recentCutoff)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (recentInterview?.id) {
+      return NextResponse.json({
+        interviewId: recentInterview.id,
+        scriptType,
+        resumeSnapshotId: null,
+        deduped: true,
+      });
+    }
+
+    const { data: activeInterview } = await serviceClient
+      .from('interviews')
+      .select('id, status')
+      .eq('user_id', user.id)
+      .in('status', ['pending', 'in_progress'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (activeInterview?.id) {
+      return NextResponse.json(
+        {
+          error: 'active_interview',
+          interviewId: activeInterview.id,
+          status: activeInterview.status,
+          resumeUrl: `/interview/script/${activeInterview.id}`,
+        },
+        { status: 409 },
+      );
+    }
+
+    // Step 6 — returning user: any prior completed interview
     const { count: completedCount, error: countError } = await serviceClient
       .from('interviews')
       .select('id', { count: 'exact', head: true })
@@ -143,59 +189,56 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
     const isReturningUser = (completedCount ?? 0) >= 1;
 
-    // Step 6 — credit check + deduction (same pattern as v1 start route)
-    const creditResult = await checkAndDeductCredit(user.id);
-    if (!creditResult.success) {
+    // Step 7 — atomically create the v2.1 interview and its linked credit debit.
+    const creditResult = await createInterviewWithCredit({
+      userId: user.id,
+      resumeId,
+      role,
+      difficulty,
+      questionCount,
+      status: 'in_progress',
+      startedAt: new Date().toISOString(),
+      interviewerId,
+      sessionContext: {
+        goal,
+        interviewMode,
+        experienceYears,
+        interviewerId,
+        cameraMode,
+        ...(jobDescription ? { jobDescription } : {}),
+      },
+      engine: 'v2.1',
+      scriptType,
+      selfIntroEnabled,
+      followUpEnabled,
+      isReturningUser,
+      maxSkips,
+      skipsUsed: 0,
+      currentTurnIndex: 0,
+    });
+    if (!creditResult.success || !creditResult.interviewId) {
       return NextResponse.json({ error: 'no_credits', upgradeUrl: '/upgrade' }, { status: 402 });
     }
+    const interviewId = creditResult.interviewId;
 
-    // Step 7 — insert v2.1 interview row
-    const { data: interview, error: interviewError } = await serviceClient
-      .from('interviews')
-      .insert({
-        user_id: user.id,
-        resume_id: resumeId,
-        role,
-        difficulty,
-        interviewer_id: interviewerId,
-        status: 'in_progress',
-        started_at: new Date().toISOString(),
-        question_count: questionCount,
-        session_context: {
-          goal,
-          interviewMode,
-          experienceYears,
-          interviewerId,
-          cameraMode,
-          ...(jobDescription ? { jobDescription } : {}),
-        },
-        engine: 'v2.1',
-        script_type: scriptType,
-        self_intro_enabled: selfIntroEnabled,
-        follow_up_enabled: followUpEnabled,
-        is_returning_user: isReturningUser,
-        max_skips: maxSkips,
-        skips_used: 0,
-        current_turn_index: 0,
-      })
-      .select('id')
-      .single();
-
-    if (interviewError || !interview) {
-      await refundCredit(user.id);
-      console.error(`[interview/script/start] DB insert failed (userId=${user.id}):`, interviewError);
-      return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
+    if (creditResult.created === false) {
+      return NextResponse.json({
+        interviewId,
+        scriptType,
+        resumeSnapshotId: null,
+        deduped: true,
+      });
     }
 
     // Step 8 — freeze resume content for this interview (immutable snapshot)
     const snapshot = await createResumeInterviewSnapshot(serviceClient, {
-      interviewId: interview.id,
+      interviewId,
       resumeId,
       jobDescription,
     });
     if (!snapshot) {
       console.warn('[interview/script/start] snapshot not created; turn will use live fallback', {
-        interviewId: interview.id,
+        interviewId,
         resumeId,
       });
     }
@@ -203,7 +246,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Step 9 — analytics (grep `[product-event]` / durable milestone)
     trackInterviewEvent('interview_created', {
       userId: user.id,
-      interviewId: interview.id,
+      interviewId,
       engine: 'v2.1',
       role,
       difficulty,
@@ -214,7 +257,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
     persistMilestoneEventOnce('interview_started', {
       user_id: user.id,
-      interview_id: interview.id,
+      interview_id: interviewId,
       engine: 'v2.1',
       role,
       difficulty,
@@ -225,7 +268,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Step 10 — created
     return NextResponse.json(
       {
-        interviewId: interview.id,
+        interviewId,
         scriptType,
         resumeSnapshotId: snapshot?.id ?? null,
       },

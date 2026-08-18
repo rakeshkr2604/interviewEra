@@ -6,6 +6,7 @@ import { BlogStartFreeCta } from '@/components/analytics/BlogStartFreeCta';
 import { BRAND_ICON_192_PATH, brandArticleOgTitle, generateMetadata, siteConfig } from '@/lib/seo/metadata';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { AiMockBlogReadingProgress } from '@/components/blog/AiMockBlogReadingProgress';
+import { PAID_PLANS } from '@/lib/pricing/plans';
 
 const CANONICAL_PATH = '/blog/ai-mock-interviews-smartest-prep-2026';
 const PUBLISHED_ISO = '2026-05-08';
@@ -188,7 +189,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
             <div className="rounded-lg bg-blue-50 border-l-4 border-blue-500 p-4 mb-8">
               <p className="text-sm text-blue-800 m-0">
                 <strong>Update (May 14, 2026):</strong> InterviewEra pricing updated.
-                New plans: Starter ₹149 for 30-day access (8 credits), Pro ₹399 for 30-day access (25 credits).
+                New plans: Starter ₹{PAID_PLANS.starter.amountInr} for 30-day access (8 credits), Pro ₹{PAID_PLANS.pro.amountInr} for 30-day access (25 credits).
                 Free tier now offers 3 lifetime credits.
               </p>
             </div>
@@ -542,7 +543,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
                 Stop Reading. Start Practicing.
               </h3>
               <p className="mb-0 mt-6 text-lg leading-[1.75] text-white/95 sm:text-xl">
-                InterviewEra gives you 5 free credits — no card needed, no catch. The job market in 2026 won&apos;t wait
+                InterviewEra gives you 3 free credits — no card needed, no catch. The job market in 2026 won&apos;t wait
                 for you.
               </p>
               <Link

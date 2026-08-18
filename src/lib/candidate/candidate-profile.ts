@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { CandidateProfileFields } from './types';
+import { mergeCandidateProfileJson } from '@/lib/profile/onboarding-state';
 
 const preferenceListSchema = z.array(z.string().trim().min(1).max(120)).max(5);
 
@@ -68,8 +69,11 @@ export function mergeCandidateProfile(
   };
 }
 
-export function profileToStorage(profile: CandidateProfileFields): Record<string, unknown> {
-  return {
+export function profileToStorage(
+  profile: CandidateProfileFields,
+  existing?: unknown,
+): Record<string, unknown> {
+  return mergeCandidateProfileJson(existing, {
     preferred_role: profile.preferredRole,
     graduation_year: profile.graduationYear,
     college_name: profile.collegeName,
@@ -77,7 +81,7 @@ export function profileToStorage(profile: CandidateProfileFields): Record<string
     ...(profile.degree != null ? { degree: profile.degree } : {}),
     ...(profile.targetRoles != null ? { target_roles: profile.targetRoles } : {}),
     ...(profile.targetCompanies != null ? { target_companies: profile.targetCompanies } : {}),
-  };
+  });
 }
 
 export function experienceLevelFromYears(years: number): CandidateProfileFields['experienceLevel'] {

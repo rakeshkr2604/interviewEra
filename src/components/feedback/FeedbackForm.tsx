@@ -9,6 +9,17 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ScreenshotUploader } from '@/components/feedback/ScreenshotUploader'
+import {
+  TECHNICAL_FAILURE_CATEGORIES,
+  TECHNICAL_FAILURE_CATEGORY_LABELS,
+  type FeedbackInterviewOption,
+  type TechnicalFailureCategory,
+} from '@/lib/technical-failures/types'
+import { TECHNICAL_FAILURE_STATUS_LABELS } from '@/lib/technical-failures/status'
+import {
+  INTERVIEW_TECHNICAL_BUG_OPTION_ID,
+  INTERVIEW_TECHNICAL_BUG_OPTION_LABEL,
+} from '@/lib/technical-failures/ux'
 import { cn } from '@/lib/utils'
 import {
   IE_FIELD_GROUP_CLASS,
@@ -22,7 +33,6 @@ import {
 } from '@/lib/theme/component-classes'
 
 const MAX_TEXT = 2000
-
 const OTHER_OPTION_ID = 'other' as const
 
 type FeedbackOption = { id: string; label: string }
@@ -49,17 +59,27 @@ const CONFUSION_OPTIONS: readonly FeedbackOption[] = [
   { id: OTHER_OPTION_ID, label: 'Other (tell us yourself)' },
 ]
 
+/** General product bugs only. Interview incidents converge on technical_issue. */
 const BUGS_OPTIONS: readonly FeedbackOption[] = [
   { id: 'none', label: 'No issues — everything worked smoothly' },
-  { id: 'mic_failed', label: 'Microphone did not work' },
-  { id: 'audio_glitch', label: 'Audio or playback glitched' },
-  { id: 'session_stuck', label: 'Session froze or got stuck' },
+  {
+    id: INTERVIEW_TECHNICAL_BUG_OPTION_ID,
+    label: INTERVIEW_TECHNICAL_BUG_OPTION_LABEL,
+  },
   { id: 'upload_fail', label: 'Resume upload failed' },
   { id: 'wrong_score', label: 'Score was missing or looked wrong' },
-  { id: 'mobile_issue', label: 'Broke or lagged on mobile' },
   { id: 'login_issue', label: 'Login or account issue' },
   { id: OTHER_OPTION_ID, label: 'Other (tell us yourself)' },
 ]
+
+type FeedbackCategory =
+  | 'general'
+  | 'bug'
+  | 'feature'
+  | 'interview'
+  | 'report'
+  | 'ai_quality'
+  | 'technical_issue'
 
 type WouldUse = boolean | null
 
@@ -69,11 +89,7 @@ function composeFeedbackField(
   otherText: string,
 ): string {
   if (!selectedId) return ''
-
-  if (selectedId === OTHER_OPTION_ID) {
-    return otherText.trim().slice(0, MAX_TEXT)
-  }
-
+  if (selectedId === OTHER_OPTION_ID) return otherText.trim().slice(0, MAX_TEXT)
   const label = options.find((o) => o.id === selectedId)?.label ?? ''
   return label.slice(0, MAX_TEXT)
 }
@@ -171,7 +187,6 @@ function RatingPicker({
   const active = hover || value
 
   function pick(starIndex: number, half: boolean) {
-    // Star 1 left half still maps to 1 (DB min); halves start at 1.5.
     const next = half ? Math.max(1, starIndex - 0.5) : starIndex
     onChange(next)
   }
@@ -252,9 +267,18 @@ function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.Re
   )
 }
 
-export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
+export function FeedbackForm({
+  defaultName = '',
+  interviews = [],
+  initialCategory = 'interview',
+  onTechnicalCaseReported,
+}: {
+  defaultName?: string
+  interviews?: FeedbackInterviewOption[]
+  initialCategory?: FeedbackCategory
+  onTechnicalCaseReported?: (caseId: string | null) => void
+}) {
   const [submitting, setSubmitting] = useState(false)
-
   const [name, setName] = useState(defaultName)
   const [rating, setRating] = useState(0)
   const [likedId, setLikedId] = useState('')
@@ -266,23 +290,39 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
   const [wouldUse, setWouldUse] = useState<WouldUse>(null)
   const [consentPublicDisplay, setConsentPublicDisplay] = useState(false)
   const [npsScore, setNpsScore] = useState<number | null>(null)
-  const [feedbackCategory, setFeedbackCategory] = useState<
-    'general' | 'bug' | 'feature' | 'interview' | 'report' | 'ai_quality'
-  >('interview')
+  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>(initialCategory)
+  const [technicalInterviewId, setTechnicalInterviewId] = useState('')
+  const [technicalFailureCategory, setTechnicalFailureCategory] = useState<
+    TechnicalFailureCategory | ''
+  >('')
+  const [technicalIssueDescription, setTechnicalIssueDescription] = useState('')
   const [screenshotPath, setScreenshotPath] = useState<string | null>(null)
   const [screenshotUploading, setScreenshotUploading] = useState(false)
-  // Bumping this key remounts the uploader, clearing its internal state on reset.
   const [uploaderKey, setUploaderKey] = useState(0)
-  // Collected on mount; cached so submit has no async delay.
   const [sessionCtx, setSessionCtx] = useState<FeedbackSessionContext | null>(null)
+  const [existingCaseNotice, setExistingCaseNotice] = useState<{
+    status: string
+    caseId?: string
+  } | null>(null)
+
+  useEffect(() => {
+    setFeedbackCategory(initialCategory)
+  }, [initialCategory])
 
   useEffect(() => {
     collectFeedbackContext()
-      .then(setSessionCtx)
-      .catch(() => { /* non-fatal — feedback still submits without context */ })
-  }, [])
+      .then((context) => {
+        setSessionCtx(context)
+        if (context.session_id && interviews.some((interview) => interview.id === context.session_id)) {
+          setTechnicalInterviewId(context.session_id)
+        }
+      })
+      .catch(() => {
+        /* non-fatal */
+      })
+  }, [interviews])
 
-  function reset() {
+  function reset(keepCategory: FeedbackCategory = 'interview') {
     setName(defaultName)
     setRating(0)
     setLikedId('')
@@ -294,39 +334,78 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     setWouldUse(null)
     setConsentPublicDisplay(false)
     setNpsScore(null)
-    setFeedbackCategory('interview')
+    setFeedbackCategory(keepCategory)
+    setTechnicalInterviewId('')
+    setTechnicalFailureCategory('')
+    setTechnicalIssueDescription('')
     setScreenshotPath(null)
     setScreenshotUploading(false)
     setUploaderKey((k) => k + 1)
   }
 
+  function switchToTechnicalIssue(prefillDescription = '') {
+    setFeedbackCategory('technical_issue')
+    setBugsId('')
+    setBugsOther('')
+    if (prefillDescription) setTechnicalIssueDescription(prefillDescription.slice(0, MAX_TEXT))
+    toast.message('Switched to Interview technical issue so the team can investigate; credit restoration is review-based.')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (submitting) return // guard against double submission
+    if (submitting) return
 
     if (screenshotUploading) {
       toast.error('Hang on — your screenshot is still uploading.')
       return
     }
-    if (rating < 1) {
+
+    const isTechnicalIssue = feedbackCategory === 'technical_issue'
+    if (!isTechnicalIssue && rating < 1) {
       toast.error('Please pick a star rating first.')
       return
     }
 
-    const likedText = composeFeedbackField(likedId, LIKED_OPTIONS, likedOther)
-    const confusionText = composeFeedbackField(confusionId, CONFUSION_OPTIONS, confusionOther)
-    const bugsText = composeFeedbackField(bugsId, BUGS_OPTIONS, bugsOther)
+    if (bugsId === INTERVIEW_TECHNICAL_BUG_OPTION_ID) {
+      switchToTechnicalIssue()
+      return
+    }
 
-    if (likedId === OTHER_OPTION_ID && !likedOther.trim()) {
+    const likedText = isTechnicalIssue ? '' : composeFeedbackField(likedId, LIKED_OPTIONS, likedOther)
+    const confusionText = isTechnicalIssue
+      ? ''
+      : composeFeedbackField(confusionId, CONFUSION_OPTIONS, confusionOther)
+    const bugsText = isTechnicalIssue
+      ? technicalIssueDescription.trim()
+      : composeFeedbackField(bugsId, BUGS_OPTIONS, bugsOther)
+
+    if (!isTechnicalIssue && likedId === OTHER_OPTION_ID && !likedOther.trim()) {
       toast.error('Add a short note for “Other” under what you liked.')
       return
     }
-    if (confusionId === OTHER_OPTION_ID && !confusionOther.trim()) {
+    if (!isTechnicalIssue && confusionId === OTHER_OPTION_ID && !confusionOther.trim()) {
       toast.error('Add a short note for “Other” under what confused you.')
       return
     }
-    if (bugsId === OTHER_OPTION_ID && !bugsOther.trim()) {
+    if (!isTechnicalIssue && bugsId === OTHER_OPTION_ID && !bugsOther.trim()) {
       toast.error('Add a short note for “Other” under bugs or issues.')
+      return
+    }
+
+    if (isTechnicalIssue && interviews.length === 0) {
+      toast.error('No interviews found to report. Email support@interviewera.com if you need help.')
+      return
+    }
+    if (isTechnicalIssue && !technicalInterviewId) {
+      toast.error('Select the interview affected by the technical issue.')
+      return
+    }
+    if (isTechnicalIssue && !technicalFailureCategory) {
+      toast.error('Select the technical issue type.')
+      return
+    }
+    if (isTechnicalIssue && !technicalIssueDescription.trim()) {
+      toast.error('Describe what happened during the interview.')
       return
     }
 
@@ -336,20 +415,28 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     }
 
     setSubmitting(true)
+    setExistingCaseNotice(null)
     try {
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim() || defaultName,
-          rating,
+          rating: isTechnicalIssue ? null : rating,
           likedText,
           confusionText,
           bugsText,
-          wouldUseAgain: wouldUse,
-          consentPublicDisplay,
-          npsScore,
+          wouldUseAgain: isTechnicalIssue ? null : wouldUse,
+          consentPublicDisplay: isTechnicalIssue ? false : consentPublicDisplay,
+          npsScore: isTechnicalIssue ? null : npsScore,
           feedbackCategory,
+          ...(isTechnicalIssue
+            ? {
+                interviewId: technicalInterviewId,
+                technicalFailureCategory,
+                technicalIssueDescription: technicalIssueDescription.trim(),
+              }
+            : {}),
           pageUrl: typeof window !== 'undefined' ? window.location.href : '',
           browserInfo: typeof navigator !== 'undefined' ? navigator.userAgent : '',
           ...(screenshotPath ? { screenshotPath } : {}),
@@ -357,14 +444,35 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
         }),
       })
 
+      const data = (await res.json().catch(() => null)) as {
+        error?: string
+        deduped?: boolean
+        technicalFailureCase?: { status?: string; created?: boolean }
+      } | null
+
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null
         toast.error(data?.error || 'Something went wrong. Please try again.')
         return
       }
 
-      toast.success('Thanks for your feedback. We review every submission.')
-      reset()
+      if (isTechnicalIssue && data?.deduped) {
+        const status = data.technicalFailureCase?.status ?? 'submitted'
+        setExistingCaseNotice({ status })
+        onTechnicalCaseReported?.(null)
+        toast.message('This technical issue has already been reported.', {
+          description: `Current status: ${TECHNICAL_FAILURE_STATUS_LABELS[status as keyof typeof TECHNICAL_FAILURE_STATUS_LABELS] ?? status}.`,
+        })
+        document.getElementById('technical-issue-status')?.scrollIntoView({ behavior: 'smooth' })
+        return
+      }
+
+      toast.success(
+        isTechnicalIssue
+          ? 'Interview technical issue submitted for investigation. Target resolution: 48–72 hours.'
+          : 'Thanks for your feedback. We review every submission.',
+      )
+      if (isTechnicalIssue) onTechnicalCaseReported?.(null)
+      reset(isTechnicalIssue ? 'technical_issue' : 'interview')
     } catch {
       toast.error('Something went wrong. Please try again.')
     } finally {
@@ -372,35 +480,64 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
     }
   }
 
+  const isTechnicalIssue = feedbackCategory === 'technical_issue'
+
   return (
     <form
       onSubmit={handleSubmit}
       className="dashboard-premium-card overflow-hidden"
       style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}
     >
-          <div className="space-y-5 p-5 sm:p-6">
-            {/* Rating */}
-            <div className={IE_FIELD_GROUP_CLASS}>
-              <FieldLabel htmlFor="fb-rating">Overall rating</FieldLabel>
-              <RatingPicker value={rating} onChange={setRating} disabled={submitting} />
-            </div>
+      <div className="space-y-5 p-5 sm:p-6">
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <FieldLabel htmlFor="fb-name">Your name</FieldLabel>
+          <input
+            id="fb-name"
+            type="text"
+            value={name}
+            maxLength={80}
+            disabled={submitting}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="How should we address you?"
+            className={IE_INPUT_TOOL_CLASS}
+            style={IE_FIELD_SURFACE_STYLE}
+          />
+        </div>
 
-            {/* Name */}
-            <div className={IE_FIELD_GROUP_CLASS}>
-              <FieldLabel htmlFor="fb-name">Your name</FieldLabel>
-              <input
-                id="fb-name"
-                type="text"
-                value={name}
-                maxLength={80}
-                disabled={submitting}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="How should we address you?"
-                className={IE_INPUT_TOOL_CLASS}
-                style={IE_FIELD_SURFACE_STYLE}
-              />
-            </div>
+        <div className={IE_FIELD_GROUP_CLASS}>
+          <FieldLabel htmlFor="fb-category">Feedback type</FieldLabel>
+          <select
+            id="fb-category"
+            value={feedbackCategory}
+            disabled={submitting}
+            onChange={(e) => {
+              const next = e.target.value as FeedbackCategory
+              setFeedbackCategory(next)
+              setExistingCaseNotice(null)
+              if (next === 'technical_issue') setBugsId('')
+            }}
+            className={IE_INPUT_TOOL_CLASS}
+            style={IE_FIELD_SURFACE_STYLE}
+          >
+            <option value="general">General</option>
+            <option value="feature">Feature request</option>
+            <option value="bug">Bug report</option>
+            <option value="interview">Interview experience</option>
+            <option value="technical_issue">Interview technical issue</option>
+            <option value="report">Report usefulness</option>
+            <option value="ai_quality">AI answer quality</option>
+          </select>
+        </div>
 
+        {!isTechnicalIssue ? (
+          <div className={IE_FIELD_GROUP_CLASS}>
+            <FieldLabel htmlFor="fb-rating">Overall rating</FieldLabel>
+            <RatingPicker value={rating} onChange={setRating} disabled={submitting} />
+          </div>
+        ) : null}
+
+        {!isTechnicalIssue ? (
+          <>
             <FeedbackOptionField
               id="fb-liked"
               label="What did you like?"
@@ -430,7 +567,13 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
               label="Bugs or issues?"
               options={BUGS_OPTIONS}
               selectedId={bugsId}
-              onSelectedIdChange={setBugsId}
+              onSelectedIdChange={(id) => {
+                if (id === INTERVIEW_TECHNICAL_BUG_OPTION_ID) {
+                  switchToTechnicalIssue()
+                  return
+                }
+                setBugsId(id)
+              }}
               otherText={bugsOther}
               onOtherTextChange={setBugsOther}
               disabled={submitting}
@@ -438,7 +581,6 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
               otherPlaceholder="What broke, and what were you doing…"
             />
 
-            {/* Would use again */}
             <div className="space-y-2">
               <FieldLabel htmlFor="fb-woulduse">Would you use InterviewEra again?</FieldLabel>
               <div className="flex gap-2" role="radiogroup" aria-label="Would you use it again">
@@ -472,115 +614,217 @@ export function FeedbackForm({ defaultName = '' }: { defaultName?: string }) {
                 })}
               </div>
             </div>
+          </>
+        ) : null}
+
+        {isTechnicalIssue ? (
+          <div
+            className="space-y-4 rounded-2xl border p-4"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
+          >
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                Interview technical issue
+              </p>
+              <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                Submitting a report does not automatically restore an interview credit. If a technical issue prevented your interview from being completed, the team will investigate; if the issue is confirmed after review, the interview credit may be restored. Target
+                resolution: 48–72 hours.
+              </p>
+            </div>
+
+            {existingCaseNotice ? (
+              <div
+                className="rounded-xl border p-3 text-sm"
+                style={{
+                  borderColor: 'var(--accent-primary)',
+                  background: 'color-mix(in srgb, var(--accent-primary) 8%, transparent)',
+                  color: 'var(--text-primary)',
+                }}
+                role="status"
+              >
+                This technical issue has already been reported. Current status:{' '}
+                <strong>
+                  {TECHNICAL_FAILURE_STATUS_LABELS[
+                    existingCaseNotice.status as keyof typeof TECHNICAL_FAILURE_STATUS_LABELS
+                  ] ?? existingCaseNotice.status}
+                </strong>
+                .{' '}
+                <a href="#technical-issue-status" className="font-semibold underline underline-offset-2">
+                  View status
+                </a>
+              </div>
+            ) : null}
 
             <div className={IE_FIELD_GROUP_CLASS}>
-              <FieldLabel htmlFor="fb-category">Feedback type</FieldLabel>
+              <FieldLabel htmlFor="fb-technical-interview">Affected interview</FieldLabel>
               <select
-                id="fb-category"
-                value={feedbackCategory}
+                id="fb-technical-interview"
+                value={technicalInterviewId}
+                disabled={submitting || interviews.length === 0}
+                onChange={(e) => setTechnicalInterviewId(e.target.value)}
+                className={IE_INPUT_TOOL_CLASS}
+                style={IE_FIELD_SURFACE_STYLE}
+                required
+              >
+                <option value="">
+                  {interviews.length === 0 ? 'No interviews available' : 'Select an interview…'}
+                </option>
+                {interviews.map((interview) => (
+                  <option key={interview.id} value={interview.id}>
+                    {interview.role} · {interview.difficulty} · {interview.status}
+                    {interview.started_at
+                      ? ` · ${new Date(interview.started_at).toLocaleDateString('en-IN')}`
+                      : ''}
+                  </option>
+                ))}
+              </select>
+              {interviews.length === 0 ? (
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Email{' '}
+                  <a
+                    href="mailto:support@interviewera.com?subject=Interview%20technical%20issue"
+                    className="underline underline-offset-2"
+                    style={{ color: 'var(--accent-primary)' }}
+                  >
+                    support@interviewera.com
+                  </a>{' '}
+                  if you need help without an interview on file.
+                </p>
+              ) : null}
+            </div>
+
+            <div className={IE_FIELD_GROUP_CLASS}>
+              <FieldLabel htmlFor="fb-technical-category">Issue type</FieldLabel>
+              <select
+                id="fb-technical-category"
+                value={technicalFailureCategory}
                 disabled={submitting}
                 onChange={(e) =>
-                  setFeedbackCategory(
-                    e.target.value as typeof feedbackCategory,
-                  )
+                  setTechnicalFailureCategory(e.target.value as TechnicalFailureCategory | '')
                 }
                 className={IE_INPUT_TOOL_CLASS}
                 style={IE_FIELD_SURFACE_STYLE}
+                required
               >
-                <option value="general">General</option>
-                <option value="feature">Feature request</option>
-                <option value="bug">Bug report</option>
-                <option value="interview">Interview experience</option>
-                <option value="report">Report usefulness</option>
-                <option value="ai_quality">AI answer quality</option>
+                <option value="">Select the closest issue…</option>
+                {TECHNICAL_FAILURE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>
+                    {TECHNICAL_FAILURE_CATEGORY_LABELS[category]}
+                  </option>
+                ))}
               </select>
             </div>
 
             <div className={IE_FIELD_GROUP_CLASS}>
-              <FieldLabel htmlFor="fb-nps">Overall Score (0–10, optional)</FieldLabel>
-              <input
-                id="fb-nps"
-                type="range"
-                min={0}
-                max={10}
-                value={npsScore ?? 5}
-                disabled={submitting}
-                onChange={(e) => setNpsScore(parseInt(e.target.value, 10))}
-                className="w-full"
-              />
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                {npsScore === null ? 'Slide to set a score' : `Score: ${npsScore}`}
-              </p>
-            </div>
-
-            {/* Screenshot */}
-            <ScreenshotUploader
-              key={uploaderKey}
-              disabled={submitting}
-              onUploadingChange={setScreenshotUploading}
-              onUploaded={setScreenshotPath}
-              onCleared={() => setScreenshotPath(null)}
-            />
-
-            {/* Optional public-display consent — unchecked by default; never required */}
-            <label
-              htmlFor="fb-consent-public"
-              className="flex cursor-pointer items-start gap-3 rounded-xl border p-3"
-              style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
-            >
-              <input
-                id="fb-consent-public"
-                type="checkbox"
-                checked={consentPublicDisplay}
-                disabled={submitting}
-                onChange={(e) => setConsentPublicDisplay(e.target.checked)}
-                className="mt-1 size-4 shrink-0 rounded border accent-[var(--accent-primary)]"
-              />
-              <span className="text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
-                I&apos;m okay with InterviewEra sharing this feedback (with my first name only, never
-                my email) publicly on the website or in marketing materials.
-                <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Optional — you can submit feedback either way.
+              <div className="flex items-center justify-between">
+                <FieldLabel htmlFor="fb-technical-description">What happened?</FieldLabel>
+                <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                  {technicalIssueDescription.length}/{MAX_TEXT}
                 </span>
-              </span>
-            </label>
+              </div>
+              <Textarea
+                id="fb-technical-description"
+                value={technicalIssueDescription}
+                maxLength={MAX_TEXT}
+                disabled={submitting}
+                placeholder="Describe where the interview stopped, any error shown, and what you tried."
+                onChange={(e) => setTechnicalIssueDescription(e.target.value)}
+                className={IE_TEXTAREA_TOOL_CLASS}
+                style={IE_FIELD_SURFACE_STYLE}
+                required
+              />
+            </div>
           </div>
+        ) : (
+          <div className={IE_FIELD_GROUP_CLASS}>
+            <FieldLabel htmlFor="fb-nps">Overall Score (0–10, optional)</FieldLabel>
+            <input
+              id="fb-nps"
+              type="range"
+              min={0}
+              max={10}
+              value={npsScore ?? 5}
+              disabled={submitting}
+              onChange={(e) => setNpsScore(parseInt(e.target.value, 10))}
+              className="w-full"
+            />
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {npsScore === null ? 'Slide to set a score' : `Score: ${npsScore}`}
+            </p>
+          </div>
+        )}
 
-          <div
-            className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end sm:p-6"
-            style={{ borderColor: 'var(--card-border)' }}
+        <ScreenshotUploader
+          key={uploaderKey}
+          disabled={submitting}
+          recommended={isTechnicalIssue}
+          onUploadingChange={setScreenshotUploading}
+          onUploaded={setScreenshotPath}
+          onCleared={() => setScreenshotPath(null)}
+        />
+
+        {!isTechnicalIssue ? (
+          <label
+            htmlFor="fb-consent-public"
+            className="flex cursor-pointer items-start gap-3 rounded-xl border p-3"
+            style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
           >
-            <Link
-              href="/dashboard"
-              className="inline-flex h-auto items-center justify-center rounded-[14px] border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
-              style={{
-                borderColor: 'var(--card-border)',
-                color: 'var(--text-primary)',
-                background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-                pointerEvents: submitting ? 'none' : undefined,
-                opacity: submitting ? 0.6 : undefined,
-              }}
-            >
-              Back to dashboard
-            </Link>
-            <Button
-              type="submit"
-              disabled={submitting || screenshotUploading}
-              className={cn(IE_SUBMIT_BUTTON_CLASS, 'h-auto w-auto px-5 py-2.5 text-sm')}
-              style={IE_SUBMIT_BUTTON_STYLE}
-            >
-              {submitting ? (
-                <>
-                  <Loader2 className={IE_SPINNER_CLASS} aria-hidden />
-                  Sending…
-                </>
-              ) : screenshotUploading ? (
-                'Waiting for upload…'
-              ) : (
-                'Send feedback'
-              )}
-            </Button>
-          </div>
+            <input
+              id="fb-consent-public"
+              type="checkbox"
+              checked={consentPublicDisplay}
+              disabled={submitting}
+              onChange={(e) => setConsentPublicDisplay(e.target.checked)}
+              className="mt-1 size-4 shrink-0 rounded border accent-[var(--accent-primary)]"
+            />
+            <span className="text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
+              I&apos;m okay with InterviewEra sharing this feedback (with my first name only, never my
+              email) publicly on the website or in marketing materials.
+              <span className="mt-1 block text-xs" style={{ color: 'var(--text-muted)' }}>
+                Optional — you can submit feedback either way.
+              </span>
+            </span>
+          </label>
+        ) : null}
+      </div>
+
+      <div
+        className="flex flex-col-reverse gap-2 border-t p-5 sm:flex-row sm:justify-end sm:p-6"
+        style={{ borderColor: 'var(--card-border)' }}
+      >
+        <Link
+          href="/dashboard"
+          className="inline-flex h-auto items-center justify-center rounded-[14px] border-2 px-4 py-2.5 text-sm font-semibold transition-colors"
+          style={{
+            borderColor: 'var(--card-border)',
+            color: 'var(--text-primary)',
+            background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
+            pointerEvents: submitting ? 'none' : undefined,
+            opacity: submitting ? 0.6 : undefined,
+          }}
+        >
+          Back to dashboard
+        </Link>
+        <Button
+          type="submit"
+          disabled={submitting || screenshotUploading || (isTechnicalIssue && interviews.length === 0)}
+          className={cn(IE_SUBMIT_BUTTON_CLASS, 'h-auto w-auto px-5 py-2.5 text-sm')}
+          style={IE_SUBMIT_BUTTON_STYLE}
+        >
+          {submitting ? (
+            <>
+              <Loader2 className={IE_SPINNER_CLASS} aria-hidden />
+              Sending…
+            </>
+          ) : screenshotUploading ? (
+            'Waiting for upload…'
+          ) : isTechnicalIssue ? (
+            'Submit for review'
+          ) : (
+            'Send feedback'
+          )}
+        </Button>
+      </div>
     </form>
   )
 }

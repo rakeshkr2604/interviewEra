@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { INTERVIEWER_IDS } from '@/lib/config/interviewers';
+import { TECHNICAL_FAILURE_CATEGORIES } from '@/lib/technical-failures/types';
 import type { InterviewGoal } from '@/types/onboarding.types';
 import { safeText } from '@/lib/utils/sanitize';
 
@@ -11,6 +12,15 @@ export const displayNameSchema = z
     /^[a-zA-Z\s'-]{2,50}$/,
     'Name must be 2–50 characters (letters, spaces, apostrophes, or hyphens only).',
   );
+
+/** Shared auth password policy so campus clients cannot drift from the signup API. */
+export const authPasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters.')
+  .regex(/[A-Z]/, 'Password must include an uppercase letter.')
+  .regex(/[a-z]/, 'Password must include a lowercase letter.')
+  .regex(/[0-9]/, 'Password must include a number.')
+  .regex(/[^A-Za-z0-9\s]/, 'Password must include a special character.');
 
 export const resumeUploadSchema = z.object({
   userId: z.string().uuid(),
@@ -129,6 +139,7 @@ export const paymentPreviewDiscountSchema = z.object({
     .min(1)
     .max(64)
     .transform((s) => s.trim().toUpperCase()),
+  coupon_attempt_id: z.string().uuid().optional(),
 });
 
 export const paymentVerifySchema = z.object({
@@ -181,7 +192,10 @@ export const feedbackSubmitSchema = z.object({
     .max(160)
     .transform((s) => safeText(s, 80))
     .refine((s) => s.length >= 1, 'Name is required.'),
-  rating: halfStarRatingSchema,
+  rating: z.preprocess(
+    (value) => (value === null || value === undefined || value === '' ? null : value),
+    z.union([halfStarRatingSchema, z.null()]).default(null),
+  ),
   likedText: feedbackText(2000),
   confusionText: feedbackText(2000),
   bugsText: feedbackText(2000),
@@ -190,9 +204,16 @@ export const feedbackSubmitSchema = z.object({
   consentPublicDisplay: z.boolean().optional().default(false),
   npsScore: z.coerce.number().int().min(0).max(10).nullable().optional().default(null),
   feedbackCategory: z
-    .enum(['general', 'bug', 'feature', 'interview', 'report', 'ai_quality'])
+    .enum(['general', 'bug', 'feature', 'interview', 'report', 'ai_quality', 'technical_issue'])
     .optional()
     .default('general'),
+  interviewId: z.string().uuid().optional(),
+  technicalFailureCategory: z.enum(TECHNICAL_FAILURE_CATEGORIES).optional(),
+  technicalIssueDescription: z
+    .string()
+    .max(2000)
+    .transform((s) => safeText(s, 2000))
+    .optional(),
   pageUrl: z
     .preprocess((v) => (typeof v === 'string' ? v : ''), z.string().max(2048))
     .transform((s) => safeText(s, 2048)),
@@ -227,6 +248,39 @@ export const feedbackSubmitSchema = z.object({
       speech_recognition_enabled: z.boolean().optional(),
     })
     .optional(),
+}).superRefine((value, ctx) => {
+  if (value.feedbackCategory !== 'technical_issue') {
+    if (value.rating === null) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['rating'],
+        message: 'Pick a rating.',
+      });
+    }
+    return;
+  }
+
+  if (!value.interviewId) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['interviewId'],
+      message: 'Select the affected interview.',
+    });
+  }
+  if (!value.technicalFailureCategory) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['technicalFailureCategory'],
+      message: 'Select the technical issue type.',
+    });
+  }
+  if (!value.technicalIssueDescription?.trim()) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['technicalIssueDescription'],
+      message: 'Describe what happened during the interview.',
+    });
+  }
 })
 
 export type FeedbackSubmitInput = z.infer<typeof feedbackSubmitSchema>;

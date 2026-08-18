@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, GraduationCap, Rocket } from 'lucide-react';
+import { ArrowRight, Building2, GraduationCap, Rocket } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
@@ -26,6 +26,8 @@ const PATHS: {
   ctaKey: (typeof CTA_KEYS)[keyof typeof CTA_KEYS];
   section: string;
   icon: LucideIcon;
+  context: string;
+  index: string;
   shot?: 'students' | 'colleges' | 'hiring';
 }[] = [
   {
@@ -36,6 +38,8 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_STUDENTS,
     section: 'audience_students',
     icon: Rocket,
+    context: 'Individual practice',
+    index: '01',
     shot: 'students',
   },
   {
@@ -46,6 +50,8 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_COLLEGES,
     section: 'audience_colleges',
     icon: GraduationCap,
+    context: 'Campus readiness',
+    index: '02',
     shot: 'colleges',
   },
   {
@@ -56,6 +62,8 @@ const PATHS: {
     ctaKey: CTA_KEYS.AUDIENCE_HIRING_TEAMS,
     section: 'audience_hiring_teams',
     icon: Building2,
+    context: 'Candidate evaluation',
+    index: '03',
     shot: 'hiring',
   },
 ];
@@ -70,24 +78,35 @@ export function AudiencePathSection() {
   return (
     <section
       className={cn(
-        'px-4 pb-20 sm:px-5 sm:pb-24',
-        'ie-lh-surface-35 border-b pt-6 sm:pt-8',
+        'px-4 py-16 sm:px-5 sm:py-20 lg:py-24',
+        'ie-lh-surface-35 relative overflow-hidden border-b',
       )}
       aria-labelledby="audience-path-heading"
     >
-      <div className={LANDING_PAGE_CONTAINER}>
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 h-80 opacity-70"
+        style={{
+          background:
+            'radial-gradient(ellipse 55% 65% at 50% 0%, color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent 72%)',
+        }}
+        aria-hidden
+      />
+      <div className={cn(LANDING_PAGE_CONTAINER, 'relative')}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
-          <h2 id="audience-path-heading" className={cn(LANDING_HOME_HEADING, 'text-2xl sm:text-3xl')}>
+          <h2 id="audience-path-heading" className={LANDING_HOME_HEADING}>
             Who is InterviewEra for?
           </h2>
           <p className={LANDING_HOME_SUBHEAD}>Pick the path that matches your role.</p>
         </div>
 
-        <ul className="mx-auto mt-8 grid max-w-5xl gap-4 sm:grid-cols-3" role="list">
+        <ul
+          className="relative mx-auto mt-10 grid max-w-[70rem] gap-5 lg:grid-cols-3 lg:gap-6"
+          role="list"
+        >
           {PATHS.map((path) => {
             const Icon = path.icon;
             return (
-              <li key={path.title} role="listitem">
+              <li key={path.title} className="flex" role="listitem">
                 <TrackedCtaLink
                   href={path.href}
                   ctaKey={path.ctaKey}
@@ -97,30 +116,48 @@ export function AudiencePathSection() {
                   // viewport prefetch thrashing the homepage main thread.
                   prefetch={path.href === '/campus' ? false : undefined}
                   className={cn(
-                    'ie-lh-surface-94 group flex h-full min-h-11 flex-col rounded-2xl border p-5',
-                    'transition-[border-color,box-shadow,transform] duration-150 hover:-translate-y-0.5',
+                    'ie-lh-surface-94 group flex min-h-11 w-full flex-col overflow-hidden',
+                    'rounded-[var(--ie-radius-2xl)] border',
+                    'transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-1',
                     'motion-reduce:transform-none focus-visible:outline-none focus-visible:ring-2',
                     'focus-visible:ring-[color-mix(in_srgb,var(--accent-primary)_35%,transparent)] focus-visible:ring-offset-2',
                   )}
                 >
-                  <span
-                    className="ie-lh-icon-tile mb-4 flex size-11 items-center justify-center rounded-xl"
-                    aria-hidden
-                  >
-                    <Icon className="size-5" />
-                  </span>
-                  <h3 className="ie-lh-text-primary text-lg font-semibold">{path.title}</h3>
-                  <p className="ie-lh-text-secondary mt-2 text-sm leading-relaxed">
-                    {path.description}
-                  </p>
-                  {path.shot ? (
-                    <div className="mt-1 flex-1">
-                      <Shot kind={path.shot} />
+                  <div className="p-6 pb-5 sm:p-7 sm:pb-6 lg:p-6 lg:pb-5 xl:p-7 xl:pb-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <span
+                        className="ie-lh-icon-tile-primary flex size-12 items-center justify-center rounded-2xl"
+                        aria-hidden
+                      >
+                        <Icon className="size-[1.35rem]" strokeWidth={1.8} />
+                      </span>
+                      <span className="font-[family-name:var(--font-jetbrains)] text-xs font-medium tracking-[0.12em] text-[var(--text-muted)]">
+                        {path.index}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                  <span className="ie-lh-text-link mt-4 text-sm font-semibold">{path.cta} →</span>
+
+                    <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-hover)]">
+                      {path.context}
+                    </p>
+                    <h3 className="ie-lh-text-primary mt-2 font-[family-name:var(--font-bricolage)] text-2xl font-bold leading-tight tracking-[-0.02em]">
+                      {path.title}
+                    </h3>
+                    <p className="ie-lh-text-secondary mt-3 max-w-sm text-[15px] leading-relaxed">
+                      {path.description}
+                    </p>
+                  </div>
+
+                  <div className="mt-auto px-3 pb-3 sm:px-4 sm:pb-4 lg:px-3 lg:pb-3 xl:px-4 xl:pb-4">
+                    {path.shot ? <Shot kind={path.shot} /> : null}
+                  </div>
+
+                  <span className="flex min-h-14 items-center justify-between gap-4 border-t border-[var(--card-border)] px-6 py-4 text-sm font-semibold text-[var(--accent-link)] sm:px-7 lg:px-6 xl:px-7">
+                    <span>{path.cta}</span>
+                    <ArrowRight
+                      className="size-4 transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none"
+                      aria-hidden
+                    />
+                  </span>
                 </TrackedCtaLink>
               </li>
             );

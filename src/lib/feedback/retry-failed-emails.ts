@@ -14,7 +14,7 @@ interface FeedbackRow {
   name: string | null;
   email: string | null;
   user_id: string | null;
-  rating: number;
+  rating: number | null;
   liked_text: string | null;
   confusion_text: string | null;
   bugs_text: string | null;
@@ -24,6 +24,7 @@ interface FeedbackRow {
   screenshot_url: string | null;
   session_context: Record<string, unknown> | null;
   labels: string[] | null;
+  feedback_category: string | null;
   created_at: string;
   email_attempts: number;
 }
@@ -51,7 +52,7 @@ export async function retryFailedFeedbackEmails(
     .from('feedbacks')
     .select(
       'id, name, email, user_id, rating, liked_text, confusion_text, bugs_text, ' +
-        'would_use_again, page_url, browser_info, screenshot_url, session_context, labels, created_at, email_attempts',
+        'would_use_again, page_url, browser_info, screenshot_url, session_context, labels, feedback_category, created_at, email_attempts',
     )
     .eq('email_status', 'failed')
     .order('created_at', { ascending: true })
@@ -86,6 +87,7 @@ export async function retryFailedFeedbackEmails(
         ? (row.session_context as unknown as import('@/lib/feedback/collect-context').FeedbackSessionContext)
         : null,
       labels: (row.labels ?? []) as FeedbackLabel[],
+      feedbackCategory: row.feedback_category ?? null,
       createdAt: new Date(row.created_at),
     };
 

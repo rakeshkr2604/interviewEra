@@ -90,6 +90,9 @@ flowchart TB
 - **User state** (`users.plan_tier`, credits, expiry) — access grant
 - **Idempotency marker** — `users.last_payment_id === paymentId`
 - **Both paths** call the same function — whichever arrives first activates; the other replays safely
+- **Ownership ≠ completeness** — `last_payment_id` proves the CAS winner; replay must still verify/heal the local payment binding, one payment-owned ledger row, and exact campaign consumption
+- **Historical entitlement snapshot** — new activations persist credits/start/expiry on the server-owned payment row before CAS; recovery never recalculates them from current pricing or extends expiry
+- **Provider proof before ownership** — verify and webhook fetch Razorpay order/payment entities and must match their IDs, amount, INR currency, and successful statuses to the frozen local order before the CAS
 
 ---
 
@@ -202,9 +205,22 @@ If zero rows returned, re-read `last_payment_id` (with brief backoff for commit 
 
 | Request pattern | Credits | Expiry | Ledger | Payment row |
 |-----------------|---------|--------|--------|-------------|
-| First call (verify or webhook) | +N once | extended once | 1 row | `paid` |
-| Second call (any path) | 0 | unchanged | 0 | unchanged |
-| N duplicate retries | 0 | unchanged | 0 | unchanged |
+| First call (verify or webhook) | +N once | extended once | 1 payment-owned row | `paid` |
+| Second call, complete state | 0 | unchanged | 0 | unchanged |
+| Replay after partial local write | 0 | unchanged | heal missing row exactly once | heal binding/status |
+| N duplicate/concurrent retries | 0 | unchanged | still exactly 1 | `paid` |
+
+### Activation completeness and replay healing
+
+`users.last_payment_id === paymentId` is the ownership marker, not a completion marker. After ownership, `complete_payment_activation_local` runs as a service-role-only PostgreSQL function and locks the exact user/payment rows. In one local transaction it:
+
+1. verifies exact user/order/payment ownership and rejects mismatches;
+2. verifies the immutable entitlement snapshot (or recognizes an already-linked legacy-complete ledger row);
+3. heals `payments.payment_id/status` without using `payments.status` as ownership;
+4. links or inserts exactly one `credit_transactions` row using the unique `payment_id` identity;
+5. changes no user balance, plan, start, or expiry.
+
+Campaign consumption remains the existing exact-redemption RPC after local completion. A campaign failure returns a retryable activation failure; replay retries only that same redemption. A physically absent base order row or ambiguous historical ledger fails closed because original payment/entitlement authority cannot be reconstructed safely.
 
 **Response types (no ambiguous `skipped`):**
 
@@ -220,6 +236,14 @@ If zero rows returned, re-read `last_payment_id` (with brief backoff for commit 
 ```
 
 Funnel analytics (`payment_completed`) fires only on fresh activation (`activationWasFresh()`).
+
+### Provider-to-local validation boundary
+
+`resolveExpectedOrderAmount()` remains the local expectation lookup: it returns the order’s stored amount, currency, owner, plan, and exact campaign reservation linkage. It never re-quotes a campaign. `provider-payment-validation.ts` separately compares that expectation to the Razorpay payment entity (`id`, `order_id`, amount, `INR`, `captured`) and order entity (`id`, amount, `INR`, `paid`, notes owner/plan).
+
+Both verify and webhook run that contract before `activatePlanAfterPayment()`. Provider mismatch fails closed with no ownership CAS, entitlement, recovery, ledger, or campaign mutation. `activatePlanAfterPayment()` additionally rejects a different existing `payments.payment_id` before its CAS. This protects the Phase 7A recovery boundary: replay/healing is permitted only after trusted provider validation has established the exact payment/order identity.
+
+Discounted campaign amounts remain historical: Starter ₹209/₹149 and Pro ₹559/₹399 validate against the frozen `payments.amount` and linked redemption’s `final_amount_paise`, not current list price or campaign availability.
 
 ---
 
@@ -273,7 +297,7 @@ Every activation log includes `order_id`, `payment_id`, `user_id`.
 |------|----------|------------|
 | Partial deploy (old verify + new webhook or vice versa) | High | Deploy all payment files atomically |
 | Webhook secret mismatch | High | Monitor `[payment:webhook] invalid_signature`; returns 400 |
-| User update succeeds, ledger insert fails | Medium | Returns 500; webhook retries; idempotency prevents double credits |
+| User CAS succeeds, payment/ledger completion fails | Medium | Returns 500; replay atomically heals missing local artifacts without changing entitlement |
 | `order.paid` without `payment.id` | Low | Logged `missing_payment_id`; `payment.captured` always includes payment id |
 | Campus users attempting self-serve | Low | Blocked in activation with explicit error |
 | Pre-fix stuck payments (`paid` row, null `last_payment_id`) | Medium | Manual recovery (see checklist) |

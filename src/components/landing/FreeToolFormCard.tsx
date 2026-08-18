@@ -55,9 +55,9 @@ export function FreeToolFormCard({
             >
               {headerEyebrow}
             </p>
-            <p className="mt-1 text-sm font-semibold leading-snug sm:text-base lg:text-lg" style={{ color: 'var(--text-primary)' }}>
+            <h2 className="mt-1 text-sm font-semibold leading-snug sm:text-base lg:text-lg" style={{ color: 'var(--text-primary)' }}>
               {headerTitle}
-            </p>
+            </h2>
             {headerSubtitle ? (
               <p className="mt-1 text-xs leading-relaxed sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                 {headerSubtitle}

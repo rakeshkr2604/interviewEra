@@ -22,11 +22,14 @@ function formatBytes(n: number): string {
 
 export function ScreenshotUploader({
   disabled,
+  recommended = false,
   onUploadingChange,
   onUploaded,
   onCleared,
 }: {
   disabled?: boolean
+  /** Soft recommendation only — screenshots stay optional. */
+  recommended?: boolean
   onUploadingChange: (uploading: boolean) => void
   onUploaded: (path: string) => void
   onCleared: () => void
@@ -143,11 +146,16 @@ export function ScreenshotUploader({
   return (
     <div className="space-y-2">
       <span id="fb-screenshot-label" className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-        Attach screenshot{' '}
+        Screenshot{' '}
         <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
           (optional)
         </span>
       </span>
+      {recommended ? (
+        <p id="fb-screenshot-help" className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          Screenshots can help our team investigate the issue faster. They are optional.
+        </p>
+      ) : null}
 
       <input
         ref={inputRef}
@@ -213,7 +221,7 @@ export function ScreenshotUploader({
           onDragLeave={() => setDragActive(false)}
           onDrop={onDrop}
           disabled={disabled || busy}
-          aria-describedby="fb-screenshot-hint"
+          aria-describedby={recommended ? 'fb-screenshot-help fb-screenshot-hint' : 'fb-screenshot-hint'}
           className={cn(
             'flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-primary)]/40 disabled:cursor-not-allowed disabled:opacity-70',

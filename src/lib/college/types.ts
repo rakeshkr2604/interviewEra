@@ -3,6 +3,7 @@ export const INVITE_EXPIRY_DAYS = 7;
 export type InviteStatus = 'pending' | 'accepted' | 'expired' | 'revoked';
 
 export type CampusRole = 'campus_admin' | 'placement_officer' | 'recruiter';
+export type CampusOrgVerificationStatus = 'pending' | 'approved' | 'rejected';
 
 export type CampusPermission =
   | 'students:read'
@@ -17,6 +18,7 @@ export interface CampusOrg {
   name: string;
   seatCount: number;
   adminUserId: string;
+  verificationStatus: CampusOrgVerificationStatus;
 }
 
 export interface StudentWithProgress {

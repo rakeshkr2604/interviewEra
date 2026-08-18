@@ -1,13 +1,13 @@
 /**
  * GET /api/cron/release-expired-code-reservations
  *
- * Releases campaign_code_redemptions stuck in status=reserved for >30 minutes
- * (abandoned checkouts). Calls release_stale_campaign_reservations RPC which
- * decrements campaign_codes.redemption_count atomically per release.
+ * Releases only unbound campaign_code_redemptions stuck in status=reserved for
+ * >30 minutes (server failure before Razorpay-order attachment). Bound orders
+ * are intentionally retained because Razorpay has no terminal unpaid state.
  *
  * vercel.json: once daily at 02:45 UTC (Hobby plan forbids sub-daily crons).
- * Primary release paths remain client dismiss/fail + webhook payment.failed
- * + reserve-on-retry (migration 063); this cron is a daily sweep only.
+ * Provider initialization failure releases its exact unbound reservation in
+ * create-order; this cron is the crash-recovery backstop.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

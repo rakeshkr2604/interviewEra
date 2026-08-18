@@ -139,7 +139,8 @@ export function LoginForm({ next, email: initialEmail, reason }: LoginFormProps)
     <>
       <AuthInterstitial visible={oauthLoading} />
       <AuthFormCard
-        title="Welcome back"
+        eyebrow="Account"
+        title="Sign in to continue"
         subtitle={
           <>
             Sign in to your <BrandWordmarkSplit className="text-[inherit]" /> account
@@ -198,7 +199,7 @@ export function LoginForm({ next, email: initialEmail, reason }: LoginFormProps)
             {error ? <AuthErrorBanner message={error} /> : null}
 
             <AuthLoadingButton loading={loading} loadingLabel="Signing in…" disabled={isDisabled}>
-              {isAuthV2Enabled() ? 'Continue' : 'Sign in'}
+              Sign in
             </AuthLoadingButton>
           </form>
 

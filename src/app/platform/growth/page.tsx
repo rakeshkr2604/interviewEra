@@ -17,6 +17,8 @@ import {
   type CheckoutActivityRow,
   type GrowthRangeSelection,
 } from '@/hooks/useAdminGrowth';
+import type { ConversionFunnelMetrics } from '@/lib/admin/conversion-funnel-metrics';
+import { formatDateTimeEnIn } from '@/lib/datetime/ist';
 
 const cardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -110,11 +112,34 @@ function CopyTextButton({ text, label }: { text: string; label: string }) {
 }
 
 function eventLabel(name: CheckoutActivityRow['event_name']): string {
-  return name === 'payment_started' ? 'Checkout started' : 'Pricing viewed';
+  switch (name) {
+    case 'checkout_started':
+      return 'Checkout started';
+    case 'payment_started':
+      return 'Payment started';
+    case 'payment_failed':
+      return 'Payment failed';
+    case 'payment_completed':
+      return 'Payment completed';
+    default:
+      return 'Pricing viewed';
+  }
 }
 
 function eventBadgeStyle(name: CheckoutActivityRow['event_name']): React.CSSProperties {
-  if (name === 'payment_started') {
+  if (name === 'payment_completed') {
+    return {
+      background: 'color-mix(in srgb, var(--accent-success) 14%, transparent)',
+      color: 'var(--accent-success)',
+    };
+  }
+  if (name === 'payment_failed') {
+    return {
+      background: 'color-mix(in srgb, var(--accent-danger) 14%, transparent)',
+      color: 'var(--accent-danger)',
+    };
+  }
+  if (name === 'checkout_started') {
     return {
       background: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)',
       color: 'var(--accent-warning)',
@@ -157,7 +182,7 @@ function CheckoutActivityPanel({
         </span>
       </div>
       <p className="mb-4 text-xs" style={{ color: 'var(--text-muted)' }}>
-        Who visited pricing and who started checkout — for assist-if-confused triage.
+        Pricing, checkout, and payment lifecycle activity. Times use canonical event timestamps.
       </p>
 
       {error && (
@@ -172,7 +197,7 @@ function CheckoutActivityPanel({
         </div>
       ) : events.length === 0 ? (
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-          No pricing or checkout events in this range yet. New events populate as users hit /pricing and start Razorpay checkout.
+          No pricing, checkout, or payment events in this range yet.
         </p>
       ) : (
         <div className="overflow-x-auto">
@@ -193,7 +218,8 @@ function CheckoutActivityPanel({
               {events.map((e) => (
                 <tr key={e.id} style={{ borderTop: '1px solid var(--card-border)' }}>
                   <td className="py-2.5 pr-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
-                    {relTime(e.created_at)}
+                    <span className="block">{formatDateTimeEnIn(e.created_at)} IST</span>
+                    <span className="block">{relTime(e.created_at)}</span>
                   </td>
                   <td className="py-2.5 pr-3">
                     {e.email ? (
@@ -218,7 +244,7 @@ function CheckoutActivityPanel({
                     </span>
                   </td>
                   <td className="py-2.5 pr-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {e.event_name === 'payment_started'
+                    {e.event_name !== 'pricing_page_viewed'
                       ? [e.plan, e.amount != null ? `₹${(e.amount / 100).toFixed(0)}` : null, e.source]
                           .filter(Boolean)
                           .join(' · ') || '—'
@@ -242,6 +268,149 @@ function CheckoutActivityPanel({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+function ConversionAnalyticsPanel({
+  data,
+  loading,
+  range,
+}: {
+  data: ConversionFunnelMetrics | undefined;
+  loading: boolean;
+  range: GrowthRangeSelection;
+}) {
+  const rate = (value: number | null) => (value == null ? 'N/A' : `${value}%`);
+
+  return (
+    <div className="space-y-5">
+      <div style={cardStyle} className="p-5">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Pricing → Payment Funnel
+          </h2>
+          <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            {rangeLabel(range)} · raw counts, no significance claim
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr style={{ color: 'var(--text-muted)' }}>
+                <th className="pb-2 pr-4">Step</th>
+                <th className="pb-2 pr-4">Count</th>
+                <th className="pb-2 pr-4">From previous</th>
+                <th className="pb-2">Drop-off</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(data?.steps ?? []).map((item, index) => (
+                <tr key={item.key} style={{ borderTop: '1px solid var(--card-border)' }}>
+                  <td className="py-2.5 pr-4 font-medium">{item.label}</td>
+                  <td className="py-2.5 pr-4 tabular-nums">{loading ? '…' : item.count}</td>
+                  <td className="py-2.5 pr-4 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    {index === 0 ? 'baseline' : rate(item.conversion_pct)}
+                  </td>
+                  <td className="py-2.5 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    {index === 0 ? '—' : rate(item.drop_off_pct)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {[
+            ['Promotion views', data?.promotion_views],
+            ['Coupon entries', data?.coupon_entries],
+            ['Coupon applied', data?.coupon_applications],
+            ['Payment failed', data?.payment_failures],
+            [`Abandoned (${data?.abandonment_window_minutes ?? 60}m+)`, data?.abandoned_checkouts],
+            ['Still in window', data?.unresolved_checkouts],
+          ].map(([label, value]) => (
+            <div key={String(label)} className="rounded-lg border p-3" style={{ borderColor: 'var(--card-border)' }}>
+              <p className="text-lg font-bold tabular-nums">{loading ? '…' : (value ?? 0)}</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Abandoned is derived only: checkout older than 60 minutes with no completed or failed event. Modal close and navigation never emit abandonment.
+        </p>
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-2">
+        <div style={cardStyle} className="p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Plan comparison
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr style={{ color: 'var(--text-muted)' }}>
+                  <th className="pb-2 pr-3">Plan</th>
+                  <th className="pb-2 pr-3">Views</th>
+                  <th className="pb-2 pr-3">Selected</th>
+                  <th className="pb-2 pr-3">Checkout</th>
+                  <th className="pb-2 pr-3">Paid</th>
+                  <th className="pb-2">Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(data?.plans ?? []).map((plan) => (
+                  <tr key={plan.plan} style={{ borderTop: '1px solid var(--card-border)' }}>
+                    <td className="py-2.5 pr-3 font-medium capitalize">{plan.plan}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{plan.pricing_views}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{plan.selections}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{plan.checkout_starts}</td>
+                    <td className="py-2.5 pr-3 tabular-nums">{plan.conversions}</td>
+                    <td className="py-2.5 tabular-nums">{rate(plan.conversion_rate_pct)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style={cardStyle} className="p-5">
+          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Campaign conversion
+          </h2>
+          {(data?.campaigns.length ?? 0) === 0 ? (
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>No attributed campaign activity in this range.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th className="pb-2 pr-3">Campaign</th>
+                    <th className="pb-2 pr-3">Views</th>
+                    <th className="pb-2 pr-3">Selected</th>
+                    <th className="pb-2 pr-3">Checkout</th>
+                    <th className="pb-2 pr-3">Paid</th>
+                    <th className="pb-2">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(data?.campaigns ?? []).map((campaign) => (
+                    <tr key={campaign.campaign} style={{ borderTop: '1px solid var(--card-border)' }}>
+                      <td className="max-w-36 truncate py-2.5 pr-3 font-mono text-xs" title={campaign.campaign}>
+                        {campaign.campaign}
+                      </td>
+                      <td className="py-2.5 pr-3 tabular-nums">{campaign.promotion_views}</td>
+                      <td className="py-2.5 pr-3 tabular-nums">{campaign.selections}</td>
+                      <td className="py-2.5 pr-3 tabular-nums">{campaign.checkout_starts}</td>
+                      <td className="py-2.5 pr-3 tabular-nums">{campaign.conversions}</td>
+                      <td className="py-2.5 tabular-nums">{rate(campaign.conversion_rate_pct)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -475,6 +644,12 @@ export default function PlatformGrowthPage() {
           </table>
         </div>
       </div>
+
+      <ConversionAnalyticsPanel
+        data={growth?.conversion}
+        loading={growthLoading}
+        range={range}
+      />
 
       {/* Revenue + referrals + feedback */}
       <div className="grid gap-5 lg:grid-cols-3">

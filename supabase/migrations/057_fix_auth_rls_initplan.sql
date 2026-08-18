@@ -1,6 +1,14 @@
 -- ============================================================================
 -- 057_fix_auth_rls_initplan.sql
 -- ============================================================================
+-- Historical migration 057 was manually applied to production before being
+-- added to version control (commit 9fb0864). Its static policy list includes
+-- tables created by later timestamped migrations, so this version is a
+-- fresh-replay no-op. The generic policy reconciliation is rerun after every
+-- dependency exists by 20260817162058.
+--
+-- Original body retained as commented historical evidence:
+/*
 -- Purpose: Fix Supabase Performance Advisor `auth_rls_initplan` warnings.
 --
 -- Problem: RLS policies that call auth.uid() / auth.role() / auth.jwt() /
@@ -10,17 +18,17 @@
 -- Reference:
 --   https://supabase.com/docs/guides/database/postgres/row-level-security#call-functions-with-select
 --
--- Scope: ONLY wrap auth.*/current_setting() calls. No other logic changes.
+-- Scope: ONLY wrap auth.* / current_setting() calls. No other logic changes.
 --         Does NOT consolidate duplicate/overlapping policies.
 --
--- Source of policy list: reconstructed from supabase/migrations/*.sql
+-- Source of policy list: reconstructed from SQL files in supabase/migrations
 -- (live pg_policies unavailable — Management API token unauthorized).
 --
 -- Counts (migration-reconstructed):
 --   77 policies total, 76 need initplan wrap (~92 bare auth.* call sites)
 --   Advisor reported 179 warnings — gap is expected if production has
 --   extra Dashboard-created policies / alternate names. The safety-net DO
---   block at the end rewrites ANY remaining bare auth.*/current_setting()
+--   block at the end rewrites ANY remaining bare auth.* / current_setting()
 --   calls in public + storage so production-only policies are covered.
 --
 -- Apply via Dashboard SQL Editor after review. Do NOT auto-apply from CI.
@@ -746,7 +754,7 @@ CREATE POLICY "storage_resumes_insert_own_uid" ON "storage"."objects"
 
 
 -- ============================================================================
--- Safety net: wrap any remaining bare auth.*/current_setting() calls in
+-- Safety net: wrap any remaining bare auth.* / current_setting() calls in
 -- public + storage policies (covers production-only policy names not present
 -- in migration history, e.g. Dashboard-created aliases).
 -- Logs each rewrite via RAISE NOTICE for review in the SQL Editor output.
@@ -869,3 +877,4 @@ COMMIT;
 --
 -- Expect: 0 rows.
 -- ============================================================================
+*/

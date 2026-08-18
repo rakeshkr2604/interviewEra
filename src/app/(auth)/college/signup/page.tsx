@@ -11,14 +11,23 @@ export const metadata = authPageMetadata({
   path: '/college/signup',
 });
 
-export default async function CollegeSignupPage() {
+export default async function CollegeSignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string }>;
+}) {
+  const { status } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (status === 'pending') {
+    redirect('/college/setup?status=pending');
+  }
+
   if (user) {
-    redirect('/dashboard');
+    redirect('/college/setup');
   }
 
   return (

@@ -36,6 +36,8 @@ export async function createPlanOrder(params: {
   plan: PaidPlanId;
   /** Server-computed amount (list or discounted). Defaults to plan list price. */
   amountPaise?: number;
+  /** Campaign redemption/checkout-attempt identity for provider correlation. */
+  redemptionId?: string;
 }): Promise<{
   order_id: string;
   amount: number;
@@ -75,7 +77,11 @@ export async function createPlanOrder(params: {
       amount: amountPaise,
       currency: 'INR',
       receipt: receiptId,
-      notes: { user_id: params.userId, plan: params.plan },
+      notes: {
+        user_id: params.userId,
+        plan: params.plan,
+        ...(params.redemptionId ? { campaign_redemption_id: params.redemptionId } : {}),
+      },
     });
   } catch (err) {
     paymentError('create-order', 'razorpay_api_failed', {
@@ -116,6 +122,23 @@ export async function fetchRazorpayOrder(orderId: string): Promise<{
     currency: order.currency as string,
     status: order.status as string,
     notes: (order.notes ?? {}) as Record<string, string>,
+  };
+}
+
+export async function fetchRazorpayPayment(paymentId: string): Promise<{
+  id: string;
+  order_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+}> {
+  const payment = await getRazorpayClient().payments.fetch(paymentId);
+  return {
+    id: payment.id as string,
+    order_id: payment.order_id as string,
+    amount: typeof payment.amount === 'number' ? payment.amount : Number(payment.amount),
+    currency: payment.currency as string,
+    status: payment.status as string,
   };
 }
 

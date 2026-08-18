@@ -4,6 +4,8 @@ import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { VerificationPending } from '@/components/auth/VerificationPending';
 import { authPageMetadata } from '@/lib/seo/metadata';
 import { parseAuthIntent } from '@/lib/auth/auth-intent';
+import { isSafePath } from '@/lib/auth/auth-params';
+import { CAMPUS_SETUP_PATH } from '@/lib/college/signup-continuation';
 
 export const metadata = authPageMetadata({
   title: 'Verify your email',
@@ -12,13 +14,24 @@ export const metadata = authPageMetadata({
 });
 
 interface VerifyPendingPageProps {
-  searchParams: Promise<{ email?: string; intent?: string }>;
+  searchParams: Promise<{ email?: string; intent?: string; next?: string; status?: string }>;
 }
 
 export default async function VerifyPendingPage({ searchParams }: VerifyPendingPageProps) {
-  const { email: rawEmail, intent: rawIntent } = await searchParams;
+  const {
+    email: rawEmail,
+    intent: rawIntent,
+    next: rawNext,
+    status: rawStatus,
+  } = await searchParams;
   const email = rawEmail?.trim() ?? '';
   const intent = parseAuthIntent(rawIntent);
+  const next = isSafePath(rawNext)
+    ? rawNext
+    : intent === 'college'
+      ? CAMPUS_SETUP_PATH
+      : undefined;
+  const status = rawStatus === 'verification_required' ? rawStatus : undefined;
 
   return (
     <div
@@ -37,7 +50,7 @@ export default async function VerifyPendingPage({ searchParams }: VerifyPendingP
           </Link>
         </div>
         {email ? (
-          <VerificationPending email={email} intent={intent} />
+          <VerificationPending email={email} intent={intent} next={next} status={status} />
         ) : (
           <div className="mx-auto max-w-md space-y-4 text-center">
             <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>

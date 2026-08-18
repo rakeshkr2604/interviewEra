@@ -2,7 +2,8 @@
  * Resolve the authoritative expected checkout amount for an order.
  *
  * Source of truth: `payments.amount` (written at create-order — list or discounted).
- * Optional cross-check: campaign_code_redemptions.final_amount_paise when linked.
+ * Required cross-check: a linked campaign redemption must match the exact
+ * payment owner, order, plan and amount.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -12,6 +13,7 @@ export type ExpectedOrderAmount =
   | {
       ok: true;
       amountPaise: number;
+      currency: string;
       plan: PaidPlanId;
       userId: string;
       campaignRedemptionId: string | null;
@@ -25,7 +27,7 @@ export async function resolveExpectedOrderAmount(
 ): Promise<ExpectedOrderAmount> {
   const { data: payment, error } = await svc
     .from('payments')
-    .select('user_id, plan, amount, campaign_redemption_id')
+    .select('user_id, plan, amount, currency, campaign_redemption_id')
     .eq('order_id', orderId)
     .maybeSingle();
 
@@ -38,19 +40,28 @@ export async function resolveExpectedOrderAmount(
   }
 
   const amountPaise = Number(payment.amount);
+  const currency = String(payment.currency ?? '');
   const redemptionId = (payment.campaign_redemption_id as string | null) ?? null;
 
   if (redemptionId) {
     const { data: redemption, error: redErr } = await svc
       .from('campaign_code_redemptions')
-      .select('final_amount_paise, status')
+      .select('user_id, order_id, plan, final_amount_paise, status')
       .eq('id', redemptionId)
       .maybeSingle();
 
-    if (!redErr && redemption && Number(redemption.final_amount_paise) !== amountPaise) {
+    if (
+      redErr ||
+      !redemption ||
+      redemption.user_id !== payment.user_id ||
+      redemption.order_id !== orderId ||
+      redemption.plan !== payment.plan ||
+      Number(redemption.final_amount_paise) !== amountPaise ||
+      !['reserved', 'consumed'].includes(redemption.status as string)
+    ) {
       return {
         ok: false,
-        error: 'Discounted amount does not match reservation.',
+        error: 'Discounted order does not match its reservation.',
         code: 'redemption_mismatch',
       };
     }
@@ -59,6 +70,7 @@ export async function resolveExpectedOrderAmount(
   return {
     ok: true,
     amountPaise,
+    currency,
     plan: payment.plan as PaidPlanId,
     userId: payment.user_id as string,
     campaignRedemptionId: redemptionId,

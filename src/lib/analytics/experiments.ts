@@ -5,6 +5,7 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { FLAGS, FLAG_DEFAULTS, type FlagName } from '@/lib/analytics/flags';
 import { persistProductEventAsync } from '@/lib/analytics/product-events-store';
+import { FREE_PLAN } from '@/lib/pricing/plans';
 
 export const EXPERIMENTS = {
   FIRST_INTERVIEW_QUESTIONS: FLAGS.FIRST_INTERVIEW_QUESTIONS,
@@ -16,7 +17,7 @@ export type ExperimentKey = (typeof EXPERIMENTS)[keyof typeof EXPERIMENTS];
 /** Variant definitions per experiment. */
 export const EXPERIMENT_VARIANTS: Record<ExperimentKey, readonly string[]> = {
   [EXPERIMENTS.FIRST_INTERVIEW_QUESTIONS]: ['4', '6'],
-  [EXPERIMENTS.FREE_CREDIT_COUNT]: ['5', '7'],
+  [EXPERIMENTS.FREE_CREDIT_COUNT]: [String(FREE_PLAN.credits)],
 };
 
 function hashToBucket(input: string): number {

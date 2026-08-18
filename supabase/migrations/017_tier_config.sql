@@ -1,7 +1,7 @@
 -- InterviewEra — Tier Config Table
 -- Creates the tier_config reference table that was defined in the unnumbered
--- supabase-migration-retention-system.sql but never included in the numbered
--- migration sequence applied to production.
+-- historical draft supabase/manual/supabase-migration-retention-system.sql
+-- but never included in the numbered migration sequence applied to production.
 --
 -- tier_config is read-only reference data (like a pricing / difficulty table).
 -- No user writes needed — only service_role inserts the seed rows here.

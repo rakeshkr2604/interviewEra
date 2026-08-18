@@ -4,6 +4,8 @@ import { isPlatformAdminUser } from '@/lib/admin/auth';
 import { hasCampusPermission, resolveCampusRole } from './rbac';
 import type { CampusOrg, CampusPermission, CampusRole } from './types';
 
+const CAMPUS_NOT_APPROVED_ERROR = 'Campus organization is pending verification.';
+
 export interface CampusAuthContext {
   userId: string;
   org: CampusOrg;
@@ -45,12 +47,15 @@ export async function requireCampusAuth(
 
   const { data: org } = await serviceClient
     .from('campus_organizations')
-    .select('id, name, seat_count, admin_user_id')
+    .select('id, name, seat_count, admin_user_id, verification_status')
     .eq('admin_user_id', user.id)
     .single();
 
   if (!org) {
     return NextResponse.json({ error: 'Campus organization not found' }, { status: 404 });
+  }
+  if (org.verification_status !== 'approved') {
+    return NextResponse.json({ error: CAMPUS_NOT_APPROVED_ERROR }, { status: 403 });
   }
 
   return {
@@ -60,6 +65,7 @@ export async function requireCampusAuth(
       name: org.name,
       seatCount: org.seat_count,
       adminUserId: org.admin_user_id,
+      verificationStatus: 'approved',
     },
     role,
   };
@@ -73,9 +79,10 @@ export async function requireCampusOrgAccess(
 
   const { data: org } = await serviceClient
     .from('campus_organizations')
-    .select('id, name, seat_count, admin_user_id')
+    .select('id, name, seat_count, admin_user_id, verification_status')
     .eq('id', collegeId)
     .eq('admin_user_id', userId)
+    .eq('verification_status', 'approved')
     .single();
 
   if (!org) return null;
@@ -86,6 +93,7 @@ export async function requireCampusOrgAccess(
       name: org.name,
       seatCount: org.seat_count,
       adminUserId: org.admin_user_id,
+      verificationStatus: 'approved',
     },
   };
 }

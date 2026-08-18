@@ -98,7 +98,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const merged = mergeCandidateProfile(base, parsed.data);
     const { error: updateError } = await supabase
       .from('users')
-      .update({ candidate_profile: profileToStorage(merged) })
+      .update({ candidate_profile: profileToStorage(merged, existing.candidate_profile) })
       .eq('id', user.id);
 
     if (updateError) {

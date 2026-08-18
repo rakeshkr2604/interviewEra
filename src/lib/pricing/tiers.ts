@@ -4,8 +4,8 @@
  * User-facing labels: src/lib/pricing/copy.ts
  */
 
-import { PAID_PLANS } from '@/lib/pricing/plans';
-import { marketingPaidCtaLabel, planCreditsFeatureLine } from '@/lib/pricing/copy';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
+import { marketingPaidCtaLabel } from '@/lib/pricing/copy';
 
 export const BILLING_AMOUNTS = {
   starter: {
@@ -22,29 +22,74 @@ export const BILLING_AMOUNTS = {
 
 /** Free tier rows: ✓ / ✕ must match dashboard */
 export const FREE_TIER_FEATURES = [
-  { text: '3 lifetime credits', included: true as const },
-  { text: 'Basic score report', included: true as const },
-  { text: 'Detailed analysis (blurred preview)', included: false as const },
-  { text: 'Model answer comparisons (blurred preview)', included: false as const },
+  { text: `${FREE_PLAN.credits} interview credits`, included: true as const },
+  { text: 'Resume-personalized questions', included: true as const },
+  { text: 'Advanced interview scoring + score guide', included: true as const },
+  { text: 'Up to 2 adaptive follow-up questions', included: true as const },
+  { text: 'Full answer feedback', included: false as const },
+  { text: '30-day improvement roadmap', included: false as const },
+  { text: 'Model-answer comparison and PDF export', included: false as const },
 ] as const;
 
 /** Paid tiers — same strings everywhere */
 export const STARTER_FEATURES = [
-  planCreditsFeatureLine('starter'),
-  'Full AI feedback on every answer',
-  '5 dimension scores per answer',
-  'Progress tracking across sessions',
+  `${PAID_PLANS.starter.credits} interview credits · ${PAID_PLANS.starter.durationDays}-day access`,
+  'Full answer feedback',
+  'Dimension notes and report synthesis',
+  '30-day improvement roadmap',
+  'Advanced interview scoring + score guide',
+  'Up to 2 adaptive follow-up questions',
   'Resume-personalized questions',
+  'Progress tracking across sessions',
+  'Post-interview report and email',
 ] as const;
 
 export const PRO_FEATURES = [
-  planCreditsFeatureLine('pro'),
-  'Full feedback + detailed analysis',
-  'Model answer comparisons',
-  'Keyword gap analysis',
+  `${PAID_PLANS.pro.credits} interview credits · ${PAID_PLANS.pro.durationDays}-day access`,
+  'Full feedback with deeper analysis',
+  'Dimension notes, synthesis, and 30-day roadmap',
+  'Advanced interview scoring + score guide',
+  'Model-answer comparison',
   'PDF report export',
-  'Interview replay',
+  'Resume-personalized practice and progress tracking',
 ] as const;
+
+export const PLAN_POSITIONING = {
+  free: {
+    title: 'Try InterviewEra',
+    description: 'Best for a first mock interview and light practice.',
+  },
+  starter: {
+    title: 'Get interview-ready',
+    description: 'Best when interviews are coming up and you need full feedback.',
+  },
+  pro: {
+    title: 'Serious preparation',
+    description: 'Best for deeper analysis, model answers, and PDF export.',
+  },
+} as const;
+
+export type ComparisonValue = 'included' | 'not_included' | 'limited' | string;
+
+export const PRICING_COMPARISON = [
+  { feature: 'Interview credits', free: '3', starter: '8', pro: '25' },
+  { feature: 'Access duration', free: 'Free forever', starter: '30 days', pro: '30 days' },
+  { feature: 'Resume personalization', free: 'included', starter: 'included', pro: 'included' },
+  { feature: 'Adaptive follow-ups', free: 'Up to 2', starter: 'Up to 2', pro: 'Up to 2' },
+  { feature: 'Advanced scoring', free: 'included', starter: 'included', pro: 'included' },
+  { feature: 'Score guide', free: 'included', starter: 'included', pro: 'included' },
+  { feature: 'Detailed answer feedback', free: 'not_included', starter: 'included', pro: 'included' },
+  { feature: 'Improvement guidance', free: 'not_included', starter: '30-day roadmap', pro: '30-day roadmap' },
+  { feature: 'Progress tracking', free: 'included', starter: 'included', pro: 'included' },
+  { feature: 'Model-answer comparison', free: 'not_included', starter: 'not_included', pro: 'included' },
+  { feature: 'PDF export', free: 'not_included', starter: 'not_included', pro: 'included' },
+  { feature: 'Post-interview report and email', free: 'included', starter: 'included', pro: 'included' },
+] as const satisfies readonly {
+  feature: string;
+  free: ComparisonValue;
+  starter: ComparisonValue;
+  pro: ComparisonValue;
+}[];
 
 /** Marketing page: signup CTAs (checkout happens after login on /upgrade) */
 export const MARKETING_PRICING_CARDS = [

@@ -14,6 +14,13 @@ export type TrustMetric = {
   description?: string;
 };
 
+/** Aggregate candidate rating shown on the homepage. */
+export const CANDIDATE_RATING = {
+  value: 4.5,
+  outOf: 5,
+  label: 'Average Candidate Rating',
+} as const;
+
 export const TRUST_METRICS: readonly TrustMetric[] = [
   {
     id: 'candidates',

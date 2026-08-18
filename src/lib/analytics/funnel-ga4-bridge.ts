@@ -50,20 +50,62 @@ export function trackFunnelOnce(
 }
 
 export function trackPaymentStartedOnce(options: {
-  subscriptionId: string;
+  orderId: string;
   userId?: string;
   plan: string;
   amount: number;
   source: string;
+  campaignCodeId?: string;
 }): void {
-  trackFunnelOnce(`payment_started:${options.subscriptionId}`, 'payment_started', {
+  trackFunnelOnce(`payment_started:${options.orderId}`, 'payment_started', {
     userId: options.userId,
     plan: options.plan,
     amount: options.amount,
     source: options.source,
-    // Persist Razorpay order id into product_events.props (snake_case end-to-end).
-    // Historically this value was only used as the dedupe key above and never stored.
-    order_id: options.subscriptionId,
+    campaignCodeId: options.campaignCodeId,
+    order_id: options.orderId,
+  });
+}
+
+export function trackPlanSelected(options: {
+  plan: 'free' | 'starter' | 'pro';
+  sourcePage: '/pricing' | '/upgrade';
+  source: string;
+  campaignCode?: string;
+  campaignCodeId?: string;
+}): void {
+  trackFunnelEvent('plan_selected', options);
+}
+
+export function trackPromotionViewedOnce(options: {
+  plan: 'starter' | 'pro';
+  sourcePage: '/pricing' | '/upgrade';
+  campaignCode?: string;
+  campaignCodeId: string;
+  discountPaise: number;
+  finalAmountPaise: number;
+  expiresAt?: string;
+  isActive: boolean;
+}): void {
+  if (!options.isActive || options.discountPaise <= 0 || options.finalAmountPaise <= 0) {
+    return;
+  }
+  trackFunnelOnce(
+    `promotion_viewed:${options.sourcePage}:${options.campaignCodeId}:${options.plan}`,
+    'promotion_viewed',
+    options,
+  );
+}
+
+export function trackCouponEntered(options: {
+  plan: 'starter' | 'pro' | 'all';
+  sourcePage: '/upgrade';
+  campaignCode: string;
+  couponAttemptId: string;
+}): void {
+  trackFunnelEvent('coupon_entered', {
+    ...options,
+    source: 'coupon_form',
   });
 }
 

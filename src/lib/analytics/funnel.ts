@@ -20,7 +20,14 @@ export type FunnelEventName =
   | 'resume_uploaded'
   | 'mock_interview_started'
   | 'mock_interview_completed'
+  | 'plan_selected'
+  | 'promotion_viewed'
+  | 'coupon_entered'
+  | 'coupon_applied'
+  | 'checkout_started'
+  | 'checkout_abandoned'
   | 'payment_started'
+  | 'payment_failed'
   | 'payment_completed'
   | 'pricing_page_viewed';
 
@@ -37,6 +44,13 @@ export type FunnelEventPayload = {
   /** Razorpay order id (payment_started) — prefer snake_case `order_id`. */
   orderId?: string;
   order_id?: string;
+  campaignCode?: string;
+  campaignCodeId?: string;
+  discountPaise?: number;
+  finalAmountPaise?: number;
+  expiresAt?: string;
+  failureCategory?: string;
+  couponAttemptId?: string;
   authenticated?: boolean;
   score?: number;
   method?: string;
@@ -69,19 +83,50 @@ const RUNTIME_FUNNEL_EVENTS = new Set<FunnelEventName>([
   'resume_uploaded',
   'mock_interview_started',
   'mock_interview_completed',
+  'plan_selected',
+  'promotion_viewed',
+  'coupon_entered',
+  'coupon_applied',
+  'checkout_started',
+  'checkout_abandoned',
   'payment_started',
+  'payment_failed',
   'payment_completed',
   'pricing_page_viewed',
 ]);
 
-/** Product-event names allowed for durable client funnel persistence. */
+/** Product-event names in the conversion/lifecycle funnel. */
 export const DURABLE_FUNNEL_PRODUCT_EVENT_NAMES = [
   'signup_completed',
   'resume_uploaded',
   'mock_interview_started',
   'interview_completed',
+  'plan_selected',
+  'promotion_viewed',
+  'coupon_entered',
+  'coupon_applied',
+  'checkout_started',
+  'checkout_abandoned',
   'payment_started',
+  'payment_failed',
   'payment_completed',
+  'pricing_page_viewed',
+] as const satisfies readonly ProductEventName[];
+
+/**
+ * Product-event names accepted from the browser durable endpoint.
+ * Money outcomes and checkout initialization are server-only so a client
+ * cannot forge a conversion, failure, or authoritative amount.
+ */
+export const CLIENT_DURABLE_FUNNEL_PRODUCT_EVENT_NAMES = [
+  'signup_completed',
+  'resume_uploaded',
+  'mock_interview_started',
+  'interview_completed',
+  'plan_selected',
+  'promotion_viewed',
+  'coupon_entered',
+  'payment_started',
   'pricing_page_viewed',
 ] as const satisfies readonly ProductEventName[];
 

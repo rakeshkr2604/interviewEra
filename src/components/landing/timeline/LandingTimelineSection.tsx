@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   TIMELINE_INTRO,
   TIMELINE_SPINE_LABELS,
@@ -14,7 +14,9 @@ import {
   spineProgress,
   TimelineDeviceHeader,
   TimelineScreens,
+  TimelineStageScreen,
 } from '@/components/landing/timeline/TimelineScreens';
+import type { TimelineSessionState } from '@/components/landing/timeline/useTimelineSession';
 import { cn } from '@/lib/utils';
 import './LandingTimeline.css';
 
@@ -76,25 +78,50 @@ function TimelineStageCopyPanel({
   );
 }
 
+/**
+ * One self-contained mobile chapter: label + copy + the demo evidence for that
+ * stage, all in normal document flow. Unlike desktop there is no shared canvas,
+ * so nothing needs a fixed height or an inner scroller.
+ */
 function MobileTimelineStage({
   stageIndex,
+  state,
+  showBars,
+  active,
   onVisible,
 }: {
   stageIndex: TimelineStageIndex;
+  state: TimelineSessionState;
+  showBars: boolean;
+  /** False while the desktop tree owns the section (this subtree is display:none). */
+  active: boolean;
   onVisible: (stage: TimelineStageIndex) => void;
 }) {
   const ref = useRef<HTMLElement | null>(null);
   const copy = TIMELINE_STAGE_COPY[stageIndex - 1];
+  const inView = active && state.stage === stageIndex;
+
+  // Each card narrates its own stage, so the shared session state is re-pinned
+  // to this section's index before the header derives status/progress/timer.
+  const stageState = useMemo<TimelineSessionState>(
+    () => ({ ...state, stage: stageIndex }),
+    [state, stageIndex],
+  );
+
+  // At most one video element plays at a time — only the section on screen.
+  const videoVisible = inView && (stageIndex === 2 || stageIndex === 3);
 
   useEffect(() => {
     const node = ref.current;
     if (!node || !('IntersectionObserver' in window)) return;
 
+    // Sections are now taller than the viewport, so an area-ratio threshold is
+    // unreachable. Track a thin band at the viewport centre instead.
     const io = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) onVisible(stageIndex);
       },
-      { rootMargin: '-20% 0px', threshold: 0.35 },
+      { rootMargin: '-45% 0px -45% 0px', threshold: 0 },
     );
     io.observe(node);
     return () => io.disconnect();
@@ -102,10 +129,6 @@ function MobileTimelineStage({
 
   return (
     <article ref={ref} className="ie-tl-mobile-stage" aria-labelledby={`tl-mobile-${stageIndex}`}>
-      <div className="ie-tl-mobile-stage__meta">
-        <span className="ie-tl-mobile-stage__num">0{stageIndex}</span>
-        <span className="ie-tl-mobile-stage__label">{TIMELINE_SPINE_LABELS[stageIndex - 1]}</span>
-      </div>
       <div className="ie-tl-mobile-stage__copy">
         <p className="ie-tl-copy__kicker">{copy.kicker}</p>
         <h3 id={`tl-mobile-${stageIndex}`} className="ie-tl-copy__title">
@@ -113,13 +136,21 @@ function MobileTimelineStage({
         </h3>
         <p className="ie-tl-copy__body">{copy.body}</p>
       </div>
+
+      <div className="landing-timeline__device landing-timeline__device--mobile">
+        <TimelineDeviceHeader state={stageState} videoVisible={videoVisible} />
+        <div className="ie-tl-stage-screen">
+          <TimelineStageScreen stage={stageIndex} state={stageState} showBars={showBars} />
+        </div>
+      </div>
     </article>
   );
 }
 
 export default function LandingTimelineSection() {
-  const { trackRef, state, setMobileStage } = useTimelineSession();
-  const videoVisible = state.stage === 2 || state.stage === 3;
+  const { trackRef, state, setMobileStage, desktopSticky } = useTimelineSession();
+  // The desktop tree is display:none on mobile — don't decode a video for it there.
+  const videoVisible = desktopSticky && (state.stage === 2 || state.stage === 3);
   const showBars = state.reached >= 4;
 
   return (
@@ -159,14 +190,16 @@ export default function LandingTimelineSection() {
         </div>
 
         <div className="landing-timeline__mobile">
-          <div className="landing-timeline__device landing-timeline__device--mobile">
-            <TimelineDeviceHeader state={state} videoVisible={videoVisible} />
-            <TimelineScreens state={state} showBars={showBars} />
-          </div>
-
           <div className="landing-timeline__mobile-stages">
             {([1, 2, 3, 4, 5] as TimelineStageIndex[]).map((n) => (
-              <MobileTimelineStage key={n} stageIndex={n} onVisible={setMobileStage} />
+              <MobileTimelineStage
+                key={n}
+                stageIndex={n}
+                state={state}
+                showBars={showBars}
+                active={!desktopSticky}
+                onVisible={setMobileStage}
+              />
             ))}
           </div>
         </div>

@@ -8,8 +8,13 @@ import { AuthFormCard } from '@/components/auth/AuthFormCard';
 import { AuthErrorBanner } from '@/components/auth/AuthErrorBanner';
 import { AuthLoadingButton } from '@/components/auth/AuthLoadingButton';
 import { PasswordField } from '@/components/auth/PasswordField';
-import { isAuthV2Enabled } from '@/lib/auth/flags';
 import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
+import {
+  CAMPUS_SETUP_PATH,
+  campusVerificationPendingPath,
+  saveCampusSignupDraft,
+} from '@/lib/college/signup-continuation';
+import { authPasswordSchema } from '@/lib/validations/schemas';
 
 import { IE_FIELD_SURFACE_STYLE, IE_INPUT_CLASS } from '@/lib/theme/component-classes';
 
@@ -55,8 +60,9 @@ export function CollegeSignupFields() {
         setError('Please enter estimated student count.');
         return;
       }
-      if (password.length < 8) {
-        setError('Password must be at least 8 characters.');
+      const passwordCheck = authPasswordSchema.safeParse(password);
+      if (!passwordCheck.success) {
+        setError(passwordCheck.error.issues[0]?.message ?? 'Password does not meet requirements.');
         return;
       }
 
@@ -67,7 +73,7 @@ export function CollegeSignupFields() {
           email,
           password,
           name: officerName,
-          next: '/college/dashboard',
+          next: CAMPUS_SETUP_PATH,
           metadata: { role: 'college_admin' },
         }),
       });
@@ -88,50 +94,14 @@ export function CollegeSignupFields() {
         return;
       }
 
-      const response = await fetch('/api/college/create-org', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: signupBody.userId,
-          collegeName,
-          studentCount: parseInt(studentCount),
-        }),
+      saveCampusSignupDraft({
+        collegeName: collegeName.trim(),
+        studentCount: parseInt(studentCount, 10),
       });
-
-      if (!response.ok) {
-        const err = (await response.json()) as { error?: string };
-        setError(err.error || 'Failed to create organization.');
-        return;
-      }
-
-      const orgBody = (await response.json()) as {
-        status?: string;
-        message?: string;
-      };
 
       const emailDomain = email.includes('@') ? email.split('@')[1] : undefined;
       trackVerificationSent({ intent: 'college', email_domain: emailDomain });
-
-      if (orgBody.status === 'pending_verification') {
-        if (isAuthV2Enabled()) {
-          router.push(
-            `/auth/verify-pending?email=${encodeURIComponent(email)}&intent=college&status=pending`,
-          );
-          return;
-        }
-      }
-
-      if (isAuthV2Enabled()) {
-        router.push(
-          `/auth/verify-pending?email=${encodeURIComponent(email)}&intent=college`,
-        );
-        return;
-      }
-
-      setError(null);
-      router.push(
-        `/login?email=${encodeURIComponent(email)}`,
-      );
+      router.push(campusVerificationPendingPath(email));
     } catch {
       setError('An unexpected error occurred.');
     } finally {
@@ -185,8 +155,8 @@ export function CollegeSignupFields() {
 
         {error ? <AuthErrorBanner message={error} /> : null}
 
-        <AuthLoadingButton loading={loading} loadingLabel="Creating workspace…">
-          Create campus workspace
+        <AuthLoadingButton loading={loading} loadingLabel="Creating account…">
+          Create account and verify email
         </AuthLoadingButton>
 
         <p className="text-center text-sm" style={{ color: 'var(--text-secondary)' }}>

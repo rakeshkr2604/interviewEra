@@ -1,8 +1,7 @@
 import Link from 'next/link';
-import Image from 'next/image';
-import type { LucideIcon } from 'lucide-react';
-import { ArrowLeft, Shield, Zap } from 'lucide-react';
-import { AuthBrandChipIcon, AUTH_BRAND_MARK_PATH } from '@/components/auth/AuthBrandChipIcon';
+import { ArrowLeft } from 'lucide-react';
+import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
+import { AuthTrustProof } from '@/components/auth/AuthTrustProof';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
 import { AuthSplitLayout } from '@/components/layout/AuthSplitLayout';
@@ -11,6 +10,7 @@ import { LoginForm } from './LoginForm';
 import { authPageMetadata } from '@/lib/seo/metadata';
 import { isSafePath } from '@/lib/auth/auth-params';
 import type { SessionRedirectReason } from '@/lib/auth/auth-params';
+import { INTERVIEW_TRANSFORMATION_CAPABILITIES } from '@/lib/landing/interview-transformation-content';
 
 export const metadata = authPageMetadata({
   title: 'Login',
@@ -21,16 +21,6 @@ export const metadata = authPageMetadata({
 interface LoginPageProps {
   searchParams: Promise<{ next?: string; email?: string; reason?: string }>;
 }
-
-type Bullet =
-  | { kind: 'lucide'; icon: LucideIcon; text: string }
-  | { kind: 'brand'; text: string };
-
-const BULLETS: Bullet[] = [
-  { kind: 'lucide', icon: Shield, text: 'Secure sign-in with email or Google' },
-  { kind: 'lucide', icon: Zap, text: 'Resume-aware practice picks up where you left off' },
-  { kind: 'brand', text: 'Free to start — upgrade when you want deeper analytics' },
-];
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
@@ -77,43 +67,32 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   Welcome back
                 </h1>
                 <p className="text-base leading-relaxed sm:text-lg" style={{ color: 'var(--text-secondary)' }}>
-                  Continue mock interviews, review scores, and tighten your stories — same premium experience on every
-                  screen.
+                  Continue your preparation with your interview history, resume insights, and progress in one place.
                 </p>
               </div>
 
               <ul className="mx-auto max-w-md space-y-3.5 text-left sm:max-w-lg lg:mx-0 lg:max-w-none">
-                {BULLETS.map((item) => (
-                  <li key={item.text} className="flex gap-3 text-sm sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+                {INTERVIEW_TRANSFORMATION_CAPABILITIES.map(({ icon: Icon, title, description }) => (
+                  <li key={title} className="flex gap-3 text-sm" style={{ color: 'var(--text-secondary)' }}>
                     <span
-                      className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl overflow-hidden"
-                      style={
-                        item.kind === 'lucide'
-                          ? {
-                              background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
-                              color: 'var(--accent-primary)',
-                            }
-                          : undefined
-                      }
+                      className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl"
+                      style={{
+                        background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                        color: 'var(--accent-primary)',
+                      }}
                     >
-                      {item.kind === 'lucide' ? (() => {
-                        const Icon = item.icon;
-                        return <Icon className="size-4" aria-hidden />;
-                      })() : (
-                        <Image
-                          src={AUTH_BRAND_MARK_PATH}
-                          width={36}
-                          height={36}
-                          className="size-9 rounded-lg"
-                          alt=""
-                          aria-hidden
-                        />
-                      )}
+                      <Icon className="size-4" aria-hidden />
                     </span>
-                    <span className="leading-relaxed">{item.text}</span>
+                    <span className="leading-relaxed">
+                      <strong className="block font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {title}
+                      </strong>
+                      {description}
+                    </span>
                   </li>
                 ))}
               </ul>
+              <AuthTrustProof />
             </>
           }
           right={<LoginForm next={next} email={email} reason={reason} />}

@@ -28,6 +28,9 @@ type PaymentRow = {
   amount: number;
   status: 'created' | 'paid' | 'failed';
   campaign_redemption_id?: string | null;
+  entitlement_credits?: number | null;
+  entitlement_plan_started_at?: string | null;
+  entitlement_plan_expires_at?: string | null;
 };
 
 type UserRow = {
@@ -41,7 +44,13 @@ type UserRow = {
   plan_status: string;
 };
 
-type CreditTx = { user_id: string; amount: number; reason: string };
+type CreditTx = {
+  user_id: string;
+  type: 'credit';
+  amount: number;
+  reason: string;
+  payment_id: string | null;
+};
 
 type RedemptionRow = {
   id: string;
@@ -54,15 +63,17 @@ function createPaymentStore(initial: {
   user: UserRow;
   payments: PaymentRow[];
   redemptions?: RedemptionRow[];
+  ledger?: CreditTx[];
 }) {
   const state = {
     user: { ...initial.user },
     payments: initial.payments.map((p) => ({ ...p })),
-    ledger: [] as CreditTx[],
+    ledger: (initial.ledger ?? []).map((row) => ({ ...row })),
     redemptions: (initial.redemptions ?? []).map((r) => ({ ...r })),
     paymentUpdates: 0,
     userUpdates: 0,
     consumeCalls: 0,
+    completionCalls: 0,
   };
 
   const supabase = {
@@ -79,6 +90,96 @@ function createPaymentStore(initial: {
         row.payment_id = (args.p_payment_id as string) ?? row.payment_id;
         return { data: true, error: null };
       }
+      if (fn === 'complete_payment_activation_local') {
+        state.completionCalls++;
+        const userId = args.p_user_id as string;
+        const orderId = args.p_order_id as string;
+        const paymentId = args.p_payment_id as string;
+        const payment = state.payments.find((row) => row.order_id === orderId);
+        if (
+          !payment ||
+          payment.user_id !== userId ||
+          state.user.id !== userId ||
+          state.user.last_payment_id !== paymentId ||
+          state.user.last_order_id !== orderId ||
+          (payment.payment_id != null && payment.payment_id !== paymentId)
+        ) {
+          return { data: null, error: { code: 'P0001', message: 'ownership mismatch' } };
+        }
+
+        const expectedReason = `Plan payment: ${payment.plan} (${paymentId})`;
+        const linked = state.ledger.filter(
+          (row) => row.payment_id === paymentId && row.type === 'credit',
+        );
+        if (linked.length > 1) {
+          return { data: null, error: { code: 'P0001', message: 'ambiguous ledger' } };
+        }
+
+        const hasSnapshot =
+          payment.entitlement_credits != null &&
+          payment.entitlement_plan_started_at != null &&
+          payment.entitlement_plan_expires_at != null;
+        const hadPaymentGap = payment.payment_id !== paymentId || payment.status !== 'paid';
+        let ledgerHealed = false;
+
+        if (linked.length === 1) {
+          const row = linked[0];
+          if (
+            row.user_id !== userId ||
+            row.reason !== expectedReason ||
+            (hasSnapshot && row.amount !== payment.entitlement_credits)
+          ) {
+            return { data: null, error: { code: 'P0001', message: 'inconsistent ledger' } };
+          }
+        } else {
+          if (!hasSnapshot) {
+            return { data: null, error: { code: 'P0001', message: 'historical ambiguity' } };
+          }
+          const unlinked = state.ledger.filter(
+            (row) =>
+              row.payment_id == null &&
+              row.user_id === userId &&
+              row.type === 'credit' &&
+              row.reason === expectedReason,
+          );
+          if (unlinked.length > 1 || (unlinked[0] && unlinked[0].amount !== payment.entitlement_credits)) {
+            return { data: null, error: { code: 'P0001', message: 'ambiguous ledger' } };
+          }
+          if (unlinked.length === 1) {
+            unlinked[0].payment_id = paymentId;
+          } else {
+            state.ledger.push({
+              user_id: userId,
+              type: 'credit',
+              amount: payment.entitlement_credits!,
+              reason: expectedReason,
+              payment_id: paymentId,
+            });
+          }
+          ledgerHealed = true;
+        }
+
+        payment.payment_id = paymentId;
+        payment.status = 'paid';
+        if (hadPaymentGap) state.paymentUpdates++;
+
+        return {
+          data: [
+            {
+              activation_complete: true,
+              payment_healed: hadPaymentGap,
+              ledger_healed: ledgerHealed,
+              entitlement_credits:
+                payment.entitlement_credits ?? linked[0]?.amount ?? 0,
+              plan_started_at:
+                payment.entitlement_plan_started_at ?? state.user.plan_started_at,
+              plan_expires_at:
+                payment.entitlement_plan_expires_at ?? state.user.plan_expires_at,
+            },
+          ],
+          error: null,
+        };
+      }
       return { data: null, error: { message: `unexpected rpc ${fn}` } };
     },
     from(table: string) {
@@ -87,22 +188,33 @@ function createPaymentStore(initial: {
           select: (_cols: string) => ({
             eq: (column: string, value: string) => ({
               maybeSingle: async () => {
-                if (column === 'order_id') {
-                  const row = state.payments.find((p) => p.order_id === value);
-                  return { data: row ? { ...row } : null, error: null };
-                }
-                return { data: null, error: null };
+                const row = state.payments.find(
+                  (payment) => payment[column as keyof PaymentRow] === value,
+                );
+                return { data: row ? { ...row } : null, error: null };
               },
             }),
           }),
           update: (payload: Partial<PaymentRow>) => ({
-            eq: async (column: string, value: string) => {
+            eq: (column: string, value: string) => {
               const idx = state.payments.findIndex((p) => p[column as keyof PaymentRow] === value);
-              if (idx >= 0) {
-                state.payments[idx] = { ...state.payments[idx], ...payload };
-                state.paymentUpdates++;
-              }
-              return { error: null };
+              return {
+                is: (_snapshotColumn: string, snapshotValue: null) => ({
+                  select: (_columns: string) => ({
+                    maybeSingle: async () => {
+                      if (
+                        idx < 0 ||
+                        snapshotValue !== null ||
+                        state.payments[idx].entitlement_credits != null
+                      ) {
+                        return { data: null, error: null };
+                      }
+                      state.payments[idx] = { ...state.payments[idx], ...payload };
+                      return { data: { ...state.payments[idx] }, error: null };
+                    },
+                  }),
+                }),
+              };
             },
           }),
         };
@@ -162,15 +274,6 @@ function createPaymentStore(initial: {
         };
       }
 
-      if (table === 'credit_transactions') {
-        return {
-          insert: async (row: CreditTx) => {
-            state.ledger.push(row);
-            return { error: null };
-          },
-        };
-      }
-
       throw new Error(`Unexpected table: ${table}`);
     },
   };
@@ -203,8 +306,11 @@ function starterPayment(
     order_id: orderId,
     payment_id: paymentId,
     plan: 'starter',
-    amount: 14900,
+    amount: 29900,
     status,
+    entitlement_credits: null,
+    entitlement_plan_started_at: null,
+    entitlement_plan_expires_at: null,
   };
 }
 
@@ -213,22 +319,42 @@ const starterParams = (source: string, paymentId = PAY_STARTER): ActivatePlanPar
   plan: 'starter',
   orderId: ORDER_STARTER,
   paymentId,
-  amountPaise: 14900,
+  amountPaise: 29900,
   source,
 });
 
 const PAY_OLD = 'pay_old';
 
 function createStaleReadStore() {
+  const startedAt = new Date('2026-08-01T00:00:00.000Z').toISOString();
+  const expiresAt = new Date('2026-08-31T00:00:00.000Z').toISOString();
   const state = {
     user: baseUser({
       last_payment_id: PAY_OLD,
+      last_order_id: ORDER_STARTER,
       plan_tier: 'starter',
       credits_remaining: 2,
       plan_status: 'active',
+      plan_started_at: startedAt,
+      plan_expires_at: expiresAt,
     }),
-    payments: [starterPayment()],
-    ledger: [] as CreditTx[],
+    payments: [
+      {
+        ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+        entitlement_credits: 8,
+        entitlement_plan_started_at: startedAt,
+        entitlement_plan_expires_at: expiresAt,
+      },
+    ],
+    ledger: [
+      {
+        user_id: USER_ID,
+        type: 'credit' as const,
+        amount: 8,
+        reason: `Plan payment: starter (${PAY_STARTER})`,
+        payment_id: PAY_STARTER,
+      },
+    ],
     userUpdates: 0,
     paymentUpdates: 0,
     userSelectCount: 0,
@@ -239,7 +365,24 @@ function createStaleReadStore() {
   state.user.credits_remaining = 10;
 
   const supabase = {
-    rpc: async () => ({ data: true, error: null }),
+    rpc: async (fn: string) => {
+      if (fn === 'complete_payment_activation_local') {
+        return {
+          data: [
+            {
+              activation_complete: true,
+              payment_healed: false,
+              ledger_healed: false,
+              entitlement_credits: 8,
+              plan_started_at: startedAt,
+              plan_expires_at: expiresAt,
+            },
+          ],
+          error: null,
+        };
+      }
+      return { data: true, error: null };
+    },
     from(table: string) {
       if (table === 'payments') {
         return {
@@ -255,7 +398,13 @@ function createStaleReadStore() {
             }),
           }),
           update: () => ({
-            eq: async () => ({ error: null }),
+            eq: () => ({
+              is: () => ({
+                select: () => ({
+                  maybeSingle: async () => ({ data: null, error: null }),
+                }),
+              }),
+            }),
           }),
         };
       }
@@ -296,15 +445,6 @@ function createStaleReadStore() {
               }),
             }),
           }),
-        };
-      }
-
-      if (table === 'credit_transactions') {
-        return {
-          insert: async (row: CreditTx) => {
-            state.ledger.push(row);
-            return { error: null };
-          },
         };
       }
 
@@ -439,7 +579,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
     expect('activationFailed' in result && result.activationFailed).toBe(false);
     expect(state.user.credits_remaining).toBe(10);
     expect(state.userUpdates).toBe(0);
-    expect(state.ledger).toHaveLength(0);
+    expect(state.ledger).toHaveLength(1);
   });
 
   it('duplicate webhook retries — idempotent', async () => {
@@ -498,7 +638,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
     assertSingleActivation(state);
   });
 
-  it('upgrade Starter → Pro grants pro credits once', async () => {
+  it('upgrade Starter → Pro at current ₹799 list grants pro credits once', async () => {
     const { supabase, state } = createPaymentStore({
       user: baseUser({
         plan_tier: 'starter',
@@ -513,7 +653,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
           order_id: ORDER_PRO,
           payment_id: null,
           plan: 'pro',
-          amount: 39900,
+          amount: 79900,
           status: 'created',
         },
       ],
@@ -524,13 +664,53 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
       plan: 'pro',
       orderId: ORDER_PRO,
       paymentId: PAY_PRO,
-      amountPaise: 39900,
+      amountPaise: 79900,
       source: 'verify',
     });
 
     expect(state.user.plan_tier).toBe('pro');
     expect(state.user.credits_remaining).toBe(26);
     expect(state.user.last_payment_id).toBe(PAY_PRO);
+    expect(state.ledger[0].amount).toBe(25);
+    assertSingleActivation(state);
+  });
+
+  it('activates a frozen historical ₹798 Pro payment without reinterpreting current list price', async () => {
+    const orderId = 'order_pro_historical_798';
+    const paymentId = 'pay_pro_historical_798';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        plan_tier: 'starter',
+        plan_status: 'active',
+        credits_remaining: 1,
+        last_payment_id: PAY_STARTER,
+      }),
+      payments: [
+        {
+          id: 'row-pro-historical',
+          user_id: USER_ID,
+          order_id: orderId,
+          payment_id: null,
+          plan: 'pro',
+          amount: 79800,
+          status: 'created',
+        },
+      ],
+    });
+
+    await activatePlanAfterPayment(supabase, {
+      userId: USER_ID,
+      plan: 'pro',
+      orderId,
+      paymentId,
+      amountPaise: 79800,
+      source: 'verify',
+    });
+
+    expect(state.user.plan_tier).toBe('pro');
+    expect(state.user.credits_remaining).toBe(26);
+    expect(state.user.last_payment_id).toBe(paymentId);
+    expect(state.payments[0].amount).toBe(79800);
     expect(state.ledger[0].amount).toBe(25);
     assertSingleActivation(state);
   });
@@ -561,7 +741,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
           order_id: orderId,
           payment_id: null,
           plan: 'starter',
-          amount: 13410,
+          amount: 20900,
           status: 'created',
           campaign_redemption_id: redemptionId,
         },
@@ -581,7 +761,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
       plan: 'starter',
       orderId,
       paymentId,
-      amountPaise: 13410,
+      amountPaise: 20900,
       source: 'webhook',
     });
 
@@ -594,17 +774,34 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
 
   it('already_activated replay heals a stuck reserved redemption', async () => {
     const redemptionId = 'red-stuck-001';
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
     const { supabase, state } = createPaymentStore({
       user: baseUser({
         last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
         plan_tier: 'starter',
         plan_status: 'active',
         credits_remaining: 11,
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
       }),
       payments: [
         {
           ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
           campaign_redemption_id: redemptionId,
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+      ledger: [
+        {
+          user_id: USER_ID,
+          type: 'credit',
+          amount: 8,
+          reason: `Plan payment: starter (${PAY_STARTER})`,
+          payment_id: PAY_STARTER,
         },
       ],
       redemptions: [
@@ -625,6 +822,349 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
     expect(state.consumeCalls).toBeGreaterThanOrEqual(1);
   });
 
+  it('complete replay performs no payment or ledger writes', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+        credits_remaining: 4,
+      }),
+      payments: [
+        {
+          ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+      ledger: [
+        {
+          user_id: USER_ID,
+          type: 'credit',
+          amount: 8,
+          reason: `Plan payment: starter (${PAY_STARTER})`,
+          payment_id: PAY_STARTER,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect(result.alreadyActivated).toBe(true);
+    expect(state.paymentUpdates).toBe(0);
+    expect(state.ledger).toHaveLength(1);
+    expect(state.user.credits_remaining).toBe(4);
+  });
+
+  it('ownership with incomplete payment binding heals only the payment artifact', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+      ledger: [
+        {
+          user_id: USER_ID,
+          type: 'credit',
+          amount: 8,
+          reason: `Plan payment: starter (${PAY_STARTER})`,
+          payment_id: PAY_STARTER,
+        },
+      ],
+    });
+
+    const first = await activatePlanAfterPayment(supabase, starterParams('webhook'));
+    const second = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect(first.alreadyActivated).toBe(true);
+    expect(second.alreadyActivated).toBe(true);
+    expect(state.payments[0].payment_id).toBe(PAY_STARTER);
+    expect(state.payments[0].status).toBe('paid');
+    expect(state.paymentUpdates).toBe(1);
+    expect(state.ledger).toHaveLength(1);
+  });
+
+  it('ownership with missing ledger heals exactly one ledger artifact', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+    });
+
+    await activatePlanAfterPayment(supabase, starterParams('webhook'));
+    await activatePlanAfterPayment(supabase, starterParams('webhook'));
+
+    expect(state.ledger).toEqual([
+      expect.objectContaining({
+        payment_id: PAY_STARTER,
+        amount: 8,
+        reason: `Plan payment: starter (${PAY_STARTER})`,
+      }),
+    ]);
+    expect(state.user.credits_remaining).toBe(3);
+  });
+
+  it('ownership with payment binding and ledger missing heals both once under concurrent replay', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+    });
+
+    const [a, b] = await Promise.all([
+      activatePlanAfterPayment(supabase, starterParams('verify')),
+      activatePlanAfterPayment(supabase, starterParams('webhook')),
+    ]);
+
+    expect(a.alreadyActivated).toBe(true);
+    expect(b.alreadyActivated).toBe(true);
+    expect(state.paymentUpdates).toBe(1);
+    expect(state.ledger).toHaveLength(1);
+    expect(state.user.credits_remaining).toBe(3);
+  });
+
+  it('ambiguous historical credit state fails closed without granting', async () => {
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+      }),
+      payments: [starterPayment(ORDER_STARTER, 'paid', PAY_STARTER)],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect('activationFailed' in result && result.activationFailed).toBe(true);
+    expect(state.ledger).toHaveLength(0);
+    expect(state.user.credits_remaining).toBe(3);
+  });
+
+  it('wrong user or order identity fails closed', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: 'different_order',
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect('activationFailed' in result && result.activationFailed).toBe(true);
+    expect(state.ledger).toHaveLength(0);
+  });
+
+  it('different payment identity on the owned order fails closed', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(ORDER_STARTER, 'paid', 'pay_different'),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect('activationFailed' in result && result.activationFailed).toBe(true);
+    expect(state.ledger).toHaveLength(0);
+  });
+
+  it('rejects a conflicting local payment ID before changing ownership CAS', async () => {
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({ last_payment_id: 'pay-old' }),
+      payments: [starterPayment(ORDER_STARTER, 'created', 'pay-other')],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('verify'));
+
+    expect('activationFailed' in result && result.activationFailed).toBe(true);
+    expect(state.user.last_payment_id).toBe('pay-old');
+    expect(state.userUpdates).toBe(0);
+    expect(state.ledger).toHaveLength(0);
+  });
+
+  it('physically missing base payment row fails closed because history is unrecoverable', async () => {
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'starter',
+        plan_status: 'active',
+      }),
+      payments: [],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('webhook'));
+
+    expect('activationFailed' in result && result.activationFailed).toBe(true);
+    expect(state.ledger).toHaveLength(0);
+    expect(state.user.credits_remaining).toBe(3);
+  });
+
+  it('expired entitlement recovery records artifacts without extending expiry', async () => {
+    const startedAt = '2026-05-01T00:00:00.000Z';
+    const expiresAt = '2026-05-31T00:00:00.000Z';
+    const { supabase, state } = createPaymentStore({
+      user: baseUser({
+        last_payment_id: PAY_STARTER,
+        last_order_id: ORDER_STARTER,
+        plan_tier: 'free',
+        plan_status: 'expired',
+        plan_started_at: startedAt,
+        plan_expires_at: expiresAt,
+      }),
+      payments: [
+        {
+          ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+          entitlement_credits: 8,
+          entitlement_plan_started_at: startedAt,
+          entitlement_plan_expires_at: expiresAt,
+        },
+      ],
+    });
+
+    const result = await activatePlanAfterPayment(supabase, starterParams('webhook'));
+
+    expect(result.alreadyActivated).toBe(true);
+    expect(state.user.plan_tier).toBe('free');
+    expect(state.user.plan_status).toBe('expired');
+    expect(state.user.plan_expires_at).toBe(expiresAt);
+    expect(state.ledger).toHaveLength(1);
+  });
+
+  it('already consumed campaign remains consumed and no-campaign replay does not call consume', async () => {
+    const startedAt = '2026-08-01T00:00:00.000Z';
+    const expiresAt = '2026-08-31T00:00:00.000Z';
+    const redemptionId = 'red-consumed-001';
+    const completeLedger: CreditTx[] = [
+      {
+        user_id: USER_ID,
+        type: 'credit',
+        amount: 8,
+        reason: `Plan payment: starter (${PAY_STARTER})`,
+        payment_id: PAY_STARTER,
+      },
+    ];
+    const ownedUser = baseUser({
+      last_payment_id: PAY_STARTER,
+      last_order_id: ORDER_STARTER,
+      plan_tier: 'starter',
+      plan_status: 'active',
+      plan_started_at: startedAt,
+      plan_expires_at: expiresAt,
+    });
+    const payment = {
+      ...starterPayment(ORDER_STARTER, 'paid', PAY_STARTER),
+      entitlement_credits: 8,
+      entitlement_plan_started_at: startedAt,
+      entitlement_plan_expires_at: expiresAt,
+    };
+    const consumed = createPaymentStore({
+      user: ownedUser,
+      payments: [{ ...payment, campaign_redemption_id: redemptionId }],
+      ledger: completeLedger,
+      redemptions: [
+        {
+          id: redemptionId,
+          status: 'consumed',
+          order_id: ORDER_STARTER,
+          payment_id: PAY_STARTER,
+        },
+      ],
+    });
+    const noCampaign = createPaymentStore({
+      user: ownedUser,
+      payments: [payment],
+      ledger: completeLedger,
+    });
+
+    await activatePlanAfterPayment(consumed.supabase, starterParams('verify'));
+    await activatePlanAfterPayment(noCampaign.supabase, starterParams('verify'));
+
+    expect(consumed.state.redemptions[0]).toEqual(
+      expect.objectContaining({ status: 'consumed', payment_id: PAY_STARTER }),
+    );
+    expect(noCampaign.state.consumeCalls).toBe(0);
+  });
+
   it('emits ALERT error when consume keeps failing after retries', async () => {
     const { activationError } = await import('@/lib/razorpay/payment-log');
     const redemptionId = 'red-fail-001';
@@ -633,7 +1173,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
       payments: [
         {
           ...starterPayment(),
-          amount: 13410,
+          amount: 20900,
           campaign_redemption_id: redemptionId,
         },
       ],
@@ -643,7 +1183,7 @@ describe('activatePlanAfterPayment — dual-path idempotent activation', () => {
 
     await activatePlanAfterPayment(supabase, {
       ...starterParams('webhook'),
-      amountPaise: 13410,
+      amountPaise: 20900,
     });
 
     expect(state.user.last_payment_id).toBe(PAY_STARTER);

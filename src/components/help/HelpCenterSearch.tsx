@@ -15,6 +15,7 @@ import {
   UserCircle,
   Wrench,
 } from 'lucide-react';
+import { TECHNICAL_ISSUE_FEEDBACK_HREF } from '@/lib/technical-failures/ux';
 
 type Category = {
   icon: React.ComponentType<{ className?: string }>;
@@ -35,7 +36,7 @@ const CATEGORIES: Category[] = [
   { icon: BarChart3, name: 'Scoring & Feedback', desc: 'Understand the five-dimension rubric and your report.', href: '/help#scoring', meta: 'FAQ' },
   { icon: CreditCard, name: 'Billing & Credits', desc: 'Credits, plans, payments, and refunds.', href: '/help#credits-plans', meta: 'FAQ' },
   { icon: UserCircle, name: 'Account & Login', desc: 'Sign-in, profile, and account settings.', href: null, meta: 'Expanding soon' },
-  { icon: Wrench, name: 'Technical Issues', desc: 'Audio, microphone, browser, and session troubleshooting.', href: null, meta: 'Expanding soon' },
+  { icon: Wrench, name: 'Technical Issues', desc: 'Audio, microphone, browser, and session troubleshooting.', href: TECHNICAL_ISSUE_FEEDBACK_HREF, meta: 'Report' },
   { icon: GraduationCap, name: 'Placement Practice', desc: 'Role- and company-specific interview question sets.', href: '/interview-questions', meta: 'Library' },
   { icon: HelpCircle, name: 'FAQ', desc: 'Quick answers to the most common questions.', href: '/help', meta: 'FAQ' },
 ];

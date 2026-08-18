@@ -219,7 +219,7 @@ export interface TierPromptModifiers {
   [key: string]: unknown;
 }
 
-/** `public.tier_config` (see `supabase-migration-retention-system.sql`). */
+/** `public.tier_config` (see `017_tier_config.sql`; historical draft in `supabase/manual/`). */
 export interface TierConfig {
   tier_id: UserTierId;
   tier_name: string;

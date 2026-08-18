@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/server';
 import {
   fetchRazorpayOrder,
+  fetchRazorpayPayment,
   verifyPaymentSignature,
 } from '@/lib/razorpay/client';
 import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
@@ -12,6 +13,7 @@ import { paymentVerifySchema } from '@/lib/validations/schemas';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { resolveExpectedOrderAmount } from '@/lib/razorpay/expected-order-amount';
+import { validateProviderPaymentAgainstLocalExpectation } from '@/lib/razorpay/provider-payment-validation';
 
 /**
  * Client payment verification — validates Razorpay payload, then delegates
@@ -87,8 +89,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   });
 
   let remoteOrder;
+  let remotePayment;
   try {
-    remoteOrder = await fetchRazorpayOrder(razorpay_order_id);
+    [remoteOrder, remotePayment] = await Promise.all([
+      fetchRazorpayOrder(razorpay_order_id),
+      fetchRazorpayPayment(razorpay_payment_id),
+    ]);
     paymentLog('verify', 'order_fetch_ok', {
       user_id: user.id,
       order_id: razorpay_order_id,
@@ -97,34 +103,16 @@ export async function POST(request: Request): Promise<NextResponse> {
       amount: remoteOrder.amount,
     });
   } catch (err) {
-    paymentError('verify', 'order_fetch_failed', {
+    paymentError('verify', 'provider_entity_fetch_failed', {
       user_id: user.id,
       order_id: razorpay_order_id,
       payment_id: razorpay_payment_id,
       error: err instanceof Error ? err.message : 'unknown',
     });
     return NextResponse.json(
-      { ok: false, error: 'Could not confirm order with payment provider.' },
+      { ok: false, error: 'Could not confirm payment with payment provider.' },
       { status: 502 },
     );
-  }
-
-  const notesUserId = remoteOrder.notes?.['user_id'];
-  const notesPlan = remoteOrder.notes?.['plan'];
-  if (notesUserId !== user.id) {
-    paymentWarn('verify', 'order_user_mismatch', {
-      user_id: user.id,
-      order_id: razorpay_order_id,
-      payment_id: razorpay_payment_id,
-    });
-    return NextResponse.json(
-      { ok: false, error: 'Order does not belong to this user.' },
-      { status: 403 },
-    );
-  }
-
-  if (!isPaidPlanId(notesPlan)) {
-    return NextResponse.json({ ok: false, error: 'Invalid plan on order.' }, { status: 400 });
   }
 
   const service = createServiceClient();
@@ -154,27 +142,31 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  if (expected.plan !== notesPlan) {
-    paymentError('verify', 'plan_mismatch', {
+  const providerValidation = validateProviderPaymentAgainstLocalExpectation(
+    remotePayment,
+    remoteOrder,
+    {
+      userId: expected.userId,
+      plan: expected.plan,
+      orderId: razorpay_order_id,
+      amountPaise: expected.amountPaise,
+      currency: expected.currency,
+      campaignRedemptionId: expected.campaignRedemptionId,
+    },
+    razorpay_payment_id,
+  );
+  if (!providerValidation.ok) {
+    paymentWarn('verify', `provider_${providerValidation.code}`, {
       user_id: user.id,
       order_id: razorpay_order_id,
       payment_id: razorpay_payment_id,
-      notes_plan: notesPlan,
-      payment_plan: expected.plan,
+      expected: providerValidation.expected,
+      actual: providerValidation.actual,
     });
-    return NextResponse.json({ ok: false, error: 'Plan mismatch for this order.' }, { status: 400 });
-  }
-
-  // Authoritative: payments.amount (discounted or list) must match Razorpay order.
-  if (remoteOrder.amount !== expected.amountPaise) {
-    paymentError('verify', 'amount_mismatch', {
-      user_id: user.id,
-      order_id: razorpay_order_id,
-      payment_id: razorpay_payment_id,
-      expected: expected.amountPaise,
-      actual: remoteOrder.amount,
-    });
-    return NextResponse.json({ ok: false, error: 'Order amount mismatch.' }, { status: 400 });
+    return NextResponse.json(
+      { ok: false, error: 'Payment details could not be confirmed.' },
+      { status: 400 },
+    );
   }
 
   const result = await activatePlanAfterPayment(service, {
@@ -204,6 +196,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       user_id: user.id,
       plan: expected.plan,
       amount: expected.amountPaise,
+      order_id: razorpay_order_id,
       payment_id: razorpay_payment_id,
       source: 'verify',
     });

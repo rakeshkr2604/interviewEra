@@ -36,12 +36,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     // ── Fetch campus org ───────────────────────────────────────────────────────
     const { data: org } = await serviceClient
       .from('campus_organizations')
-      .select('id, name, seat_count')
+      .select('id, name, seat_count, verification_status')
       .eq('admin_user_id', user.id)
       .single();
 
     if (!org) {
       return NextResponse.json({ error: 'Campus organization not found' }, { status: 404 });
+    }
+    if (org.verification_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Campus organization is pending verification.' },
+        { status: 403 },
+      );
     }
 
     // ── Validate body ──────────────────────────────────────────────────────────
@@ -171,7 +177,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                     <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Unlimited AI mock interviews, tailored to your resume</p>
                     <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Detailed scoring across 5 performance dimensions</p>
                     <p style="margin:0 0 6px;font-size:14px;color:#475569;">&#10003; &nbsp;Progress tracking and placement-readiness analytics</p>
-                    <p style="margin:0 0 0;font-size:14px;color:#475569;">&#10003; &nbsp;Interview replay and model answer comparison</p>
+                    <p style="margin:0 0 0;font-size:14px;color:#475569;">&#10003; &nbsp;Model answer comparison and Improvement Guidance</p>
                   </td>
                 </tr>
               </table>

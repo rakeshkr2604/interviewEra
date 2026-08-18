@@ -128,19 +128,21 @@
   overflow: hidden;
 }
 
+/*
+ * Mobile: the demo sits inside its own stage section in normal document flow.
+ * Deliberately no sticky pin, no max-height and no inner scroller — the page is
+ * the only scroll surface, and the card is opaque enough that the next section
+ * can never ghost through it.
+ */
 .landing-timeline__device--mobile {
-  /* Keep the demo visible while stage copy scrolls underneath */
-  position: sticky;
-  top: calc(env(safe-area-inset-top, 0px) + 3.75rem);
-  z-index: 4;
-  margin-bottom: 1.25rem;
-  max-height: min(68vh, 34rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  -webkit-overflow-scrolling: touch;
+  margin-top: 1rem;
   box-shadow:
     0 0.75rem 2rem color-mix(in srgb, var(--bg-primary) 40%, transparent),
     inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.ie-tl-stage-screen {
+  margin-top: 1rem;
 }
 
 .landing-timeline__mobile-stages {
@@ -897,8 +899,8 @@
 }
 
 .ie-tl-ready__headline {
-  margin: 0 0 0.875rem;
-  max-width: 27.5rem;
+  margin: 0 auto 0.875rem;
+  max-width: 30rem;
   font-family: var(--font-bricolage), sans-serif;
   font-size: clamp(1.625rem, 3vw, 2.125rem);
   font-weight: 700;
@@ -916,20 +918,21 @@
 }
 
 .ie-tl-ready__body {
-  margin: 0 0 1.625rem;
-  max-width: 23.75rem;
+  margin: 0 auto 1.5rem;
+  max-width: 28rem;
   font-size: 0.9375rem;
   line-height: 1.6;
   color: var(--text-secondary);
-  text-wrap: pretty;
+  /* balance over pretty — avoids a single orphan word on the last line */
+  text-wrap: balance;
 }
 
+/* Single centered axis: CTA, then footnote under it */
 .ie-tl-ready__actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 1.125rem;
-  flex-wrap: wrap;
-  justify-content: center;
+  gap: 0.75rem;
 }
 
 .ie-tl-ready__cta {
@@ -946,34 +949,41 @@
 }
 
 .ie-tl-ready__footnote {
+  max-width: 24rem;
   font-family: var(--font-jetbrains), ui-monospace, monospace;
   font-size: 0.6875rem;
+  line-height: 1.5;
+  letter-spacing: 0.04em;
   color: var(--text-muted);
+  text-wrap: balance;
 }
 
 .ie-tl-mobile-stage {
-  padding: 1.25rem 0;
+  padding: 1.75rem 0 2rem;
   border-top: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
 }
 
-.ie-tl-mobile-stage__meta {
-  display: flex;
-  align-items: baseline;
-  gap: 0.625rem;
-  margin-bottom: 0.625rem;
+.ie-tl-mobile-stage:first-child {
+  padding-top: 0.75rem;
+  border-top: 0;
 }
 
-.ie-tl-mobile-stage__num {
-  font-family: var(--font-jetbrains), ui-monospace, monospace;
+/* The kicker ("01 · RESUME") is the section marker now that the desktop rail is
+   hidden, so it carries slightly more weight than in the desktop copy stack. */
+.ie-tl-mobile-stage__copy .ie-tl-copy__kicker {
   font-size: 0.75rem;
-  color: var(--accent-hover);
+  letter-spacing: 0.2em;
 }
 
-.ie-tl-mobile-stage__label {
-  font-family: var(--font-bricolage), sans-serif;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary);
+/* Trim resume metadata density without dropping any field. */
+.ie-tl-mobile-stage .ie-tl-resume-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.ie-tl-mobile-stage .ie-tl-resume-field:last-child {
+  grid-column: 1 / -1;
 }
 
 @keyframes ie-tl-breathe {
@@ -1062,6 +1072,14 @@
 
   .ie-tl-resume-fields {
     flex-direction: row;
+  }
+
+  .ie-tl-mobile-stage .ie-tl-resume-fields {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .ie-tl-mobile-stage .ie-tl-resume-field:last-child {
+    grid-column: auto;
   }
 
   .ie-tl-bar-row {

@@ -1,6 +1,7 @@
 import Link from 'next/link';
-import { ArrowLeft, Building2, CalendarPlus, GraduationCap, Rocket, Target } from 'lucide-react';
+import { ArrowLeft, Building2, CheckCircle2, GraduationCap, MailCheck, Rocket, Target } from 'lucide-react';
 import { AuthBrandChipIcon } from '@/components/auth/AuthBrandChipIcon';
+import { AuthTrustProof } from '@/components/auth/AuthTrustProof';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { IntentBadge } from '@/components/auth/IntentBadge';
 import { AuthPremiumShell } from '@/components/layout/AuthPremiumShell';
@@ -9,9 +10,15 @@ import { SignupPageClient } from './SignupPageClient';
 import { generateMetadata } from '@/lib/seo/metadata';
 import { isSafePath } from '@/lib/auth/auth-params';
 import { parseAuthIntent, type AuthIntent } from '@/lib/auth/auth-intent';
+import { isPaidPlanId, type PaidPlanId } from '@/lib/pricing/plans';
+import {
+  buildUpgradeIntentPath,
+  normalizePricingCampaignCode,
+  parseUpgradeIntent,
+} from '@/lib/pricing/plan-intent';
 
 interface SignupPageProps {
-  searchParams: Promise<{ next?: string; email?: string; intent?: string }>;
+  searchParams: Promise<{ next?: string; email?: string; intent?: string; plan?: string; code?: string }>;
 }
 
 export const metadata = generateMetadata({
@@ -27,13 +34,13 @@ const COPY: Record<
   { h1: string; subtitle: string; bullets: { icon: typeof Rocket; text: string }[] }
 > = {
   candidate: {
-    h1: 'Start your first mock interview',
+    h1: 'Create your free InterviewEra account',
     subtitle:
-      'AI mock interviews tailored to your resume, with rubric-scored feedback built for placement season.',
+      'Practice with measurable feedback while keeping your interview history, resume insights, and progress in one account.',
     bullets: [
-      { icon: Rocket, text: 'Resume-aware questions — not one-size-fits-all banks' },
-      { icon: Target, text: 'Scores and fixes you can use before the next mock' },
-      { icon: CalendarPlus, text: 'Optional placement month helps us tune your prep rhythm' },
+      { icon: CheckCircle2, text: '3 interview credits included — no payment required' },
+      { icon: Target, text: 'Resume-personalized practice with advanced scoring' },
+      { icon: MailCheck, text: 'Email verification required before protected product access' },
     ],
   },
   college: {
@@ -59,9 +66,16 @@ const COPY: Record<
 export default async function SignupPage({ searchParams }: SignupPageProps) {
   const params = await searchParams;
   const intent = parseAuthIntent(params.intent);
-  const next = isSafePath(params.next) ? params.next : undefined;
+  const legacyPlan: PaidPlanId | undefined =
+    params.plan && isPaidPlanId(params.plan) ? params.plan : undefined;
+  const safeCode = normalizePricingCampaignCode(params.code);
+  const legacyUpgrade = legacyPlan
+    ? buildUpgradeIntentPath(legacyPlan, safeCode)
+    : undefined;
+  const next = isSafePath(params.next) ? params.next : legacyUpgrade;
   const email = params.email?.trim() || undefined;
   const copy = COPY[intent];
+  const selectedPlan = parseUpgradeIntent(next).plan;
 
   return (
     <div
@@ -123,9 +137,10 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
                   </li>
                 ))}
               </ul>
+              <AuthTrustProof />
             </>
           }
-          right={<SignupPageClient intent={intent} next={next} email={email} />}
+          right={<SignupPageClient intent={intent} next={next} email={email} selectedPlan={selectedPlan} />}
         />
       </AuthPremiumShell>
     </div>

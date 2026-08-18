@@ -30,7 +30,7 @@ const PLACEHOLDERS = {
   name: 'Your Name',
   email: 'e.g. you@gmail.com — we reply to this address',
   message:
-    'Tell us what you need — billing, login, interview bug, or feedback. Include your account email if different from above.',
+    'Tell us what you need — billing, login, or product questions. For interview technical issues (mic, freeze, session failure), use Feedback → Interview technical issue so the team can investigate; if confirmed after review, the interview credit may be restored.',
 } as const;
 
 function FieldLabel({

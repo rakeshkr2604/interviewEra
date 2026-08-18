@@ -7,9 +7,9 @@ import path from 'path';
 
 const dir = path.resolve('supabase/migrations');
 
-/** Approximate apply order: numeric 001–056 first, then dated 2026…, skip duplicate retention dump last. */
+/** Approximate apply order: numeric 001–056 first, then dated 2026… (retention dump lives under supabase/manual/). */
 function migrationOrder(name) {
-  if (name === 'supabase-migration-retention-system.sql') return 9999;
+  if (name === 'supabase-migration-retention-system.sql') return 9999; // legacy name if reintroduced
   if (/^\d{3}_/.test(name)) return Number(name.slice(0, 3));
   if (/^2026/.test(name)) return 1000 + Number(name.slice(0, 14)); // after 056 by filename? NO — dated mid-July run before 055
   return 5000;

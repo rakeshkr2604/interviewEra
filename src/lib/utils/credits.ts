@@ -1,4 +1,8 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import type {
+  InterviewDifficulty,
+  InterviewStatus,
+} from '@/types/app.types';
 
 export interface CreditResult {
   success: boolean;
@@ -6,29 +10,90 @@ export interface CreditResult {
   reason?: 'no_credits';
 }
 
+export interface CreateInterviewWithCreditInput {
+  userId: string;
+  resumeId: string;
+  role: string;
+  difficulty: InterviewDifficulty;
+  questionCount: number;
+  status: Extract<InterviewStatus, 'pending' | 'in_progress'>;
+  startedAt: string | null;
+  interviewerId: string;
+  sessionContext: object;
+  engine?: 'v1' | 'v2.1';
+  scriptType?: string | null;
+  selfIntroEnabled?: boolean;
+  followUpEnabled?: boolean;
+  isReturningUser?: boolean;
+  maxSkips?: number;
+  skipsUsed?: number;
+  currentTurnIndex?: number;
+}
+
+export interface InterviewCreditResult extends CreditResult {
+  interviewId?: string;
+  creditTransactionId?: string;
+  created?: boolean;
+}
+
 /**
- * Atomically deducts 1 credit via PostgreSQL RPC.
- * The deduct_credit function uses UPDATE...WHERE credits_remaining > 0,
- * which prevents race conditions at the DB level.
+ * Canonical interview start path: creates the interview, deducts one credit,
+ * marks ownership, and writes the linked debit in one PostgreSQL transaction.
  */
-export async function checkAndDeductCredit(userId: string): Promise<CreditResult> {
+export async function createInterviewWithCredit(
+  input: CreateInterviewWithCreditInput,
+): Promise<InterviewCreditResult> {
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase.rpc('deduct_credit', {
-    p_user_id: userId,
+  const { data, error } = await supabase.rpc('create_interview_with_credit', {
+    p_user_id: input.userId,
+    p_resume_id: input.resumeId,
+    p_role: input.role,
+    p_difficulty: input.difficulty,
+    p_question_count: input.questionCount,
+    p_status: input.status,
+    p_started_at: input.startedAt,
+    p_interviewer_id: input.interviewerId,
+    p_session_context: input.sessionContext,
+    p_engine: input.engine ?? 'v1',
+    p_script_type: input.scriptType ?? null,
+    p_self_intro_enabled: input.selfIntroEnabled ?? true,
+    p_follow_up_enabled: input.followUpEnabled ?? true,
+    p_is_returning_user: input.isReturningUser ?? false,
+    p_max_skips: input.maxSkips ?? 2,
+    p_skips_used: input.skipsUsed ?? 0,
+    p_current_turn_index: input.currentTurnIndex ?? 0,
   });
 
   if (error) {
-    throw new Error(`Credit deduction failed: ${error.message}`);
+    throw new Error(`Interview creation and credit deduction failed: ${error.message}`);
   }
 
-  const result = (data as Array<{ success: boolean; remaining: number }>)[0];
+  const result = (
+    data as Array<{
+      success: boolean;
+      remaining: number;
+      interview_id: string | null;
+      credit_transaction_id: string | null;
+      created: boolean;
+    }>
+  )[0];
 
   if (!result?.success) {
     return { success: false, remaining: 0, reason: 'no_credits' };
   }
 
-  return { success: true, remaining: result.remaining };
+  if (!result.interview_id || !result.credit_transaction_id) {
+    throw new Error('Interview credit transaction returned incomplete ownership data');
+  }
+
+  return {
+    success: true,
+    remaining: result.remaining,
+    interviewId: result.interview_id,
+    creditTransactionId: result.credit_transaction_id,
+    created: result.created,
+  };
 }
 
 export async function addCredit(
@@ -50,17 +115,21 @@ export async function addCredit(
 }
 
 /**
- * Refunds 1 credit when an interview start operation fails after deduction.
+ * Refunds 1 credit linked to an interview when start setup fails after debit.
  * Logs but does not throw — refund failure must not mask the original error.
  */
-export async function refundCredit(userId: string): Promise<void> {
+export async function refundCredit(userId: string, interviewId: string): Promise<void> {
   const supabase = createServiceClient();
 
   const { error } = await supabase.rpc('refund_credit', {
     p_user_id: userId,
+    p_interview_id: interviewId,
   });
 
   if (error) {
-    console.error(`[credits] Refund failed for user ${userId}:`, error.message);
+    console.error(
+      `[credits] Refund failed for user ${userId}, interview ${interviewId}:`,
+      error.message,
+    );
   }
 }

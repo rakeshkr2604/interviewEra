@@ -12,6 +12,8 @@ import {
   Calculator,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { computeCampaignDiscountQuote } from '@/lib/campaign-codes';
+import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
 
 const cardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -33,6 +35,8 @@ interface CampaignCode {
   max_redemptions: number | null;
   redemption_count: number;
   is_active: boolean;
+  applies_to_plans: PaidPlanId[];
+  starts_at: string | null;
   expires_at: string | null;
 }
 
@@ -97,13 +101,35 @@ function toDateInputValue(iso: string | null): string {
   if (!iso) return '';
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }
 
 function dateInputToIso(dateStr: string): string | null {
   if (!dateStr.trim()) return null;
-  // End of day UTC so “Expires Jul 30” includes that calendar day.
-  return `${dateStr}T23:59:59.000Z`;
+  const parsed = new Date(dateStr);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+function selectedPlans(value: 'both' | PaidPlanId): PaidPlanId[] {
+  return value === 'both' ? [] : [value];
+}
+
+function campaignPricePreview(
+  plan: PaidPlanId,
+  discountType: 'percent' | 'flat_paise',
+  discountValue: number,
+): string {
+  const config = getPaidPlan(plan);
+  const quote = computeCampaignDiscountQuote({
+    listAmountPaise: config.amountPaise,
+    promoFloorPaise: config.promoFloorPaise,
+    discountType,
+    discountValue,
+  });
+  return quote.ok
+    ? `${config.label}: ₹${config.amountInr} → ₹${quote.final_amount_paise / 100}`
+    : `${config.label}: invalid (${quote.error_code})`;
 }
 
 export default function PlatformRewardsPage() {
@@ -121,7 +147,9 @@ export default function PlatformRewardsPage() {
   const [newPartner, setNewPartner] = useState('');
   const [newDiscountType, setNewDiscountType] = useState<'percent' | 'flat_paise'>('percent');
   const [newDiscountValue, setNewDiscountValue] = useState(10);
+  const [newPlan, setNewPlan] = useState<'both' | PaidPlanId>('both');
   const [newMax, setNewMax] = useState('');
+  const [newStarts, setNewStarts] = useState('');
   const [newExpires, setNewExpires] = useState('');
 
   // Edit panel
@@ -129,7 +157,9 @@ export default function PlatformRewardsPage() {
   const [editLabel, setEditLabel] = useState('');
   const [editDiscountType, setEditDiscountType] = useState<'percent' | 'flat_paise'>('percent');
   const [editDiscountValue, setEditDiscountValue] = useState(10);
+  const [editPlan, setEditPlan] = useState<'both' | PaidPlanId>('both');
   const [editMax, setEditMax] = useState('');
+  const [editStarts, setEditStarts] = useState('');
   const [editExpires, setEditExpires] = useState('');
   const [editActive, setEditActive] = useState(true);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -215,7 +245,9 @@ export default function PlatformRewardsPage() {
     setEditLabel(c.label);
     setEditDiscountType(c.discount_type);
     setEditDiscountValue(c.discount_value);
+    setEditPlan(c.applies_to_plans.length === 1 ? c.applies_to_plans[0] : 'both');
     setEditMax(c.max_redemptions != null ? String(c.max_redemptions) : '');
+    setEditStarts(toDateInputValue(c.starts_at));
     setEditExpires(toDateInputValue(c.expires_at));
     setEditActive(c.is_active);
   }
@@ -231,7 +263,9 @@ export default function PlatformRewardsPage() {
         partner_name: newKind === 'sponsorship' ? newPartner : null,
         discount_type: newDiscountType,
         discount_value: newDiscountValue,
+        applies_to_plans: selectedPlans(newPlan),
         max_redemptions: newMax ? parseInt(newMax, 10) : null,
+        starts_at: dateInputToIso(newStarts),
         expires_at: dateInputToIso(newExpires),
       }),
     });
@@ -244,7 +278,9 @@ export default function PlatformRewardsPage() {
     setNewCode('');
     setNewLabel('');
     setNewPartner('');
+    setNewPlan('both');
     setNewMax('');
+    setNewStarts('');
     setNewExpires('');
     await loadCodes();
     await loadStats();
@@ -261,7 +297,9 @@ export default function PlatformRewardsPage() {
           label: editLabel.trim() || editing.code,
           discount_type: editDiscountType,
           discount_value: editDiscountValue,
+          applies_to_plans: selectedPlans(editPlan),
           max_redemptions: editMax ? parseInt(editMax, 10) : null,
+          starts_at: dateInputToIso(editStarts),
           expires_at: dateInputToIso(editExpires),
           is_active: editActive,
         }),
@@ -493,11 +531,23 @@ export default function PlatformRewardsPage() {
               </select>
               <input
                 type="number"
+                min={0}
+                max={newDiscountType === 'percent' ? 50 : undefined}
                 value={newDiscountValue}
                 onChange={(e) => setNewDiscountValue(parseInt(e.target.value, 10) || 0)}
                 className="rounded-lg border px-3 py-2 text-sm"
                 style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
               />
+              <select
+                value={newPlan}
+                onChange={(e) => setNewPlan(e.target.value as 'both' | PaidPlanId)}
+                className="rounded-lg border px-3 py-2 text-sm"
+                style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+              >
+                <option value="both">Starter + Pro</option>
+                <option value="starter">Starter only</option>
+                <option value="pro">Pro only</option>
+              </select>
               <input
                 placeholder="Max uses (optional)"
                 value={newMax}
@@ -506,9 +556,19 @@ export default function PlatformRewardsPage() {
                 style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
               />
               <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Expiry (optional)
+                Start (optional)
                 <input
-                  type="date"
+                  type="datetime-local"
+                  value={newStarts}
+                  onChange={(e) => setNewStarts(e.target.value)}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                End (optional)
+                <input
+                  type="datetime-local"
                   value={newExpires}
                   onChange={(e) => setNewExpires(e.target.value)}
                   className="rounded-lg border px-3 py-2 text-sm"
@@ -516,6 +576,11 @@ export default function PlatformRewardsPage() {
                 />
               </label>
             </div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              {newPlan !== 'pro' && campaignPricePreview('starter', newDiscountType, newDiscountValue)}
+              {newPlan === 'both' ? ' · ' : ''}
+              {newPlan !== 'starter' && campaignPricePreview('pro', newDiscountType, newDiscountValue)}
+            </p>
             <button
               type="button"
               onClick={() => void createCode()}
@@ -602,11 +667,23 @@ export default function PlatformRewardsPage() {
                 </select>
                 <input
                   type="number"
+                  min={0}
+                  max={editDiscountType === 'percent' ? 50 : undefined}
                   value={editDiscountValue}
                   onChange={(e) => setEditDiscountValue(parseInt(e.target.value, 10) || 0)}
                   className="rounded-lg border px-3 py-2 text-sm"
                   style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
                 />
+                <select
+                  value={editPlan}
+                  onChange={(e) => setEditPlan(e.target.value as 'both' | PaidPlanId)}
+                  className="rounded-lg border px-3 py-2 text-sm"
+                  style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+                >
+                  <option value="both">Starter + Pro</option>
+                  <option value="starter">Starter only</option>
+                  <option value="pro">Pro only</option>
+                </select>
                 <input
                   placeholder="Max uses (blank = ∞)"
                   value={editMax}
@@ -615,9 +692,19 @@ export default function PlatformRewardsPage() {
                   style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
                 />
                 <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Expiry (blank = none)
+                  Start (blank = immediate)
                   <input
-                    type="date"
+                    type="datetime-local"
+                    value={editStarts}
+                    onChange={(e) => setEditStarts(e.target.value)}
+                    className="rounded-lg border px-3 py-2 text-sm"
+                    style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  End (blank = none)
+                  <input
+                    type="datetime-local"
                     value={editExpires}
                     onChange={(e) => setEditExpires(e.target.value)}
                     className="rounded-lg border px-3 py-2 text-sm"
@@ -633,6 +720,11 @@ export default function PlatformRewardsPage() {
                   Active
                 </label>
               </div>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                {editPlan !== 'pro' && campaignPricePreview('starter', editDiscountType, editDiscountValue)}
+                {editPlan === 'both' ? ' · ' : ''}
+                {editPlan !== 'starter' && campaignPricePreview('pro', editDiscountType, editDiscountValue)}
+              </p>
               <button
                 type="button"
                 disabled={savingEdit}
@@ -652,6 +744,7 @@ export default function PlatformRewardsPage() {
                   <th className="pb-2 pr-3">Code</th>
                   <th className="pb-2 pr-3">Kind</th>
                   <th className="pb-2 pr-3">Partner</th>
+                  <th className="pb-2 pr-3">Plan</th>
                   <th className="pb-2 pr-3">Discount</th>
                   <th className="pb-2 pr-3">Used / Max</th>
                   <th className="pb-2 pr-3">Expiry</th>
@@ -673,6 +766,11 @@ export default function PlatformRewardsPage() {
                     </td>
                     <td className="py-2 pr-3" style={{ color: 'var(--text-muted)' }}>
                       {c.partner_name ?? '—'}
+                    </td>
+                    <td className="py-2 pr-3">
+                      {c.applies_to_plans.length === 0
+                        ? 'Both'
+                        : c.applies_to_plans.map((plan) => getPaidPlan(plan).label).join(', ')}
                     </td>
                     <td className="py-2 pr-3">
                       {c.discount_type === 'percent'
@@ -710,7 +808,7 @@ export default function PlatformRewardsPage() {
                 ))}
                 {codes.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="py-4" style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={9} className="py-4" style={{ color: 'var(--text-muted)' }}>
                       No codes yet.
                     </td>
                   </tr>

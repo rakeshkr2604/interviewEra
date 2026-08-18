@@ -26,6 +26,17 @@ export async function updateOrgProfile(formData: FormData) {
     return { error: 'Forbidden.' };
   }
 
+  const { data: org } = await serviceClient
+    .from('campus_organizations')
+    .select('id, verification_status')
+    .eq('admin_user_id', user.id)
+    .single();
+
+  if (!org) return { error: 'Campus organization not found.' };
+  if (org.verification_status !== 'approved') {
+    return { error: 'Campus organization is pending verification.' };
+  }
+
   const name = (formData.get('name') as string | null)?.trim();
   const coordinatorName = (formData.get('coordinator_name') as string | null)?.trim() || null;
   const contactEmail = (formData.get('contact_email') as string | null)?.trim() || null;
@@ -45,7 +56,7 @@ export async function updateOrgProfile(formData: FormData) {
       coordinator_name: coordinatorName,
       contact_email: contactEmail,
     })
-    .eq('admin_user_id', user.id);
+    .eq('id', org.id);
 
   if (error) {
     return { error: `Failed to update: ${error.message}` };

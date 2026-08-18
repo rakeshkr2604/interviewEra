@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { checkAndDeductCredit, refundCredit } from '@/lib/utils/credits';
+import { createInterviewWithCredit, refundCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import { interviewStartSchema } from '@/lib/validations/schemas';
 import { computeJdFingerprint } from '@/lib/redis/question-cache';
@@ -219,14 +219,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       useAsyncPrepare = false;
     }
 
-    const creditResult = await checkAndDeductCredit(user.id);
-    if (!creditResult.success) {
-      return NextResponse.json(
-        { error: 'no_credits', upgradeUrl: '/upgrade' },
-        { status: 402 },
-      );
-    }
-
     const generation: InterviewGenerationContext | undefined = useAsyncPrepare
       ? {
           status: 'pending',
@@ -251,38 +243,45 @@ export async function POST(request: Request): Promise<NextResponse> {
       ...(generation ? { generation } : {}),
     };
 
-    const { data: interview, error: interviewError } = await serviceClient
-      .from('interviews')
-      .insert({
-        user_id: user.id,
-        resume_id: resumeId,
-        role,
-        difficulty,
-        interviewer_id: interviewer.id,
-        status: useAsyncPrepare ? 'pending' : 'in_progress',
-        started_at: useAsyncPrepare ? null : new Date().toISOString(),
-        question_count: questionCount,
-        session_context: sessionContext,
-      })
-      .select('id')
-      .single();
+    const creditResult = await createInterviewWithCredit({
+      userId: user.id,
+      resumeId,
+      role,
+      difficulty,
+      questionCount,
+      status: useAsyncPrepare ? 'pending' : 'in_progress',
+      startedAt: useAsyncPrepare ? null : new Date().toISOString(),
+      interviewerId: interviewer.id,
+      sessionContext,
+    });
+    if (!creditResult.success || !creditResult.interviewId) {
+      return NextResponse.json(
+        { error: 'no_credits', upgradeUrl: '/upgrade' },
+        { status: 402 },
+      );
+    }
+    const interviewId = creditResult.interviewId;
 
-    if (interviewError || !interview) {
-      await refundCredit(user.id);
-      console.error('[interview/start] DB insert error:', interviewError);
-      return NextResponse.json({ error: 'Failed to create interview record' }, { status: 500 });
+    if (creditResult.created === false) {
+      return NextResponse.json({
+        interviewId,
+        preparing: useAsyncPrepare,
+        phase: useAsyncPrepare ? 'generating_questions' : 'interview_ready',
+        creditsRemaining: creditResult.remaining,
+        deduped: true,
+      });
     }
 
     // Freeze resume for this interview (immutable; prepare/questions must not chase live edits)
     await createResumeInterviewSnapshot(serviceClient, {
-      interviewId: interview.id,
+      interviewId,
       resumeId,
       jobDescription,
     });
 
     trackInterviewEvent('interview_created', {
       userId: user.id,
-      interviewId: interview.id,
+      interviewId,
       role,
       difficulty,
       async: useAsyncPrepare,
@@ -294,7 +293,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Dedupe: partial unique index on (event_name, interview_id) — migration 052.
     persistMilestoneEventOnce('interview_started', {
       user_id: user.id,
-      interview_id: interview.id,
+      interview_id: interviewId,
       role,
       difficulty,
       async: useAsyncPrepare,
@@ -304,11 +303,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       trackProductEvent({
         event: 'interview_generation_started',
         userId: user.id,
-        interviewId: interview.id,
+        interviewId,
         async: true,
       });
       return NextResponse.json({
-        interviewId: interview.id,
+        interviewId,
         preparing: true,
         phase: 'generating_questions',
         creditsRemaining: creditResult.remaining,
@@ -316,8 +315,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     if (!resolvedQuestions?.length) {
-      await refundCredit(user.id);
-      await serviceClient.from('interviews').delete().eq('id', interview.id);
+      await refundCredit(user.id, interviewId);
+      await serviceClient.from('interviews').delete().eq('id', interviewId);
       return NextResponse.json({ error: 'No questions available for this interview.' }, { status: 500 });
     }
 
@@ -325,21 +324,21 @@ export async function POST(request: Request): Promise<NextResponse> {
       .from('questions')
       .insert(
         resolvedQuestions.map((q) => ({
-          interview_id: interview.id,
+          interview_id: interviewId,
           ...q,
         })),
       )
       .select('id, interview_id, order_index, question_text, rubric, category');
 
     if (questionsError || !insertedQuestions) {
-      await refundCredit(user.id);
-      await serviceClient.from('interviews').delete().eq('id', interview.id);
+      await refundCredit(user.id, interviewId);
+      await serviceClient.from('interviews').delete().eq('id', interviewId);
       console.error('[interview/start] Questions insert error:', questionsError);
       return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
     }
 
     return NextResponse.json({
-      interviewId: interview.id,
+      interviewId,
       preparing: false,
       phase: 'interview_ready',
       questions: insertedQuestions,

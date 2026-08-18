@@ -22,6 +22,7 @@ import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import {
   trackPaymentCompletedGa4Backup,
   trackPaymentStartedOnce,
+  trackPlanSelected,
 } from '@/lib/analytics/funnel-ga4-bridge';
 
 interface RazorpayOrderCheckoutOptions {
@@ -60,6 +61,7 @@ interface CheckoutButtonProps {
   source?: string;
   /** Optional campaign / promo code (server validates; never trust client amount). */
   promoCode?: string;
+  campaignCodeId?: string;
   /** True when extending an active paid plan (shows confirm modal). */
   isRenewal?: boolean;
   planExpiresAt?: string | null;
@@ -130,6 +132,7 @@ export function CheckoutButton({
   label,
   source = 'upgrade',
   promoCode,
+  campaignCodeId,
   isRenewal = false,
   planExpiresAt,
   className,
@@ -199,17 +202,6 @@ export function CheckoutButton({
         plan: 'starter' | 'pro';
       };
 
-      const releaseReservationBestEffort = () => {
-        void fetch('/api/payments/release-campaign-reservation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ order_id: data.order_id }),
-          keepalive: true,
-        }).catch(() => {
-          /* webhook + reserve-retry are backups */
-        });
-      };
-
       let userId: string | undefined;
       try {
         const { createClient } = await import('@/lib/supabase/client');
@@ -223,14 +215,6 @@ export function CheckoutButton({
       }
 
       console.info('[payment:checkout] opening', { plan: data.plan, orderId: data.order_id });
-
-      trackPaymentStartedOnce({
-        subscriptionId: data.order_id,
-        userId,
-        plan: data.plan,
-        amount: data.amount,
-        source,
-      });
 
       let dismissed = false;
 
@@ -282,7 +266,6 @@ export function CheckoutButton({
         modal: {
           ondismiss: () => {
             dismissed = true;
-            releaseReservationBestEffort();
             setLoading(false);
             toast.message(PAYMENT_CANCELLED_MESSAGE);
           },
@@ -292,12 +275,19 @@ export function CheckoutButton({
       rzp.on('payment.failed', (failResponse) => {
         const msg = failResponse.error?.description ?? PAYMENT_FAILED_USER_MESSAGE;
         console.error('[payment:checkout] payment.failed', msg);
-        releaseReservationBestEffort();
         toast.error(msg);
         setLoading(false);
       });
 
       rzp.open();
+      trackPaymentStartedOnce({
+        orderId: data.order_id,
+        userId,
+        plan: data.plan,
+        amount: data.amount,
+        source,
+        campaignCodeId,
+      });
       if (!dismissed) {
         setLoading(false);
       }
@@ -306,9 +296,26 @@ export function CheckoutButton({
       toast.error(PAYMENT_ORDER_FAILED_MESSAGE);
       setLoading(false);
     }
-  }, [scriptReady, loading, label, plan, userEmail, source, promoCode, router]);
+  }, [
+    scriptReady,
+    loading,
+    label,
+    plan,
+    userEmail,
+    source,
+    promoCode,
+    campaignCodeId,
+    router,
+  ]);
 
   function handleClick() {
+    trackPlanSelected({
+      plan,
+      sourcePage: '/upgrade',
+      source: 'pricing_grid',
+      campaignCode: promoCode,
+      campaignCodeId,
+    });
     if (isRenewal && planExpiresAt) {
       setRenewDialogOpen(true);
       return;

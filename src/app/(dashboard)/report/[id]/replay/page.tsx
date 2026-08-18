@@ -13,8 +13,8 @@ interface ReplayPageProps {
 export async function generateMetadata({ params }: ReplayPageProps): Promise<Metadata> {
   const { id } = await params;
   return buildPageMetadata({
-    title: 'Interview replay',
-    description: 'Replay video and transcript from your mock interview.',
+    title: 'Interview answer review',
+    description: 'Review recorded answers, scores, and feedback from your mock interview.',
     path: `/report/${id}/replay`,
     noIndex: true,
   });

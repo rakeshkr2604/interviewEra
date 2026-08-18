@@ -198,8 +198,9 @@ Browser (runId R, interviewId I)
   ▼
 middleware — mints requestId Q per request → logs http_request {Q,R,I,userId}
   ▼
+/api/interview/start — logs with {Q,I,userId}
+  └─ create_interview_with_credit  → credit_transactions {user_id, interview_id: I}
 /api/interview/answer — logs with {Q,I,userId}
-  ├─ deduct_credit RPC             → (existing credit_transactions row; userId)
   ├─ evaluate-answer → OpenRouter  → ai_call_logs {interview_id: I, request_id: Q}
   ├─ evaluations insert            → row keyed by answer→question→I
   └─ product_events                → {request_id: Q, user_id, props.interviewId: I}

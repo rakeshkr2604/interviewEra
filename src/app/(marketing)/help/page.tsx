@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { generateMetadata } from '@/lib/seo/metadata';
 import { canonicalUrl } from '@/lib/seo/site-url';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
+import { planPriceLine } from '@/lib/pricing/copy';
+import { TECHNICAL_ISSUE_FEEDBACK_HREF } from '@/lib/technical-failures/ux';
 
 /** FAQ anchor page — canonical hub is /help-center (no duplicate indexing). */
 const helpCanonical = canonicalUrl('/help-center');
@@ -50,7 +52,15 @@ const SECTIONS = [
     faqs: [
       {
         q: 'What is a credit?',
-        a: 'One credit = one complete interview session. Credits are deducted when you start an interview, not when you finish. If a session fails to start due to a technical error, the credit is automatically refunded.',
+        a: (
+          <span>
+            One credit starts one mock interview session. Credits are deducted when you start an interview, not when you finish. A session that is started but left incomplete still uses that credit. If a technical issue prevents your interview from being completed, report it through{' '}
+            <Link href={TECHNICAL_ISSUE_FEEDBACK_HREF} className="underline underline-offset-2">
+              Feedback → Interview technical issue
+            </Link>{' '}
+            with details. Screenshots are optional but can help investigation. If the issue is confirmed after review, the interview credit may be restored.
+          </span>
+        ),
       },
       {
         q: 'How many free credits do I get?',
@@ -60,9 +70,9 @@ const SECTIONS = [
         q: 'What are the paid plans?',
         a: (
           <span>
-            <strong>Starter — ₹149 (30-day access):</strong> 8 interview credits, full per-answer feedback, detailed scores.
+            <strong>Starter — {planPriceLine('starter')} (30-day access):</strong> 8 interview credits, full per-answer feedback, 30-day improvement roadmap, and detailed scores.
             <br />
-            <strong>Pro — ₹399 (30-day access):</strong> 25 interview credits, plus detailed analysis, model answer comparison, PDF export, and interview replay.
+            <strong>Pro — {planPriceLine('pro')} (30-day access):</strong> 25 interview credits, deeper analysis, model-answer comparison, PDF export, and replay.
             <br />
             <strong>Campus — contact us:</strong> Unlimited interviews for entire college batches with cohort-level analytics.
             <br />
@@ -102,7 +112,7 @@ const SECTIONS = [
       },
       {
         q: 'Can I retake the same interview?',
-        a: 'Yes — each retake costs 1 credit and generates a fresh set of questions (shuffled from the cache for your resume + role combination).',
+        a: 'Yes — each retake uses 1 credit and generates a fresh set of questions (shuffled from the cache for your resume + role combination).',
       },
     ],
   },
@@ -126,16 +136,12 @@ const SECTIONS = [
         ),
       },
       {
-        q: 'What is blurred on Free and Starter plans?',
-        a: 'The detailed per-dimension analysis and model answer comparison are blurred on Free and Starter plans. You still see your overall score and the 2–3 sentence feedback summary. Upgrade to Pro or Campus to unlock the full breakdown.',
+        q: 'What report features are plan-gated?',
+        a: 'Free plans show overall scores and short per-answer feedback. Starter unlocks detailed feedback, dimension notes, hiring intelligence, and the 30-day improvement roadmap. Pro adds model-answer comparison, keyword analysis, PDF export, and interview replay. Campus plans follow your institution\'s contract.',
       },
       {
         q: 'Can I export my report as a PDF?',
         a: 'PDF export is available on the Pro and Campus plans.',
-      },
-      {
-        q: 'Can I replay a past interview session?',
-        a: 'Interview replay (reviewing your answers alongside scores and feedback) is available on Pro and Campus.',
       },
       {
         q: 'Where can I see my score history?',
@@ -149,7 +155,7 @@ const SECTIONS = [
     faqs: [
       {
         q: 'How do I renew my plan?',
-        a: 'Go to Settings → Billing and click "Renew plan", or visit the Upgrade page. Each payment is one-time — there is no auto-renewal. UPI, cards, net banking, and wallets are supported via Razorpay.',
+        a: 'Go to Settings → Billing and click "Renew plan", or visit the Upgrade page. Each payment is one-time — there is no auto-renewal. Renewal extends from your current expiry date and adds the new plan\'s credits to your remaining balance. UPI, cards, net banking, and wallets are supported via Razorpay.',
       },
       {
         q: 'What payment methods are accepted?',

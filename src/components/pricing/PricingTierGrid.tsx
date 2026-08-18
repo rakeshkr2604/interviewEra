@@ -1,526 +1,402 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
-import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import { useEffect, type ReactNode } from 'react';
 import { Check, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import { BillingCycleToggle, type BillingCycle } from '@/components/pricing/BillingCycleToggle';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CTA_KEYS } from '@/lib/analytics/cta-keys';
+import { CheckoutButton } from '@/components/pricing/CheckoutButton';
+import { CampaignCountdown } from '@/components/pricing/CampaignCountdown';
+import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
+import { PricingWhatsAppSupport } from '@/components/pricing/PricingWhatsAppSupport';
+import { TechnicalIssueProtection } from '@/components/pricing/TechnicalIssueProtection';
 import {
-  BILLING_AMOUNTS,
   FREE_TIER_FEATURES,
+  PLAN_POSITIONING,
   PRO_FEATURES,
   STARTER_FEATURES,
 } from '@/lib/pricing/tiers';
-import {
-  marketingPaidCtaLabel,
-  planPeriodLine,
-  planPriceLine,
-  planUsdApproxHint,
-  upgradeCheckoutLabel,
-} from '@/lib/pricing/copy';
-import { PlanStatusHeader } from '@/components/pricing/PlanStatusHeader';
-import { PaymentTrustSection } from '@/components/pricing/PaymentTrustSection';
+import { PAID_PLANS, type PaidPlanId } from '@/lib/pricing/plans';
 import { isPaidPlanActive, isRenewalCheckout } from '@/lib/pricing/plan-status';
+import { marketingPaidCtaLabel, upgradeCheckoutLabel } from '@/lib/pricing/copy';
 import type { PlanTier } from '@/types/app.types';
-import { CheckoutButton } from '@/components/pricing/CheckoutButton';
-import type { PaidPlanId } from '@/lib/pricing/plans';
+import { cn } from '@/lib/utils';
+import { buildSignupIntentHref } from '@/lib/pricing/plan-intent';
+import {
+  trackPlanSelected,
+  trackPromotionViewedOnce,
+} from '@/lib/analytics/funnel-ga4-bridge';
 
 export type PromoPlanQuote = {
   list_amount_paise: number;
   discount_paise: number;
   final_amount_paise: number;
   label: string | null;
+  discountPercent?: number | null;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  serverNow?: string | null;
+  isActive?: boolean;
+  campaignCodeId?: string | null;
 };
 
-const TIER_ORDER: Record<PlanTier, number> = {
-  free: 0,
-  starter: 1,
-  pro: 2,
-  campus: 3,
-  campus_admin: 3,
+type PricingGridProps = {
+  variant: 'public' | 'dashboard';
+  currentPlan?: PlanTier;
+  userEmail?: string;
+  planExpiresAt?: string | null;
+  planStatus?: string | null;
+  promoCode?: string;
+  promoQuotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
+  selectedPlan?: PaidPlanId;
+  belowGrid?: ReactNode;
+  onCampaignExpired?: () => void;
 };
 
-const upgradeCardInner =
-  'flex h-full min-h-0 w-full flex-1 flex-col gap-0 border-0 bg-transparent px-0 py-5 shadow-none ring-0 rounded-none sm:px-1 sm:py-6';
-
-const upgradeCtaStyle = {
-  background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-  boxShadow: '0 16px 48px color-mix(in srgb, var(--accent-primary) 32%, transparent)',
+const paidFeatures = {
+  starter: STARTER_FEATURES,
+  pro: PRO_FEATURES,
 } as const;
 
-/** Full-width, button-shaped footer so tiers match CTAs (not plain right-aligned text). */
-function PlanTierFooter({ children }: { children: ReactNode }) {
+function rupees(paise: number): string {
+  return `₹${Math.round(paise / 100)}`;
+}
+
+function IncludedRow({ text, included = true }: { text: string; included?: boolean }) {
+  return (
+    <li className="flex items-start gap-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+      {included ? (
+        <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+      ) : (
+        <X className="mt-0.5 size-4 shrink-0 opacity-45" style={{ color: 'var(--text-muted)' }} aria-hidden />
+      )}
+      <span className={included ? '' : 'opacity-70'}>{text}</span>
+    </li>
+  );
+}
+
+function PlanPrice({ plan, quote }: { plan: PaidPlanId; quote?: PromoPlanQuote }) {
+  const activeQuote = quote?.isActive !== false && quote?.final_amount_paise;
+  if (!activeQuote) {
+    return (
+      <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+        ₹{PAID_PLANS[plan].amountInr}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap items-baseline gap-2 tabular-nums">
+        <span className="text-base font-medium line-through" style={{ color: 'var(--text-muted)' }}>
+          {rupees(quote.list_amount_paise)}
+        </span>
+        <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+          {rupees(quote.final_amount_paise)}
+        </span>
+        {quote.discountPercent != null ? (
+          <Badge
+            className="border-0 text-[10px] font-bold tracking-wide text-white"
+            style={{ background: 'var(--accent-primary)' }}
+          >
+            {quote.discountPercent}% OFF
+          </Badge>
+        ) : null}
+      </div>
+      {quote.label ? (
+        <p className="text-xs font-medium" style={{ color: 'var(--accent-primary)' }}>
+          {quote.label}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function CampaignOffer({
+  quotes,
+  onExpired,
+}: {
+  quotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
+  onExpired?: () => void;
+}) {
+  const quote = quotes?.starter ?? quotes?.pro;
+  if (!quote?.expiresAt || !quote.serverNow || quote.isActive === false) return null;
+
   return (
     <div
-      role="status"
-      className="flex min-h-12 w-full shrink-0 items-center justify-center rounded-[14px] border-2 px-4 text-center text-sm font-semibold"
+      className="mb-6 flex flex-col items-center justify-between gap-2 rounded-2xl border px-4 py-3 text-center sm:flex-row sm:text-left"
       style={{
-        borderColor: 'var(--card-border)',
-        background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-        color: 'var(--text-secondary)',
+        borderColor: 'color-mix(in srgb, var(--accent-primary) 35%, var(--card-border))',
+        background: 'color-mix(in srgb, var(--accent-primary) 8%, var(--card-bg))',
       }}
+      role="status"
+    >
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: 'var(--accent-primary)' }}>
+          Limited-time offer
+        </p>
+        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+          Campaign pricing is applied from the server quote.
+        </p>
+      </div>
+      <CampaignCountdown expiresAt={quote.expiresAt} serverNow={quote.serverNow} onExpired={onExpired} />
+    </div>
+  );
+}
+
+function PaidAction({
+  plan,
+  props,
+  quote,
+}: {
+  plan: PaidPlanId;
+  props: PricingGridProps;
+  quote?: PromoPlanQuote;
+}) {
+  if (props.variant === 'public') {
+    return (
+      <TrackedCtaLink
+        href={buildSignupIntentHref(plan, props.promoCode)}
+        ctaKey={CTA_KEYS.PRICING_CTA}
+        ctaText={marketingPaidCtaLabel(plan)}
+        section="pricing_grid"
+        onClick={() =>
+          trackPlanSelected({
+            plan,
+            sourcePage: '/pricing',
+            source: 'pricing_grid',
+            campaignCode: props.promoCode,
+            campaignCodeId: quote?.campaignCodeId ?? undefined,
+          })
+        }
+        className="inline-flex min-h-12 w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        style={{ background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)' }}
+      >
+        {marketingPaidCtaLabel(plan)}
+      </TrackedCtaLink>
+    );
+  }
+
+  const currentPlan = props.currentPlan ?? 'free';
+  const isCampus = currentPlan === 'campus' || currentPlan === 'campus_admin';
+  const cannotBuyStarter = plan === 'starter' && currentPlan === 'pro';
+  if (isCampus) {
+    return <PlanFooter>Managed by your institution</PlanFooter>;
+  }
+  if (cannotBuyStarter) {
+    return <PlanFooter>Included in your Pro plan</PlanFooter>;
+  }
+
+  const renewal = isRenewalCheckout(plan, currentPlan, props.planExpiresAt, props.planStatus);
+  const quotedLabel =
+    quote?.final_amount_paise && quote.isActive !== false
+      ? `Get ${PAID_PLANS[plan].label} for ${rupees(quote.final_amount_paise)}`
+      : upgradeCheckoutLabel(plan, currentPlan);
+
+  return (
+    <CheckoutButton
+      userEmail={props.userEmail ?? ''}
+      plan={plan}
+      source="upgrade"
+      promoCode={props.promoCode}
+      campaignCodeId={quote?.campaignCodeId ?? undefined}
+      label={quotedLabel}
+      isRenewal={renewal}
+      planExpiresAt={renewal ? props.planExpiresAt : null}
+      className="h-12 w-full rounded-xl border-0 text-sm font-semibold text-white"
+      style={{
+        background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
+        boxShadow: '0 14px 35px color-mix(in srgb, var(--accent-primary) 24%, transparent)',
+      }}
+    />
+  );
+}
+
+/** Keeps plan titles aligned on multi-column layouts where only Pro carries a badge. */
+function PlanBadgeSpacer() {
+  return (
+    <div className="hidden md:block" aria-hidden>
+      <Badge className="invisible w-fit border-0 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em]">
+        Recommended
+      </Badge>
+    </div>
+  );
+}
+
+function PlanFooter({ children }: { children: ReactNode }) {
+  return (
+    <div
+      className="flex min-h-12 items-center justify-center rounded-xl border px-4 text-center text-sm font-semibold"
+      style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
     >
       {children}
     </div>
   );
 }
 
-/** Landing pricing: same tokens as rest of marketing site (light + dark) */
-const marketingCardShell =
-  'flex h-full flex-col gap-0 rounded-2xl border-2 border-[var(--card-border)] bg-[var(--card-bg)] py-5 text-[var(--text-primary)] shadow-[0_12px_40px_-8px_color-mix(in_srgb,var(--text-primary)_10%,transparent)] ring-0 transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_20px_48px_-10px_color-mix(in_srgb,var(--accent-primary)_22%,transparent)]';
-const marketingCardPopular =
-  'relative overflow-visible border-[var(--accent-primary)] pt-9 ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)] shadow-[0_0_40px_color-mix(in_srgb,var(--accent-primary)_28%,transparent)]';
+export function PricingPlanGrid(props: PricingGridProps) {
+  const currentPlan = props.currentPlan ?? 'free';
+  const paidActive = isPaidPlanActive(currentPlan, props.planStatus, props.planExpiresAt);
+  const sourcePage = props.variant === 'public' ? '/pricing' : '/upgrade';
 
-function MarketingFeatureRow({ text, included }: { text: string; included: boolean }) {
-  return (
-    <p className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-      {included ? (
-        <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      ) : (
-        <X className="mt-0.5 size-4 shrink-0 opacity-40" style={{ color: 'var(--text-muted)' }} aria-hidden />
-      )}
-      <span className={included ? '' : 'opacity-70'}>{text}</span>
-    </p>
-  );
-}
-
-function MarketingPaidFeatureRow({ text }: { text: string }) {
-  return (
-    <li className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-      <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      {text}
-    </li>
-  );
-}
-
-function FeatureRow({ text, included }: { text: string; included: boolean }) {
-  return (
-    <p className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-      {included ? (
-        <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      ) : (
-        <X className="mt-0.5 size-4 shrink-0 text-muted-foreground/40" aria-hidden />
-      )}
-      <span className={included ? '' : 'text-muted-foreground'}>{text}</span>
-    </p>
-  );
-}
-
-function PaidFeatureRow({ text }: { text: string }) {
-  return (
-    <li className="flex items-start gap-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-      <Check className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-      {text}
-    </li>
-  );
-}
-
-function marketingSignupHref(plan: 'starter' | 'pro', cycle: BillingCycle): string {
-  const q = new URLSearchParams();
-  q.set('plan', plan);
-  q.set('cycle', cycle);
-  return `/signup?${q.toString()}`;
-}
-
-/** Landing: same toggle + price logic as /upgrade; CTAs pass plan + cycle for post-signup upsell. */
-export function MarketingPricingSection() {
-  const [cycle, setCycle] = useState<BillingCycle>('monthly');
-
-  const proPerDay = Math.max(1, Math.round(BILLING_AMOUNTS.pro.monthlyInr / 30));
+  useEffect(() => {
+    for (const plan of ['starter', 'pro'] as const) {
+      const quote = props.promoQuotes?.[plan];
+      if (
+        quote?.isActive === false ||
+        !quote?.campaignCodeId ||
+        !quote.final_amount_paise ||
+        quote.discount_paise <= 0
+      ) {
+        continue;
+      }
+      trackPromotionViewedOnce({
+        plan,
+        sourcePage,
+        campaignCode: props.promoCode,
+        campaignCodeId: quote.campaignCodeId,
+        discountPaise: quote.discount_paise,
+        finalAmountPaise: quote.final_amount_paise,
+        expiresAt: quote.expiresAt ?? undefined,
+        isActive: true,
+      });
+    }
+  }, [props.promoCode, props.promoQuotes, sourcePage]);
 
   return (
-    <div className="space-y-8">
-      <p
-        className="mx-auto max-w-3xl text-center text-xl font-bold leading-snug md:text-2xl md:leading-snug"
-        style={{ color: 'var(--text-primary)' }}
-      >
-        Every interview you practice is one less surprise on the real day.
-      </p>
-      <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
-        Start <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>free</span>, no card — pay once for 30 days of access when you want PDF export, replay, and full analysis.
-      </p>
-      <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed md:text-base" style={{ color: 'var(--text-secondary)' }}>
-        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Pro</span> works out to about{' '}
-        <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-          ₹{proPerDay}/day
-        </span>{' '}
-        for a 30-day period — less than one coffee vs walking in under-prepared.
-      </p>
-      <BillingCycleToggle value={cycle} onChange={setCycle} id="marketing-billing" variant="default" />
-      <p className="mx-auto max-w-2xl text-center text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        ₹{BILLING_AMOUNTS.pro.monthlyInr} for 30 days of full-feedback practice — less than what most spend on a
-        single day of eating out, for a month of getting interview-ready.
-      </p>
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Free */}
-        <Card className={marketingCardShell}>
-          <CardHeader className="pb-2">
+    <div className="space-y-7">
+      <CampaignOffer quotes={props.promoQuotes} onExpired={props.onCampaignExpired} />
+
+      <div className="grid gap-5 md:grid-cols-3 md:items-stretch">
+        <Card
+          id="plan-free"
+          className={cn(
+            'flex h-full flex-col rounded-2xl border-2 py-0 shadow-sm',
+            currentPlan === 'free' && props.variant === 'dashboard' && 'ring-2 ring-[var(--accent-primary)]/30',
+          )}
+          style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+        >
+          <CardHeader className="space-y-3 px-5 pb-3 pt-6">
+            <PlanBadgeSpacer />
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Free
-              </CardTitle>
+              <h3 className="text-xl font-semibold">Free</h3>
+              {currentPlan === 'free' && props.variant === 'dashboard' ? <Badge>Current plan</Badge> : null}
             </div>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              ₹0
-              <span className="text-sm font-normal" style={{ color: 'var(--text-muted)' }}>
-                {' '}
-                Forever
-              </span>
+            <div>
+              <p className="text-3xl font-bold">₹0</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Free forever</p>
+            </div>
+            <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
+              {PLAN_POSITIONING.free.title}
             </p>
           </CardHeader>
-          <CardContent className="flex flex-1 flex-col space-y-4">
-            <div className="flex-1 space-y-2">
-              {FREE_TIER_FEATURES.map((f) => (
-                <MarketingFeatureRow key={f.text} text={f.text} included={f.included} />
+          <CardContent className="flex flex-1 flex-col px-5 pb-5">
+            <ul className="flex-1 space-y-2.5">
+              {FREE_TIER_FEATURES.map((feature) => (
+                <IncludedRow key={feature.text} text={feature.text} included={feature.included} />
               ))}
+            </ul>
+            <p className="mt-4 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              {PLAN_POSITIONING.free.description}
+            </p>
+            <div className="mt-4">
+              {props.variant === 'public' ? (
+                <TrackedCtaLink
+                  href="/signup"
+                  ctaKey={CTA_KEYS.GET_STARTED}
+                  ctaText="Start free"
+                  section="pricing_grid"
+                  onClick={() =>
+                    trackPlanSelected({
+                      plan: 'free',
+                      sourcePage: '/pricing',
+                      source: 'pricing_grid',
+                    })
+                  }
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border-2 px-4 py-3 text-sm font-semibold"
+                  style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+                >
+                  Start free
+                </TrackedCtaLink>
+              ) : currentPlan === 'free' ? (
+                <PlanFooter>Your current plan</PlanFooter>
+              ) : (
+                <div className="min-h-12" aria-hidden />
+              )}
             </div>
-            <TrackedCtaLink
-              href="/signup"
-              ctaKey={CTA_KEYS.GET_STARTED}
-              ctaText="Get started free"
-              section="pricing_grid"
-              className="block rounded-xl border-2 px-4 py-3 text-center text-sm font-semibold shadow-sm transition-all duration-300 hover:shadow-md"
+          </CardContent>
+        </Card>
+
+        {(['starter', 'pro'] as const).map((plan) => {
+          const selected = props.selectedPlan === plan;
+          const current = currentPlan === plan;
+          const isPro = plan === 'pro';
+          const quote = props.promoQuotes?.[plan];
+          return (
+            <Card
+              id={`plan-${plan}`}
+              key={plan}
+              className={cn(
+                'flex h-full flex-col rounded-2xl border-2 py-0 shadow-sm transition-transform hover:-translate-y-0.5',
+                (selected || current) && 'ring-2 ring-[var(--accent-primary)]/35',
+              )}
               style={{
-                borderColor: 'var(--card-border)',
+                borderColor: isPro ? 'var(--accent-primary)' : 'var(--card-border)',
                 background: 'var(--card-bg)',
-                color: 'var(--text-primary)',
               }}
             >
-              Get started free
-            </TrackedCtaLink>
-          </CardContent>
-        </Card>
-
-        {/* Starter */}
-        <Card className={marketingCardShell}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Starter
-            </CardTitle>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {planPriceLine('starter')}{' '}
-              <span className="text-sm font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                ({planUsdApproxHint('starter')})
-              </span>
-            </p>
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-              {planPeriodLine()}
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col space-y-4">
-            <ul className="flex-1 space-y-2">
-              {STARTER_FEATURES.map((f) => (
-                <MarketingPaidFeatureRow key={f} text={f} />
-              ))}
-            </ul>
-            <TrackedCtaLink
-              href={marketingSignupHref('starter', cycle)}
-              ctaKey={CTA_KEYS.PRICING_CTA}
-              ctaText={marketingPaidCtaLabel('starter')}
-              section="pricing_grid"
-              className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
-            >
-              {marketingPaidCtaLabel('starter')}
-            </TrackedCtaLink>
-          </CardContent>
-        </Card>
-
-        {/* Pro — most popular */}
-        <Card className={cn(marketingCardShell, marketingCardPopular, 'sm:col-span-2 lg:col-span-1')}>
-          <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
-            <Badge
-              className="px-3 py-1 text-xs font-semibold whitespace-nowrap text-white shadow-md"
-              style={{ background: 'var(--accent-primary)', boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)' }}
-            >
-              Popular for heavy practice
-            </Badge>
-          </div>
-          <CardHeader className="pb-2 pt-2">
-            <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Pro
-            </CardTitle>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--accent-primary)' }}>
-              {planPriceLine('pro')}{' '}
-              <span className="text-sm font-medium tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                ({planUsdApproxHint('pro')})
-              </span>
-            </p>
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
-              {planPeriodLine()}
-            </p>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col space-y-4">
-            <ul className="flex-1 space-y-2">
-              {PRO_FEATURES.map((f) => (
-                <MarketingPaidFeatureRow key={f} text={f} />
-              ))}
-            </ul>
-            <TrackedCtaLink
-              href={marketingSignupHref('pro', cycle)}
-              ctaKey={CTA_KEYS.PRICING_CTA}
-              ctaText={marketingPaidCtaLabel('pro')}
-              section="pricing_grid"
-              className="block rounded-xl bg-indigo-600 px-4 py-3 text-center text-sm font-semibold text-white shadow-lg shadow-indigo-500/30 transition-all duration-300 hover:bg-indigo-700 hover:shadow-indigo-500/45"
-            >
-              {marketingPaidCtaLabel('pro')}
-            </TrackedCtaLink>
-          </CardContent>
-        </Card>
+              <CardHeader className="space-y-3 px-5 pb-3 pt-6">
+                {isPro ? (
+                  <Badge
+                    className="w-fit border-0 px-2.5 py-1 text-[11px] font-bold uppercase tracking-[0.1em] text-white"
+                    style={{ background: 'var(--accent-primary)' }}
+                  >
+                    Recommended
+                  </Badge>
+                ) : (
+                  <PlanBadgeSpacer />
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-xl font-semibold">{PAID_PLANS[plan].label}</h3>
+                  {current && props.variant === 'dashboard' ? (
+                    <Badge>{paidActive ? 'Current plan' : 'Previous plan'}</Badge>
+                  ) : null}
+                </div>
+                <div>
+                  <PlanPrice plan={plan} quote={quote} />
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {PAID_PLANS[plan].credits} interview credits · {PAID_PLANS[plan].durationDays}-day access
+                  </p>
+                </div>
+                <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                  {PLAN_POSITIONING[plan].title}
+                </p>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col px-5 pb-5">
+                <ul className="flex-1 space-y-2.5">
+                  {paidFeatures[plan].slice(1).map((feature) => (
+                    <IncludedRow key={feature} text={feature} />
+                  ))}
+                </ul>
+                <p className="mt-4 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  {PLAN_POSITIONING[plan].description}
+                </p>
+                <div className="mt-4">
+                  <PaidAction plan={plan} props={props} quote={quote} />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
+
+      {props.belowGrid}
+
       <PaymentTrustSection />
-    </div>
-  );
-}
 
-interface AppPricingGridProps {
-  currentPlan: PlanTier;
-  userEmail: string;
-  planExpiresAt?: string | null;
-  planStatus?: string | null;
-  billingCycle: 'monthly' | 'annual';
-  /** Applied campaign / promo code for checkout. */
-  promoCode?: string;
-  /** Per-plan preview quotes for compact price display (presentation only). */
-  promoQuotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
-  /** Slot between plan cards and trust section (e.g. collapsed promo entry). */
-  belowGrid?: ReactNode;
-}
-
-function PaidPlanPrice({
-  plan,
-  quote,
-}: {
-  plan: PaidPlanId;
-  quote?: PromoPlanQuote;
-}) {
-  if (!quote) {
-    return (
-      <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-        {planPriceLine(plan)}
-      </p>
-    );
-  }
-
-  const listInr = Math.round(quote.list_amount_paise / 100);
-  const finalInr = Math.round(quote.final_amount_paise / 100);
-
-  return (
-    <div className="space-y-1">
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 tabular-nums">
-        <span
-          className="text-lg font-medium line-through"
-          style={{ color: 'var(--text-muted)' }}
-        >
-          ₹{listInr}
-        </span>
-        <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-          ₹{finalInr}
-        </span>
-        <span
-          className="text-[10px] font-semibold uppercase tracking-wide"
-          style={{ color: 'var(--accent-primary)' }}
-        >
-          applied
-        </span>
-      </p>
-    </div>
-  );
-}
-
-/** Logged-in /upgrade — Razorpay one-time 30-day orders */
-export function AppPricingGrid({
-  currentPlan,
-  userEmail,
-  planExpiresAt = null,
-  planStatus = null,
-  promoCode,
-  promoQuotes,
-  belowGrid,
-}: Omit<AppPricingGridProps, 'billingCycle'>) {
-  const isCampus = currentPlan === 'campus' || currentPlan === 'campus_admin';
-  const isPaidActive = isPaidPlanActive(currentPlan, planStatus, planExpiresAt);
-  const canBuyStarter = !isCampus && currentPlan !== 'pro';
-  const canBuyPro = !isCampus;
-  const starterIsRenewal = isRenewalCheckout('starter', currentPlan, planExpiresAt, planStatus);
-  const proIsRenewal = isRenewalCheckout('pro', currentPlan, planExpiresAt, planStatus);
-
-  function renderPlanStatus(plan: PlanTier) {
-    if (isCampus) {
-      return <PlanTierFooter>Managed by your institution</PlanTierFooter>;
-    }
-    if (currentPlan === plan) {
-      return null;
-    }
-    // Paid users: no faux CTA on the Free card (reads like a disabled button)
-    if (plan === 'free' && currentPlan !== 'free') {
-      return <div className="min-h-12 shrink-0" aria-hidden />;
-    }
-    if (TIER_ORDER[currentPlan] > TIER_ORDER[plan]) {
-      return <PlanTierFooter>Included in your plan</PlanTierFooter>;
-    }
-    return null;
-  }
-
-  function starterButtonLabel(): string {
-    return upgradeCheckoutLabel('starter', currentPlan);
-  }
-
-  function proButtonLabel(): string {
-    return upgradeCheckoutLabel('pro', currentPlan);
-  }
-
-  return (
-    <div className="space-y-6">
-    <div className="grid gap-6 md:grid-cols-3 md:items-stretch">
-      <div
-        className={cn(
-          'dashboard-premium-card dashboard-premium-card--overflow-visible flex min-h-0 flex-col transition-transform duration-200 hover:-translate-y-0.5',
-          currentPlan === 'free' &&
-            'ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_42%,transparent)]',
-        )}
-      >
-        <Card className={cn(upgradeCardInner, 'gap-4')}>
-          <CardHeader className="shrink-0 px-5 pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Free
-              </CardTitle>
-              {currentPlan === 'free' && <PlanStatusHeader />}
-            </div>
-            <p className="text-3xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              ₹0
-            </p>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5">
-            <div className="min-h-0 flex-1 space-y-2">
-              {FREE_TIER_FEATURES.map((f) => (
-                <FeatureRow key={f.text} text={f.text} included={f.included} />
-              ))}
-            </div>
-            <div className="mt-auto shrink-0 pt-4">{renderPlanStatus('free')}</div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div
-        className={cn(
-          'dashboard-premium-card dashboard-premium-card--overflow-visible flex min-h-0 flex-col transition-transform duration-200 hover:-translate-y-0.5',
-          currentPlan === 'starter' &&
-            'ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_42%,transparent)]',
-        )}
-      >
-        <Card className={cn(upgradeCardInner, 'gap-4')}>
-          <CardHeader className="shrink-0 px-5 pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Starter
-              </CardTitle>
-              {currentPlan === 'starter' && (
-                <PlanStatusHeader planExpiresAt={planExpiresAt} isActive={isPaidActive} />
-              )}
-            </div>
-            <PaidPlanPrice plan="starter" quote={promoQuotes?.starter} />
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
-              {planPeriodLine()}
-            </p>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5">
-            <ul className="min-h-0 flex-1 space-y-2">
-              {STARTER_FEATURES.map((f) => (
-                <PaidFeatureRow key={f} text={f} />
-              ))}
-            </ul>
-            <div className="mt-auto shrink-0 pt-4">
-              {canBuyStarter ? (
-                <CheckoutButton
-                  userEmail={userEmail}
-                  plan="starter"
-                  source="upgrade"
-                  promoCode={promoCode}
-                  label={starterButtonLabel()}
-                  isRenewal={starterIsRenewal}
-                  planExpiresAt={starterIsRenewal ? planExpiresAt : null}
-                  className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
-                  style={upgradeCtaStyle}
-                />
-              ) : (
-                renderPlanStatus('starter') ?? <PlanTierFooter>Unavailable</PlanTierFooter>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div
-        className={cn(
-          'dashboard-premium-card dashboard-premium-card--overflow-visible relative flex min-h-0 flex-col pt-8 transition-transform duration-200 hover:-translate-y-0.5 md:pt-10',
-          'ring-2 ring-[color-mix(in_srgb,var(--accent-primary)_45%,transparent)]',
-          currentPlan === 'pro' &&
-            'ring-[color-mix(in_srgb,var(--accent-primary)_55%,transparent)]',
-        )}
-      >
-        <div className="pointer-events-none absolute left-1/2 top-0 z-20 -translate-x-1/2 -translate-y-1/2">
-          <Badge
-            className="px-3 py-1.5 text-xs font-semibold whitespace-nowrap shadow-md"
-            style={{
-              background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)',
-              color: '#fff',
-              boxShadow: '0 8px 24px color-mix(in srgb, var(--accent-primary) 35%, transparent)',
-            }}
-          >
-            Most popular
-          </Badge>
-        </div>
-        <Card className={cn(upgradeCardInner, 'gap-4 pt-2')}>
-          <CardHeader className="shrink-0 px-5 pb-2 pt-0">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Pro
-              </CardTitle>
-              {currentPlan === 'pro' && (
-                <PlanStatusHeader
-                  planExpiresAt={planExpiresAt}
-                  isActive={isPaidActive}
-                />
-              )}
-            </div>
-            <PaidPlanPrice plan="pro" quote={promoQuotes?.pro} />
-            <p className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
-              {planPeriodLine()}
-            </p>
-          </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-0 px-5 pb-5">
-            <ul className="min-h-0 flex-1 space-y-2">
-              {PRO_FEATURES.map((f) => (
-                <PaidFeatureRow key={f} text={f} />
-              ))}
-            </ul>
-            <div className="mt-auto shrink-0 pt-4">
-              {canBuyPro ? (
-                <CheckoutButton
-                  userEmail={userEmail}
-                  plan="pro"
-                  source="upgrade"
-                  promoCode={promoCode}
-                  label={proButtonLabel()}
-                  isRenewal={proIsRenewal}
-                  planExpiresAt={proIsRenewal ? planExpiresAt : null}
-                  className="landing-cta-lift h-12 rounded-[14px] border-0 text-base font-semibold text-white"
-                  style={upgradeCtaStyle}
-                />
-              ) : (
-                renderPlanStatus('pro') ?? <PlanTierFooter>Unavailable</PlanTierFooter>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-    {belowGrid ? <div className="pt-1">{belowGrid}</div> : null}
-    <PaymentTrustSection />
+      {props.variant === 'public' ? <PricingWhatsAppSupport /> : null}
+      <TechnicalIssueProtection />
     </div>
   );
 }

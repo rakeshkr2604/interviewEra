@@ -4,12 +4,28 @@ import { useEffect, useRef } from 'react';
 import { Users } from 'lucide-react';
 import { COMMUNITY_COPY } from '@/lib/community/community';
 import {
+  hasJoinedCommunity,
+  hasShownPlacement,
   markPlacementShown,
-  shouldShowInlineCta,
 } from '@/lib/community/storage';
 import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 import { cn } from '@/lib/utils';
+
+/**
+ * This component writes the "already shown" session mark itself, so re-reading
+ * it later in the same page load (remount, re-render) would hide the CTA before
+ * the user ever sees it. Decide once per page load, per placement.
+ */
+const placementDecisions = new Map<string, boolean>();
+
+function isPlacementAllowed(placement: string): boolean {
+  const decided = placementDecisions.get(placement);
+  if (decided !== undefined) return decided;
+  const allowed = !hasShownPlacement(placement);
+  placementDecisions.set(placement, allowed);
+  return allowed;
+}
 
 interface CommunityCTAProps {
   placement: string;
@@ -17,6 +33,11 @@ interface CommunityCTAProps {
   title?: string;
   subtitle?: string;
   className?: string;
+  /**
+   * Renders as a fixed page section: no session/joined gating and no hydration
+   * flip. Use where the CTA is part of the page layout rather than a nudge.
+   */
+  persistent?: boolean;
 }
 
 export function CommunityCTA({
@@ -25,18 +46,20 @@ export function CommunityCTA({
   title,
   subtitle,
   className,
+  persistent = false,
 }: CommunityCTAProps) {
-  const visible = useCommunityStorageSnapshot(
-    () => shouldShowInlineCta(placement),
+  const gatedVisible = useCommunityStorageSnapshot(
+    () => !hasJoinedCommunity() && isPlacementAllowed(placement),
     () => false,
   );
+  const visible = persistent || gatedVisible;
   const markedRef = useRef(false);
 
   useEffect(() => {
-    if (!visible || markedRef.current) return;
+    if (persistent || !visible || markedRef.current) return;
     markedRef.current = true;
     markPlacementShown(placement);
-  }, [visible, placement]);
+  }, [persistent, visible, placement]);
 
   if (!visible) return null;
 

@@ -6,7 +6,8 @@ import { gotoMarketingPage } from '../helpers/marketing-nav';
 const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
   { path: '/', heading: HOME_HERO_HEADING },
   { path: '/campus', heading: /placement outcomes/i },
-  { path: '/pricing', heading: /simple plans/i },
+  // /pricing accessible copy is "InterviewEra plans" (sr-only <h2 id="pricing-plans">).
+  { path: '/pricing', heading: /interviewera plans/i },
   { path: '/how-it-works', heading: /before the interview/i },
 ];
 

@@ -99,7 +99,7 @@ describe('trackFunnelEvent', () => {
     trackFunnelEvent('payment_started', {
       userId: 'user-1',
       plan: 'starter',
-      amount: 14900,
+      amount: 29900,
       source: 'upgrade',
       order_id: 'order_TGBnRqXqsQCisy',
     });

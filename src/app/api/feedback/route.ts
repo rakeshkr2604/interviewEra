@@ -62,10 +62,19 @@ export async function POST(request: Request): Promise<NextResponse> {
     browserInfo,
     screenshotPath,
     sessionContext,
+    interviewId,
+    technicalFailureCategory,
+    technicalIssueDescription,
   } = parsed.data;
 
+  const isTechnicalIssue = feedbackCategory === 'technical_issue';
+  const persistedRating = isTechnicalIssue ? null : rating;
+  const persistedBugsText = isTechnicalIssue
+    ? technicalIssueDescription?.trim() ?? ''
+    : bugsText;
+
   // Require at least one substantive field (text or screenshot).
-  if (!likedText && !confusionText && !bugsText && !screenshotPath) {
+  if (!likedText && !confusionText && !persistedBugsText && !screenshotPath) {
     return NextResponse.json(
       { error: 'Please share at least one note or screenshot before submitting.' },
       { status: 400 },
@@ -74,9 +83,30 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const service = createServiceClient();
 
+  if (screenshotPath && !isOwnedScreenshotPath(screenshotPath, user.id)) {
+    return NextResponse.json({ error: 'Invalid screenshot reference.' }, { status: 403 });
+  }
+
+  if (isTechnicalIssue) {
+    const { data: interview, error: interviewError } = await service
+      .from('interviews')
+      .select('id')
+      .eq('id', interviewId!)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (interviewError) {
+      console.error('[feedback] interview ownership lookup failed:', interviewError.message);
+      return NextResponse.json({ error: 'Could not verify the selected interview.' }, { status: 502 });
+    }
+    if (!interview) {
+      return NextResponse.json({ error: 'Interview not found.' }, { status: 404 });
+    }
+  }
+
   // Resolve a long-lived signed URL for the screenshot (non-fatal if it fails).
   let screenshotUrl: string | null = null;
-  if (screenshotPath && isOwnedScreenshotPath(screenshotPath, user.id)) {
+  if (screenshotPath) {
     const { data, error } = await service.storage
       .from(SCREENSHOT_BUCKET)
       .createSignedUrl(screenshotPath, SCREENSHOT_URL_TTL_SECONDS);
@@ -91,23 +121,27 @@ export async function POST(request: Request): Promise<NextResponse> {
   const email = user.email ?? '';
   const createdAt = new Date();
 
-  const typedSessionCtx = (sessionContext ?? null) as unknown as FeedbackSessionContext | null;
-  const labels = autoTagFeedback(likedText, confusionText, bugsText, typedSessionCtx);
+  const persistedSessionContext = isTechnicalIssue
+    ? { ...(sessionContext ?? {}), session_id: interviewId! }
+    : sessionContext ?? null;
+  const typedSessionCtx = persistedSessionContext as unknown as FeedbackSessionContext | null;
+  const labels = autoTagFeedback(likedText, confusionText, persistedBugsText, typedSessionCtx);
 
   const payload: FeedbackPayload = {
     name,
     email,
     userId: user.id,
-    rating,
+    rating: persistedRating,
     likedText,
     confusionText,
-    bugsText,
-    wouldUseAgain: wouldUseAgain ?? null,
+    bugsText: persistedBugsText,
+    wouldUseAgain: isTechnicalIssue ? null : wouldUseAgain ?? null,
     pageUrl,
     browserInfo,
     screenshotUrl,
     sessionContext: typedSessionCtx,
     labels,
+    feedbackCategory: feedbackCategory ?? 'general',
     createdAt,
   };
 
@@ -124,20 +158,20 @@ export async function POST(request: Request): Promise<NextResponse> {
       user_id: user.id,
       name,
       email,
-      rating,
+      rating: persistedRating,
       liked_text: likedText,
       confusion_text: confusionText,
-      bugs_text: bugsText,
-      would_use_again: wouldUseAgain ?? null,
-      consent_public_display: consentPublicDisplay === true,
-      nps_score: npsScore ?? null,
+      bugs_text: persistedBugsText,
+      would_use_again: isTechnicalIssue ? null : wouldUseAgain ?? null,
+      consent_public_display: !isTechnicalIssue && consentPublicDisplay === true,
+      nps_score: isTechnicalIssue ? null : npsScore ?? null,
       feedback_category: feedbackCategory ?? 'general',
       is_anonymous: false,
       page_url: pageUrl,
       browser_info: browserInfo,
       severity,
       screenshot_url: screenshotUrl,
-      session_context: sessionContext ?? null,
+      session_context: persistedSessionContext,
       labels,
       created_at: createdAt.toISOString(),
       // Retry-system columns — start in 'pending'; email-sender will update.
@@ -155,6 +189,83 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
+  let technicalFailureCase:
+    | {
+        status: string;
+        created: boolean;
+      }
+    | undefined;
+
+  if (isTechnicalIssue) {
+    const { data: caseRows, error: caseError } = await service.rpc(
+      'create_technical_failure_case',
+      {
+        p_user_id: user.id,
+        p_interview_id: interviewId!,
+        p_feedback_id: insertedRow.id,
+        p_failure_category: technicalFailureCategory!,
+      },
+    );
+
+    const caseRow = (
+      caseRows as Array<{
+        case_id: string;
+        case_status: string;
+        original_debit_transaction_id: string | null;
+        created: boolean;
+      }> | null
+    )?.[0];
+
+    if (caseError || !caseRow) {
+      console.error('[feedback] technical failure case creation failed:', caseError?.message);
+      const { error: cleanupError } = await service
+        .from('feedbacks')
+        .delete()
+        .eq('id', insertedRow.id);
+      if (cleanupError) {
+        console.error('[feedback] failed technical feedback cleanup:', cleanupError.message);
+      }
+      return NextResponse.json(
+        { error: 'Could not create the technical issue case. Please try again.' },
+        { status: 502 },
+      );
+    }
+
+    technicalFailureCase = {
+      status: caseRow.case_status,
+      created: caseRow.created,
+    };
+
+    if (!caseRow.created) {
+      const { error: duplicateCleanupError } = await service
+        .from('feedbacks')
+        .delete()
+        .eq('id', insertedRow.id);
+      if (duplicateCleanupError) {
+        console.error(
+          '[feedback] duplicate technical feedback cleanup failed:',
+          duplicateCleanupError.message,
+        );
+        return NextResponse.json(
+          { error: 'The existing technical issue case was found, but retry cleanup failed.' },
+          { status: 502 },
+        );
+      }
+      if (screenshotPath) {
+        const { error: screenshotCleanupError } = await service.storage
+          .from(SCREENSHOT_BUCKET)
+          .remove([screenshotPath]);
+        if (screenshotCleanupError) {
+          console.error(
+            '[feedback] duplicate screenshot cleanup failed:',
+            screenshotCleanupError.message,
+          );
+        }
+      }
+      return NextResponse.json({ ok: true, technicalFailureCase, deduped: true });
+    }
+  }
+
   // ── 2. Attempt immediate email delivery. ────────────────────────────────────
   // sendFeedbackEmail handles its own DB status transitions (pending → sent or
   // pending → failed). Failures here are non-fatal — the retry cron recovers.
@@ -167,9 +278,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     user_id: user.id,
     feedback_category: feedbackCategory ?? 'general',
   });
-  if (npsScore !== null && npsScore !== undefined) {
+  if (!isTechnicalIssue && npsScore !== null && npsScore !== undefined) {
     trackProductEventServer({ event_name: 'nps_submitted', user_id: user.id, nps_score: npsScore });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, technicalFailureCase });
 }

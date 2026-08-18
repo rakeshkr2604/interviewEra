@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server';
 import { getEmailAppUrl } from '@/lib/server/get-base-url';
+import { hasVerifiedEmail } from '@/lib/auth/verified-email-policy';
 import { sendLifecycleTemplate } from './send-template';
 
 const LOG_PREFIX = '[welcome-email]';
@@ -8,16 +9,6 @@ export interface SendWelcomeEmailResult {
   sent: boolean;
   skipped: boolean;
   error?: string;
-}
-
-function isEmailVerified(
-  emailConfirmedAt: string | null | undefined,
-  appMetadata: Record<string, unknown> | undefined,
-): boolean {
-  if (emailConfirmedAt) return true;
-  const providers = appMetadata?.providers;
-  if (Array.isArray(providers) && providers.includes('google')) return true;
-  return false;
 }
 
 /**
@@ -33,7 +24,7 @@ export async function sendWelcomeEmailIfNeeded(userId: string): Promise<SendWelc
   }
 
   const user = authUser.user;
-  if (!isEmailVerified(user.email_confirmed_at, user.app_metadata as Record<string, unknown>)) {
+  if (!hasVerifiedEmail(user)) {
     console.info(`${LOG_PREFIX} skip unverified user`, { userId });
     return { sent: false, skipped: true };
   }

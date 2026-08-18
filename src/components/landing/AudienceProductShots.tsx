@@ -4,21 +4,20 @@ import { ProductPreviewFrame } from '@/components/product-preview/ProductPreview
 export function StudentsProductShot() {
   return (
     <ProductPreviewFrame
-      className="mt-3"
       label="Student mock interview report preview with five scoring dimensions"
     >
-      <div className="bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-2.5 sm:p-3">
+      <div className="min-h-[13rem] bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
               Live session
             </p>
-            <p className="truncate text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               Frontend Intern · Meera
             </p>
           </div>
           <span
-            className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
             style={{
               background: 'color-mix(in srgb, var(--accent-success) 14%, transparent)',
               color: 'var(--accent-success)',
@@ -29,14 +28,14 @@ export function StudentsProductShot() {
         </div>
 
         <div
-          className="mt-2.5 rounded-lg border p-2.5"
+          className="mt-3 rounded-xl border p-3"
           style={{
             borderColor: 'var(--card-border)',
             background: 'var(--card-bg)',
           }}
         >
           <div className="flex items-end justify-between gap-2">
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+            <p className="text-[11px] font-medium" style={{ color: 'var(--text-secondary)' }}>
               Overall
             </p>
             <p
@@ -55,7 +54,7 @@ export function StudentsProductShot() {
               ] as const
             ).map((row) => (
               <div key={row.label}>
-                <div className="flex items-center justify-between gap-2 text-[10px]">
+                <div className="flex items-center justify-between gap-2 text-[11px]">
                   <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
                   <span className="tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {row.pct}%
@@ -86,21 +85,20 @@ export function StudentsProductShot() {
 export function CollegesProductShot() {
   return (
     <ProductPreviewFrame
-      className="mt-3"
       label="Campus T&P dashboard preview with batch readiness and student analytics"
     >
-      <div className="bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-2.5 sm:p-3">
+      <div className="min-h-[13rem] bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
               Campus workspace
             </p>
-            <p className="truncate text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               Placement batch · CSE 2026
             </p>
           </div>
           <span
-            className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
             style={{
               background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
               color: 'var(--accent-primary)',
@@ -110,7 +108,7 @@ export function CollegesProductShot() {
           </span>
         </div>
 
-        <div className="mt-2.5 grid grid-cols-3 gap-1.5">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           {(
             [
               { label: 'Students', value: '248' },
@@ -120,7 +118,7 @@ export function CollegesProductShot() {
           ).map((stat) => (
             <div
               key={stat.label}
-              className="rounded-lg border px-1.5 py-2 text-center"
+              className="rounded-xl border px-1.5 py-2.5 text-center"
               style={{
                 borderColor: 'var(--card-border)',
                 background: 'var(--card-bg)',
@@ -132,7 +130,7 @@ export function CollegesProductShot() {
               >
                 {stat.value}
               </p>
-              <p className="mt-0.5 text-[9px]" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-0.5 text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 {stat.label}
               </p>
             </div>
@@ -140,13 +138,13 @@ export function CollegesProductShot() {
         </div>
 
         <div
-          className="mt-2 rounded-lg border px-2.5 py-2"
+          className="mt-2.5 rounded-xl border px-3 py-2.5"
           style={{
             borderColor: 'var(--card-border)',
             background: 'var(--card-bg)',
           }}
         >
-          <p className="text-[10px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+          <p className="text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
             Batch readiness
           </p>
           <div
@@ -174,24 +172,23 @@ export function CollegesProductShot() {
 export function HiringTeamsProductShot() {
   return (
     <ProductPreviewFrame
-      className="mt-3"
       label="Hiring team candidate evaluation preview with consistent rubric scores"
     >
-      <div className="bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-2.5 sm:p-3">
+      <div className="min-h-[13rem] bg-[color-mix(in_srgb,var(--bg-secondary)_55%,var(--card-bg))] p-3.5">
         <div className="flex items-center justify-between gap-2">
           <div className="min-w-0">
-            <p className="text-[9px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
               Candidate eval
             </p>
-            <p className="truncate text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
               SDE Intern · Round 2
             </p>
           </div>
           <span
-            className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+            className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
             style={{
-              background: 'color-mix(in srgb, var(--accent-warning) 14%, transparent)',
-              color: 'var(--accent-warning)',
+              background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+              color: 'var(--accent-primary)',
             }}
           >
             Review
@@ -199,7 +196,7 @@ export function HiringTeamsProductShot() {
         </div>
 
         <div
-          className="mt-2.5 space-y-1.5 rounded-lg border p-2.5"
+          className="mt-3 space-y-2 rounded-xl border p-3"
           style={{
             borderColor: 'var(--card-border)',
             background: 'var(--card-bg)',
@@ -214,10 +211,10 @@ export function HiringTeamsProductShot() {
           ).map((row) => (
             <div key={row.name} className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-[11px] font-semibold" style={{ color: 'var(--text-primary)' }}>
+                <p className="truncate text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>
                   {row.name}
                 </p>
-                <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                   Same rubric · 5 dimensions
                 </p>
               </div>
@@ -228,7 +225,7 @@ export function HiringTeamsProductShot() {
                 >
                   {row.score}
                 </p>
-                <p className="text-[9px] font-medium" style={{ color: 'var(--text-secondary)' }}>
+                <p className="text-[10px] font-medium" style={{ color: 'var(--text-secondary)' }}>
                   {row.signal}
                 </p>
               </div>

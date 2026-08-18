@@ -12,7 +12,7 @@ export interface FeedbackPayload {
   name: string;
   email: string;
   userId: string | null;
-  rating: number;
+  rating: number | null;
   likedText: string;
   confusionText: string;
   bugsText: string;
@@ -25,6 +25,8 @@ export interface FeedbackPayload {
   sessionContext: FeedbackSessionContext | null;
   /** Auto-detected category labels. Empty array means no label matched. */
   labels: FeedbackLabel[];
+  /** Optional submitter category — used for triage labels. */
+  feedbackCategory?: string | null;
   createdAt: Date;
 }
 
@@ -77,6 +79,10 @@ export function assessFeedback(p: FeedbackPayload): {
   label: string;
   severity: FeedbackSeverity;
 } {
+  if (p.feedbackCategory === 'technical_issue') {
+    return { label: 'Interview technical issue', severity: 'high' };
+  }
+
   const hay = haystack(p);
 
   for (const group of CRITICAL_GROUPS) {
@@ -87,15 +93,18 @@ export function assessFeedback(p: FeedbackPayload): {
 
   const hasBug = p.bugsText.trim().length > 0 || matchesAny(hay, BUG_KEYWORDS);
   if (hasBug) {
-    return { label: 'Bug Report', severity: p.rating <= 2 ? 'high' : 'medium' };
+    return {
+      label: 'Bug Report',
+      severity: p.rating !== null && p.rating <= 2 ? 'high' : 'medium',
+    };
   }
   if (p.confusionText.trim()) {
     return { label: 'Confusing UX', severity: 'medium' };
   }
-  if (p.rating <= 2) {
+  if (p.rating !== null && p.rating <= 2) {
     return { label: 'Negative Feedback', severity: 'medium' };
   }
-  if (p.rating >= 4) {
+  if (p.rating !== null && p.rating >= 4) {
     return { label: 'Positive Feedback', severity: 'low' };
   }
   return { label: 'General Feedback', severity: 'low' };
@@ -103,7 +112,8 @@ export function assessFeedback(p: FeedbackPayload): {
 
 export function buildSubject(p: FeedbackPayload): string {
   const { label, severity } = assessFeedback(p);
-  return `[${severity.toUpperCase()}][InterviewEra Feedback] Rating: ${p.rating}/5 — ${label}`;
+  const rating = p.rating === null ? 'No rating' : `Rating: ${p.rating}/5`;
+  return `[${severity.toUpperCase()}][InterviewEra Feedback] ${rating} — ${label}`;
 }
 
 /** Submission timestamp rendered in IST (Asia/Kolkata). */
@@ -316,7 +326,7 @@ export function buildFeedbackEmailHtml(p: FeedbackPayload): string {
     <tr>
       <td style="padding:20px 24px;background:linear-gradient(135deg,#4f46e5,#7c3aed);">
         <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#e0e7ff;">InterviewEra Feedback</p>
-        <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">${ratingStars(p.rating)} &nbsp;${p.rating}/5</p>
+        <p style="margin:6px 0 0;font-size:20px;font-weight:800;color:#ffffff;line-height:1.25;">${p.rating === null ? 'Interview technical issue' : `${ratingStars(p.rating)} &nbsp;${p.rating}/5`}</p>
         <div style="margin-top:12px;">
           <span style="display:inline-block;font-size:12px;font-weight:800;letter-spacing:.07em;padding:4px 12px;border-radius:999px;background:${sc.bg};color:${sc.fg};">${severity.toUpperCase()} SEVERITY</span>
           <span style="display:inline-block;margin-left:6px;font-size:11px;font-weight:700;padding:4px 11px;border-radius:999px;background:rgba(255,255,255,0.18);color:#ffffff;">${escapeHtml(label)}</span>
@@ -385,7 +395,7 @@ export function buildFeedbackEmailText(p: FeedbackPayload): string {
 
   return [
     `[${severity.toUpperCase()}] InterviewEra Feedback — ${label}`,
-    `Rating: ${p.rating}/5`,
+    `Rating: ${p.rating === null ? 'not requested (technical issue)' : `${p.rating}/5`}`,
     ``,
     `Name: ${p.name}`,
     `Email: ${p.email}`,

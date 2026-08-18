@@ -39,12 +39,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });
   }
 
-  const listAmountPaise = getPaidPlan(plan).amountPaise;
+  const planConfig = getPaidPlan(plan);
+  const listAmountPaise = planConfig.amountPaise;
   const svc = createServiceClient();
   const quote = await quoteCampaignDiscount(svc, {
     code: code.trim().toUpperCase(),
     plan,
     listAmountPaise,
+    promoFloorPaise: planConfig.promoFloorPaise,
   });
 
   if (!quote.ok) {
@@ -61,9 +63,15 @@ export async function POST(request: Request) {
     ok: true,
     label: quote.label,
     kind: quote.kind,
+    discount_type: quote.discount_type,
+    discount_value: quote.discount_value,
     list_amount_paise: listAmountPaise,
     discount_paise: quote.discount_paise,
     final_amount_paise: quote.final_amount_paise,
+    startsAt: quote.starts_at,
+    expiresAt: quote.expires_at,
+    isActive: quote.is_active,
+    serverNow: quote.server_now,
   });
 }
 

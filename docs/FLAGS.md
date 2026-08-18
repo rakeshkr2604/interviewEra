@@ -6,6 +6,17 @@ Two categories exist and are labeled per flag: **Migration/Experiment** (should 
 
 ---
 
+## Staging execution safety contract
+
+- **Variables**: `APP_ENV`, `EXPECTED_SUPABASE_PROJECT_REF`, `STAGING_ENV_SOURCE`, `ALLOW_STAGING_EMAIL`, `STAGING_APPROVED_EMAIL_FROM`, and `STAGING_LLM_MODE`.
+- **Location**: `src/lib/env/staging-environment.ts`; used by `playwright.staging.config.ts`, staging integration setup, and the Razorpay webhook runtime isolation guard (`evaluateWebhookSupabaseIsolation` — when `APP_ENV=staging` or `VERCEL_ENV=preview`).
+- **Default state**: absent → staging E2E fails closed. Local staging loads only `.env.staging.local`; `STAGING_ENV_SOURCE=injected` permits future CI/Vercel environment injection without reading a local file.
+- **Purpose**: prove the certified staging Supabase target, reject the production project and live Razorpay keys, keep email disabled unless explicitly approved, and require either disabled LLM use or an explicit non-production key.
+- **Category**: Permanent operational safety contract.
+- **Planned removal criteria**: N/A. These checks must remain while live staging integration tooling exists.
+
+---
+
 ## `NEXT_PUBLIC_AUTH_V2`
 
 - **Location**: `src/lib/auth/flags.ts::isAuthV2Enabled()` — `process.env.NEXT_PUBLIC_AUTH_V2 === '1'`

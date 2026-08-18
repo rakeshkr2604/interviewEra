@@ -27,6 +27,7 @@
 import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
+import type { TechnicalFailureCaseView } from '@/lib/technical-failures/types';
 
 export const runtime = 'nodejs';
 
@@ -37,7 +38,7 @@ export interface FeedbackRow {
   user_id: string | null;
   name: string;
   email: string;
-  rating: number;
+  rating: number | null;
   liked_text: string;
   confusion_text: string;
   bugs_text: string;
@@ -60,6 +61,7 @@ export interface FeedbackRow {
   labels: string[];
   // Public-display opt-in (migration 064) — false for all pre-consent rows
   consent_public_display: boolean;
+  technical_failure_case?: TechnicalFailureCaseView | null;
 }
 
 export interface DashboardStats {
@@ -93,6 +95,67 @@ function bySeverity(a: FeedbackRow, b: FeedbackRow): number {
   const bo = SEVERITY_ORDER[b.severity ?? ''] ?? 4;
   if (ao !== bo) return ao - bo;
   return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+}
+
+async function attachTechnicalFailureCases(
+  service: ReturnType<typeof createServiceClient>,
+  rows: FeedbackRow[],
+): Promise<FeedbackRow[]> {
+  const feedbackIds = rows.map((row) => row.id);
+  if (feedbackIds.length === 0) return rows;
+
+  const { data: cases, error } = await service
+    .from('technical_failure_cases')
+    .select(
+      'id, user_id, interview_id, feedback_id, failure_category, status, original_debit_transaction_id, restoration_transaction_id, service_recovery_transaction_id, submitted_at, review_started_at, resolved_at, restored_at, service_recovery_granted_at, reviewed_by_email, decision_reason, service_recovery_reason',
+    )
+    .in('feedback_id', feedbackIds);
+
+  if (error || !cases?.length) {
+    if (error) console.error('[admin/feedback] technical case query failed:', error.message);
+    return rows;
+  }
+
+  const interviewIds = cases.map((item) => item.interview_id as string);
+  const debitIds = cases
+    .map((item) => item.original_debit_transaction_id as string | null)
+    .filter((id): id is string => Boolean(id));
+
+  const [{ data: interviews }, { data: debits }] = await Promise.all([
+    service
+      .from('interviews')
+      .select('id, role, difficulty, status, engine, started_at, completed_at, credit_deducted')
+      .in('id', interviewIds),
+    debitIds.length > 0
+      ? service
+          .from('credit_transactions')
+          .select('id, amount, reason, created_at')
+          .in('id', debitIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const interviewById = new Map((interviews ?? []).map((item) => [item.id as string, item]));
+  const debitById = new Map((debits ?? []).map((item) => [item.id as string, item]));
+  const caseByFeedbackId = new Map(
+    cases.map((item) => {
+      const interview = interviewById.get(item.interview_id as string) ?? null;
+      const debitId = item.original_debit_transaction_id as string | null;
+      const debit = debitId ? debitById.get(debitId) ?? null : null;
+      return [
+        item.feedback_id as string,
+        {
+          ...item,
+          interview,
+          original_debit: debit,
+        } as unknown as TechnicalFailureCaseView,
+      ];
+    }),
+  );
+
+  return rows.map((row) => ({
+    ...row,
+    technical_failure_case: caseByFeedbackId.get(row.id) ?? null,
+  }));
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
@@ -204,8 +267,9 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
     const sorted = [...((allRows ?? []) as FeedbackRow[])].sort(bySeverity);
     const sliced = sorted.slice((page - 1) * limit, (page - 1) * limit + limit);
+    const enriched = await attachTechnicalFailureCases(service, sliced);
     return NextResponse.json({
-      items: sliced,
+      items: enriched,
       total: sorted.length,
       page,
       limit,
@@ -227,8 +291,10 @@ export async function GET(request: Request): Promise<NextResponse> {
 
   const total = count ?? 0;
 
+  const items = await attachTechnicalFailureCases(service, (data ?? []) as FeedbackRow[]);
+
   return NextResponse.json({
-    items:       (data ?? []) as FeedbackRow[],
+    items,
     total,
     page,
     limit,

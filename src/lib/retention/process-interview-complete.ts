@@ -267,6 +267,91 @@ async function recomputeProgressRollupsFromLogs(
   }
 }
 
+/**
+ * Self-repair streak when session_quality_log was inserted but updateStreak never
+ * ran (same partial-write class as rollup repair — root-cause F3). Idempotent:
+ * a fully-processed session is a same-day no-op or no change.
+ */
+async function repairStreakFromExistingLog(
+  supabase: ReturnType<typeof createServiceClient>,
+  userId: string,
+  interviewId: string,
+): Promise<void> {
+  const { data: logRow, error: logErr } = await supabase
+    .from('session_quality_log')
+    .select(
+      'questions_answered, total_questions, avg_answer_duration_sec, session_score, unlock_contribution, completed_at',
+    )
+    .eq('interview_id', interviewId)
+    .maybeSingle();
+
+  if (logErr || !logRow) {
+    if (logErr) {
+      logger.error('retention_streak_repair_log_read_failed', {
+        userId,
+        interviewId,
+        error: logErr.message,
+      });
+    }
+    return;
+  }
+
+  const sessionCompletedAt =
+    typeof logRow.completed_at === 'string' && Number.isFinite(Date.parse(logRow.completed_at))
+      ? new Date(logRow.completed_at)
+      : undefined;
+
+  const streakResult = await updateStreak(
+    userId,
+    {
+      interviewId,
+      questionsAnswered: Number(logRow.questions_answered) || 0,
+      totalQuestions: Math.max(1, Number(logRow.total_questions) || 1),
+      avgAnswerDurationSec: Number(logRow.avg_answer_duration_sec) || 0,
+      sessionScore: Number(logRow.session_score) || 0,
+    },
+    sessionCompletedAt ? { now: sessionCompletedAt } : {},
+  );
+
+  if (!streakResult.ok) {
+    logger.error('retention_streak_repair_failed', {
+      userId,
+      interviewId,
+      reasonCode: streakResult.reasonCode,
+      message: streakResult.message,
+    });
+    return;
+  }
+
+  const contribution =
+    logRow.unlock_contribution && typeof logRow.unlock_contribution === 'object'
+      ? (logRow.unlock_contribution as Record<string, unknown>)
+      : {};
+  const streakDelta = streakResult.newStreak - streakResult.previousStreak;
+  const priorDelta =
+    typeof contribution.streak_delta === 'number' ? contribution.streak_delta : 0;
+
+  if (priorDelta === 0 && streakDelta !== 0) {
+    const { error: patchErr } = await supabase
+      .from('session_quality_log')
+      .update({
+        unlock_contribution: {
+          ...contribution,
+          streak_delta: streakDelta,
+        },
+      })
+      .eq('interview_id', interviewId);
+
+    if (patchErr) {
+      logger.error('retention_streak_repair_contribution_failed', {
+        userId,
+        interviewId,
+        error: patchErr.message,
+      });
+    }
+  }
+}
+
 export async function processInterviewRetention(
   userId: string,
   interviewId: string,
@@ -283,6 +368,7 @@ export async function processInterviewRetention(
     // Self-repair partial writes (log inserted, roll-up never landed) so stale
     // user_progress counters converge on retry instead of staying wrong forever.
     await recomputeProgressRollupsFromLogs(supabase, userId);
+    await repairStreakFromExistingLog(supabase, userId, interviewId);
     return idlePayload(userId, interviewId, 'session_quality_log exists');
   }
 

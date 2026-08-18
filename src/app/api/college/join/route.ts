@@ -70,12 +70,18 @@ export async function POST(request: NextRequest) {
 
     const { data: org } = await serviceClient
       .from('campus_organizations')
-      .select('id, seat_count')
+      .select('id, seat_count, verification_status')
       .eq('id', orgId)
       .single();
 
     if (!org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+    if (org.verification_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Campus organization is pending verification.' },
+        { status: 403 },
+      );
     }
 
     const { count: currentStudents } = await serviceClient

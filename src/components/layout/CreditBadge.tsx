@@ -64,7 +64,7 @@ export function CreditBadge({
           }}
           role="tooltip"
         >
-          <p>Each interview uses 1 credit.</p>
+          <p>Starting a mock interview session uses 1 credit.</p>
           {paidActive && planExpiresAt ? (
             <p className="mt-1.5 leading-snug" style={{ color: 'var(--text-secondary)' }}>
               <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>

@@ -3,6 +3,10 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  computeConversionFunnelMetrics,
+  type ConversionFunnelMetrics,
+} from '@/lib/admin/conversion-funnel-metrics';
 
 export interface RetentionCohort {
   label: string;
@@ -28,6 +32,7 @@ export interface GrowthMetricsResult {
     conversion_rate_pct: number | null;
     revenue_inr: number;
   };
+  conversion: ConversionFunnelMetrics;
   feedback: {
     submissions: number;
     avg_rating: number | null;
@@ -128,11 +133,11 @@ export async function computeGrowthMetrics(
     creditedReferrals,
     pendingReferrals,
     pricingViews,
-    checkoutStarted,
     paymentsCaptured,
     revenueRows,
     feedbackRows,
     failedEmails,
+    conversion,
   ] = await Promise.all([
     countActiveSince(svc, weekAgo),
     countActiveSince(svc, monthAgo),
@@ -146,13 +151,6 @@ export async function computeGrowthMetrics(
         .from('product_events')
         .select('id', { count: 'exact', head: true })
         .eq('event_name', 'pricing_page_viewed')
-        .gte('created_at', sinceIso),
-    ),
-    withUntil(
-      svc
-        .from('product_events')
-        .select('id', { count: 'exact', head: true })
-        .eq('event_name', 'payment_started')
         .gte('created_at', sinceIso),
     ),
     withUntil(
@@ -179,13 +177,16 @@ export async function computeGrowthMetrics(
       .from('feedbacks')
       .select('id', { count: 'exact', head: true })
       .eq('email_status', 'failed'),
+    computeConversionFunnelMetrics(svc, sinceIso, untilIso),
   ]);
 
   const payments = paymentsCaptured.count ?? 0;
   const pricing = pricingViews.count ?? 0;
 
   const feedbackList = feedbackRows.data ?? [];
-  const ratings = feedbackList.map((r) => Number(r.rating)).filter((n) => Number.isFinite(n));
+  const ratings = feedbackList
+    .map((r) => (r.rating === null ? null : Number(r.rating)))
+    .filter((n): n is number => n !== null && Number.isFinite(n));
   const npsScores = feedbackList
     .map((r) => (r.nps_score === null ? null : Number(r.nps_score)))
     .filter((n): n is number => n !== null && Number.isFinite(n));
@@ -225,11 +226,13 @@ export async function computeGrowthMetrics(
     },
     revenue: {
       pricing_page_views: pricing,
-      checkout_started: checkoutStarted.count ?? 0,
+      checkout_started:
+        conversion.steps.find((item) => item.key === 'checkout_started')?.count ?? 0,
       payments_captured: payments,
       conversion_rate_pct: pct(payments, pricing),
       revenue_inr: revenueInr,
     },
+    conversion,
     feedback: {
       submissions: feedbackList.length,
       avg_rating:

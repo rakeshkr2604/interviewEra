@@ -54,7 +54,7 @@ export function CreditsOverviewCard({
             <h2 id="credits-overview-heading" className="dashboard-section-title !mt-0 text-base sm:text-lg lg:text-xl">
               Credits
             </h2>
-            <p className="dashboard-section-subtitle">1 credit per mock interview</p>
+            <p className="dashboard-section-subtitle">1 credit starts one mock interview session</p>
           </div>
         </div>
       </div>

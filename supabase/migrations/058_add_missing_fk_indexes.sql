@@ -1,6 +1,14 @@
 -- ============================================================================
 -- 058_add_missing_fk_indexes.sql
 -- ============================================================================
+-- Historical migration 058 was manually applied to production before being
+-- added to version control (commit 9fb0864). Three index targets are created
+-- by later timestamped migrations, so this version is a fresh-replay no-op.
+-- All original index operations are reconciled after dependencies exist by
+-- 20260817162058.
+--
+-- Original body retained as commented historical evidence:
+/*
 -- Purpose: Cover 11 foreign-key columns flagged by Supabase Performance Advisor
 -- as lacking a supporting index (speeds joins, FK validation, and cascades).
 --
@@ -73,3 +81,4 @@ CREATE INDEX IF NOT EXISTS idx_resumes_current_version_id
   ON public.resumes (current_version_id);
 
 COMMIT;
+*/

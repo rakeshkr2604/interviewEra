@@ -7,7 +7,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
-import { normalizeCampaignCode } from '@/lib/campaign-codes';
+import {
+  computeCampaignDiscountQuote,
+  normalizeCampaignCode,
+} from '@/lib/campaign-codes';
+import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
 
 const createSchema = z.object({
   code: z.string().min(2).max(64),
@@ -16,13 +20,37 @@ const createSchema = z.object({
   partner_name: z.string().max(120).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
   discount_type: z.enum(['percent', 'flat_paise']),
-  discount_value: z.number().int().positive(),
+  discount_value: z.number().int().nonnegative(),
   applies_to_plans: z.array(z.enum(['starter', 'pro'])).optional().default([]),
   max_redemptions: z.number().int().positive().optional().nullable(),
   starts_at: z.string().datetime().optional().nullable(),
   expires_at: z.string().datetime().optional().nullable(),
   is_active: z.boolean().optional().default(true),
 });
+
+function validateCampaignPricing(input: z.infer<typeof createSchema>): string | null {
+  if (input.starts_at && input.expires_at && input.starts_at >= input.expires_at) {
+    return 'Campaign end must be after its start.';
+  }
+
+  const plans: PaidPlanId[] =
+    input.applies_to_plans.length > 0 ? input.applies_to_plans : ['starter', 'pro'];
+  for (const plan of plans) {
+    const config = getPaidPlan(plan);
+    const quote = computeCampaignDiscountQuote({
+      listAmountPaise: config.amountPaise,
+      promoFloorPaise: config.promoFloorPaise,
+      discountType: input.discount_type,
+      discountValue: input.discount_value,
+    });
+    if (!quote.ok) {
+      return quote.error_code === 'CODE_DISCOUNT_INVALID'
+        ? 'Discount must be between 0% and 50% and use integer-safe values.'
+        : `${config.label} final price cannot be below ₹${config.promoFloorPaise / 100}.`;
+    }
+  }
+  return null;
+}
 
 export async function GET() {
   const { error } = await requirePlatformAdmin();
@@ -73,8 +101,9 @@ export async function POST(request: Request) {
   if (input.kind === 'sponsorship' && !input.partner_name?.trim()) {
     return NextResponse.json({ error: 'partner_name is required for sponsorship codes' }, { status: 400 });
   }
-  if (input.discount_type === 'percent' && (input.discount_value < 1 || input.discount_value > 99)) {
-    return NextResponse.json({ error: 'Percent discount must be 1–99' }, { status: 400 });
+  const pricingError = validateCampaignPricing(input);
+  if (pricingError) {
+    return NextResponse.json({ error: pricingError }, { status: 400 });
   }
 
   const svc = createServiceClient();
@@ -105,6 +134,21 @@ export async function POST(request: Request) {
       { error: conflict ? 'Code already exists' : 'Failed to create code' },
       { status: conflict ? 409 : 500 },
     );
+  }
+
+  const { error: auditErr } = await svc.from('product_events').insert({
+    event_name: 'campaign_created',
+    user_id: admin!.id,
+    props: {
+      campaign_code_id: data.id,
+      code: data.code,
+      applies_to_plans: data.applies_to_plans,
+      discount_type: data.discount_type,
+      discount_value: data.discount_value,
+    },
+  });
+  if (auditErr) {
+    console.error('[admin/campaign-codes] create audit:', auditErr.message);
   }
 
   return NextResponse.json({ code: data }, { status: 201 });

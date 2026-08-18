@@ -13,8 +13,18 @@ import { CreditExhaustedSection } from './CreditExhaustedSection';
 import { UpgradePageFooter } from '@/components/pricing/UpgradePageFooter';
 import { CommunityCTA } from '@/components/community/CommunityCTA';
 import type { PlanTier, RadarDataPoint } from '@/types/app.types';
+import { isPaidPlanId } from '@/lib/pricing/plans';
+import { formatPlanExpiryEnIn } from '@/lib/pricing/copy';
+import { normalizePricingCampaignCode } from '@/lib/pricing/plan-intent';
 
-export default async function UpgradePage() {
+export default async function UpgradePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string; code?: string }>;
+}) {
+  const params = await searchParams;
+  const selectedPlan = params.plan && isPaidPlanId(params.plan) ? params.plan : undefined;
+  const initialCode = normalizePricingCampaignCode(params.code);
   const supabase = await createClient();
 
   const {
@@ -75,13 +85,43 @@ export default async function UpgradePage() {
     <div className="space-y-8">
       <DashboardPageHeader
         eyebrow="Pricing"
-        title={isExhausted ? 'Keep your momentum going' : 'Upgrade your plan'}
+        title={isExhausted ? 'Keep your momentum going' : 'Upgrade your preparation'}
         subtitle={
           isExhausted
             ? "You've used your credits. Same one-time plans as our homepage — pay once for 30 days and unlock more practice."
             : 'More credits, deeper feedback, better results. Credits deduct when an interview starts.'
         }
       />
+
+      <section
+        className="dashboard-premium-card grid gap-4 p-5 sm:grid-cols-3 sm:p-6"
+        aria-label="Current plan status"
+      >
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Current plan
+          </p>
+          <p className="mt-1 text-xl font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
+            {currentPlan.replace('_', ' ')}
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Credits
+          </p>
+          <p className="mt-1 text-xl font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+            {creditsRemaining} remaining
+          </p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Access
+          </p>
+          <p className="mt-1 text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+            {planExpiresAt ? `Expires ${formatPlanExpiryEnIn(planExpiresAt)}` : 'No expiry'}
+          </p>
+        </div>
+      </section>
 
       {isExhausted && (
         <CreditExhaustedSection
@@ -95,6 +135,8 @@ export default async function UpgradePage() {
         userEmail={email}
         planExpiresAt={planExpiresAt}
         planStatus={planStatus}
+        selectedPlan={selectedPlan}
+        initialCode={initialCode}
       />
 
       <CommunityCTA

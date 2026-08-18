@@ -10,8 +10,25 @@ concurrency:
 
 jobs:
   e2e_integration:
-    name: Resume integration E2E
+    name: Staging resume integration E2E
     runs-on: ubuntu-latest
+    environment: staging
+    env:
+      APP_ENV: staging
+      EXPECTED_SUPABASE_PROJECT_REF: iiowrzfwemaxytbykjrg
+      STAGING_ENV_SOURCE: injected
+      ALLOW_STAGING_EMAIL: 'false'
+      STAGING_LLM_MODE: disabled
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.STAGING_NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_APP_URL: ${{ vars.STAGING_NEXT_PUBLIC_APP_URL }}
+      RAZORPAY_KEY_ID: ${{ secrets.STAGING_RAZORPAY_KEY_ID }}
+      NEXT_PUBLIC_RAZORPAY_KEY_ID: ${{ secrets.STAGING_RAZORPAY_KEY_ID }}
+      RAZORPAY_KEY_SECRET: ${{ secrets.STAGING_RAZORPAY_KEY_SECRET }}
+      RAZORPAY_WEBHOOK_SECRET: ${{ secrets.STAGING_RAZORPAY_WEBHOOK_SECRET }}
+      E2E_TEST_EMAIL: ${{ secrets.STAGING_E2E_TEST_EMAIL }}
+      E2E_TEST_PASSWORD: ${{ secrets.STAGING_E2E_TEST_PASSWORD }}
 
     steps:
       - name: Checkout
@@ -26,32 +43,41 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Staging environment preflight
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${APP_ENV:-}" != "staging" ]]; then
+            echo "::error::APP_ENV must be staging"
+            exit 1
+          fi
+          if [[ "${EXPECTED_SUPABASE_PROJECT_REF:-}" != "iiowrzfwemaxytbykjrg" ]]; then
+            echo "::error::Unexpected staging Supabase project ref"
+            exit 1
+          fi
+          if [[ "${STAGING_ENV_SOURCE:-}" != "injected" ]]; then
+            echo "::error::STAGING_ENV_SOURCE must be injected"
+            exit 1
+          fi
+          if [[ "${NEXT_PUBLIC_SUPABASE_URL:-}" == *"plfuvgkycmxcyshrgpgv"* ]]; then
+            echo "::error::Production Supabase is forbidden"
+            exit 1
+          fi
+          if [[ "${NEXT_PUBLIC_APP_URL:-}" == "https://interviewera.com"* ]] ||
+             [[ "${NEXT_PUBLIC_APP_URL:-}" == "https://www.interviewera.com"* ]]; then
+            echo "::error::Production application URL is forbidden"
+            exit 1
+          fi
+          npm exec tsx -- -e "import { loadSafeStagingEnvironment } from './src/lib/env/staging-environment.ts'; loadSafeStagingEnvironment({ type: 'injected' }); console.log('Staging environment preflight passed');"
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
       - name: Build
         run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          NEXT_PUBLIC_APP_URL: http://127.0.0.1:3000
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          OPENAI_API_KEY: sk-placeholder
-          RESEND_API_KEY: re_placeholder
-          UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
-          UPSTASH_REDIS_REST_TOKEN: placeholder_token
 
       - name: Integration E2E tests
-        run: npm run test:e2e:integration
+        run: npm run test:e2e:staging
         env:
           CI: true
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          E2E_TEST_EMAIL: ${{ secrets.E2E_TEST_EMAIL }}
-          E2E_TEST_PASSWORD: ${{ secrets.E2E_TEST_PASSWORD }}
-          OPENAI_API_KEY: sk-placeholder
-          RESEND_API_KEY: re_placeholder
-          UPSTASH_REDIS_REST_URL: https://placeholder.upstash.io
-          UPSTASH_REDIS_REST_TOKEN: placeholder_token

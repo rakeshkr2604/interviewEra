@@ -19,6 +19,7 @@ import {
 import { isRenewalCheckout } from '@/lib/pricing/plan-status'
 import { CheckoutButton } from '@/components/pricing/CheckoutButton'
 import { cn } from '@/lib/utils'
+import { formatCreditLedgerReason } from '@/lib/technical-failures/status'
 import type { PlanTier } from '@/types/app.types'
 
 export type BillingTx = {
@@ -292,13 +293,14 @@ export function BillingUsageCard({
                 <tr style={{ color: 'var(--text-muted)' }}>
                   <th className="pb-2 pr-2 font-semibold">Date</th>
                   <th className="pb-2 pr-2 font-semibold">Type</th>
+                  <th className="pb-2 pr-2 font-semibold">Reason</th>
                   <th className="pb-2 pr-2 text-right font-semibold">Amount</th>
                 </tr>
               </thead>
               <tbody style={{ color: 'var(--text-primary)' }}>
                 {recentTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan={3} className="py-4 text-center" style={{ color: 'var(--text-muted)' }}>
+                    <td colSpan={4} className="py-4 text-center" style={{ color: 'var(--text-muted)' }}>
                       No transactions yet.
                     </td>
                   </tr>
@@ -313,6 +315,9 @@ export function BillingUsageCard({
                         })}
                       </td>
                       <td className="py-2 pr-2 align-top capitalize">{t.type}</td>
+                      <td className="py-2 pr-2 align-top" style={{ color: 'var(--text-secondary)' }}>
+                        {formatCreditLedgerReason(t.reason)}
+                      </td>
                       <td className="py-2 text-right align-top font-medium tabular-nums">
                         {t.type === 'debit' ? '−' : '+'}
                         {t.amount}

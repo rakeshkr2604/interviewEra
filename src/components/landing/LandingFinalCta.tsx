@@ -5,6 +5,7 @@ import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
 import { LANDING_HOME_INNER } from '@/lib/landing/container';
+import { CANDIDATE_RATING } from '@/lib/landing/trust-metrics';
 
 export default function LandingFinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
   const cta = isLoggedIn ? '/dashboard' : '/signup';
@@ -24,9 +25,11 @@ export default function LandingFinalCta({ isLoggedIn }: { isLoggedIn: boolean })
             <span aria-hidden className="tracking-wide" style={{ color: T.warn }}>
               ★★★★★
             </span>
-            <span className="sr-only">4.5 out of 5 stars — </span>
+            <span className="sr-only">
+              {CANDIDATE_RATING.value} out of {CANDIDATE_RATING.outOf} stars —{' '}
+            </span>
             {' '}
-            4.5 / 5 Average Candidate Rating
+            {CANDIDATE_RATING.value} / {CANDIDATE_RATING.outOf} {CANDIDATE_RATING.label}
           </p>
           <div className="mb-5 inline-block rounded-full px-4 py-1.5 text-xs font-semibold" style={{ background: T.accdim, border: `1px solid ${T.accbrd}`, color: T.acc2 }}>
             Free to start — no card required

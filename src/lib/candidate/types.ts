@@ -121,6 +121,7 @@ export interface CandidateSnapshot {
   targetRole: string;
   profile: CandidateProfileFields;
   latestResume: ResumeSnapshot | null;
+  hasActiveResume: boolean;
   resumeCompletionPct: number;
   progress: UserProgressRow | null;
   completedSessionCount: number;

@@ -1,18 +1,21 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Ticket } from 'lucide-react';
-import { AppPricingGrid, type PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
-import { BillingCycleToggle, type BillingCycle } from '@/components/pricing/BillingCycleToggle';
+import { PricingPlanGrid, type PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
 import type { PlanTier } from '@/types/app.types';
 import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+import { trackCouponEntered } from '@/lib/analytics/funnel-ga4-bridge';
 
 interface PricingSectionProps {
   currentPlan: PlanTier;
   userEmail: string;
   planExpiresAt?: string | null;
   planStatus?: string | null;
+  selectedPlan?: PaidPlanId;
+  initialCode?: string;
 }
 
 type PreviewJson = {
@@ -23,13 +26,24 @@ type PreviewJson = {
   list_amount_paise?: number;
   discount_paise?: number;
   final_amount_paise?: number;
+  discount_type?: string;
+  discount_value?: number;
+  startsAt?: string | null;
+  expiresAt?: string | null;
+  isActive?: boolean;
+  serverNow?: string | null;
+  campaign_code_id?: string | null;
 };
 
-async function previewPlan(plan: PaidPlanId, code: string): Promise<PreviewJson & { plan: PaidPlanId }> {
+async function previewPlan(
+  plan: PaidPlanId,
+  code: string,
+  couponAttemptId: string,
+): Promise<PreviewJson & { plan: PaidPlanId }> {
   const res = await fetch('/api/payments/preview-discount', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ plan, code }),
+    body: JSON.stringify({ plan, code, coupon_attempt_id: couponAttemptId }),
   });
   const json = (await res.json()) as PreviewJson;
   return { ...json, plan, ok: res.ok && json.ok === true };
@@ -40,30 +54,41 @@ export function PricingSection({
   userEmail,
   planExpiresAt,
   planStatus,
+  selectedPlan,
+  initialCode,
 }: PricingSectionProps) {
-  // TEMPORARILY HIDDEN: annual billing toggle (2026-05-14) — cycle fixed to 'monthly'
-  const [cycle, setCycle] = useState<BillingCycle>('monthly');
+  const router = useRouter();
   const [codeOpen, setCodeOpen] = useState(false);
-  const [codeDraft, setCodeDraft] = useState('');
+  const [codeDraft, setCodeDraft] = useState(initialCode ?? '');
   const [appliedCode, setAppliedCode] = useState<string | undefined>();
   const [quotes, setQuotes] = useState<Partial<Record<PaidPlanId, PromoPlanQuote>>>({});
   const [inlineError, setInlineError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const inputId = useId();
   const errorId = useId();
+  const initialCodeApplied = useRef(false);
 
-  async function applyCode() {
-    const code = codeDraft.trim().toUpperCase();
+  async function applyCode(codeOverride?: string, trackEntry = true) {
+    const code = (codeOverride ?? codeDraft).trim().toUpperCase();
     if (!code) {
       setInlineError('Enter a code');
       return;
+    }
+    const couponAttemptId = crypto.randomUUID();
+    if (trackEntry) {
+      trackCouponEntered({
+        plan: selectedPlan ?? 'all',
+        sourcePage: '/upgrade',
+        campaignCode: code,
+        couponAttemptId,
+      });
     }
     setApplying(true);
     setInlineError(null);
     try {
       const [starter, pro] = await Promise.all([
-        previewPlan('starter', code),
-        previewPlan('pro', code),
+        previewPlan('starter', code, couponAttemptId),
+        previewPlan('pro', code, couponAttemptId),
       ]);
 
       const nextQuotes: Partial<Record<PaidPlanId, PromoPlanQuote>> = {};
@@ -73,6 +98,12 @@ export function PricingSection({
           discount_paise: starter.discount_paise ?? 0,
           final_amount_paise: starter.final_amount_paise,
           label: starter.label ?? null,
+          discountPercent: starter.discount_type === 'percent' ? starter.discount_value ?? null : null,
+          startsAt: starter.startsAt ?? null,
+          expiresAt: starter.expiresAt ?? null,
+          isActive: starter.isActive,
+          serverNow: starter.serverNow ?? null,
+          campaignCodeId: starter.campaign_code_id ?? null,
         };
       }
       if (pro.ok && typeof pro.final_amount_paise === 'number') {
@@ -81,6 +112,12 @@ export function PricingSection({
           discount_paise: pro.discount_paise ?? 0,
           final_amount_paise: pro.final_amount_paise,
           label: pro.label ?? null,
+          discountPercent: pro.discount_type === 'percent' ? pro.discount_value ?? null : null,
+          startsAt: pro.startsAt ?? null,
+          expiresAt: pro.expiresAt ?? null,
+          isActive: pro.isActive,
+          serverNow: pro.serverNow ?? null,
+          campaignCodeId: pro.campaign_code_id ?? null,
         };
       }
 
@@ -114,6 +151,14 @@ export function PricingSection({
     }
   }
 
+  useEffect(() => {
+    if (!initialCode || initialCodeApplied.current) return;
+    initialCodeApplied.current = true;
+    void applyCode(initialCode, false);
+    // Initial URL intent is applied once; later edits are user-controlled.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCode]);
+
   function clearCode() {
     setCodeDraft('');
     setAppliedCode(undefined);
@@ -122,35 +167,28 @@ export function PricingSection({
     setCodeOpen(true);
   }
 
+  function expireCode() {
+    setAppliedCode(undefined);
+    setQuotes({});
+    setInlineError('This offer has ended. Current list pricing is shown.');
+    setCodeOpen(false);
+    router.refresh();
+  }
+
   return (
     <div className="dashboard-premium-card overflow-visible">
       <PricingPageViewTracker sourcePage="/upgrade" authenticated />
-      {false && (
-        <div
-          className="border-b-2 px-6 py-5 sm:px-8 sm:py-6"
-          style={{
-            borderColor: 'var(--card-border)',
-            background: 'linear-gradient(90deg, color-mix(in srgb, var(--accent-primary) 10%, transparent), transparent)',
-          }}
-        >
-          <p
-            className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] sm:text-[11px]"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            Billing
-          </p>
-          <BillingCycleToggle value={cycle} onChange={setCycle} id="upgrade-billing" />
-        </div>
-      )}
-
       <div className="p-6 sm:p-8">
-        <AppPricingGrid
+        <PricingPlanGrid
+          variant="dashboard"
           currentPlan={currentPlan}
           userEmail={userEmail}
           planExpiresAt={planExpiresAt}
           planStatus={planStatus}
           promoCode={appliedCode}
           promoQuotes={quotes}
+          selectedPlan={selectedPlan}
+          onCampaignExpired={expireCode}
           belowGrid={
             <div className="flex flex-col items-center text-center">
               {!codeOpen && !appliedCode && (

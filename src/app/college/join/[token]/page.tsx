@@ -44,9 +44,13 @@ async function getInviteData(token: string) {
 
     const { data: org } = await serviceClient
       .from('campus_organizations')
-      .select('id, name')
+      .select('id, name, verification_status')
       .eq('id', invite.org_id)
       .single();
+
+    if (org?.verification_status !== 'approved') {
+      return { invite, org: null, error: 'pending_verification' as const };
+    }
 
     return { invite, org };
   } catch {
@@ -62,6 +66,24 @@ export default async function JoinInvitePage({ params }: PageProps) {
   } = await supabase.auth.getUser();
 
   const { invite, org, error } = await getInviteData(token);
+
+  if (error === 'pending_verification') {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg-primary)' }}>
+        <div
+          className="w-full max-w-md rounded-2xl p-8 text-center"
+          style={{ background: 'var(--card-bg)', border: '1.5px solid var(--card-border)' }}
+        >
+          <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Campus Verification Pending
+          </h1>
+          <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            This campus organization is pending verification. Try again after it has been approved.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (error === 'accepted') {
     return (
@@ -201,7 +223,7 @@ export default async function JoinInvitePage({ params }: PageProps) {
                   <li>✓ Unlimited AI mock interviews</li>
                   <li>✓ Detailed scoring across 5 dimensions</li>
                   <li>✓ Progress tracking and placement readiness</li>
-                  <li>✓ Interview replay and model answer comparison</li>
+                  <li>✓ Model answer comparison and Improvement Guidance</li>
                 </ul>
               </div>
 

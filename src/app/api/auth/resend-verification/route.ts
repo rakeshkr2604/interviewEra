@@ -3,9 +3,12 @@ import { z } from 'zod';
 import { createServiceClient } from '@/lib/supabase/server';
 import { sendSignupVerificationEmail } from '@/lib/email/lifecycle/send-verification';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { sanitizeNext } from '@/lib/auth/auth-params';
+import { hasVerifiedEmail } from '@/lib/auth/verified-email-policy';
 
 const bodySchema = z.object({
   email: z.string().trim().email('Enter a valid email address.'),
+  next: z.string().optional(),
 });
 
 const GENERIC_SUCCESS =
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
   const ip = clientIp(request);
   const email = parsed.data.email.trim().toLowerCase();
+  const next = sanitizeNext(parsed.data.next);
 
   const rlIp = await checkRateLimit(`resend-verification:${ip}`, 3600, 5);
   const rlEmail = await checkRateLimit(`resend-verification:${email}`, 3600, 3);
@@ -65,14 +69,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     });
 
     const user = linkData?.user;
-    if (!user || user.email_confirmed_at) {
+    if (!user || hasVerifiedEmail(user)) {
       return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
     }
 
     const name =
       typeof user.user_metadata?.name === 'string' ? user.user_metadata.name : undefined;
 
-    await sendSignupVerificationEmail(email, { name });
+    await sendSignupVerificationEmail(email, { name, next });
 
     return NextResponse.json({ ok: true, message: GENERIC_SUCCESS });
   } catch (err) {

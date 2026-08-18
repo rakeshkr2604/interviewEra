@@ -2,7 +2,7 @@
  * Campus workspace verification — prevents self-service campus_admin escalation.
  */
 
-export type CampusOrgVerificationStatus = 'pending' | 'approved';
+export type CampusOrgVerificationStatus = 'pending' | 'approved' | 'rejected';
 
 /**
  * True only on Vercel Production (`VERCEL_ENV=production`).

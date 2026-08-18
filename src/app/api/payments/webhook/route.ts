@@ -1,13 +1,18 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { verifyWebhookSignature } from '@/lib/razorpay/client';
+import {
+  fetchRazorpayOrder,
+  fetchRazorpayPayment,
+  verifyWebhookSignature,
+} from '@/lib/razorpay/client';
 import { activatePlanAfterPayment } from '@/lib/razorpay/activate-plan';
 import { shouldTrackPaymentCompleted } from '@/lib/razorpay/activation-api-response';
 import { isPaidPlanId } from '@/lib/pricing/plans';
 import { paymentError, paymentLog, paymentWarn } from '@/lib/razorpay/payment-log';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
-import { releaseCampaignReservationForOrder } from '@/lib/campaign-codes';
 import { resolveExpectedOrderAmount } from '@/lib/razorpay/expected-order-amount';
+import { validateProviderPaymentAgainstLocalExpectation } from '@/lib/razorpay/provider-payment-validation';
+import { evaluateWebhookSupabaseIsolation } from '@/lib/env/staging-environment';
 
 interface RazorpayPaymentEntity {
   id: string;
@@ -65,6 +70,22 @@ export async function POST(request: Request): Promise<NextResponse> {
     payment_id: paymentId,
   });
 
+  // After signature + parse, before any DB client: Preview/staging Supabase target lock.
+  // VERCEL_ENV=production / local unset APP_ENV is passthrough (no EXPECTED_SUPABASE_PROJECT_REF).
+  const isolation = evaluateWebhookSupabaseIsolation();
+  if (!isolation.ok) {
+    paymentError('webhook', 'environment_isolation_failed', {
+      eventId,
+      order_id: orderId,
+      payment_id: paymentId,
+      code: isolation.code,
+    });
+    return NextResponse.json(
+      { error: 'Webhook environment isolation failed' },
+      { status: 500 },
+    );
+  }
+
   const supabase = createServiceClient();
   const now = new Date().toISOString();
 
@@ -93,6 +114,47 @@ export async function POST(request: Request): Promise<NextResponse> {
           eventId,
           code: expected.code,
           error: expected.error,
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      let providerPayment;
+      let providerOrder;
+      try {
+        [providerPayment, providerOrder] = await Promise.all([
+          fetchRazorpayPayment(paymentId),
+          fetchRazorpayOrder(orderId),
+        ]);
+      } catch (err) {
+        paymentError('webhook', 'provider_entity_fetch_failed', {
+          order_id: orderId,
+          payment_id: paymentId,
+          eventId,
+          error: err instanceof Error ? err.message : 'unknown',
+        });
+        return NextResponse.json({ error: 'Webhook provider verification failed' }, { status: 500 });
+      }
+
+      const providerValidation = validateProviderPaymentAgainstLocalExpectation(
+        providerPayment,
+        providerOrder,
+        {
+          userId: expected.userId,
+          plan: expected.plan,
+          orderId,
+          amountPaise: expected.amountPaise,
+          currency: expected.currency,
+          campaignRedemptionId: expected.campaignRedemptionId,
+        },
+        paymentId,
+      );
+      if (!providerValidation.ok) {
+        paymentWarn('webhook', `provider_${providerValidation.code}`, {
+          order_id: orderId,
+          payment_id: paymentId,
+          eventId,
+          expected: providerValidation.expected,
+          actual: providerValidation.actual,
         });
         return NextResponse.json({ ok: true });
       }
@@ -130,6 +192,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           user_id: expected.userId,
           plan: expected.plan,
           amount: expected.amountPaise,
+          order_id: orderId,
           payment_id: paymentId,
           source: 'webhook',
         });
@@ -153,24 +216,39 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ ok: true });
       }
 
-      const { error } = await supabase
+      const expected = await resolveExpectedOrderAmount(
+        supabase,
+        payment.order_id,
+        isPaidPlanId,
+      );
+      const { data: failedRows, error } = await supabase
         .from('payments')
         .update({ status: 'failed', updated_at: now })
         .eq('order_id', payment.order_id)
-        .in('status', ['created']);
+        .in('status', ['created'])
+        .select('order_id');
 
       if (error) throw new Error(error.message);
 
-      const { released, redemptionId } = await releaseCampaignReservationForOrder(
-        supabase,
-        payment.order_id,
-      );
+      if ((failedRows?.length ?? 0) > 0 && expected.ok) {
+        trackProductEventServer({
+          event_name: 'payment_failed',
+          user_id: expected.userId,
+          plan: expected.plan,
+          amount: expected.amountPaise,
+          order_id: payment.order_id,
+          payment_id: payment.id,
+          payment_status: payment.status,
+          failure_category: 'gateway_failed',
+          source: 'webhook',
+        });
+      }
 
       paymentLog('webhook', 'payment_failed', {
         order_id: payment.order_id,
         payment_id: payment.id,
-        campaign_reservation_released: released,
-        redemption_id: redemptionId,
+        campaign_reservation_released: false,
+        reason: 'bound_order_may_still_be_paid',
       });
       return NextResponse.json({ ok: true });
     }

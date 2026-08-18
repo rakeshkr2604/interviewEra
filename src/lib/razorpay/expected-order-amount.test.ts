@@ -14,7 +14,8 @@ describe('resolveExpectedOrderAmount', () => {
                   data: {
                     user_id: 'user-1',
                     plan: 'starter',
-                    amount: 13410,
+                    amount: 20900,
+                    currency: 'INR',
                     campaign_redemption_id: 'red-1',
                   },
                   error: null,
@@ -28,7 +29,13 @@ describe('resolveExpectedOrderAmount', () => {
             select: () => ({
               eq: () => ({
                 maybeSingle: async () => ({
-                  data: { final_amount_paise: 13410, status: 'reserved' },
+                  data: {
+                    user_id: 'user-1',
+                    order_id: 'order_disc',
+                    plan: 'starter',
+                    final_amount_paise: 20900,
+                    status: 'reserved',
+                  },
                   error: null,
                 }),
               }),
@@ -42,14 +49,15 @@ describe('resolveExpectedOrderAmount', () => {
     const result = await resolveExpectedOrderAmount(svc as never, 'order_disc', isPaidPlanId);
     expect(result).toEqual({
       ok: true,
-      amountPaise: 13410,
+      amountPaise: 20900,
+      currency: 'INR',
       plan: 'starter',
       userId: 'user-1',
       campaignRedemptionId: 'red-1',
     });
   });
 
-  it('returns list price from payments.amount when no campaign code was used', async () => {
+  it('returns the stored Pro list price from payments.amount when no campaign code was used', async () => {
     const svc = {
       from: vi.fn((table: string) => {
         if (table === 'payments') {
@@ -59,8 +67,9 @@ describe('resolveExpectedOrderAmount', () => {
                 maybeSingle: async () => ({
                   data: {
                     user_id: 'user-1',
-                    plan: 'starter',
-                    amount: 14900,
+                    plan: 'pro',
+                    amount: 79900,
+                    currency: 'INR',
                     campaign_redemption_id: null,
                   },
                   error: null,
@@ -76,8 +85,9 @@ describe('resolveExpectedOrderAmount', () => {
     const result = await resolveExpectedOrderAmount(svc as never, 'order_list', isPaidPlanId);
     expect(result).toEqual({
       ok: true,
-      amountPaise: 14900,
-      plan: 'starter',
+      amountPaise: 79900,
+      currency: 'INR',
+      plan: 'pro',
       userId: 'user-1',
       campaignRedemptionId: null,
     });
@@ -94,7 +104,8 @@ describe('resolveExpectedOrderAmount', () => {
                   data: {
                     user_id: 'user-1',
                     plan: 'starter',
-                    amount: 13410,
+                    amount: 20900,
+                    currency: 'INR',
                     campaign_redemption_id: 'red-1',
                   },
                   error: null,
@@ -107,7 +118,13 @@ describe('resolveExpectedOrderAmount', () => {
           select: () => ({
             eq: () => ({
               maybeSingle: async () => ({
-                data: { final_amount_paise: 10000, status: 'reserved' },
+                data: {
+                  user_id: 'user-1',
+                  order_id: 'order_bad',
+                  plan: 'starter',
+                  final_amount_paise: 10000,
+                  status: 'reserved',
+                },
                 error: null,
               }),
             }),
@@ -123,10 +140,37 @@ describe('resolveExpectedOrderAmount', () => {
     }
   });
 
+  it('fails closed when the linked redemption cannot be loaded', async () => {
+    const svc = {
+      from: vi.fn((table: string) => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () =>
+              table === 'payments'
+                ? {
+                    data: {
+                      user_id: 'user-1',
+                      plan: 'starter',
+                      amount: 20900,
+                      currency: 'INR',
+                      campaign_redemption_id: 'red-missing',
+                    },
+                    error: null,
+                  }
+                : { data: null, error: { message: 'lookup failed' } },
+          }),
+        }),
+      })),
+    };
+
+    const result = await resolveExpectedOrderAmount(svc as never, 'order_missing', isPaidPlanId);
+    expect(result).toMatchObject({ ok: false, code: 'redemption_mismatch' });
+  });
+
   it('verify path: discounted remote amount matches expected; list-price compare would wrongly fail', () => {
-    const remoteAmount = 13410;
-    const listPrice = 14900;
-    const expectedFromPayments = 13410;
+    const remoteAmount = 20900;
+    const listPrice = 29900;
+    const expectedFromPayments = 20900;
 
     // Pre-fix bug: compared remote to list price → false reject
     expect(remoteAmount === listPrice).toBe(false);

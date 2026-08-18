@@ -228,6 +228,12 @@ export async function loadCandidateSnapshot(
     (resumes ?? []).find((r) => r.is_primary && r.status === 'parsed') ??
     resumes?.[0] ??
     null;
+  const hasActiveResume = (resumes ?? []).some(
+    (resume) =>
+      resume.status !== 'failed' &&
+      typeof resume.storage_path === 'string' &&
+      resume.storage_path.trim().length > 0,
+  );
   let latestResume: ResumeSnapshot | null = null;
   if (latestResumeRow) {
     const parsed =
@@ -273,6 +279,7 @@ export async function loadCandidateSnapshot(
     targetRole,
     profile,
     latestResume,
+    hasActiveResume,
     resumeCompletionPct: resumeCompletionPct(latestResume),
     progress: (progressSnap as UserProgressRow | null) ?? null,
     completedSessionCount: completedInterviews.length,

@@ -1,11 +1,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { config } from 'dotenv';
 import type { InterviewResumeSnapshot } from '../../src/lib/session/interview-resume-snapshot';
 import { Q3_QUESTION_TEXT } from './interview-resume-mocks';
+import { loadSelectedE2eEnvironment } from './e2e-environment';
 
-config({ path: join(process.cwd(), '.env.local') });
+loadSelectedE2eEnvironment();
 
 const STORAGE_PATH = join(process.cwd(), 'e2e', '.auth', 'user.json');
 

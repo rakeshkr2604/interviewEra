@@ -30,6 +30,15 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect('/dashboard');
   }
 
+  const { data: org } = await svc
+    .from('campus_organizations')
+    .select('verification_status')
+    .eq('admin_user_id', user.id)
+    .single();
+  if (org?.verification_status !== 'approved') {
+    redirect('/college/signup?status=pending');
+  }
+
   return (
     <div className="min-h-screen" style={{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }}>
       <AdminTopBar />

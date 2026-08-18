@@ -1,4 +1,7 @@
 import { authReady } from './auth-fixture';
+import { loadSelectedE2eEnvironment } from './e2e-environment';
+
+loadSelectedE2eEnvironment();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? '';
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ?? '';

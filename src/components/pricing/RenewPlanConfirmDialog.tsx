@@ -46,6 +46,7 @@ export function RenewPlanConfirmDialog({
             </span>
             , your renewal will extend from that date.
           </p>
+          <p>Renewal adds the new plan&apos;s credits to your remaining balance.</p>
         </div>
         <DialogFooter className="gap-2 sm:gap-2">
           <Button

@@ -7,7 +7,7 @@ export const NAV_TOOLS_MENU = 'Tools';
 export const NAV_RESOURCES_MENU = 'Resources';
 export const NAV_PRICING_LINK = 'Pricing';
 export const NAV_SIGN_IN = 'Sign in';
-export const NAV_SIGN_UP = 'Sign up';
+export const NAV_SIGN_UP = "Sign up - It's Free!";
 
 /** Wait until auth-deferred navbar has hydrated (not skeleton). */
 export async function waitForMainNav(page: Page): Promise<void> {

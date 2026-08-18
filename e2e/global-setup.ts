@@ -2,9 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { chromium, type FullConfig } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
-import { config } from 'dotenv';
-
-config({ path: join(process.cwd(), '.env.local') });
+import { loadSelectedE2eEnvironment } from './helpers/e2e-environment';
 
 const AUTH_DIR = join(process.cwd(), 'e2e', '.auth');
 const STORAGE_PATH = join(AUTH_DIR, 'user.json');
@@ -16,6 +14,7 @@ function supabaseAuthCookieName(supabaseUrl: string): string {
 }
 
 export default async function globalSetup(_config: FullConfig): Promise<void> {
+  loadSelectedE2eEnvironment();
   mkdirSync(AUTH_DIR, { recursive: true });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
@@ -24,7 +23,9 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const PORT = process.env.PLAYWRIGHT_PORT ?? '3000';
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
 
-  if (!url || !serviceKey || !anonKey || serviceKey.includes('placeholder')) {
+  // CI uses placeholder credentials for environment-safe runs. Abort auth bootstrap
+  // to avoid failing network calls (e.g. DNS for placeholder.supabase.co).
+  if (!url || !serviceKey || !anonKey || url.includes('placeholder') || serviceKey.includes('placeholder')) {
     writeFileSync(READY_PATH, '0');
     return;
   }

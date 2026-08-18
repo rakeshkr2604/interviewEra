@@ -1,8 +1,8 @@
 /**
  * POST /api/payments/release-campaign-reservation
  *
- * Auth: signed-in user. Releases a reserved campaign code for an order they own
- * (modal dismiss / payment.failed client path). Idempotent via RPC.
+ * Backward-compatible no-op for order-bound reservations. Signed-in users may
+ * identify only their own order; the database RPC rejects bound releases.
  */
 
 import { NextResponse } from 'next/server';
@@ -74,7 +74,11 @@ export async function POST(request: Request): Promise<NextResponse> {
     released,
   });
 
-  return NextResponse.json({ ok: true, released });
+  return NextResponse.json({
+    ok: true,
+    released,
+    reason: released ? 'released' : 'bound_order_retained',
+  });
 }
 
 export const runtime = 'nodejs';

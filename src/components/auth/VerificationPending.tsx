@@ -8,9 +8,11 @@ import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
 export interface VerificationPendingProps {
   email: string;
   intent?: AuthIntent;
+  next?: string;
+  status?: 'verification_required';
 }
 
-export function VerificationPending({ email, intent }: VerificationPendingProps) {
+export function VerificationPending({ email, intent, next, status }: VerificationPendingProps) {
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -27,7 +29,7 @@ export function VerificationPending({ email, intent }: VerificationPendingProps)
       const res = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, ...(next ? { next } : {}) }),
       });
 
       const body = (await res.json().catch(() => null)) as { error?: string; message?: string } | null;
@@ -61,16 +63,24 @@ export function VerificationPending({ email, intent }: VerificationPendingProps)
     }
   }
 
-  const signupHref = intent && intent !== 'candidate' ? `/signup?intent=${intent}` : '/signup';
+  const signupParams = new URLSearchParams();
+  if (intent && intent !== 'candidate') signupParams.set('intent', intent);
+  if (next) signupParams.set('next', next);
+  const signupHref = signupParams.size ? `/signup?${signupParams.toString()}` : '/signup';
+  const loginHref = next ? `/login?${new URLSearchParams({ next, email }).toString()}` : '/login';
 
   return (
     <div className="mx-auto w-full max-w-md space-y-6 text-center sm:text-left">
       <h1 className="text-2xl font-bold tracking-tight sm:text-3xl" style={{ color: 'var(--text-primary)' }}>
-        Check your inbox
+        {status === 'verification_required' && intent === 'college'
+          ? 'Verify your email to continue campus setup'
+          : 'Check your inbox'}
       </h1>
       <p className="text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
         We sent a verification link to <strong style={{ color: 'var(--text-primary)' }}>{email}</strong>. Click it to
-        activate your account.
+        {intent === 'college'
+          ? ' verify your account, then continue setting up your campus.'
+          : ' activate your account.'}
       </p>
 
       {feedback ? (
@@ -111,7 +121,7 @@ export function VerificationPending({ email, intent }: VerificationPendingProps)
         <Link href={signupHref} className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
           Change email
         </Link>
-        <Link href="/login" className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
+        <Link href={loginHref} className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
           Back to sign in
         </Link>
       </div>

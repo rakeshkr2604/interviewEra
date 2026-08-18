@@ -2,7 +2,7 @@
  * GET /api/admin/checkout-activity?range=30&limit=50
  * Optional: &from=YYYY-MM-DD&to=YYYY-MM-DD (custom range overrides preset)
  *
- * Recent pricing_page_viewed + payment_started events joined with user email.
+ * Recent pricing and checkout/payment funnel events joined with user email.
  * For payment_started rows missing props.order_id (legacy emits), falls back to
  * the nearest payments.order_id for that user.
  *
@@ -16,7 +16,13 @@ import { getCached, setCached } from '@/lib/admin/cache';
 import { parseAdminDateBounds, resolveGrowthPreset } from '@/lib/admin/date-range';
 
 const CACHE_TTL = 60_000;
-const EVENT_NAMES = ['pricing_page_viewed', 'payment_started'] as const;
+const EVENT_NAMES = [
+  'pricing_page_viewed',
+  'checkout_started',
+  'payment_started',
+  'payment_failed',
+  'payment_completed',
+] as const;
 /** Max skew when matching a legacy payment_started event to payments.order_id. */
 const PAYMENT_MATCH_WINDOW_MS = 10 * 60_000;
 
@@ -137,7 +143,7 @@ export async function GET(request: Request) {
       const props = (e.props ?? {}) as Record<string, unknown>;
       const eventName = e.event_name as CheckoutActivityEventName;
       let orderId =
-        eventName === 'payment_started' ? extractOrderId(props) : null;
+        eventName === 'pricing_page_viewed' ? null : extractOrderId(props);
 
       // Legacy payment_started rows never stored order_id — match nearest payments row.
       if (eventName === 'payment_started' && !orderId && e.user_id) {

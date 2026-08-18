@@ -5,9 +5,11 @@
  * Re-introduce remote flags later via env or a server endpoint if needed.
  *
  * Flag keys kept for documentation:
- *   free_credit_count — was "5" | "7"
+ *   free_credit_count — historical experiment; fixed at canonical plan value now
  *   first_interview_questions — was "6" (control) | "4" (variant)
  */
+
+import { FREE_PLAN } from '@/lib/pricing/plans';
 
 export const FLAGS = {
   FREE_CREDIT_COUNT: 'free_credit_count',
@@ -18,7 +20,7 @@ export type FlagName = (typeof FLAGS)[keyof typeof FLAGS];
 
 /** Values used when no remote override is configured. */
 export const FLAG_DEFAULTS: Record<FlagName, string> = {
-  [FLAGS.FREE_CREDIT_COUNT]: '5',
+  [FLAGS.FREE_CREDIT_COUNT]: String(FREE_PLAN.credits),
   [FLAGS.FIRST_INTERVIEW_QUESTIONS]: '6',
 };
 

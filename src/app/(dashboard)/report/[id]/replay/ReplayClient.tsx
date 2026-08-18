@@ -82,7 +82,7 @@ export function ReplayClient({ reportId, role, difficulty, items }: ReplayClient
             Transcript review
           </p>
           <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl" style={{ color: 'var(--text-primary)' }}>
-            Interview Replay — {role}
+            Interview Answer Review — {role}
           </h1>
           <p className="mt-1 text-sm capitalize" style={{ color: 'var(--text-secondary)' }}>
             {difficulty} difficulty

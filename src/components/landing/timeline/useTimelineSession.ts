@@ -228,5 +228,5 @@ export function useTimelineSession() {
     }));
   }, []);
 
-  return { trackRef, state, setMobileStage };
+  return { trackRef, state, setMobileStage, desktopSticky };
 }

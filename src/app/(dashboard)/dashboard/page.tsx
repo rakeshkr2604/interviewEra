@@ -17,6 +17,7 @@ import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { DashboardCommunityCard } from '@/components/community/DashboardCommunityCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
+import { ProfileCompletionCard } from '@/components/dashboard/ProfileCompletionCard'
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker'
 import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
@@ -31,6 +32,7 @@ import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
 import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
 import type { UserProgressRow } from '@/lib/retention/types'
 import type { PlanTier } from '@/types/app.types'
+import { resolveProfileOnboarding } from '@/lib/profile/onboarding-state'
 
 export const metadata = PAGE_SEO.dashboard
 
@@ -165,6 +167,17 @@ export default async function DashboardPage() {
       : ((progressSnap as UserProgressRow | null) ?? null),
     interviews: (interviewsRaw ?? []) as InterviewWithReportsRow[],
   })
+  const profileOnboarding = resolveProfileOnboarding({
+    name: userData?.name,
+    candidateProfile:
+      userData && 'candidate_profile' in userData ? userData.candidate_profile : null,
+    hasActiveResume: candidateSnapshot.hasActiveResume,
+    hasInterviewHistory: (interviewsRaw ?? []).length > 0,
+  })
+  if (profileOnboarding.shouldRedirectToWelcome && planTier !== 'campus_admin') {
+    redirect('/welcome')
+  }
+
   const readiness = computeReadinessScore(candidateSnapshot)
   const roadmap = generatePersonalizedRoadmap(candidateSnapshot)
 
@@ -221,11 +234,15 @@ export default async function DashboardPage() {
         />
       </div>
 
+      <ProfileCompletionCard resolution={profileOnboarding} />
+
       <QuickActionsGrid resumeCompletionPct={candidateSnapshot.resumeCompletionPct} />
 
       <ReadinessOverviewCard readiness={readiness} />
 
-      <RecommendationsStrip roadmap={roadmap} />
+      {profileOnboarding.state === 'complete' ? (
+        <RecommendationsStrip roadmap={roadmap} />
+      ) : null}
 
       <DashboardCommunityCard />
 

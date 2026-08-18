@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Code2,
   CreditCard,
+  FilePenLine,
   GraduationCap,
   HelpCircle,
   Layers,
@@ -72,6 +73,35 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type NavUser = MarketingNavUser;
+const NAV_FLOAT_THRESHOLD_PX = 48;
+
+function useNavbarScrolled(): boolean {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const sync = () => {
+      frame = 0;
+      const next = window.scrollY > NAV_FLOAT_THRESHOLD_PX;
+      setScrolled((current) => (current === next ? current : next));
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(sync);
+    };
+
+    sync();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (frame) cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return scrolled;
+}
 
 function NavbarPrimaryCta({
   href,
@@ -168,12 +198,21 @@ const INTERVIEW_QUESTIONS_ITEMS = [
 
 const TOOL_ICONS = [Sparkles, Shield, Award] as const;
 
-const TOOLS_ITEMS = NAV_TOOLS_ITEMS.map((item, index) => ({
-  icon: TOOL_ICONS[index],
-  label: item.label,
-  href: item.href,
-  desc: item.desc,
-})) as readonly DropItem[];
+const TOOLS_ITEMS = [
+  ...NAV_TOOLS_ITEMS.map((item, index) => ({
+    icon: TOOL_ICONS[index] ?? Sparkles,
+    label: item.label,
+    href: item.href,
+    desc: item.desc,
+  })),
+  {
+    icon: FilePenLine,
+    label: 'Resume Builder',
+    href: '#',
+    desc: 'Build ATS-ready resumes',
+    comingSoon: true as const,
+  },
+] as unknown as readonly DropItem[];
 
 const RESOURCES_ITEMS = [
   {
@@ -311,41 +350,30 @@ function NavbarSignInLink({
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// ─── Shared shell (sticky + scroll-aware blur/shadow) ─────────────────────────
+// ─── Shared shell (expanded at top → compact floating glass on scroll) ────────
 
-function NavShell({ children }: { children: React.ReactNode }) {
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 10);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll(); // sync on mount in case page is already scrolled
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  // Defer backdrop-filter until the user has scrolled: blur on the sticky
-  // header forces expensive paint/compositing during the LCP-critical window.
-  // At scrollY≈0 use a near-opaque fill (no filter); once scrolled, restore
-  // the translucent + blur glass look so settled appearance matches before.
+function NavShell({
+  children,
+  scrolled,
+}: {
+  children: React.ReactNode;
+  scrolled: boolean;
+}) {
   return (
     <header
       role="banner"
+      data-navbar-state={scrolled ? 'floating' : 'expanded'}
       className={cn(
-        'sticky top-0 z-50 border-b transition-shadow duration-200 motion-reduce:transition-none',
+        'sticky top-0 z-50 border-b',
+        'transition-[background-color,border-color,box-shadow] duration-300 ease-out',
+        'motion-reduce:transition-none',
         NAV_SHELL_HEIGHT_CLASS,
-        scrolled && 'shadow-sm',
       )}
       style={{
-        borderColor: 'var(--card-border)',
+        borderColor: scrolled ? 'transparent' : 'var(--card-border)',
         background: scrolled
-          ? 'color-mix(in srgb, var(--bg-primary) 82%, transparent)'
+          ? 'transparent'
           : 'color-mix(in srgb, var(--bg-primary) 96%, transparent)',
-        ...(scrolled
-          ? {
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-            }
-          : {}),
       }}
     >
       {/* Skip-to-content for keyboard users */}
@@ -360,9 +388,27 @@ function NavShell({ children }: { children: React.ReactNode }) {
       <nav
         aria-label="Main navigation"
         className={cn(
-          LANDING_PAGE_CONTAINER,
-          'flex h-full items-center gap-1 px-4 sm:px-5',
+          'flex items-center gap-1',
+          'transition-[width,max-width,height,padding,border-radius,border-color,background-color,box-shadow,transform] duration-300 ease-out',
+          'motion-reduce:transition-none',
+          scrolled
+            ? 'relative top-2 mx-auto h-12 w-[calc(100%-1rem)] max-w-5xl rounded-2xl border px-2.5 sm:w-[calc(100%-2rem)] sm:px-3.5'
+            : cn(LANDING_PAGE_CONTAINER, 'h-16 px-4 sm:px-5'),
         )}
+        style={
+          scrolled
+            ? {
+                borderColor:
+                  'color-mix(in srgb, var(--accent-primary) 18%, var(--card-border))',
+                background:
+                  'color-mix(in srgb, var(--bg-primary) 84%, transparent)',
+                backdropFilter: 'blur(16px) saturate(1.12)',
+                WebkitBackdropFilter: 'blur(16px) saturate(1.12)',
+                boxShadow:
+                  '0 14px 38px -22px color-mix(in srgb, var(--accent-primary) 45%, transparent), 0 6px 18px -12px rgba(15, 23, 42, 0.28), inset 0 1px 0 color-mix(in srgb, white 55%, transparent)',
+              }
+            : undefined
+        }
       >
         {children}
       </nav>
@@ -379,6 +425,7 @@ interface DropItem {
   readonly desc: string;
   readonly ctaKey?: CtaKey;
   readonly ctaSection?: string;
+  readonly comingSoon?: boolean;
 }
 
 function NavHoverMenu({
@@ -399,7 +446,7 @@ function NavHoverMenu({
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const isActive = isAnyNavPathActive(
     pathname,
-    items.map((item) => item.href),
+    items.filter((item) => !item.comingSoon).map((item) => item.href),
   );
 
   const show = useCallback(() => {
@@ -429,10 +476,14 @@ function NavHoverMenu({
     desc,
     ctaKey,
     ctaSection,
+    comingSoon,
   }: DropItem) => {
-    const itemActive = isNavPathActive(pathname, href);
+    const itemActive = !comingSoon && isNavPathActive(pathname, href);
     const itemClassName = cn(
-      'group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]',
+      'group flex items-start gap-3 rounded-lg px-3 py-2.5 transition-colors',
+      comingSoon
+        ? 'cursor-default opacity-80'
+        : 'hover:bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]',
       itemActive && 'bg-[color-mix(in_srgb,var(--accent-primary)_8%,transparent)]',
     );
     const inner = (
@@ -440,16 +491,34 @@ function NavHoverMenu({
         <span
           className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg"
           style={{
-            background: 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
-            color: 'var(--accent-link)',
+            background: comingSoon
+              ? 'color-mix(in srgb, var(--text-muted) 12%, transparent)'
+              : 'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+            color: comingSoon ? 'var(--text-muted)' : 'var(--accent-link)',
           }}
           aria-hidden
         >
           <Icon className="size-3.5" />
         </span>
-        <span className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-            {itemLabel}
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex items-center gap-2">
+            <span
+              className="text-sm font-medium"
+              style={{ color: comingSoon ? 'var(--text-muted)' : 'var(--text-primary)' }}
+            >
+              {itemLabel}
+            </span>
+            {comingSoon ? (
+              <span
+                className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+                style={{
+                  background: 'color-mix(in srgb, var(--accent-warning) 18%, transparent)',
+                  color: 'var(--accent-warning)',
+                }}
+              >
+                Coming soon
+              </span>
+            ) : null}
           </span>
           <span className="text-xs leading-snug" style={{ color: 'var(--text-secondary)' }}>
             {desc}
@@ -461,6 +530,20 @@ function NavHoverMenu({
       setOpen(false);
       onNavigate?.();
     };
+
+    if (comingSoon) {
+      return (
+        <div
+          key={`soon-${itemLabel}`}
+          role="menuitem"
+          aria-disabled="true"
+          aria-label={`${itemLabel}, coming soon`}
+          className={itemClassName}
+        >
+          {inner}
+        </div>
+      );
+    }
 
     // Campus landing is a heavy client island (motion/react) — do not
     // viewport-prefetch it from marketing chrome.
@@ -626,6 +709,27 @@ function MobileNavLink({
   );
 }
 
+function MobileComingSoonRow({ label }: { label: string }) {
+  return (
+    <div
+      className={cn(NAV_MOBILE_LINK_BASE, 'cursor-default justify-between opacity-80')}
+      style={{ color: 'var(--text-muted)' }}
+      aria-label={`${label}, coming soon`}
+    >
+      <span>{label}</span>
+      <span
+        className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+        style={{
+          background: 'color-mix(in srgb, var(--accent-warning) 18%, transparent)',
+          color: 'var(--accent-warning)',
+        }}
+      >
+        Coming soon
+      </span>
+    </div>
+  );
+}
+
 // ─── Avatar dropdown ──────────────────────────────────────────────────────────
 
 function AvatarMenu({
@@ -766,11 +870,18 @@ const AUTH_NAV_SKELETON_STYLE = {
   opacity: 0.55,
 } as const;
 
-function AuthNavPlaceholder() {
+function AuthNavPlaceholder({ scrolled }: { scrolled: boolean }) {
   return (
-    <NavShell>
-      <BrandHomeLink variant="navbar" className="mr-2 shrink-0" />
-      <div className="hidden flex-1 items-center gap-2 lg:flex" aria-hidden>
+    <NavShell scrolled={scrolled}>
+      <BrandHomeLink
+        variant="navbar"
+        compact={scrolled}
+        className="mr-2 shrink-0"
+      />
+      <div
+        className={cn('hidden flex-1 items-center gap-2', !scrolled && 'lg:flex')}
+        aria-hidden
+      >
         {Array.from({ length: 4 }).map((_, index) => (
           <div
             key={index}
@@ -782,19 +893,25 @@ function AuthNavPlaceholder() {
       <div className="ml-auto flex items-center gap-2">
         <ThemeToggle />
         <div
-          className="hidden h-9 w-24 rounded-[var(--ie-radius-sm)] lg:block"
+          className={cn(
+            'h-9 w-24 rounded-[var(--ie-radius-sm)]',
+            scrolled ? 'hidden sm:block' : 'hidden lg:block',
+          )}
           style={AUTH_NAV_SKELETON_STYLE}
           aria-hidden
         />
         <div
-          className="hidden size-9 rounded-full lg:block"
+          className={cn(
+            'size-9 rounded-full',
+            'hidden lg:block',
+          )}
           style={AUTH_NAV_SKELETON_STYLE}
           aria-hidden
         />
         <Button
           variant="ghost"
           size="icon"
-          className="size-9 shrink-0 lg:hidden"
+          className={cn('size-9 shrink-0', !scrolled && 'lg:hidden')}
           aria-label="Open navigation menu"
           aria-busy="true"
           disabled
@@ -810,12 +927,26 @@ function AuthNavPlaceholder() {
 
 // ─── Anonymous navbar ─────────────────────────────────────────────────────────
 
-function AnonymousNav({ user = null }: { user?: NavUser | null }) {
+function AnonymousNav({
+  user = null,
+  scrolled,
+}: {
+  user?: NavUser | null;
+  scrolled: boolean;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const loggedIn = Boolean(user);
 
   const closeMobile = () => {
     setMobileOpen(false);
+  };
+
+  const handleMobileOpenChange = (open: boolean) => {
+    setMobileOpen(open);
+    if (!open) {
+      requestAnimationFrame(() => menuTriggerRef.current?.focus({ preventScroll: true }));
+    }
   };
 
   const MOBILE_PRACTICE_LINKS = [
@@ -830,12 +961,25 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
   ] as const;
 
   return (
-    <NavShell>
+    <NavShell scrolled={scrolled}>
       {/* Logo */}
-      <BrandHomeLink variant="navbar" className="mr-2 shrink-0" />
+      <BrandHomeLink
+        variant="navbar"
+        compact={scrolled}
+        className="mr-2 shrink-0"
+      />
 
       {/* Desktop: Product / Interview Questions / Tools / Resources / Pricing */}
-      <div className="hidden items-center gap-0.5 lg:flex">
+      <div
+        inert={scrolled ? true : undefined}
+        className={cn(
+          'hidden items-center gap-0.5 lg:flex',
+          'transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none',
+          scrolled
+            ? 'pointer-events-none max-w-0 -translate-y-1 overflow-hidden opacity-0 motion-reduce:translate-y-0'
+            : 'max-w-[42rem] opacity-100',
+        )}
+      >
         <NavHoverMenu label="Product" items={PRODUCT_ITEMS} menuId="nav-product" />
         <NavHoverMenu
           label="Interview Questions"
@@ -852,8 +996,35 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
         <MarketingNavLink href="/pricing">Pricing</MarketingNavLink>
       </div>
 
+      {/* Floating: Tools / Resources / Pricing centered between logo and actions */}
+      {scrolled ? (
+        <div
+          data-nav-surface="floating"
+          className="hidden min-w-0 flex-1 justify-center sm:flex"
+        >
+          <div className="flex items-center gap-0.5">
+            <NavHoverMenu label="Tools" items={TOOLS_ITEMS} menuId="nav-tools-floating" />
+            <NavHoverMenu
+              label="Resources"
+              items={RESOURCES_ITEMS}
+              menuId="nav-resources-floating"
+            />
+            <MarketingNavLink href="/pricing">Pricing</MarketingNavLink>
+          </div>
+        </div>
+      ) : null}
+
       {/* Desktop: right — logged-in: credits/dashboard/avatar; anon: sign in/up */}
-      <div className="ml-auto hidden items-center gap-2 lg:flex">
+      <div
+        inert={scrolled ? true : undefined}
+        className={cn(
+          'ml-auto hidden items-center gap-2 lg:flex',
+          'transition-[max-width,opacity,transform] duration-200 ease-out motion-reduce:transition-none',
+          scrolled
+            ? 'pointer-events-none max-w-0 translate-y-1 overflow-hidden opacity-0 motion-reduce:translate-y-0'
+            : 'max-w-[28rem] opacity-100',
+        )}
+      >
         {loggedIn && user ? (
           <>
             <Link href="/upgrade" tabIndex={-1} aria-label={`${user.credits_remaining} credits remaining`}>
@@ -876,27 +1047,60 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
             <NavbarPrimaryCta
               href="/signup"
               ctaKey={CTA_KEYS.SIGN_UP}
-              ctaText="Sign up"
+              ctaText="Sign up - It's Free!"
               section="navbar"
             >
-              Sign up
+              Sign up - It&apos;s Free!
             </NavbarPrimaryCta>
           </>
         )}
       </div>
 
-      {/* Mobile: Theme / Credits / Hamburger */}
-      <div className="ml-auto flex items-center gap-2 lg:hidden">
+      {/* Mobile at all times; compact priority actions on desktop after scroll. */}
+      <div
+        className={cn(
+          'relative z-10 flex shrink-0 items-center gap-2',
+          // Floating mid-links take flex-1 on sm+; keep ml-auto on mobile only.
+          scrolled ? 'ml-auto sm:ml-0' : 'ml-auto',
+          !scrolled && 'lg:hidden',
+        )}
+      >
         {loggedIn && user ? (
           <Link href="/upgrade" tabIndex={-1} aria-label={`${user.credits_remaining} credits remaining`}>
             <CreditBadge creditsRemaining={user.credits_remaining} />
           </Link>
         ) : null}
         <ThemeToggle />
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+        {scrolled && loggedIn && user ? (
+          <>
+            <Link
+              href="/dashboard"
+              className={cn(NAV_PRIMARY_CTA_CLASS, 'hidden px-3.5 sm:inline-flex')}
+              style={NAV_PRIMARY_CTA_STYLE}
+            >
+              Dashboard
+            </Link>
+            <div className="hidden lg:block">
+              <AvatarMenu user={user} />
+            </div>
+          </>
+        ) : null}
+        {scrolled && !loggedIn ? (
+          <NavbarPrimaryCta
+            href="/signup"
+            ctaKey={CTA_KEYS.SIGN_UP}
+            ctaText="Sign up - It's Free!"
+            section="navbar_floating"
+            className="hidden sm:inline-flex"
+          >
+            Sign up - It&apos;s Free!
+          </NavbarPrimaryCta>
+        ) : null}
+        <Sheet open={mobileOpen} onOpenChange={handleMobileOpenChange}>
           <SheetTrigger
             render={
               <Button
+                ref={menuTriggerRef}
                 variant="ghost"
                 size="icon"
                 className="size-9 shrink-0"
@@ -909,6 +1113,7 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
           </SheetTrigger>
           <SheetContent
             side="right"
+            finalFocus={false}
             className="flex w-[min(100%,20rem)] max-h-[100dvh] flex-col gap-0 overflow-hidden border-l border-border p-0 motion-reduce:transition-none sm:max-w-sm"
           >
             <SheetHeader className="shrink-0 border-b border-border px-4 py-4 text-left">
@@ -940,7 +1145,7 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
               )}
             </SheetHeader>
             <nav
-              aria-label="Mobile navigation"
+              aria-label="Navigation menu"
               className="ie-touch-scroll ie-overscroll-contain flex min-h-0 flex-1 flex-col overflow-y-auto p-2"
             >
               <p className={NAV_MOBILE_SECTION_LABEL}>Product</p>
@@ -959,6 +1164,7 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
                   onNavigate={closeMobile}
                 />
               ))}
+              <MobileComingSoonRow label="Resume Builder" />
 
               <p className={NAV_MOBILE_SECTION_LABEL}>Resources</p>
               {MOBILE_RESOURCE_LINKS.map(({ href, label }) => (
@@ -1009,12 +1215,12 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
                   <NavbarPrimaryCta
                     href="/signup"
                     ctaKey={CTA_KEYS.SIGN_UP}
-                    ctaText="Sign up"
+                    ctaText="Sign up - It's Free!"
                     section="navbar_mobile"
                     onClick={closeMobile}
                     className="w-full min-h-11 py-3 text-base"
                   >
-                    Sign up
+                    Sign up - It&apos;s Free!
                   </NavbarPrimaryCta>
                 </>
               )}
@@ -1041,7 +1247,8 @@ function AnonymousNav({ user = null }: { user?: NavUser | null }) {
  */
 export function Navbar() {
   const { showAuthPlaceholder, user } = useMarketingNavbarAuth();
+  const scrolled = useNavbarScrolled();
 
-  if (showAuthPlaceholder) return <AuthNavPlaceholder />;
-  return <AnonymousNav user={user} />;
+  if (showAuthPlaceholder) return <AuthNavPlaceholder scrolled={scrolled} />;
+  return <AnonymousNav user={user} scrolled={scrolled} />;
 }

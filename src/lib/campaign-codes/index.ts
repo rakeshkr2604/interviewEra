@@ -8,26 +8,90 @@ import type { PaidPlanId } from '@/lib/pricing/plans';
 export type CampaignCodeKind = 'promo' | 'sponsorship';
 export type CampaignDiscountType = 'percent' | 'flat_paise';
 
+/** Exact column order returned by quote_campaign_discount in the latest migration. */
+export const CAMPAIGN_QUOTE_RPC_COLUMNS = [
+  'ok',
+  'error_code',
+  'campaign_code_id',
+  'discount_paise',
+  'final_amount_paise',
+  'label',
+  'kind',
+  'discount_type',
+  'discount_value',
+  'starts_at',
+  'expires_at',
+  'is_active',
+  'server_now',
+] as const;
+
 export type CampaignDiscountErrorCode =
   | 'CODE_INVALID'
+  | 'CODE_NOT_STARTED'
   | 'CODE_EXPIRED'
   | 'CODE_EXHAUSTED'
   | 'CODE_NOT_APPLICABLE'
   | 'CODE_ALREADY_USED'
-  | 'CODE_BELOW_MINIMUM';
+  | 'CODE_BELOW_MINIMUM'
+  | 'CODE_DISCOUNT_INVALID'
+  | 'CHECKOUT_INITIALIZING';
 
 export const CAMPAIGN_DISCOUNT_USER_MESSAGES: Record<CampaignDiscountErrorCode, string> = {
   CODE_INVALID: 'This code is not valid.',
+  CODE_NOT_STARTED: 'This campaign has not started yet.',
   CODE_EXPIRED: 'This code has expired.',
   CODE_EXHAUSTED: 'This code has reached its usage limit.',
   CODE_NOT_APPLICABLE: 'This code cannot be applied to the selected plan.',
   CODE_ALREADY_USED: 'You have already redeemed this code on a completed payment.',
   CODE_BELOW_MINIMUM:
-    'This code would reduce the price below the minimum charge (₹1). Choose another plan or code.',
+    'This code would reduce the price below the promotional minimum for this plan.',
+  CODE_DISCOUNT_INVALID: 'This campaign discount is invalid or exceeds 50%.',
+  CHECKOUT_INITIALIZING: 'Your checkout is still initializing. Please try again in a moment.',
 };
 
-/** Razorpay floor — must match quote_campaign_discount SQL (`v_final < 100`). */
+/** Absolute Razorpay floor; plan-specific promotional floors are higher. */
 export const MIN_CHECKOUT_PAISE = 100;
+export const MAX_CAMPAIGN_DISCOUNT_PERCENT = 50;
+
+export function campaignWindowStatus(
+  startsAt: Date | null,
+  expiresAt: Date | null,
+  now: Date,
+): 'not_started' | 'active' | 'expired' {
+  if (startsAt && startsAt.getTime() > now.getTime()) return 'not_started';
+  if (expiresAt && expiresAt.getTime() <= now.getTime()) return 'expired';
+  return 'active';
+}
+
+export function campaignAppliesToPlan(
+  appliesToPlans: readonly PaidPlanId[],
+  plan: PaidPlanId,
+): boolean {
+  return appliesToPlans.length === 0 || appliesToPlans.includes(plan);
+}
+
+/**
+ * Campaign percentage rounding policy: nearest whole rupee, with an exact
+ * half-rupee rounded down. This produces deterministic advertised prices:
+ * ₹299 @ 30% = ₹209, ₹299 @ 50% = ₹149, ₹799 @ 30% = ₹559.
+ */
+export function calculatePercentFinalAmountPaise(
+  listAmountPaise: number,
+  discountPercent: number,
+): number {
+  if (!Number.isSafeInteger(listAmountPaise) || !Number.isSafeInteger(discountPercent)) {
+    throw new TypeError('Campaign money and percentage values must be safe integers.');
+  }
+
+  const weightedPaise = listAmountPaise * (100 - discountPercent);
+  if (!Number.isSafeInteger(weightedPaise)) {
+    throw new RangeError('Campaign calculation exceeds safe integer range.');
+  }
+
+  const wholeRupees = Math.floor(weightedPaise / 10_000);
+  const remainder = weightedPaise % 10_000;
+  return (wholeRupees + (remainder > 5_000 ? 1 : 0)) * 100;
+}
 
 /**
  * Pure discount math mirroring quote_campaign_discount (for unit tests / Test Quote UI).
@@ -35,29 +99,52 @@ export const MIN_CHECKOUT_PAISE = 100;
  */
 export function computeCampaignDiscountQuote(params: {
   listAmountPaise: number;
+  promoFloorPaise: number;
   discountType: CampaignDiscountType;
   discountValue: number;
 }):
   | { ok: true; discount_paise: number; final_amount_paise: number }
-  | { ok: false; error_code: 'CODE_BELOW_MINIMUM' } {
-  const { listAmountPaise, discountType, discountValue } = params;
-  const discountPaise =
-    discountType === 'percent'
-      ? Math.floor((listAmountPaise * discountValue) / 100)
-      : discountValue;
-
-  if (discountPaise >= listAmountPaise) {
-    return { ok: false, error_code: 'CODE_BELOW_MINIMUM' };
+  | {
+      ok: false;
+      error_code: 'CODE_BELOW_MINIMUM' | 'CODE_DISCOUNT_INVALID';
+    } {
+  const { listAmountPaise, promoFloorPaise, discountType, discountValue } = params;
+  if (
+    !Number.isSafeInteger(listAmountPaise) ||
+    !Number.isSafeInteger(promoFloorPaise) ||
+    !Number.isSafeInteger(discountValue) ||
+    listAmountPaise < 0 ||
+    promoFloorPaise < MIN_CHECKOUT_PAISE ||
+    promoFloorPaise > listAmountPaise ||
+    discountValue < 0
+  ) {
+    return { ok: false, error_code: 'CODE_DISCOUNT_INVALID' };
   }
 
-  const finalAmountPaise = listAmountPaise - discountPaise;
-  if (finalAmountPaise < MIN_CHECKOUT_PAISE) {
+  let finalAmountPaise: number;
+  if (discountType === 'percent') {
+    if (discountValue > MAX_CAMPAIGN_DISCOUNT_PERCENT) {
+      return { ok: false, error_code: 'CODE_DISCOUNT_INVALID' };
+    }
+    finalAmountPaise = calculatePercentFinalAmountPaise(listAmountPaise, discountValue);
+  } else {
+    if (discountValue * 100 > listAmountPaise * MAX_CAMPAIGN_DISCOUNT_PERCENT) {
+      return { ok: false, error_code: 'CODE_DISCOUNT_INVALID' };
+    }
+    finalAmountPaise = listAmountPaise - discountValue;
+  }
+
+  if (
+    finalAmountPaise < MIN_CHECKOUT_PAISE ||
+    finalAmountPaise < promoFloorPaise ||
+    finalAmountPaise > listAmountPaise
+  ) {
     return { ok: false, error_code: 'CODE_BELOW_MINIMUM' };
   }
 
   return {
     ok: true,
-    discount_paise: discountPaise,
+    discount_paise: listAmountPaise - finalAmountPaise,
     final_amount_paise: finalAmountPaise,
   };
 }
@@ -70,10 +157,18 @@ export interface QuoteCampaignDiscountResult {
   final_amount_paise: number;
   label: string | null;
   kind: CampaignCodeKind | null;
+  discount_type: CampaignDiscountType | null;
+  discount_value: number | null;
+  starts_at: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  server_now: string | null;
 }
 
 export interface ReserveCampaignCodeResult extends QuoteCampaignDiscountResult {
   redemption_id: string | null;
+  reservation_created: boolean;
+  order_id: string | null;
 }
 
 type RpcQuoteRow = {
@@ -84,9 +179,19 @@ type RpcQuoteRow = {
   final_amount_paise: number;
   label: string | null;
   kind: string | null;
+  discount_type: string | null;
+  discount_value: number | null;
+  starts_at: string | null;
+  expires_at: string | null;
+  is_active: boolean;
+  server_now: string | null;
 };
 
-type RpcReserveRow = RpcQuoteRow & { redemption_id: string | null };
+type RpcReserveRow = RpcQuoteRow & {
+  redemption_id: string | null;
+  reservation_created: boolean | null;
+  order_id: string | null;
+};
 
 function mapQuote(row: RpcQuoteRow | null | undefined, listAmount: number): QuoteCampaignDiscountResult {
   if (!row) {
@@ -98,6 +203,12 @@ function mapQuote(row: RpcQuoteRow | null | undefined, listAmount: number): Quot
       final_amount_paise: listAmount,
       label: null,
       kind: null,
+      discount_type: null,
+      discount_value: null,
+      starts_at: null,
+      expires_at: null,
+      is_active: false,
+      server_now: null,
     };
   }
   return {
@@ -108,17 +219,32 @@ function mapQuote(row: RpcQuoteRow | null | undefined, listAmount: number): Quot
     final_amount_paise: Number(row.final_amount_paise) || listAmount,
     label: row.label,
     kind: (row.kind as CampaignCodeKind | null) ?? null,
+    discount_type: (row.discount_type as CampaignDiscountType | null) ?? null,
+    discount_value:
+      row.discount_value == null || !Number.isFinite(Number(row.discount_value))
+        ? null
+        : Number(row.discount_value),
+    starts_at: row.starts_at,
+    expires_at: row.expires_at,
+    is_active: Boolean(row.is_active),
+    server_now: row.server_now,
   };
 }
 
 export async function quoteCampaignDiscount(
   svc: SupabaseClient,
-  params: { code: string; plan: PaidPlanId; listAmountPaise: number },
+  params: {
+    code: string;
+    plan: PaidPlanId;
+    listAmountPaise: number;
+    promoFloorPaise: number;
+  },
 ): Promise<QuoteCampaignDiscountResult> {
   const { data, error } = await svc.rpc('quote_campaign_discount', {
     p_code: params.code,
     p_plan: params.plan,
     p_list_amount_paise: params.listAmountPaise,
+    p_promo_floor_paise: params.promoFloorPaise,
   });
   if (error) {
     console.error('[campaign-codes] quote failed:', error.message);
@@ -135,6 +261,7 @@ export async function reserveCampaignCode(
     code: string;
     plan: PaidPlanId;
     listAmountPaise: number;
+    promoFloorPaise: number;
     orderId?: string | null;
   },
 ): Promise<ReserveCampaignCodeResult> {
@@ -143,17 +270,57 @@ export async function reserveCampaignCode(
     p_code: params.code,
     p_plan: params.plan,
     p_list_amount_paise: params.listAmountPaise,
+    p_promo_floor_paise: params.promoFloorPaise,
     p_order_id: params.orderId ?? null,
   });
   if (error) {
     console.error('[campaign-codes] reserve failed:', error.message);
-    return { ...mapQuote(null, params.listAmountPaise), redemption_id: null };
+    return {
+      ...mapQuote(null, params.listAmountPaise),
+      redemption_id: null,
+      reservation_created: false,
+      order_id: null,
+    };
   }
   const row = Array.isArray(data) ? (data[0] as RpcReserveRow | undefined) : (data as RpcReserveRow);
   return {
     ...mapQuote(row, params.listAmountPaise),
     redemption_id: row?.redemption_id ?? null,
+    reservation_created: Boolean(row?.reservation_created),
+    order_id: row?.order_id ?? null,
   };
+}
+
+/**
+ * Atomically attach a Razorpay order and its local payment row to the exact
+ * reservation that authorized the discounted amount.
+ */
+export async function attachCampaignOrder(
+  svc: SupabaseClient,
+  params: {
+    redemptionId: string;
+    userId: string;
+    orderId: string;
+    currency: string;
+    gateway?: string;
+  },
+): Promise<boolean> {
+  const { data, error } = await svc.rpc('attach_campaign_order', {
+    p_redemption_id: params.redemptionId,
+    p_user_id: params.userId,
+    p_order_id: params.orderId,
+    p_currency: params.currency,
+    p_gateway: params.gateway ?? 'razorpay',
+  });
+  if (error) {
+    console.error('[campaign-codes] attach order failed:', error.message, {
+      redemptionId: params.redemptionId,
+      orderId: params.orderId,
+      code: error.code,
+    });
+    return false;
+  }
+  return data === true;
 }
 
 export async function releaseCampaignReservation(

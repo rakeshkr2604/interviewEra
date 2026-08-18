@@ -24,6 +24,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test --grep-invert @integration",
     "test:e2e:integration": "playwright test --grep @integration",
+    "test:e2e:staging": "playwright test --config=playwright.staging.config.ts --grep @integration",
     "test:e2e:ui": "playwright test --ui",
     "verify:pdf": "tsx scripts/verify-pdf-extract.ts",
     "submit:indexnow": "tsx scripts/submit-indexnow.ts",

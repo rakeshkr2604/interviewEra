@@ -8,27 +8,40 @@ export type PaidPlanId = 'starter' | 'pro';
 export interface PaidPlanConfig {
   id: PaidPlanId;
   label: string;
-  /** Amount in paise (100 paise = ₹1). Backend-only — never trust client. */
+  /** Authoritative list amount in paise (100 paise = ₹1). Never trust client amounts. */
   amountPaise: number;
   amountInr: number;
+  /** Lowest campaign selling price. This is not the normal/list price. */
+  promoFloorPaise: number;
   durationDays: number;
   credits: number;
 }
+
+export const FREE_PLAN = {
+  id: 'free',
+  label: 'Free',
+  amountPaise: 0,
+  amountInr: 0,
+  durationDays: null,
+  credits: 3,
+} as const;
 
 export const PAID_PLANS: Record<PaidPlanId, PaidPlanConfig> = {
   starter: {
     id: 'starter',
     label: 'Starter',
-    amountPaise: 14900,
-    amountInr: 149,
+    amountPaise: 29900,
+    amountInr: 299,
+    promoFloorPaise: 14900,
     durationDays: 30,
     credits: 8,
   },
   pro: {
     id: 'pro',
     label: 'Pro',
-    amountPaise: 39900,
-    amountInr: 399,
+    amountPaise: 79900,
+    amountInr: 799,
+    promoFloorPaise: 39900,
     durationDays: 30,
     credits: 25,
   },
@@ -36,6 +49,10 @@ export const PAID_PLANS: Record<PaidPlanId, PaidPlanConfig> = {
 
 export function getPaidPlan(plan: PaidPlanId): PaidPlanConfig {
   return PAID_PLANS[plan];
+}
+
+export function getPlanPromoFloorPaise(plan: PaidPlanId): number {
+  return PAID_PLANS[plan].promoFloorPaise;
 }
 
 export function isPaidPlanId(value: string): value is PaidPlanId {

@@ -11,6 +11,7 @@ function verifyCronSecret(request: NextRequest): boolean {
 
 /**
  * Daily plan expiry — downgrades starter/pro users whose plan_expires_at has passed.
+ * Paid credits expire with the plan: credits_remaining is zeroed (no free-tier re-grant).
  *
  * Vercel cron (vercel.json): { "path": "/api/cron/plan-expiry", "schedule": "30 0 * * *" }
  */
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const { error: updateErr } = await supabase
     .from('users')
-    .update({ plan_tier: 'free', plan_status: 'expired' })
+    .update({ plan_tier: 'free', plan_status: 'expired', credits_remaining: 0 })
     .in('id', ids);
 
   if (updateErr) {

@@ -6,7 +6,6 @@ import {
   TIMELINE_CONTEXT_BY_STAGE,
   TIMELINE_INSIGHT,
   TIMELINE_INTERVIEWER,
-  TIMELINE_LIVE_BY_STAGE,
   TIMELINE_PRESSURE,
   TIMELINE_QUESTION,
   TIMELINE_READY,
@@ -141,7 +140,7 @@ export function TimelineQuestionScreen({ stage, active, state }: ScreenProps) {
       <div className="ie-tl-question-prompt">&ldquo;{TIMELINE_QUESTION.prompt}&rdquo;</div>
       <div className="ie-tl-transcript">
         <div className="ie-tl-transcript__head">
-          <span className="ie-tl-kicker">LIVE TRANSCRIPT · YOU</span>
+          <span className="ie-tl-kicker">TRANSCRIPT · YOU</span>
           <span className={cn('ie-tl-mic', done && 'ie-tl-mic--captured')}>
             ● {done ? 'CAPTURED' : 'LISTENING'}
           </span>
@@ -339,17 +338,6 @@ export function TimelineDeviceHeader({ state, videoVisible }: DeviceHeaderProps)
             />
           )}
           <div className="ie-tl-avatar__shade" aria-hidden />
-          <div className="ie-tl-avatar__live">
-            <span
-              className={cn(
-                'ie-tl-avatar__live-dot',
-                stage === 3 && state.thinking && 'ie-tl-avatar__live-dot--warn',
-                stage === 5 && 'ie-tl-avatar__live-dot--success',
-              )}
-              aria-hidden
-            />
-            <span className="ie-tl-avatar__live-text">{TIMELINE_LIVE_BY_STAGE[idx]}</span>
-          </div>
           <div className={cn('ie-tl-wave', showWave && 'ie-tl-wave--active')} aria-hidden>
             {[10, 16, 7, 13].map((h, i) => (
               <span key={i} className="ie-tl-wave__bar" style={{ ['--h' as string]: `${h}px` }} />
@@ -441,6 +429,37 @@ export function TimelineScreens({
       <TimelineReadyScreen stage={5} active={state.stage === 5} {...props} />
     </div>
   );
+}
+
+/**
+ * Renders a single stage screen, always active.
+ *
+ * Mobile gives each stage its own section, so there is no crossfade stack to
+ * manage — the screen is the only one in its card.
+ */
+export function TimelineStageScreen({
+  stage,
+  state,
+  showBars,
+}: {
+  stage: TimelineStageIndex;
+  state: TimelineSessionState;
+  showBars: boolean;
+}) {
+  const props = { stage, active: true, state, showBars } as const;
+
+  switch (stage) {
+    case 1:
+      return <TimelineResumeScreen {...props} />;
+    case 2:
+      return <TimelineQuestionScreen {...props} />;
+    case 3:
+      return <TimelinePressureScreen {...props} />;
+    case 4:
+      return <TimelineInsightScreen {...props} />;
+    default:
+      return <TimelineReadyScreen {...props} />;
+  }
 }
 
 export function spineProgress(stage: TimelineStageIndex): string {

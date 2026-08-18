@@ -120,6 +120,12 @@ export async function DELETE(
 
   if (deleteError) {
     console.error('[admin/feedback/[id]] Delete error:', deleteError.message);
+    if (deleteError.code === '23503') {
+      return NextResponse.json(
+        { error: 'Feedback linked to a technical failure case cannot be deleted.' },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: 'Delete failed.' }, { status: 500 });
   }
 

@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ReportPDF } from '@/components/report/ReportPDF';
+import { canExportScriptReportPdf } from '@/lib/interview/script-report/access';
 import type { DetailedAnalysis, DimensionScores, PlanTier, QuestionCategory, RadarDataPoint, ReportSpeechSummary, ReportSummary, ScoreJustification } from '@/types/app.types';
 import { dimensionDisplayRowsFromRadar, radarScoresByDimensionKey } from '@/lib/utils/report-radar-dimensions';
 import { aggregateScoreJustifications } from '@/lib/utils/aggregate-score-justification';
@@ -39,7 +40,7 @@ export async function GET(request: Request): Promise<NextResponse | Response> {
       .single();
 
     const planTier = (profile?.plan_tier ?? 'free') as PlanTier;
-    if (planTier !== 'pro' && planTier !== 'campus') {
+    if (!canExportScriptReportPdf(planTier)) {
       return NextResponse.json(
         { error: 'PDF export is a Pro feature. Please upgrade your plan.' },
         { status: 403 }

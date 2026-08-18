@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Wrench,
   Gift,
+  Building2,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -25,6 +26,10 @@ const NAV_ITEMS = [
   { href: '/platform/rewards', label: 'Rewards', icon: Gift, exact: false },
   { href: '/platform/feedback', label: 'Feedback', icon: MessageSquare, exact: false },
   { href: '/platform/free-tools', label: 'Free Tools', icon: Wrench, exact: false },
+] as const;
+
+const SYSTEM_ITEMS = [
+  { href: '/platform/campus-approvals', label: 'Campus Approvals', icon: Building2, exact: false },
 ] as const;
 
 function NavItem({
@@ -131,6 +136,17 @@ export function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
         </p>
         <ul className="space-y-0.5">
           {NAV_ITEMS.map((item) => (
+            <NavItem key={item.href} {...item} onNavigate={onNavigate} />
+          ))}
+        </ul>
+        <p
+          className="mb-1.5 mt-6 px-2 text-[10px] font-semibold uppercase tracking-[0.16em]"
+          style={{ color: 'color-mix(in srgb, var(--text-muted) 52%, transparent)' }}
+        >
+          System
+        </p>
+        <ul className="space-y-0.5">
+          {SYSTEM_ITEMS.map((item) => (
             <NavItem key={item.href} {...item} onNavigate={onNavigate} />
           ))}
         </ul>

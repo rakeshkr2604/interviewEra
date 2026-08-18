@@ -32,7 +32,7 @@ async function getCampusOrgWithSeats(adminUserId: string) {
     name: org.name,
     seatCount: org.seat_count,
     seatsUsed: (enrolledCount ?? 0) + (pendingCount ?? 0),
-    verificationStatus: org.verification_status as 'pending' | 'approved',
+    verificationStatus: org.verification_status as 'pending' | 'approved' | 'rejected',
   };
 }
 
@@ -73,12 +73,8 @@ export default async function CollegeDashboardLayout({
     redirect('/college/signup');
   }
 
-  if (
-    org.verificationStatus === 'pending' &&
-    profile?.plan_tier !== 'campus_admin' &&
-    !platformAdmin
-  ) {
-    redirect('/college/signup?status=pending');
+  if (org.verificationStatus !== 'approved') {
+    redirect(`/college/setup?status=${org.verificationStatus}`);
   }
 
   return (

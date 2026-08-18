@@ -1,6 +1,11 @@
 -- InterviewEra Retention System Migration
 -- Enhances existing schema with Progress Gates, Quality Streaks, and B2B features
 -- Date: 2026-05-14
+--
+-- HISTORICAL DRAFT — not part of the numbered migration chain.
+-- Moved out of supabase/migrations/ so fresh staging/production replays do not
+-- execute this file. Live schema: numbered migrations (015_*, 017_tier_config, …).
+-- See supabase/manual/README.md.
 
 -- ============================================================================
 -- PART 1: MODIFY EXISTING TABLES

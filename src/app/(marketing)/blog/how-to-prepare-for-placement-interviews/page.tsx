@@ -281,8 +281,8 @@ export default function HowToPrepareForPlacementInterviews() {
           <Link href="/signup" className="ie-blog-inline-link">
             InterviewEra
           </Link>{' '}
-          let you run unlimited mock interviews tailored to your resume and target role, with
-          instant AI feedback on each answer. Use them. Frequently.
+          let you practice mock interviews tailored to your resume and target role, with
+          instant AI feedback on each answer — using your interview credits. Use them frequently before your real panel.
         </p>
 
         <h2 id="day-of">What to Do on Interview Day</h2>

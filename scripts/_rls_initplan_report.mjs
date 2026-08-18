@@ -1,7 +1,7 @@
 import fs from 'fs';
 
 const raw = fs.readFileSync(
-  'supabase/migrations/supabase-migration-retention-system.sql',
+  'supabase/manual/supabase-migration-retention-system.sql',
   'utf8',
 );
 const re = /CREATE\s+POLICY\s+("([^"]+)"|([a-zA-Z_][\w$]*))/gi;
@@ -33,7 +33,7 @@ const report = {
   })),
   retentionDumpPoliciesPossiblyInProd: dumpOnly.map((n) => ({
     policyName: n,
-    risk: 'If supabase-migration-retention-system.sql was applied outside the numbered chain, these names may exist alongside 015_* policies.',
+    risk: 'If supabase/manual/supabase-migration-retention-system.sql was applied outside the numbered chain, these names may exist alongside 015_* policies.',
   })),
   needsManualReview: [
     {

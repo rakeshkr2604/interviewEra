@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AuthCircuitDecor } from '@/components/layout/AuthCircuitDecor';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 
@@ -9,7 +10,7 @@ import { cn } from '@/lib/utils';
 export function AuthPremiumShell({ children }: { children: ReactNode }) {
   return (
     <main
-      className="ie-landing-type relative min-h-screen overflow-hidden pb-20 pt-10 sm:pb-28 sm:pt-14 md:pb-32 md:pt-16"
+      className="ie-landing-type relative flex min-h-screen flex-col overflow-hidden pb-16 pt-[30px] sm:pb-20 md:pb-24"
       style={{ color: 'var(--text-primary)' }}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -22,7 +23,7 @@ export function AuthPremiumShell({ children }: { children: ReactNode }) {
           style={{ background: 'color-mix(in srgb, #7c3aed 20%, transparent)' }}
         />
         <div
-          className="absolute inset-0 opacity-[0.2] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_-10%,black,transparent)]"
+          className="absolute inset-0 opacity-[0.2] [mask-image:radial-gradient(ellipse_85%_75%_at_50%_10%,black,transparent)]"
           style={{
             backgroundImage: `linear-gradient(to right, color-mix(in srgb, var(--text-secondary) 7%, transparent) 1px, transparent 1px),
               linear-gradient(to bottom, color-mix(in srgb, var(--text-secondary) 7%, transparent) 1px, transparent 1px)`,
@@ -30,6 +31,8 @@ export function AuthPremiumShell({ children }: { children: ReactNode }) {
           }}
         />
       </div>
+
+      <AuthCircuitDecor />
 
       <div className={cn('relative px-4 sm:px-5', LANDING_PAGE_CONTAINER)}>{children}</div>
     </main>

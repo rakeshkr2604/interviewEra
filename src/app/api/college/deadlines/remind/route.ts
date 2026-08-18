@@ -20,12 +20,18 @@ export async function POST(request: NextRequest) {
 
     const { data: org } = await serviceClient
       .from('campus_organizations')
-      .select('id, name')
+      .select('id, name, verification_status')
       .eq('admin_user_id', user.id)
       .single();
 
     if (!org) {
       return NextResponse.json({ error: 'Organization not found' }, { status: 404 });
+    }
+    if (org.verification_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Campus organization is pending verification.' },
+        { status: 403 },
+      );
     }
 
     const { deadlineId, emails, deadlineDescription } = await request.json();

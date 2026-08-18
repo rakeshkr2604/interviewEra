@@ -8,7 +8,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 
 export interface RewardActivityRow {
   id: string;
-  type: 'referral_credit' | 'promo' | 'sponsorship';
+  type: 'referral_credit' | 'promo' | 'sponsorship' | 'campaign_change';
   created_at: string;
   user_email: string | null;
   detail: string;
@@ -26,7 +26,8 @@ export async function GET(request: Request) {
 
   const svc = createServiceClient();
 
-  const [{ data: redemptions }, { data: creditedRefs }] = await Promise.all([
+  const [{ data: redemptions }, { data: creditedRefs }, { data: campaignChanges }] =
+    await Promise.all([
     svc
       .from('campaign_code_redemptions')
       .select('id, user_id, order_id, plan, discount_paise, final_amount_paise, status, created_at, campaign_code_id')
@@ -38,7 +39,13 @@ export async function GET(request: Request) {
       .eq('status', 'credited')
       .order('credited_at', { ascending: false })
       .limit(limit),
-  ]);
+    svc
+      .from('product_events')
+      .select('id, event_name, user_id, props, created_at')
+      .in('event_name', ['campaign_created', 'campaign_updated'])
+      .order('created_at', { ascending: false })
+      .limit(limit),
+    ]);
 
   const codeIds = [...new Set((redemptions ?? []).map((r) => r.campaign_code_id as string))];
   const userIds = new Set<string>();
@@ -46,6 +53,9 @@ export async function GET(request: Request) {
   for (const r of creditedRefs ?? []) {
     userIds.add(r.referrer_id as string);
     userIds.add(r.referred_id as string);
+  }
+  for (const event of campaignChanges ?? []) {
+    if (event.user_id) userIds.add(event.user_id as string);
   }
 
   const emailMap = new Map<string, string>();
@@ -102,6 +112,23 @@ export async function GET(request: Request) {
       status: 'credited',
       order_id: null,
       code_or_label: 'referral',
+    });
+  }
+
+  for (const event of campaignChanges ?? []) {
+    const props = (event.props ?? {}) as Record<string, unknown>;
+    rows.push({
+      id: `a-${event.id}`,
+      type: 'campaign_change',
+      created_at: event.created_at as string,
+      user_email: event.user_id ? emailMap.get(event.user_id as string) ?? null : null,
+      detail:
+        event.event_name === 'campaign_created'
+          ? 'Campaign created'
+          : `Campaign updated: ${Array.isArray(props.changed_fields) ? props.changed_fields.join(', ') : 'fields changed'}`,
+      status: event.event_name === 'campaign_created' ? 'created' : 'updated',
+      order_id: null,
+      code_or_label: typeof props.code === 'string' ? props.code : null,
     });
   }
 

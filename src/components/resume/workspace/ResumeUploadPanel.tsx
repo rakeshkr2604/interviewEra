@@ -65,6 +65,7 @@ export function ResumeUploadPanel({
   compactEmpty,
   title,
   subtitle,
+  analyticsSource = 'resume_workspace',
 }: {
   targetResumeId?: string | null;
   onSuccess: (payload: UploadSuccessPayload) => void;
@@ -72,6 +73,7 @@ export function ResumeUploadPanel({
   compactEmpty?: boolean;
   title?: string;
   subtitle?: string;
+  analyticsSource?: 'resume_workspace' | 'profile_onboarding';
 }) {
   const [dragOver, setDragOver] = useState(false);
   const [phase, setPhase] = useState<UploadPhase>('idle');
@@ -161,7 +163,7 @@ export function ResumeUploadPanel({
           return;
         }
 
-        trackResumeUploadedGa4(data.resumeId, { source: 'resume_workspace' });
+        trackResumeUploadedGa4(data.resumeId, { source: analyticsSource });
         setPhase('parsing');
 
         const parseController = new AbortController();
@@ -242,7 +244,7 @@ export function ResumeUploadPanel({
         onBusyChange?.(false);
       }
     },
-    [onBusyChange, onSuccess, targetResumeId],
+    [analyticsSource, onBusyChange, onSuccess, targetResumeId],
   );
 
   const isBusy = phase === 'uploading' || phase === 'extracting' || phase === 'parsing';

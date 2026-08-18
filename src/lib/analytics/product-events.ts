@@ -37,7 +37,14 @@ export type ProductEventName =
   | 'resume_deleted'
   | 'mock_interview_started'
   | 'payment_started'
+  | 'payment_failed'
   | 'payment_completed'
+  | 'checkout_started'
+  | 'checkout_abandoned'
+  | 'plan_selected'
+  | 'promotion_viewed'
+  | 'coupon_entered'
+  | 'coupon_applied'
   | 'pricing_page_viewed'
   | 'landing_cta_clicked'
   | 'streak_extended'
@@ -71,13 +78,22 @@ export type ProductEventName =
   | 'referral_link_shared'
   | 'feedback_submitted'
   | 'nps_submitted'
+  | 'technical_issue_reported'
+  | 'technical_issue_approved'
+  | 'technical_issue_rejected'
+  | 'credit_restored'
+  | 'service_recovery_credit_granted'
   | 'qg_generate'
   | 'qg_answer_reveal'
   | 'qg_practice_click'
   | 'qg_question_rated'
   | 'qg_profile_created'
   | 'qg_profile_updated'
-  | 'qg_profile_saved_to_account';
+  | 'qg_profile_saved_to_account'
+  | 'onboarding_started'
+  | 'onboarding_step_completed'
+  | 'onboarding_completed'
+  | 'profile_completion_updated';
 
 export type ProductEventPayload = {
   /** @deprecated Legacy field — use event_name at emit boundary. */

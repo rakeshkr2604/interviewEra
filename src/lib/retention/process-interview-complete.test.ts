@@ -227,6 +227,64 @@ describe('processInterviewRetention — first-time completion (no retry needed)'
   });
 });
 
+describe('processInterviewRetention — streak retry self-repair', () => {
+  it('re-applies updateStreak on retry when session_quality_log exists but streak was never updated', async () => {
+    const IV_NEW = '55555555-5555-4555-8555-555555555555';
+
+    db.interviews = [
+      {
+        id: IV_NEW,
+        user_id: USER_UUID,
+        status: 'completed',
+        question_count: 1,
+        started_at: '2026-07-01T00:00:00.000Z',
+        role: 'Backend Engineer',
+      },
+    ];
+    // Prior attempt inserted the log (quality met) but crashed before updateStreak.
+    db.session_quality_log = [
+      {
+        id: 'sql-partial',
+        interview_id: IV_NEW,
+        user_id: USER_UUID,
+        questions_answered: 1,
+        total_questions: 1,
+        avg_answer_duration_sec: 120,
+        session_score: 7,
+        quality_met: true,
+        dimension_scores: dims(7),
+        max_dimension_score: 7,
+        completed_at: '2026-07-01T01:00:00.000Z',
+        unlock_contribution: { streak_delta: 0, xp_gained: 70 },
+      },
+    ];
+    db.user_progress = [
+      {
+        user_id: USER_UUID,
+        current_streak: 0,
+        longest_streak: 0,
+        last_quality_session_date: null,
+        badges_earned: [],
+        current_tier: 1,
+        total_xp: 0,
+        sessions_at_current_tier: 0,
+        total_sessions: 1,
+        overall_avg_score: 7,
+        last_5_sessions_avg: 7,
+        max_dimension_score: 7,
+      },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_NEW);
+
+    expect(result.sessionLogged).toBe(false);
+    expect(result.streak).toBe(1);
+    expect(db.user_progress[0].current_streak).toBe(1);
+    expect(db.user_progress[0].longest_streak).toBe(1);
+    expect(db.user_progress[0].last_quality_session_date).toBe('2026-07-01');
+  });
+});
+
 describe('processInterviewRetention — total_sessions source', () => {
   it('derives total_sessions from completed interviews, not session_quality_log row count', async () => {
     const IV_OLD_1 = '22222222-2222-4222-8222-222222222222';

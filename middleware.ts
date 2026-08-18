@@ -7,6 +7,11 @@ import {
   extractInviteTokenFromNext,
   resolvePostAuthDestination,
 } from '@/lib/auth/resolve-destination';
+import {
+  requiresVerifiedEmailApi,
+  resolveEmailVerificationAccess,
+  VERIFICATION_PENDING_PATH,
+} from '@/lib/auth/verified-email-policy';
 import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_ROUTES = new Set([
@@ -118,8 +123,12 @@ export async function middleware(request: NextRequest) {
 
   if (isAuthV2Enabled() && pathname === '/college/signup') {
     const url = request.nextUrl.clone();
-    url.pathname = '/signup';
-    url.searchParams.set('intent', 'college');
+    if (request.nextUrl.searchParams.get('status') === 'pending') {
+      url.pathname = '/college/setup';
+    } else {
+      url.pathname = '/signup';
+      url.searchParams.set('intent', 'college');
+    }
     return NextResponse.redirect(url, 301);
   }
 
@@ -192,7 +201,10 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/open/badges') ||
     isSeoSitemapPath;
   const needsAuthResolution =
-    AUTH_ROUTES.has(pathname) || (!isPublic && !isApi) || resumeApiNeedsSession;
+    AUTH_ROUTES.has(pathname) ||
+    (!isPublic && !isApi) ||
+    resumeApiNeedsSession ||
+    requiresVerifiedEmailApi(pathname);
 
   // Rate limiting — always enforced (including for trusted-crawler UAs).
   // Spoofing Googlebot/etc. must not skip abuse protection on money/auth paths.
@@ -235,6 +247,39 @@ export async function middleware(request: NextRequest) {
   }
 
   const { response, user } = await updateSession(request);
+
+  const verificationDecision = resolveEmailVerificationAccess({
+    pathname,
+    isApi,
+    isPublic,
+    isAuthRoute: AUTH_ROUTES.has(pathname),
+    user,
+  });
+
+  if (verificationDecision === 'api_forbidden') {
+    const denied = NextResponse.json(
+      {
+        error: 'Verify your email before using this feature.',
+        code: 'EMAIL_NOT_VERIFIED',
+      },
+      { status: 403 },
+    );
+    response.cookies.getAll().forEach((cookie) => denied.cookies.set(cookie));
+    return denied;
+  }
+
+  if (verificationDecision === 'redirect_pending' && user) {
+    const pendingUrl = new URL(VERIFICATION_PENDING_PATH, request.url);
+    pendingUrl.searchParams.set('email', user.email ?? '');
+    pendingUrl.searchParams.set('status', 'verification_required');
+    pendingUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
+    if (pathname.startsWith('/college')) {
+      pendingUrl.searchParams.set('intent', 'college');
+    }
+    const redirect = NextResponse.redirect(pendingUrl);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
+  }
 
   // Unauthenticated user on a protected route → send to login (API returns JSON 401 from handlers)
   if (!user && !isPublic && !isApi) {

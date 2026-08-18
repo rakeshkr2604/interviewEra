@@ -1,82 +1,35 @@
 import { Check } from 'lucide-react';
 import { PAYMENT_TRUST_BULLETS } from '@/lib/pricing/copy';
-import { PaymentMethodsLabel, paymentMethodsPlainText } from '@/components/pricing/PaymentMethodsLabel';
+import {
+  PaymentMethodsLabel,
+  paymentMethodsPlainText,
+} from '@/components/pricing/PaymentMethodsLabel';
 
 interface PaymentTrustSectionProps {
   className?: string;
-  /** `dashboard` uses CSS vars; `marketing` uses inline styles on public pricing */
-  variant?: 'dashboard' | 'marketing';
 }
 
-function TrustBullet({ line, variant }: { line: string; variant: 'dashboard' | 'marketing' }) {
-  if (variant === 'marketing') {
-    return (
-      <li style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-        <Check
-          style={{ width: 16, height: 16, marginTop: 2, flexShrink: 0, color: 'var(--accent-success)' }}
-          aria-hidden
-        />
-        {line}
-      </li>
-    );
-  }
-  return (
-    <li className="flex items-start gap-2">
-      <Check
-        className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400"
-        aria-hidden
-      />
-      {line}
-    </li>
-  );
-}
-
-export function PaymentTrustSection({
-  className = '',
-  variant = 'dashboard',
-}: PaymentTrustSectionProps) {
-  if (variant === 'marketing') {
-    return (
-      <div className={className} style={{ maxWidth: 440, margin: '24px auto 0' }}>
-        <ul
-          style={{
-            display: 'grid',
-            gap: 10,
-            padding: 0,
-            listStyle: 'none',
-            fontSize: 14,
-            color: 'var(--text-secondary)',
-          }}
-        >
-          {PAYMENT_TRUST_BULLETS.map((line) => (
-            <TrustBullet key={line} line={line} variant="marketing" />
-          ))}
-        </ul>
-        <p
-          style={{
-            marginTop: 12,
-            fontSize: 12,
-            lineHeight: 1.6,
-            textAlign: 'center',
-            color: 'var(--text-muted)',
-          }}
-          aria-label={paymentMethodsPlainText()}
-        >
-          <PaymentMethodsLabel variant="marketing" />
-        </p>
-      </div>
-    );
-  }
-
+/** Centered trust terms + accepted payment methods — plain text, no card chrome. */
+export function PaymentTrustSection({ className = '' }: PaymentTrustSectionProps) {
   return (
     <div className={`mx-auto w-full max-w-lg ${className}`.trim()}>
       <ul
-        className="grid gap-2 text-sm sm:grid-cols-2"
-        style={{ color: 'var(--text-secondary)' }}
+        className="grid justify-center gap-2 sm:grid-cols-2"
         aria-label="Payment terms"
       >
         {PAYMENT_TRUST_BULLETS.map((line) => (
-          <TrustBullet key={line} line={line} variant="dashboard" />
+          <li
+            key={line}
+            className="flex items-start gap-2 text-xs font-medium sm:text-sm"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            <Check
+              className="mt-0.5 size-3.5 shrink-0"
+              style={{ color: 'var(--accent-success)' }}
+              aria-hidden
+            />
+            {line}
+          </li>
         ))}
       </ul>
       <p
@@ -84,7 +37,7 @@ export function PaymentTrustSection({
         style={{ color: 'var(--text-muted)' }}
         aria-label={paymentMethodsPlainText()}
       >
-        <PaymentMethodsLabel variant="dashboard" />
+        <PaymentMethodsLabel />
       </p>
     </div>
   );
