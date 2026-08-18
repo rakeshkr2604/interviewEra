@@ -55,7 +55,7 @@ describe('Domain pack access-path regression (static)', () => {
 
   it('migration contract keeps inactive packs and question rubrics off the client Data API', () => {
     const migration = read(
-      'supabase/migrations/20260817224413_domain_pack_rls_security_remediation.sql',
+      'supabase/migrations/091_domain_pack_rls_security_remediation.sql',
     );
 
     expect(migration).toContain('USING (is_active IS TRUE)');

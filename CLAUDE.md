@@ -43,7 +43,7 @@ Next.js `^16.2.7` (App Router) · TypeScript `^6` strict · React `^19.2` · Tai
 - **Folders**: `src/lib/<domain>/` groups by business domain, not technical layer. Tests sit next to the file they cover (`*.test.ts`).
 - **Error handling**: typed error classes for known failure domains (`PDFEncryptedError`, `QuotaExhaustedError`, `FallbackDisabledError`); graceful degradation with a logged fallback on user-facing critical paths, not a thrown exception.
 - **Logging**: structured, prefixed (`[payment:*]`, `[VOICE_PIPELINE]`, `[client-telemetry]`) — extend `interview-telemetry.ts` rather than inventing a new prefix.
-- **Database**: every table gets RLS on creation; service-role bypass is explicit and narrow, never a blanket grant. Migrations are numbered and additive — never rewrite a prior migration.
+- **Database**: every table gets RLS on creation; service-role bypass is explicit and narrow, never a blanket grant. Migrations are numbered and additive — never rewrite a prior migration. New files must be the next serial `NNN_name.sql` after the highest existing `supabase/migrations/*.sql` version. Do **not** use `supabase migration new` (it creates 14-digit timestamps). `npm run verify:migrations` rejects timestamp filenames.
 - **Env vars**: grouped by service in `.env.example`; `NEXT_PUBLIC_` reserved for browser-safe values.
 
 ---
@@ -56,6 +56,7 @@ Next.js `^16.2.7` (App Router) · TypeScript `^6` strict · React `^19.2` · Tai
 | Dev server | `npm run dev` (webpack) / `npm run dev:turbopack` |
 | Lint | `npm run lint` (must be 0 warnings) |
 | Typecheck | `npm run typecheck` |
+| Migration namespace | `npm run verify:migrations` (rejects 14-digit timestamp filenames) |
 | Unit tests | `npm test` / `npm run test:watch` / `npm test -- --coverage` |
 | E2E tests | `npm run test:e2e` (excludes `@integration`) / `npm run test:e2e:integration` (real Supabase, manual-dispatch) |
 | Build | `npm run build` (runs `next build --webpack` **then** `scripts/noindex-audit.ts` — fails the build on audit failure) |

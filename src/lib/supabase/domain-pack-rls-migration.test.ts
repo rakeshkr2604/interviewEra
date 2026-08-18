@@ -4,8 +4,8 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
-const migrationName = '20260817224413_domain_pack_rls_security_remediation.sql';
-const priorMigration = '20260817165144_p0_email_data_api_security_remediation.sql';
+const migrationName = '091_domain_pack_rls_security_remediation.sql';
+const priorMigration = '090_p0_email_data_api_security_remediation.sql';
 const migrationPath = path.join(root, 'supabase', 'migrations', migrationName);
 const sql = fs.readFileSync(migrationPath, 'utf8');
 const normalizedSql = sql.replace(/\s+/g, ' ').trim();

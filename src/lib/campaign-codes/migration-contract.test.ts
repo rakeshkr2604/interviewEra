@@ -7,7 +7,7 @@ const migrationPath = join(
   process.cwd(),
   'supabase',
   'migrations',
-  '20260816152656_campaign_pricing_floors_and_quote_metadata.sql',
+  '083_campaign_pricing_floors_and_quote_metadata.sql',
 );
 const sql = readFileSync(migrationPath, 'utf8');
 const rewardsBaseSql = readFileSync(
@@ -19,7 +19,7 @@ const ownershipSql = readFileSync(
     process.cwd(),
     'supabase',
     'migrations',
-    '20260816155515_harden_campaign_redemption_ownership.sql',
+    '084_harden_campaign_redemption_ownership.sql',
   ),
   'utf8',
 );

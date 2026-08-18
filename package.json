@@ -20,6 +20,7 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "verify:migrations": "tsx scripts/check-migration-namespace.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test --grep-invert @integration",

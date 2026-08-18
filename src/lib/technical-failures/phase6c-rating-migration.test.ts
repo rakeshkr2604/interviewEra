@@ -7,7 +7,7 @@ describe('Phase 6C optional technical feedback rating migration', () => {
     const sql = readFileSync(
       join(
         process.cwd(),
-        'supabase/migrations/20260816194343_phase6c_optional_technical_feedback_rating.sql',
+        'supabase/migrations/087_phase6c_optional_technical_feedback_rating.sql',
       ),
       'utf8',
     );

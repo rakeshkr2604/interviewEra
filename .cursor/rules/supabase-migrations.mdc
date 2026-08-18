@@ -1,0 +1,11 @@
+---
+description: InterviewEra serial-only Supabase migrations
+globs: supabase/migrations/**
+alwaysApply: true
+---
+
+New files in `supabase/migrations/` must be `NNN_snake_case.sql` where NNN is
+the next integer after the highest existing serial file. Never use
+`supabase migration new` and never create 14-digit timestamp filenames.
+Never rewrite an existing migration; add a follow-on serial file instead.
+Run `npm run verify:migrations` after adding a migration.

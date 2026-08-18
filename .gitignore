@@ -140,3 +140,18 @@ scripts/_backups/
 scripts/_backup_test_users.ts
 scripts/_phase*
 scripts/_round2_*
+
+# Live catalog dumps / session advisory notes (privilege maps; do not publish)
+/DB Perfomance advisory/
+
+# Local Cursor IDE settings
+/.cursor/settings.json
+
+# One-off local verify / screenshot scripts
+/scripts/manual/_*.mjs
+
+# Local Playwright config for public-route checks
+/playwright.public.config.ts
+
+# Local investigation notes (not part of the engineering program)
+/docs/investigations/

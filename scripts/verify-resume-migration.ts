@@ -1,5 +1,5 @@
 /**
- * Local structural verification for 20260718000001_resume_versions_and_snapshots.sql
+ * Local structural verification for 079_resume_versions_and_snapshots.sql
  * (Dashboard-applied migrations — no live DB required).
  *
  * Usage: npx tsx scripts/verify-resume-migration.ts
@@ -9,7 +9,7 @@ import { join } from 'node:path';
 
 const MIGRATION = join(
   process.cwd(),
-  'supabase/migrations/20260718000001_resume_versions_and_snapshots.sql',
+  'supabase/migrations/079_resume_versions_and_snapshots.sql',
 );
 
 const REQUIRED = [
@@ -45,7 +45,7 @@ function main(): void {
   }
   console.log('[verify-resume-migration] OK — all required DDL/RLS/backfill constructs present');
   console.log('[verify-resume-migration] Apply via Supabase Dashboard → SQL Editor:');
-  console.log('  supabase/migrations/20260718000001_resume_versions_and_snapshots.sql');
+  console.log('  supabase/migrations/079_resume_versions_and_snapshots.sql');
 }
 
 main();

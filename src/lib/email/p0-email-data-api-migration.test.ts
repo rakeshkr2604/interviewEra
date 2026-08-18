@@ -4,7 +4,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const root = process.cwd();
-const migrationName = '20260817165144_p0_email_data_api_security_remediation.sql';
+const migrationName = '090_p0_email_data_api_security_remediation.sql';
 const migrationPath = path.join(root, 'supabase', 'migrations', migrationName);
 const sql = fs.readFileSync(migrationPath, 'utf8');
 const normalizedSql = sql.replace(/\s+/g, ' ').trim();
@@ -52,7 +52,7 @@ const historicalHashes = {
 
 describe('P0 email Data API security migration', () => {
   it('runs after the historical-order reconciliation migration', () => {
-    expect(migrationName.localeCompare('20260817162058_reconcile_historical_migration_order.sql'))
+    expect(migrationName.localeCompare('089_reconcile_historical_migration_order.sql'))
       .toBeGreaterThan(0);
   });
 
@@ -131,3 +131,58 @@ describe('P0 email Data API security migration', () => {
     }
   });
 });
+
+describe('092 email grants without default privileges', () => {
+  const followOnName = '092_p0_email_service_role_grants_without_default_privileges.sql';
+  const followOnSql = fs.readFileSync(
+    path.join(root, 'supabase', 'migrations', followOnName),
+    'utf8',
+  );
+  const followOnNormalized = followOnSql.replace(/\s+/g, ' ').trim();
+
+  it('stays after 090 so both remain in the CLI history namespace', () => {
+    expect(followOnName.localeCompare(migrationName)).toBeGreaterThan(0);
+    expect(fs.existsSync(migrationPath)).toBe(true);
+  });
+
+  it('matches 090 table grants without revoking service_role first', () => {
+    expect(followOnNormalized).not.toMatch(
+      /REVOKE ALL ON TABLE [\s\S]* FROM PUBLIC, anon, authenticated, service_role;/,
+    );
+    expect(followOnNormalized).toContain(
+      'REVOKE ALL ON TABLE public.email_preferences, public.email_events, public.email_jobs, public.email_logs, public.email_opens, public.email_clicks, public.email_metrics, public.lifecycle_email_log FROM PUBLIC, anon, authenticated;',
+    );
+
+    const grants = [
+      ...followOnNormalized.matchAll(
+        /GRANT ([A-Z, ]+) ON TABLE public\.([a-z_]+) TO service_role;/g,
+      ),
+    ];
+    expect(grants).toHaveLength(tables.length);
+    for (const [, privileges, table] of grants) {
+      expect(privileges.split(',').map((value) => value.trim())).toEqual(
+        expectedServiceGrants[table as (typeof tables)[number]],
+      );
+    }
+  });
+
+  it('does not set postgres public default privileges', () => {
+    const executableSql = followOnSql.replace(/--[^\n]*/g, '');
+    expect(executableSql).not.toMatch(/ALTER DEFAULT PRIVILEGES/i);
+  });
+});
+
+describe('094 interview_turns historical schema', () => {
+  const historicalSql = fs.readFileSync(
+    path.join(root, 'supabase', 'migrations', '094_interview_turns.sql'),
+    'utf8',
+  );
+
+  it('creates interview_turns rather than aliasing 072 script_turns', () => {
+    expect(historicalSql).toContain('CREATE TABLE IF NOT EXISTS interview_turns');
+    expect(historicalSql).not.toMatch(/CREATE TABLE IF NOT EXISTS script_turns/i);
+    expect(historicalSql).toContain('ADD COLUMN IF NOT EXISTS current_phase');
+    expect(historicalSql).toContain('ADD COLUMN IF NOT EXISTS question_pool');
+  });
+});
+

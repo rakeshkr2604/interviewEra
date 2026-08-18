@@ -18,7 +18,7 @@ Dual-path idempotent activation: both the checkout-verify route and the Razorpay
 |---|---|
 | `src/lib/razorpay/activate-plan.ts` | Single source of truth — plan, credits, expiry, payment row, ledger, `last_payment_id` |
 | `src/lib/razorpay/provider-payment-validation.ts` | Shared Razorpay order/payment entity ↔ local expected-order validator |
-| `supabase/migrations/20260817065517_phase7a_payment_activation_recovery.sql` | Immutable entitlement snapshot + one-payment/one-ledger identity + atomic local replay completion RPC |
+| `supabase/migrations/088_phase7a_payment_activation_recovery.sql` | Immutable entitlement snapshot + one-payment/one-ledger identity + atomic local replay completion RPC |
 | `src/lib/razorpay/activation-api-response.ts` | Maps internal result → `activated` / `alreadyActivated` / `activationFailed` |
 | `src/app/api/payments/verify/route.ts` | Validates Razorpay payload → calls `activatePlanAfterPayment()` |
 | `src/app/api/payments/webhook/route.ts` | Validates webhook signature → calls `activatePlanAfterPayment()` on `payment.captured`/`order.paid` |

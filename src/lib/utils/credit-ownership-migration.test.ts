@@ -7,7 +7,7 @@ const migrationPath = path.join(
   root,
   'supabase',
   'migrations',
-  '20260816184057_phase6a_credit_interview_ownership.sql',
+  '085_phase6a_credit_interview_ownership.sql',
 );
 const sql = fs.readFileSync(migrationPath, 'utf8');
 const legacyStart = fs.readFileSync(

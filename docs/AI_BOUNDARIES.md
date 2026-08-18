@@ -15,7 +15,7 @@
 
 | Zone | Why | Source |
 |---|---|---|
-| `supabase/migrations/*.sql` — any **existing** file | Migrations are numbered and additive; the codebase's own convention (and CLAUDE.md's Engineering Standards) is "never rewrite a prior migration." A new migration file is fine; editing an old one is not. | CLAUDE.md Engineering Standards; `docs/ARCHITECTURE.md` "DB convention lesson" |
+| `supabase/migrations/*.sql` — any **existing** file | Migrations are numbered and additive; the codebase's own convention (and CLAUDE.md's Engineering Standards) is "never rewrite a prior migration." A new migration file is fine; editing an old one is not. New files must be serial `NNN_name.sql` (next integer after the highest existing version). Never create 14-digit timestamp filenames; `supabase migration new` is forbidden in this repo. | CLAUDE.md Engineering Standards; `docs/ARCHITECTURE.md` "DB convention lesson"; `docs/MIGRATION_NAMESPACE.md` |
 | The redirect logic in `middleware.ts`, `vercel.json`, and `next.config.ts` | Triple-redundant www→apex/HTTP→HTTPS normalization is **deliberate defense-in-depth**, not duplication — changing one without checking the other two can create redirect loops or gaps. | CLAUDE.md Invariant #7; `docs/ARCHITECTURE.md` "Hidden dependencies" |
 | `next.config.ts`'s `headers()` CSP block | Single source of truth for security headers; middleware does not duplicate them by design. | CLAUDE.md Invariant #8 |
 | `src/lib/razorpay/**`, `src/app/api/payments/**` | Real money; a prior production incident (payment `pay_T1Xu1KmV48WWzM`) came from exactly this kind of unreviewed change. | CLAUDE.md Invariant #1; `docs/PAYMENTS.md` (full detail: `PAYMENT_ARCHITECTURE.md`) |
@@ -56,7 +56,7 @@ Reproduced from CLAUDE.md's own table — this is the canonical source; if the t
 - `src/app/api/interview/answer/route.ts` and anything in the evaluation fallback chain — CLAUDE.md Invariant #4 (never a null/missing score) is enforced here specifically.
 - `src/lib/voice/mic-capture-coordinator.ts` and any code acquiring `getUserMedia` — CLAUDE.md Invariant #5; acquiring the mic outside the coordinator is the exact historical bug class (`docs/VOICE.md` "Common mistakes").
 - Any new page/route under `src/app/(marketing)/**` or `src/lib/seo/programmatic/**` — must be registered in `src/lib/seo/sitemap/registry.ts` or the noindex audit will fail the build (`docs/SEO.md` "Common mistakes").
-- Any new `supabase/migrations/*.sql` file — must pair RLS policies with matching table-level GRANTs in the same file (the migration-033 lesson, `docs/ARCHITECTURE.md` "DB convention lesson").
+- Any new `supabase/migrations/*.sql` file — must be serial `NNN_name.sql` (never a 14-digit timestamp), and must pair RLS policies with matching table-level GRANTs in the same file (the migration-033 lesson, `docs/ARCHITECTURE.md` "DB convention lesson"). See `docs/MIGRATION_NAMESPACE.md`.
 
 ## Forbidden assumptions (myth → reality, each sourced)
 

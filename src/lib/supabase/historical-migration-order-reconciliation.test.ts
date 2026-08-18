@@ -21,7 +21,7 @@ const historicalMigrations = [
 ] as const;
 
 const reconciliationMigration =
-  '20260817162058_reconcile_historical_migration_order.sql';
+  '089_reconcile_historical_migration_order.sql';
 
 describe('historical migration order reconciliation', () => {
   it('keeps 056-058 as no-ops for a fresh replay', () => {
@@ -30,17 +30,17 @@ describe('historical migration order reconciliation', () => {
     }
   });
 
-  it('runs the reconciliation after every timestamped dependency', () => {
+  it('runs the reconciliation after every serial dependency', () => {
     const migrationNames = fs
       .readdirSync(migrationsDirectory)
       .filter((name) => name.endsWith('.sql'))
       .sort();
 
     expect(migrationNames.indexOf(reconciliationMigration)).toBeGreaterThan(
-      migrationNames.indexOf('20260817065517_phase7a_payment_activation_recovery.sql'),
+      migrationNames.indexOf('088_phase7a_payment_activation_recovery.sql'),
     );
     expect(migrationNames.indexOf(reconciliationMigration)).toBeGreaterThan(
-      migrationNames.indexOf('20260718000001_resume_versions_and_snapshots.sql'),
+      migrationNames.indexOf('079_resume_versions_and_snapshots.sql'),
     );
   });
 

@@ -8,7 +8,7 @@ const migration = fs.readFileSync(
     root,
     'supabase',
     'migrations',
-    '20260816190336_phase6b_technical_failure_cases.sql',
+    '086_phase6b_technical_failure_cases.sql',
   ),
   'utf8',
 );
