@@ -365,15 +365,13 @@ function NavShell({
       data-navbar-state={scrolled ? 'floating' : 'expanded'}
       className={cn(
         'sticky top-0 z-50 border-b',
-        'transition-[background-color,border-color,box-shadow] duration-300 ease-out',
+        'transition-[border-color,box-shadow] duration-300 ease-out',
         'motion-reduce:transition-none',
         NAV_SHELL_HEIGHT_CLASS,
       )}
       style={{
         borderColor: scrolled ? 'transparent' : 'var(--card-border)',
-        background: scrolled
-          ? 'transparent'
-          : 'color-mix(in srgb, var(--bg-primary) 96%, transparent)',
+        background: scrolled ? 'transparent' : 'var(--bg-primary)',
       }}
     >
       {/* Skip-to-content for keyboard users */}
@@ -389,7 +387,7 @@ function NavShell({
         aria-label="Main navigation"
         className={cn(
           'flex items-center gap-1',
-          'transition-[width,max-width,height,padding,border-radius,border-color,background-color,box-shadow,transform] duration-300 ease-out',
+          'transition-[width,max-width,height,padding,border-radius,border-color,box-shadow,transform] duration-300 ease-out',
           'motion-reduce:transition-none',
           scrolled
             ? 'relative top-2 mx-auto h-12 w-[calc(100%-1rem)] max-w-5xl rounded-2xl border px-2.5 sm:w-[calc(100%-2rem)] sm:px-3.5'

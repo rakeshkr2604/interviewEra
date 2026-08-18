@@ -24,6 +24,17 @@ async function applyTheme(page: import('@playwright/test').Page, theme: 'dark' |
   }, theme);
 }
 
+async function waitForSettledTheme(
+  page: import('@playwright/test').Page,
+  theme: 'dark' | 'light',
+) {
+  await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+  await page.waitForFunction((selectedTheme) => {
+    const root = document.documentElement;
+    return root.classList.contains('dark') === (selectedTheme === 'dark');
+  }, theme);
+}
+
 function axeForRoute(page: import('@playwright/test').Page, _path: string) {
   return new AxeBuilder({ page });
 }
@@ -35,6 +46,7 @@ test.describe('marketing axe audit', () => {
     test(`marketing a11y (dark): ${path}`, async ({ page }) => {
       await applyTheme(page, 'dark');
       await gotoMarketingPage(page, path, heading ? { heading } : undefined);
+      await waitForSettledTheme(page, 'dark');
       const results = await axeForRoute(page, path).analyze();
       expect(results.violations).toEqual([]);
     });
@@ -42,6 +54,7 @@ test.describe('marketing axe audit', () => {
     test(`marketing a11y (light): ${path}`, async ({ page }) => {
       await applyTheme(page, 'light');
       await gotoMarketingPage(page, path, heading ? { heading } : undefined);
+      await waitForSettledTheme(page, 'light');
       const results = await axeForRoute(page, path).analyze();
       expect(results.violations).toEqual([]);
     });
