@@ -6,26 +6,30 @@ import { config } from 'dotenv'
 import { resolve } from 'node:path'
 import { createClient } from '@supabase/supabase-js'
 import { chromium } from '@playwright/test'
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard'
+import { createE2eUser, destroyE2eUser } from '../src/lib/e2e/user-lifecycle'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
 const BASE = 'http://localhost:3000'
 
 async function main() {
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL)
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const email = `tokencount-${Date.now()}@interviewera-mail.test`
-  const password = 'VerifyPass1!tc'
-  const { data: created } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
+  const created = await createE2eUser(admin, {
+    emailLocalPrefix: `tokencount-${Date.now()}`,
+    password: 'VerifyPass1!tc',
+    userMetadata: { name: 'T' },
   })
-  const userId = created!.user!.id
+  const email = created.email
+  const password = created.password
+  const userId = created.id
+  try {
   await admin.from('users').upsert(
     {
       id: userId,
@@ -128,6 +132,11 @@ async function main() {
       2,
     ),
   )
+  } finally {
+    await destroyE2eUser(admin, userId).catch((cleanupError) => {
+      console.error('[verify-stt-token-full-interview] cleanup failed', cleanupError)
+    })
+  }
 }
 
 main().catch((e) => {

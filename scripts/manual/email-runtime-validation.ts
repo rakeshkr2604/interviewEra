@@ -5,6 +5,8 @@
 import { config } from 'dotenv';
 import { resolve } from 'path';
 import { createClient } from '@supabase/supabase-js';
+import { assertE2eSupabaseTargetNotProduction } from '../../src/lib/e2e/target-guard';
+import { destroyE2eUser, markE2eUser } from '../../src/lib/e2e/user-lifecycle';
 
 config({ path: resolve(process.cwd(), '.env.local') });
 
@@ -118,7 +120,10 @@ async function postWelcomeWithCookie(cookie: string): Promise<{ status: number; 
   return { status: res.status, body, raw };
 }
 
-async function main(): Promise<void> {
+async function main(): Promise<number> {
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const createdUserIds: string[] = [];
+  try {
   console.log(`\nEmail Runtime Validation — ${new Date().toISOString()}`);
   console.log(`Base URL: ${BASE_URL}`);
   console.log(`Test email: ${TEST_EMAIL}\n`);
@@ -196,6 +201,14 @@ async function main(): Promise<void> {
       }),
     });
     signupUserId = (signup.body as { userId?: string })?.userId;
+    if (signupUserId) {
+      createdUserIds.push(signupUserId);
+      if (supabase) {
+        await markE2eUser(supabase, signupUserId).catch((err) => {
+          console.warn('[email-runtime-validation] mark e2e metadata failed', err);
+        });
+      }
+    }
     const pass = signup.status === 200 && (signup.body as { ok?: boolean })?.ok === true;
     record({
       id: 'T1',
@@ -485,6 +498,13 @@ async function main(): Promise<void> {
           response: t10Signup.body,
         });
       } else {
+        const t10UserId = (t10Signup.body as { userId?: string })?.userId;
+        if (t10UserId) {
+          createdUserIds.push(t10UserId);
+          await markE2eUser(supabase, t10UserId).catch((err) => {
+            console.warn('[email-runtime-validation] mark e2e metadata failed', err);
+          });
+        }
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'signup',
           email: t10Email,
@@ -591,11 +611,24 @@ async function main(): Promise<void> {
   console.log(
     `Summary: ${summary.counts.pass} PASS, ${summary.counts.fail} FAIL, ${summary.counts.notExecuted} NOT_EXECUTED`,
   );
-
-  process.exit(summary.counts.fail > 0 ? 1 : 0);
+  return summary.counts.fail > 0 ? 1 : 0;
+  } finally {
+    const svc = serviceSupabase();
+    if (svc) {
+      for (const id of [...new Set(createdUserIds)]) {
+        await destroyE2eUser(svc, id).catch((err) => {
+          console.error('[email-runtime-validation] cleanup failed', id, err);
+        });
+      }
+    }
+  }
 }
 
-void main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+void main()
+  .then((code) => {
+    if (typeof code === 'number') process.exit(code);
+  })
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });

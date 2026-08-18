@@ -3,6 +3,12 @@ import { join } from 'node:path';
 import { chromium, type FullConfig } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { loadSelectedE2eEnvironment } from './helpers/e2e-environment';
+import { isNonMutatingE2eTarget, resolveE2eSupabaseTarget } from '../src/lib/e2e/target-guard';
+import {
+  createE2eUser,
+  ensurePersistentE2eUser,
+  writeEphemeralUserRecord,
+} from '../src/lib/e2e/user-lifecycle';
 
 const AUTH_DIR = join(process.cwd(), 'e2e', '.auth');
 const STORAGE_PATH = join(AUTH_DIR, 'user.json');
@@ -22,38 +28,60 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   const PORT = process.env.PLAYWRIGHT_PORT ?? '3000';
   const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
+  const target = resolveE2eSupabaseTarget(url);
 
-  // CI uses placeholder credentials for environment-safe runs. Abort auth bootstrap
-  // to avoid failing network calls (e.g. DNS for placeholder.supabase.co).
-  if (!url || !serviceKey || !anonKey || url.includes('placeholder') || serviceKey.includes('placeholder')) {
+  if (
+    isNonMutatingE2eTarget(target) ||
+    !url ||
+    !serviceKey ||
+    !anonKey ||
+    serviceKey.includes('placeholder')
+  ) {
     writeFileSync(READY_PATH, '0');
     return;
   }
 
-  const email = process.env.E2E_TEST_EMAIL?.trim() ?? `e2e-a11y+${Date.now()}@interviewera-mail.test`;
+  const persistentEmail = process.env.E2E_TEST_EMAIL?.trim();
   const password = process.env.E2E_TEST_PASSWORD?.trim() ?? 'E2eA11yPass1!';
 
   const admin = createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  if (!process.env.E2E_TEST_EMAIL) {
-    const { error } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-    });
-    if (error && !error.message.toLowerCase().includes('already')) {
-      writeFileSync(READY_PATH, '0');
-      console.warn('[e2e setup] createUser failed:', error.message);
-      return;
+  let email: string;
+  try {
+    if (persistentEmail) {
+      const persistent = await ensurePersistentE2eUser(admin, {
+        email: persistentEmail,
+        password,
+        userMetadata: { name: 'E2E Persistent' },
+      });
+      email = persistent.email;
+    } else {
+      const created = await createE2eUser(admin, {
+        emailLocalPrefix: `e2e-a11y+${Date.now()}`,
+        password,
+        userMetadata: { name: 'E2E A11y' },
+      });
+      writeEphemeralUserRecord(created);
+      email = created.email;
     }
+  } catch (error) {
+    writeFileSync(READY_PATH, '0');
+    console.warn(
+      '[e2e setup] user bootstrap failed:',
+      error instanceof Error ? error.message : error,
+    );
+    return;
   }
 
   const anon = createClient(url, anonKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: signIn, error: signInError } = await anon.auth.signInWithPassword({ email, password });
+  const { data: signIn, error: signInError } = await anon.auth.signInWithPassword({
+    email,
+    password,
+  });
   if (signInError || !signIn.session) {
     writeFileSync(READY_PATH, '0');
     console.warn('[e2e setup] signIn failed:', signInError?.message);

@@ -8,6 +8,8 @@
 import { config } from 'dotenv'
 import { resolve } from 'node:path'
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard'
+import { createE2eUser, destroyE2eUser } from '../src/lib/e2e/user-lifecycle'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
@@ -82,19 +84,17 @@ function assertPhaseCaps(phases: string[]): string[] {
 }
 
 async function seedUser(admin: SupabaseClient, label: string) {
-  const email = `phase-audit-${label}-${Date.now()}@interviewera-mail.test`
-  const password = `VerifyPass1!${Date.now().toString(36)}`
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { name: 'Phase Audit' },
+  const created = await createE2eUser(admin, {
+    emailLocalPrefix: `phase-audit-${label}-${Date.now()}`,
+    userMetadata: { name: 'Phase Audit' },
   })
-  if (error || !created.user) throw new Error(`createUser: ${error?.message}`)
+  const email = created.email
+  const password = created.password
 
+  try {
   await admin.from('users').upsert(
     {
-      id: created.user.id,
+      id: created.id,
       email,
       name: 'Phase Audit',
       onboarding_completed: true,
@@ -107,7 +107,7 @@ async function seedUser(admin: SupabaseClient, label: string) {
   const { data: resume, error: resumeErr } = await admin
     .from('resumes')
     .insert({
-      user_id: created.user.id,
+      user_id: created.id,
       status: 'parsed',
       parsed_data: {
         target_role: 'Software Engineer',
@@ -121,7 +121,13 @@ async function seedUser(admin: SupabaseClient, label: string) {
     .single()
   if (resumeErr || !resume) throw new Error(`resume: ${resumeErr?.message}`)
 
-  return { email, password, resumeId: resume.id as string }
+  return { userId: created.id, email, password, resumeId: resume.id as string }
+  } catch (err) {
+    await destroyE2eUser(admin, created.id).catch((cleanupError) => {
+      console.error('[verify-phase-transitions] seed cleanup failed', cleanupError)
+    })
+    throw err
+  }
 }
 
 async function startInterview(
@@ -231,6 +237,7 @@ async function drive(cookie: string, interviewId: string, label: string) {
 }
 
 async function main() {
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL)
   const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
   const anon = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
@@ -249,6 +256,7 @@ async function main() {
   for (const mode of MODES) {
     console.log(`\n=== Script ${mode.label} (${mode.interviewMode}) ===`)
     const seeded = await seedUser(admin, mode.label)
+    try {
     const { data: session, error: signErr } = await browserClient.auth.signInWithPassword({
       email: seeded.email,
       password: seeded.password,
@@ -266,6 +274,11 @@ async function main() {
     const detail = `script=${scriptType} seq=${seq}${capFails.length ? ` fails=${capFails.join(';')}` : ''}`
     console.log(`  RESULT ${mode.label}: ${ok ? 'PASS' : 'FAIL'} — ${detail}`)
     results.push({ name: mode.label, ok, detail })
+    } finally {
+      await destroyE2eUser(admin, seeded.userId).catch((cleanupError) => {
+        console.error('[verify-phase-transitions] cleanup failed', cleanupError)
+      })
+    }
   }
 
   console.log('\n========== SUMMARY ==========')

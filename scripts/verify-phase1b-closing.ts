@@ -13,6 +13,8 @@
 import { config } from 'dotenv'
 import { resolve } from 'node:path'
 import { createClient, type Session, type SupabaseClient } from '@supabase/supabase-js'
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard'
+import { createE2eUser, destroyE2eUser } from '../src/lib/e2e/user-lifecycle'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
@@ -57,18 +59,14 @@ async function seedUser(admin: SupabaseClient, label: string) {
   } else {
     recipientEmail = `phase1b-${label}-${Date.now()}@interviewera-mail.test`
   }
-  const password = `VerifyPass1!${Date.now().toString(36)}`
-  const { data: created, error } = await admin.auth.admin.createUser({
+  const created = await createE2eUser(admin, {
     email: recipientEmail,
-    password,
-    email_confirm: true,
-    user_metadata: { name: 'Phase1b Verify' },
+    userMetadata: { name: 'Phase1b Verify' },
   })
-  if (error || !created.user) throw new Error(`createUser: ${error?.message}`)
-
+  try {
   await admin.from('users').upsert(
     {
-      id: created.user.id,
+      id: created.id,
       email: recipientEmail,
       name: 'Phase1b Verify',
       onboarding_completed: true,
@@ -81,7 +79,7 @@ async function seedUser(admin: SupabaseClient, label: string) {
   const { data: resume, error: resumeErr } = await admin
     .from('resumes')
     .insert({
-      user_id: created.user.id,
+      user_id: created.id,
       status: 'parsed',
       parsed_data: {
         target_role: 'Software Engineer',
@@ -96,7 +94,13 @@ async function seedUser(admin: SupabaseClient, label: string) {
   if (resumeErr || !resume) throw new Error(`resume: ${resumeErr?.message}`)
 
   console.log(`  seeded recipient=${recipientEmail}`)
-  return { userId: created.user.id, email: recipientEmail, password, resumeId: resume.id as string }
+  return { userId: created.id, email: recipientEmail, password: created.password, resumeId: resume.id as string }
+  } catch (err) {
+    await destroyE2eUser(admin, created.id).catch((cleanupError) => {
+      console.error('[verify-phase1b-closing] seed cleanup failed', cleanupError)
+    })
+    throw err
+  }
 }
 
 async function startInterview(
@@ -371,6 +375,7 @@ async function fetchInterviewStatus(admin: SupabaseClient, interviewId: string) 
 }
 
 async function main() {
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL)
   const url = requireEnv('NEXT_PUBLIC_SUPABASE_URL')
   const serviceKey = requireEnv('SUPABASE_SERVICE_ROLE_KEY')
   const anon = requireEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY')
@@ -394,6 +399,7 @@ async function main() {
     const name = 'A_full_cq'
     console.log('\n=== A: full CQ path ===')
     const seeded = await seedUser(admin, 'full')
+    try {
     const { data: session, error: signErr } = await browserClient.auth.signInWithPassword({
       email: seeded.email,
       password: seeded.password,
@@ -437,6 +443,11 @@ async function main() {
         : 'no lifecycle_email_log status=sent within timeout',
     })
     console.log(`  RESULT A_email: ${email.sent ? 'PASS' : 'FAIL'}`)
+    } finally {
+      await destroyE2eUser(admin, seeded.userId).catch((cleanupError) => {
+        console.error('[verify-phase1b-closing] cleanup failed', cleanupError)
+      })
+    }
   }
 
   // ── B) Skip CQ path ───────────────────────────────────────────────────────
@@ -444,6 +455,7 @@ async function main() {
     const name = 'B_skip_cq'
     console.log('\n=== B: skip CQ path ===')
     const seeded = await seedUser(admin, 'skip')
+    try {
     const { data: session, error: signErr } = await browserClient.auth.signInWithPassword({
       email: seeded.email,
       password: seeded.password,
@@ -476,6 +488,11 @@ async function main() {
         : 'no lifecycle_email_log status=sent within timeout',
     })
     console.log(`  RESULT B_email: ${email.sent ? 'PASS' : 'FAIL'}`)
+    } finally {
+      await destroyE2eUser(admin, seeded.userId).catch((cleanupError) => {
+        console.error('[verify-phase1b-closing] cleanup failed', cleanupError)
+      })
+    }
   }
 
   // ── C) Third email session (full CQ again) ────────────────────────────────
@@ -483,6 +500,7 @@ async function main() {
     const name = 'C_third_email_session'
     console.log('\n=== C: third completion email session ===')
     const seeded = await seedUser(admin, 'email3')
+    try {
     const { data: session, error: signErr } = await browserClient.auth.signInWithPassword({
       email: seeded.email,
       password: seeded.password,
@@ -509,6 +527,11 @@ async function main() {
     const detail = `closed=${drive.closed} status=${row.status} emailSent=${email.sent} provider=${String(email.row?.provider_message_id ?? 'n/a')}`
     console.log(`  RESULT C: ${ok ? 'PASS' : 'FAIL'} — ${detail}`)
     results.push({ name, ok, detail })
+    } finally {
+      await destroyE2eUser(admin, seeded.userId).catch((cleanupError) => {
+        console.error('[verify-phase1b-closing] cleanup failed', cleanupError)
+      })
+    }
   }
 
   console.log('\n========== SUMMARY ==========')

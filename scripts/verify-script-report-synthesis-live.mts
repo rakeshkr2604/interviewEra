@@ -9,6 +9,8 @@ import { join } from 'node:path';
 import { mkdirSync, writeFileSync, appendFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard';
+import { createE2eUser, destroyE2eUser } from '../src/lib/e2e/user-lifecycle';
 
 config({ path: join(process.cwd(), '.env.local') });
 
@@ -106,6 +108,7 @@ const ANSWER_SETS = [
 
 async function main() {
   writeFileSync(evidencePath, '');
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const admin = createClient(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
     auth: { persistSession: false },
@@ -114,9 +117,13 @@ async function main() {
     auth: { persistSession: false },
   });
 
-  const email = `synth-fix+${Date.now()}@interviewera-mail.test`;
-  const password = 'SynthFixLive1!';
-  await admin.auth.admin.createUser({ email, password, email_confirm: true });
+  const created = await createE2eUser(admin, {
+    emailLocalPrefix: `synth-fix+${Date.now()}`,
+    password: 'SynthFixLive1!',
+  });
+  const email = created.email;
+  const password = created.password;
+  try {
   const { data: signIn, error: signErr } = await anon.auth.signInWithPassword({ email, password });
   if (signErr || !signIn.session) throw signErr ?? new Error('signin');
   const userId = signIn.user.id;
@@ -277,6 +284,11 @@ async function main() {
 
   writeFileSync(join(OUT, 'summary.json'), JSON.stringify(results, null, 2));
   console.log('\nALL 3 RUNS PASSED used_llm=true');
+  } finally {
+    await destroyE2eUser(admin, created.id).catch((cleanupError) => {
+      console.error('[verify-script-report-synthesis-live] cleanup failed', cleanupError);
+    });
+  }
 }
 
 main().catch((err) => {

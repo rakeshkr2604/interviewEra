@@ -9,6 +9,8 @@ import { resolve } from 'node:path'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { createClient } from '@supabase/supabase-js'
 import { chromium, type ConsoleMessage } from '@playwright/test'
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard'
+import { createE2eUser, destroyE2eUser } from '../src/lib/e2e/user-lifecycle'
 
 config({ path: resolve(process.cwd(), '.env.local') })
 
@@ -53,19 +55,17 @@ async function seedUserAndInterview(run: number) {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
-  const email = `verify5x-r${run}-${Date.now()}@interviewera-mail.test`
-  const password = `VerifyPass1!${Date.now().toString(36)}`
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { name: 'Verify Candidate' },
+  const created = await createE2eUser(admin, {
+    emailLocalPrefix: `verify5x-r${run}-${Date.now()}`,
+    userMetadata: { name: 'Verify Candidate' },
   })
-  if (error || !created.user) throw new Error(`createUser: ${error?.message}`)
+  const email = created.email
+  const password = created.password
 
+  try {
   await admin.from('users').upsert(
     {
-      id: created.user.id,
+      id: created.id,
       email,
       name: 'Verify Candidate',
       onboarding_completed: true,
@@ -78,7 +78,7 @@ async function seedUserAndInterview(run: number) {
   const { data: resume, error: resumeErr } = await admin
     .from('resumes')
     .insert({
-      user_id: created.user.id,
+      user_id: created.id,
       status: 'parsed',
       parsed_data: {
         target_role: 'Associate Developer',
@@ -94,7 +94,7 @@ async function seedUserAndInterview(run: number) {
   const { data: interview, error: intErr } = await admin
     .from('interviews')
     .insert({
-      user_id: created.user.id,
+      user_id: created.id,
       resume_id: resume.id,
       role: 'Associate Developer',
       difficulty: 'easy',
@@ -133,6 +133,14 @@ async function seedUserAndInterview(run: number) {
     interviewId: interview.id as string,
     session: session.session,
     supabaseUrl: url,
+    userId: created.id,
+    admin,
+  }
+  } catch (err) {
+    await destroyE2eUser(admin, created.id).catch((cleanupError) => {
+      console.error('[verify-script-startup-5x] seed cleanup failed', cleanupError)
+    })
+    throw err
   }
 }
 
@@ -147,6 +155,7 @@ async function runOne(run: number): Promise<RunMetrics> {
   const seeded = await seedUserAndInterview(run)
   const interviewId = seeded.interviewId
 
+  try {
   const browser = await chromium.launch({
     headless: true,
     args: [
@@ -268,9 +277,15 @@ async function runOne(run: number): Promise<RunMetrics> {
   } finally {
     await browser.close()
   }
+  } finally {
+    await destroyE2eUser(seeded.admin, seeded.userId).catch((cleanupError) => {
+      console.error('[verify-script-startup-5x] cleanup failed', cleanupError)
+    })
+  }
 }
 
 async function main() {
+  assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL)
   mkdirSync(OUT_DIR, { recursive: true })
   if (!(await fetch(BASE).catch(() => null))) {
     console.error('Dev server not reachable:', BASE)

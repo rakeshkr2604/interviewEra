@@ -3,8 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
 import { join } from 'node:path';
 import { appendFileSync } from 'node:fs';
+import { assertE2eSupabaseTargetNotProduction } from '../src/lib/e2e/target-guard';
 
 config({ path: join(process.cwd(), '.env.local') });
+
+assertE2eSupabaseTargetNotProduction(process.env.NEXT_PUBLIC_SUPABASE_URL);
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const anon = createClient(url, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
