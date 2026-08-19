@@ -9,6 +9,10 @@ import { isPlaceholderValue } from '@/lib/redis/client';
 
 const MAX_PROP_KEYS = 32;
 const MAX_STRING_LEN = 500;
+const DIAGNOSTIC_MSG_MAX_LEN = 160;
+function isProductEventTraceEnabled(): boolean {
+  return process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE === '1';
+}
 
 export function isSupabasePlaceholderCredential(url?: string, key?: string): boolean {
   if (!url || !key) return true;
@@ -78,6 +82,84 @@ function formatErrorMessage(err: unknown): string {
   return String(err);
 }
 
+type PersistFailureCategory =
+  | 'dns_failure'
+  | 'connection_failure'
+  | 'timeout'
+  | 'tls_failure'
+  | 'http_response_failure'
+  | 'supabase_client_failure'
+  | 'runtime_platform_failure'
+  | 'unknown';
+
+function stringCode(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function numberStatus(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function sanitizeDiagnosticMessage(err: unknown): string {
+  const msg = formatErrorMessage(err).replace(/[\r\n\t]/g, ' ').trim();
+  if (!msg) return '';
+  return msg.length > DIAGNOSTIC_MSG_MAX_LEN ? `${msg.slice(0, DIAGNOSTIC_MSG_MAX_LEN)}...` : msg;
+}
+
+const DNS_ERROR_CODES = new Set(['ENOTFOUND', 'EAI_AGAIN']);
+const CONNECTION_ERROR_CODES = new Set(['ECONNREFUSED', 'ECONNRESET', 'EHOSTUNREACH', 'ENETUNREACH', 'UND_ERR_SOCKET']);
+const TIMEOUT_ERROR_CODES = new Set(['ETIMEDOUT', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'ABORT_ERR']);
+const TLS_ERROR_CODES = new Set(['ERR_SSL_PROTOCOL_ERROR', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT']);
+
+function isSupabaseErrorCode(code: string | null): boolean {
+  if (!code) return false;
+  return (
+    code === 'PGRST301' ||
+    code === '42501' ||
+    code === '42P01' ||
+    code === '401' ||
+    code === '403' ||
+    code.startsWith('PGRST')
+  );
+}
+
+export function classifyPersistFailure(error: unknown): {
+  category: PersistFailureCategory;
+  code: string | null;
+  status: number | null;
+  causeCode: string | null;
+  name: string | null;
+} {
+  const errObj = (typeof error === 'object' && error !== null ? (error as Record<string, unknown>) : null);
+  const cause =
+    errObj && typeof errObj.cause === 'object' && errObj.cause !== null
+      ? (errObj.cause as Record<string, unknown>)
+      : null;
+
+  const code = stringCode(errObj?.code);
+  const causeCode = stringCode(cause?.code);
+  const status = numberStatus(errObj?.status);
+  const name = typeof errObj?.name === 'string' ? errObj.name : null;
+
+  if (status !== null && status >= 400) return { category: 'http_response_failure', code, status, causeCode, name };
+  if (DNS_ERROR_CODES.has(code ?? '') || DNS_ERROR_CODES.has(causeCode ?? '')) {
+    return { category: 'dns_failure', code, status, causeCode, name };
+  }
+  if (CONNECTION_ERROR_CODES.has(code ?? '') || CONNECTION_ERROR_CODES.has(causeCode ?? '')) {
+    return { category: 'connection_failure', code, status, causeCode, name };
+  }
+  if (TIMEOUT_ERROR_CODES.has(code ?? '') || TIMEOUT_ERROR_CODES.has(causeCode ?? '')) {
+    return { category: 'timeout', code, status, causeCode, name };
+  }
+  if (TLS_ERROR_CODES.has(code ?? '') || TLS_ERROR_CODES.has(causeCode ?? '')) {
+    return { category: 'tls_failure', code, status, causeCode, name };
+  }
+  if (isSupabaseErrorCode(code) || isSupabaseErrorCode(causeCode)) {
+    return { category: 'supabase_client_failure', code, status, causeCode, name };
+  }
+  return { category: 'unknown', code, status, causeCode, name };
+}
+
 export function isNonRetryableError(error: unknown): boolean {
   if (!error) return false;
 
@@ -139,8 +221,18 @@ export function persistProductEventAsync(
   const cleanProps = sanitizeProps(rest);
 
   void (async () => {
+    const diagnosticEnabled = isProductEventTraceEnabled();
     const svc = getServiceClient();
     if (!svc) return;
+    const requestId = diagnosticEnabled
+      ? (typeof props.request_id === 'string'
+          ? props.request_id
+          : typeof props.requestId === 'string'
+            ? props.requestId
+            : null)
+      : null;
+    const traceId = diagnosticEnabled ? (requestId ?? `pe-${Math.random().toString(36).slice(2, 10)}`) : null;
+    const startedAt = diagnosticEnabled ? Date.now() : 0;
 
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
@@ -152,6 +244,25 @@ export function persistProductEventAsync(
         if (!error) return; // success
 
         const msg = formatErrorMessage(error);
+        const failure = classifyPersistFailure(error);
+        if (diagnosticEnabled) {
+          console.warn(
+            '[product-events-store][diagnostic]',
+            JSON.stringify({
+              trace_id: traceId,
+              request_id: requestId,
+              event_name: eventName,
+              attempt: attempt + 1,
+              elapsed_ms: Date.now() - startedAt,
+              category: failure.category,
+              code: failure.code,
+              status: failure.status,
+              cause_code: failure.causeCode,
+              error_name: failure.name,
+              message: sanitizeDiagnosticMessage(error),
+            }),
+          );
+        }
         if (isNonRetryableError(error)) {
           console.warn('[product-events-store] insert failed:', msg);
           return;
@@ -165,6 +276,25 @@ export function persistProductEventAsync(
         }
       } catch (err) {
         const msg = formatErrorMessage(err);
+        const failure = classifyPersistFailure(err);
+        if (diagnosticEnabled) {
+          console.warn(
+            '[product-events-store][diagnostic]',
+            JSON.stringify({
+              trace_id: traceId,
+              request_id: requestId,
+              event_name: eventName,
+              attempt: attempt + 1,
+              elapsed_ms: Date.now() - startedAt,
+              category: failure.category,
+              code: failure.code,
+              status: failure.status,
+              cause_code: failure.causeCode,
+              error_name: failure.name,
+              message: sanitizeDiagnosticMessage(err),
+            }),
+          );
+        }
         if (isNonRetryableError(err)) {
           console.warn('[product-events-store] persist error:', msg);
           return;

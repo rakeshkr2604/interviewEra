@@ -16,6 +16,7 @@ import {
   isNonRetryableError,
   isSupabasePlaceholderCredential,
   getServiceClient,
+  classifyPersistFailure,
 } from '@/lib/analytics/product-events-store';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 
@@ -100,9 +101,53 @@ describe('isNonRetryableError', () => {
   });
 });
 
+describe('classifyPersistFailure', () => {
+  it('classifies structured DNS errors from cause.code', () => {
+    const result = classifyPersistFailure({ name: 'TypeError', cause: { code: 'ENOTFOUND' } });
+    expect(result.category).toBe('dns_failure');
+  });
+
+  it('classifies structured connection errors', () => {
+    const result = classifyPersistFailure({ code: 'ECONNRESET' });
+    expect(result.category).toBe('connection_failure');
+  });
+
+  it('classifies structured timeout errors', () => {
+    const result = classifyPersistFailure({ cause: { code: 'ETIMEDOUT' } });
+    expect(result.category).toBe('timeout');
+  });
+
+  it('classifies structured TLS errors', () => {
+    const result = classifyPersistFailure({ code: 'CERT_HAS_EXPIRED' });
+    expect(result.category).toBe('tls_failure');
+  });
+
+  it('classifies structured HTTP failures', () => {
+    const result = classifyPersistFailure({ status: 503, message: 'Service unavailable' });
+    expect(result.category).toBe('http_response_failure');
+  });
+
+  it('classifies unknown when no reliable structured evidence exists', () => {
+    const result = classifyPersistFailure(new Error('something bad happened'));
+    expect(result.category).toBe('unknown');
+  });
+
+  it('keeps misleading message-only timeout/network hints as unknown', () => {
+    const result = classifyPersistFailure({ message: 'network timeout talking to supabase ssl endpoint' });
+    expect(result.category).toBe('unknown');
+  });
+});
+
 describe('persistProductEventAsync', () => {
   const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const originalDiagFlag = process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE;
+  const baseWarn = (calls: unknown[][]) =>
+    calls.filter((c) => {
+      const tag = String(c[0] ?? '');
+      return tag.startsWith('[product-events-store]') && tag !== '[product-events-store][diagnostic]';
+    });
+  const diagWarn = (calls: unknown[][]) => calls.filter((c) => String(c[0] ?? '').startsWith('[product-events-store][diagnostic]'));
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -110,6 +155,7 @@ describe('persistProductEventAsync', () => {
     fromMock.mockClear();
     process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
     process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+    process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = originalDiagFlag;
   });
 
   it('3 & 4. CI dummy credentials: ZERO Supabase requests made, NO Invalid API key warning emitted', async () => {
@@ -125,6 +171,7 @@ describe('persistProductEventAsync', () => {
   });
 
   it('9. Non-retryable error (Invalid API key) on non-placeholder key: exactly 1 attempt, 0 retries', async () => {
+    process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '0';
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
     insertResult = { error: { message: 'Invalid API key' } };
@@ -134,11 +181,13 @@ describe('persistProductEventAsync', () => {
     await flush();
 
     expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(baseWarn(warnSpy.mock.calls)).toHaveLength(1);
+    expect(diagWarn(warnSpy.mock.calls)).toHaveLength(0);
     expect(warnSpy).toHaveBeenCalledWith('[product-events-store] insert failed:', 'Invalid API key');
   });
 
   it('HTTP 401: no retry', async () => {
+    process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '0';
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
     insertResult = { error: { status: 401, message: 'Unauthorized request' } };
@@ -148,11 +197,13 @@ describe('persistProductEventAsync', () => {
     await flush();
 
     expect(insertMock).toHaveBeenCalledTimes(1);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(baseWarn(warnSpy.mock.calls)).toHaveLength(1);
+    expect(diagWarn(warnSpy.mock.calls)).toHaveLength(0);
     expect(warnSpy).toHaveBeenCalledWith('[product-events-store] insert failed:', 'Unauthorized request');
   });
 
   it('8. Transient error: retry still happens and preserves maximum attempt limit (2 attempts)', async () => {
+    process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '0';
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
     insertResult = { error: { message: 'Connection timeout' } };
@@ -162,7 +213,8 @@ describe('persistProductEventAsync', () => {
     await new Promise((r) => setTimeout(r, 1100));
 
     expect(insertMock).toHaveBeenCalledTimes(2);
-    expect(warnSpy).toHaveBeenCalledTimes(2);
+    expect(baseWarn(warnSpy.mock.calls)).toHaveLength(2);
+    expect(diagWarn(warnSpy.mock.calls)).toHaveLength(0);
     expect(warnSpy).toHaveBeenNthCalledWith(1, '[product-events-store] insert failed (will retry):', 'Connection timeout');
     expect(warnSpy).toHaveBeenNthCalledWith(2, '[product-events-store] insert failed after retry:', 'Connection timeout');
   });
@@ -190,5 +242,24 @@ describe('persistProductEventAsync', () => {
 
     expect(insertMock).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  it('emits diagnostic warning payload when diagnostics are enabled', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
+    process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '1';
+    insertResult = { error: { message: 'Network failure with no structured code' } };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    persistProductEventAsync('interview_started', { user_id: 'u1', request_id: 'req-1' });
+    await new Promise((r) => setTimeout(r, 1100));
+
+    expect(insertMock).toHaveBeenCalledTimes(2);
+    expect(baseWarn(warnSpy.mock.calls)).toHaveLength(2);
+    const diagnosticCalls = diagWarn(warnSpy.mock.calls);
+    expect(diagnosticCalls.length).toBeGreaterThan(0);
+    const payload = JSON.parse(String(diagnosticCalls[0]?.[1] ?? '{}')) as Record<string, unknown>;
+    expect(payload.request_id).toBe('req-1');
+    expect(payload.category).toBe('unknown');
   });
 });

@@ -85,6 +85,7 @@ const VOICE_PREVIEW_TEXT: Record<InterviewerId, string> = {
   priya: "Hi! I'm Meera, your AI interviewer. I'll guide you through this session.",
   arjun: "Hello! I'm Rohan, your technical interviewer. Let's dive into your experience.",
 }
+const AUTH_TRACE_ENABLED = process.env.NEXT_PUBLIC_IE_DIAGNOSTICS_AUTH_TRACE === '1'
 
 export default function ScriptInterviewStartPage() {
   const router = useRouter()
@@ -189,10 +190,26 @@ export default function ScriptInterviewStartPage() {
     try {
       const fd = new FormData()
       fd.append('file', file)
+      const diagnosticHeaders = AUTH_TRACE_ENABLED
+        ? (() => {
+            const hasSbCookie = document.cookie
+              .split(';')
+              .some((c) => c.trim().startsWith('sb-'))
+            const authStateHint = hasSbCookie ? 'sb_cookie_present' : 'sb_cookie_absent'
+            const correlationId = crypto.randomUUID().slice(0, 12)
+            return {
+              'x-ie-correlation-id': correlationId,
+              'x-ie-client-auth-state': authStateHint,
+              'x-ie-client-has-sb-cookie': hasSbCookie ? '1' : '0',
+              'x-ie-client-online': navigator.onLine ? '1' : '0',
+            }
+          })()
+        : undefined
       const uploadRes = await fetch('/api/resume/upload', {
         method: 'POST',
         credentials: 'include',
         body: fd,
+        headers: diagnosticHeaders,
       })
       if (!uploadRes.ok) {
         const err = (await uploadRes.json().catch(() => null)) as { error?: string } | null

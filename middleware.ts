@@ -13,6 +13,7 @@ import {
   VERIFICATION_PENDING_PATH,
 } from '@/lib/auth/verified-email-policy';
 import { NextResponse, type NextRequest } from 'next/server';
+const AUTH_TRACE_ENABLED = process.env.IE_DIAGNOSTICS_AUTH_TRACE === '1';
 
 const PUBLIC_ROUTES = new Set([
   '/',
@@ -247,6 +248,24 @@ export async function middleware(request: NextRequest) {
   }
 
   const { response, user } = await updateSession(request);
+
+  if (AUTH_TRACE_ENABLED && (pathname === '/api/resume/upload' || pathname === '/api/activity/heartbeat')) {
+    const requestCorrelationId =
+      request.headers.get('x-ie-correlation-id') ??
+      request.headers.get('x-vercel-id') ??
+      crypto.randomUUID().slice(0, 12);
+    response.headers.set('x-ie-correlation-id', requestCorrelationId);
+    console.info(
+      '[auth-trace][middleware]',
+      JSON.stringify({
+        correlation_id: requestCorrelationId,
+        path: pathname,
+        method: request.method,
+        has_user: !!user,
+        has_sb_cookie: request.cookies.getAll().some((c) => c.name.startsWith('sb-')),
+      }),
+    );
+  }
 
   const verificationDecision = resolveEmailVerificationAccess({
     pathname,

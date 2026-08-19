@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@/lib/supabase/server';
 import { normalizePagePath } from '@/lib/analytics/page-view';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
@@ -8,6 +9,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const NO_CONTENT = new NextResponse(null, { status: 204 });
+const PRODUCT_EVENT_TRACE_ENABLED = process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE === '1';
 
 function clientIp(request: Request): string {
   const fwd = request.headers.get('x-forwarded-for');
@@ -16,6 +18,11 @@ function clientIp(request: Request): string {
 }
 
 export async function POST(request: Request): Promise<NextResponse> {
+  const requestId = PRODUCT_EVENT_TRACE_ENABLED
+    ? (request.headers.get('x-ie-correlation-id') ??
+      request.headers.get('x-vercel-id') ??
+      randomUUID().slice(0, 12))
+    : null;
   try {
     const raw = await request.text();
     if (!raw || raw.length > 4096) return NO_CONTENT;
@@ -44,12 +51,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       data: { user },
     } = await supabase.auth.getUser();
 
-    trackProductEventServer({
+    const eventPayload: Parameters<typeof trackProductEventServer>[0] = {
       event_name: 'page_view',
       user_id: user?.id,
       page_path: path,
       source: 'client_navigation',
-    });
+    };
+    if (PRODUCT_EVENT_TRACE_ENABLED) {
+      eventPayload.request_id = requestId ?? undefined;
+      eventPayload.route = '/api/analytics/page-view';
+    }
+    trackProductEventServer(eventPayload);
 
     return NO_CONTENT;
   } catch {

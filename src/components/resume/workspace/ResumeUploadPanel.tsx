@@ -20,6 +20,7 @@ import type { UploadErrorKind, UploadPhase } from './types';
 
 /** Matches server MULTIPART_UPLOAD_MAX_BYTES (Vercel body cap). */
 const MAX_BYTES = 4 * 1024 * 1024;
+const AUTH_TRACE_ENABLED = process.env.NEXT_PUBLIC_IE_DIAGNOSTICS_AUTH_TRACE === '1';
 
 const PHASE_LABEL: Record<string, string> = {
   uploading: 'Uploading file…',
@@ -120,11 +121,27 @@ export function ResumeUploadPanel({
         const formData = new FormData();
         formData.append('file', file);
         if (targetResumeId) formData.append('resumeId', targetResumeId);
+        const headers = AUTH_TRACE_ENABLED
+          ? (() => {
+              const hasSbCookie = document.cookie
+                .split(';')
+                .some((c) => c.trim().startsWith('sb-'));
+              const authStateHint = hasSbCookie ? 'sb_cookie_present' : 'sb_cookie_absent';
+              const correlationId = crypto.randomUUID().slice(0, 12);
+              return {
+                'x-ie-correlation-id': correlationId,
+                'x-ie-client-auth-state': authStateHint,
+                'x-ie-client-has-sb-cookie': hasSbCookie ? '1' : '0',
+                'x-ie-client-online': navigator.onLine ? '1' : '0',
+              };
+            })()
+          : undefined;
 
         const res = await fetch('/api/resume/upload', {
           method: 'POST',
           body: formData,
           credentials: 'include',
+          headers,
         });
 
         resolved = true;

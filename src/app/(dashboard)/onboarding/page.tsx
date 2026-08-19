@@ -48,6 +48,7 @@ type ResumeStatusPayload = {
 }
 
 const JD_PARSE_MIN_LEN = 40
+const AUTH_TRACE_ENABLED = process.env.NEXT_PUBLIC_IE_DIAGNOSTICS_AUTH_TRACE === '1'
 
 /** Append short support ref when API returns requestId (production debugging). */
 function withRequestRef(msg: string, requestId?: string): string {
@@ -518,10 +519,28 @@ export default function OnboardingPage() {
     try {
       const formData = new FormData()
       formData.append('file', resumeFile)
+      const diagnosticHeaders = AUTH_TRACE_ENABLED
+        ? (() => {
+            const hasSbCookie = document.cookie
+              .split(';')
+              .some((c) => c.trim().startsWith('sb-'))
+            const authStateHint = hasSbCookie ? 'sb_cookie_present' : 'sb_cookie_absent'
+            const correlationId = crypto.randomUUID().slice(0, 12)
+            return {
+              'x-ie-correlation-id': correlationId,
+              'x-ie-client-auth-state': authStateHint,
+              'x-ie-client-has-sb-cookie': hasSbCookie ? '1' : '0',
+              'x-ie-client-online': navigator.onLine ? '1' : '0',
+            }
+          })()
+        : undefined
 
       const { ok, status, data: result, requestId: reqIdMeta } = await fetchMultipartJson<ApiErr & { resumeId?: string }>(
         '/api/resume/upload',
         formData,
+        {
+          headers: diagnosticHeaders,
+        },
       )
 
       if (!ok) {

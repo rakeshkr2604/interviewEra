@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@/lib/supabase/server';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import type { ProductEventPayload } from '@/lib/analytics/product-events';
@@ -15,6 +16,7 @@ import {
   type ProfileOnboardingMetadata,
   type ProfileOnboardingResolution,
 } from '@/lib/profile/onboarding-state';
+const PRODUCT_EVENT_TRACE_ENABLED = process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE === '1';
 
 type ResumeOwnershipResult =
   | { ok: true; hasActiveResume: boolean }
@@ -109,6 +111,11 @@ export async function GET(): Promise<NextResponse> {
 
 export async function PATCH(request: Request): Promise<NextResponse> {
   try {
+    const requestId = PRODUCT_EVENT_TRACE_ENABLED
+      ? (request.headers.get('x-ie-correlation-id') ??
+        request.headers.get('x-vercel-id') ??
+        randomUUID().slice(0, 12))
+      : null;
     const supabase = await createClient();
     const {
       data: { user },
@@ -257,7 +264,12 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       });
     }
     for (const event of events) {
-      trackProductEventServer({ ...event, user_id: user.id });
+      const payload: ProductEventPayload = { ...event, user_id: user.id };
+      if (PRODUCT_EVENT_TRACE_ENABLED) {
+        payload.request_id = requestId ?? undefined;
+        payload.route = '/api/account/onboarding';
+      }
+      trackProductEventServer(payload);
     }
 
     return NextResponse.json(responseState(after, loaded.activeResume));

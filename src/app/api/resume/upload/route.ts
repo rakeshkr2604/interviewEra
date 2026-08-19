@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
+import { headers } from 'next/headers';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { ensurePublicUserRow } from '@/lib/supabase/ensure-public-user';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
@@ -32,6 +33,7 @@ import {
   shouldSkipResumeDbInsert,
   supabaseServiceKeyFormat,
 } from '@/lib/debug/upload-diagnostics';
+const AUTH_TRACE_ENABLED = process.env.IE_DIAGNOSTICS_AUTH_TRACE === '1';
 
 // pdfjs-dist is Node-only; never Edge.
 export const runtime = 'nodejs';
@@ -223,8 +225,36 @@ export async function POST(request: Request): Promise<NextResponse> {
   const uploadStarted = Date.now();
   const reqId = randomUUID().slice(0, 8);
   const vercelId = request.headers.get('x-vercel-id');
+  let correlationId: string | null = null;
+  let clientAuthHint: string | null = null;
+  let clientSbHint: string | null = null;
+  let clientOnlineHint: string | null = null;
+  if (AUTH_TRACE_ENABLED) {
+    const incomingHeaders = await headers();
+    correlationId =
+      incomingHeaders.get('x-ie-correlation-id') ??
+      request.headers.get('x-ie-correlation-id') ??
+      vercelId ??
+      reqId;
+    clientAuthHint = request.headers.get('x-ie-client-auth-state') ?? 'unknown';
+    clientSbHint = request.headers.get('x-ie-client-has-sb-cookie') ?? 'unknown';
+    clientOnlineHint = request.headers.get('x-ie-client-online') ?? 'unknown';
+  }
 
   console.log('[UPLOAD_STAGE] request_start', { reqId, vercel_id: vercelId ?? 'n/a' });
+  if (AUTH_TRACE_ENABLED) {
+    console.info(
+      '[auth-trace][resume-upload]',
+      JSON.stringify({
+        req_id: reqId,
+        correlation_id: correlationId,
+        event: 'request_start',
+        client_auth_state: clientAuthHint,
+        client_has_sb_cookie: clientSbHint,
+        client_online: clientOnlineHint,
+      }),
+    );
+  }
 
   const cl = request.headers.get('content-length');
   if (cl) {
@@ -253,6 +283,18 @@ export async function POST(request: Request): Promise<NextResponse> {
       error: authError,
     } = await supabase.auth.getUser();
     console.log('[UPLOAD_STAGE] auth_done', { reqId, ok: !!user, authErr: authError?.message ?? null });
+    if (AUTH_TRACE_ENABLED) {
+      console.info(
+        '[auth-trace][resume-upload]',
+        JSON.stringify({
+          req_id: reqId,
+          correlation_id: correlationId,
+          event: 'auth_done',
+          has_user: !!user,
+          auth_error_message: authError?.message ?? null,
+        }),
+      );
+    }
 
     if (authError || !user) {
       console.warn(`[resume/upload][${reqId}] auth failed`, authError?.message);
