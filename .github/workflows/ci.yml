@@ -1,9 +1,9 @@
 name: CI
 
 # Triggers (updated to stop PR/push double-runs on feature branches):
-# - pull_request → main: primary verification for branch work + Dependabot
-# - push → main only: post-merge safety net (squash-merge commit ≠ PR HEAD)
-# - workflow_dispatch: manual re-run
+# - pull_request → main: full enforced validation (required status checks)
+# - push → main only: lightweight post-merge safety net (quality + security)
+# - workflow_dispatch: manual full validation re-run
 # Direct pushes to non-main branches without an open PR no longer run CI —
 # open a PR (or dispatch) to verify. See docs/CI_CD_ARCHITECTURE.md.
 on:
@@ -120,6 +120,7 @@ jobs:
     name: PDF extract regression
     runs-on: ubuntu-latest
     needs: [changes]
+    if: github.event_name != 'push'
 
     steps:
       - name: Skip (docs-only)
@@ -153,6 +154,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [changes, quality]
+    if: github.event_name != 'push'
 
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -223,6 +225,7 @@ jobs:
     name: E2E Auth
     runs-on: ubuntu-latest
     needs: [changes, quality, build]
+    if: github.event_name != 'push'
     env:
       # Must match Build job NEXT_PUBLIC_* (inlined at build time into the artifact).
       NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
