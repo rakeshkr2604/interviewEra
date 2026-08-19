@@ -1,5 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const afterMock = vi.fn((task: () => void) => {
+  task();
+});
+
+function restoreAfterMock(): void {
+  afterMock.mockReset();
+  afterMock.mockImplementation((task: () => void) => {
+    task();
+  });
+}
+
+vi.mock('next/server', () => ({
+  after: (task: () => void) => afterMock(task),
+}));
+
 let insertResult: { error: { code?: string; message: string; status?: number } | null } | Error;
 const insertMock = vi.fn(async () => {
   if (insertResult instanceof Error) throw insertResult;
@@ -17,6 +32,7 @@ import {
   isSupabasePlaceholderCredential,
   getServiceClient,
   classifyPersistFailure,
+  resetProductEventServiceClientCacheForTests,
 } from '@/lib/analytics/product-events-store';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 
@@ -61,6 +77,7 @@ describe('getServiceClient', () => {
   const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   afterEach(() => {
+    resetProductEventServiceClientCacheForTests();
     process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
     process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
   });
@@ -136,6 +153,16 @@ describe('classifyPersistFailure', () => {
     const result = classifyPersistFailure({ message: 'network timeout talking to supabase ssl endpoint' });
     expect(result.category).toBe('unknown');
   });
+
+  it('enriches generic fetch failed messages with structured cause metadata', () => {
+    const result = classifyPersistFailure({
+      name: 'TypeError',
+      message: 'fetch failed',
+      cause: { code: 'ECONNRESET', message: 'socket hang up' },
+    });
+    expect(result.category).toBe('connection_failure');
+    expect(result.causeCode).toBe('ECONNRESET');
+  });
 });
 
 describe('persistProductEventAsync', () => {
@@ -149,13 +176,28 @@ describe('persistProductEventAsync', () => {
     });
   const diagWarn = (calls: unknown[][]) => calls.filter((c) => String(c[0] ?? '').startsWith('[product-events-store][diagnostic]'));
 
-  afterEach(() => {
+  afterEach(async () => {
     vi.restoreAllMocks();
+    restoreAfterMock();
     insertMock.mockClear();
     fromMock.mockClear();
+    resetProductEventServiceClientCacheForTests();
     process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
     process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
     process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = originalDiagFlag;
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it('schedules persistence through Next.js after()', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
+    insertResult = { error: null };
+
+    persistProductEventAsync('interview_started', { user_id: 'u1' });
+    await flush();
+
+    expect(afterMock).toHaveBeenCalledTimes(1);
+    expect(insertMock).toHaveBeenCalledTimes(1);
   });
 
   it('3 & 4. CI dummy credentials: ZERO Supabase requests made, NO Invalid API key warning emitted', async () => {
@@ -203,6 +245,7 @@ describe('persistProductEventAsync', () => {
   });
 
   it('8. Transient error: retry still happens and preserves maximum attempt limit (2 attempts)', async () => {
+    vi.useFakeTimers();
     process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '0';
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
@@ -210,13 +253,16 @@ describe('persistProductEventAsync', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     persistProductEventAsync('interview_started', { user_id: 'u1' });
-    await new Promise((r) => setTimeout(r, 1100));
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.resolve();
 
     expect(insertMock).toHaveBeenCalledTimes(2);
     expect(baseWarn(warnSpy.mock.calls)).toHaveLength(2);
     expect(diagWarn(warnSpy.mock.calls)).toHaveLength(0);
     expect(warnSpy).toHaveBeenNthCalledWith(1, '[product-events-store] insert failed (will retry):', 'Connection timeout');
     expect(warnSpy).toHaveBeenNthCalledWith(2, '[product-events-store] insert failed after retry:', 'Connection timeout');
+    vi.useRealTimers();
   });
 
   it('Successful insert: exactly one insert attempt, 0 warnings', async () => {
@@ -245,6 +291,7 @@ describe('persistProductEventAsync', () => {
   });
 
   it('emits diagnostic warning payload when diagnostics are enabled', async () => {
+    vi.useFakeTimers();
     process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
     process.env.SUPABASE_SERVICE_ROLE_KEY = REAL_SYNTHETIC_JWT;
     process.env.IE_DIAGNOSTICS_PRODUCT_EVENT_TRACE = '1';
@@ -252,7 +299,9 @@ describe('persistProductEventAsync', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     persistProductEventAsync('interview_started', { user_id: 'u1', request_id: 'req-1' });
-    await new Promise((r) => setTimeout(r, 1100));
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1000);
+    await Promise.resolve();
 
     expect(insertMock).toHaveBeenCalledTimes(2);
     expect(baseWarn(warnSpy.mock.calls)).toHaveLength(2);
@@ -261,5 +310,6 @@ describe('persistProductEventAsync', () => {
     const payload = JSON.parse(String(diagnosticCalls[0]?.[1] ?? '{}')) as Record<string, unknown>;
     expect(payload.request_id).toBe('req-1');
     expect(payload.category).toBe('unknown');
+    vi.useRealTimers();
   });
 });

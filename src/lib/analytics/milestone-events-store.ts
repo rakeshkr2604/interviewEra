@@ -6,9 +6,10 @@
  * into a route/server action carry the `server-only` guard instead.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ProductEventName } from '@/lib/analytics/product-events';
 import { isSupabasePlaceholderCredential } from '@/lib/analytics/product-events-store';
+import { scheduleServerlessBackgroundWork } from '@/lib/analytics/schedule-serverless-background-work';
 
 /** Postgres unique_violation — the dedupe partial indexes in migration 052. */
 const UNIQUE_VIOLATION = '23505';
@@ -26,13 +27,32 @@ export type MilestoneEventName = Extract<
   | 'interview_abandoned'
 >;
 
-function getServiceClient() {
+let cachedServiceClient: SupabaseClient | null | undefined;
+
+export function resetMilestoneEventServiceClientCacheForTests(): void {
+  cachedServiceClient = undefined;
+}
+
+function getServiceClient(): SupabaseClient | null {
+  if (cachedServiceClient !== undefined) {
+    return cachedServiceClient;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key || isSupabasePlaceholderCredential(url, key)) return null;
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  if (!url || !key || isSupabasePlaceholderCredential(url, key)) {
+    cachedServiceClient = null;
+    return null;
+  }
+
+  cachedServiceClient = createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
+  return cachedServiceClient;
 }
 
 function sanitizeProps(
@@ -64,7 +84,7 @@ export function persistMilestoneEventOnce(
   const { user_id: _uid, ...rest } = props;
   const cleanProps = sanitizeProps(rest);
 
-  void (async () => {
+  scheduleServerlessBackgroundWork(async () => {
     try {
       const svc = getServiceClient();
       if (!svc) return;
@@ -82,5 +102,5 @@ export function persistMilestoneEventOnce(
         err instanceof Error ? err.message : String(err),
       );
     }
-  })();
+  });
 }

@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+vi.mock('next/server', () => ({
+  after: (task: () => void) => {
+    task();
+  },
+}));
+
 /**
  * `persistMilestoneEventOnce` is the exactly-once insert path backing the
  * startup-funnel milestones and interview_started/interview_completed. The
@@ -17,7 +23,7 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ from: fromMock }),
 }));
 
-import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
+import { persistMilestoneEventOnce, resetMilestoneEventServiceClientCacheForTests } from '@/lib/analytics/milestone-events-store';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -26,9 +32,9 @@ describe('persistMilestoneEventOnce', () => {
   const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   afterEach(() => {
-    vi.restoreAllMocks();
     insertMock.mockClear();
     fromMock.mockClear();
+    resetMilestoneEventServiceClientCacheForTests();
     process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
     process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
   });

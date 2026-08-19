@@ -1,10 +1,13 @@
 /**
  * Durable product-event persistence — best-effort, non-blocking.
  * Uses service-role Supabase client directly (no next/headers dependency).
+ * Persistence is scheduled via Next.js `after()` so inserts survive the
+ * serverless response lifecycle (raw fire-and-forget fetch aborts on Vercel).
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { ProductEventName } from '@/lib/analytics/product-events';
+import { scheduleServerlessBackgroundWork } from '@/lib/analytics/schedule-serverless-background-work';
 import { isPlaceholderValue } from '@/lib/redis/client';
 
 const MAX_PROP_KEYS = 32;
@@ -39,13 +42,32 @@ export function isSupabasePlaceholderCredential(url?: string, key?: string): boo
   return false;
 }
 
-export function getServiceClient() {
+let cachedServiceClient: SupabaseClient | null | undefined;
+
+export function resetProductEventServiceClientCacheForTests(): void {
+  cachedServiceClient = undefined;
+}
+
+export function getServiceClient(): SupabaseClient | null {
+  if (cachedServiceClient !== undefined) {
+    return cachedServiceClient;
+  }
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
-  if (!url || !key || isSupabasePlaceholderCredential(url, key)) return null;
-  return createClient(url, key, {
-    auth: { persistSession: false, autoRefreshToken: false },
+  if (!url || !key || isSupabasePlaceholderCredential(url, key)) {
+    cachedServiceClient = null;
+    return null;
+  }
+
+  cachedServiceClient = createClient(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
   });
+  return cachedServiceClient;
 }
 
 function sanitizeProps(
@@ -69,9 +91,22 @@ function sanitizeProps(
 function formatErrorMessage(err: unknown): string {
   if (typeof err === 'object' && err !== null) {
     const obj = err as Record<string, unknown>;
-    if (typeof obj.message === 'string' && obj.message.length > 0) {
-      return obj.message;
+    const message = typeof obj.message === 'string' && obj.message.length > 0 ? obj.message : '';
+    const cause =
+      obj.cause && typeof obj.cause === 'object' && obj.cause !== null
+        ? (obj.cause as Record<string, unknown>)
+        : null;
+    const causeCode = typeof cause?.code === 'string' ? cause.code : null;
+    const causeMessage =
+      typeof cause?.message === 'string' && cause.message.length > 0 ? cause.message : null;
+
+    if (message && causeCode && !message.includes(causeCode)) {
+      return `${message} (${causeCode})`;
     }
+    if (message && causeMessage && message === 'fetch failed' && causeMessage !== message) {
+      return `${message}: ${causeMessage}`;
+    }
+    if (message) return message;
   }
   if (typeof err === 'string' && err.length > 0) {
     return err;
@@ -80,6 +115,18 @@ function formatErrorMessage(err: unknown): string {
     return err.message;
   }
   return String(err);
+}
+
+function formatPersistFailureLog(error: unknown): string {
+  const msg = formatErrorMessage(error);
+  const failure = classifyPersistFailure(error);
+  if (msg !== 'fetch failed' && msg !== 'TypeError: fetch failed') {
+    return msg;
+  }
+  const parts = [msg];
+  if (failure.causeCode) parts.push(`cause=${failure.causeCode}`);
+  if (failure.category !== 'unknown') parts.push(`category=${failure.category}`);
+  return parts.join(' ');
 }
 
 type PersistFailureCategory =
@@ -205,6 +252,98 @@ export function isNonRetryableError(error: unknown): boolean {
   return false;
 }
 
+async function persistProductEventWork(
+  eventName: ProductEventName,
+  userId: string | null,
+  cleanProps: Record<string, string | number | boolean>,
+  traceContext: {
+    diagnosticEnabled: boolean;
+    requestId: string | null;
+    traceId: string | null;
+    startedAt: number;
+  },
+): Promise<void> {
+  const svc = getServiceClient();
+  if (!svc) return;
+
+  const { diagnosticEnabled, requestId, traceId, startedAt } = traceContext;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { error } = await svc.from('product_events').insert({
+        event_name: eventName,
+        user_id: userId,
+        props: cleanProps,
+      });
+      if (!error) return;
+
+      const msg = formatPersistFailureLog(error);
+      const failure = classifyPersistFailure(error);
+      if (diagnosticEnabled) {
+        console.warn(
+          '[product-events-store][diagnostic]',
+          JSON.stringify({
+            trace_id: traceId,
+            request_id: requestId,
+            event_name: eventName,
+            attempt: attempt + 1,
+            elapsed_ms: Date.now() - startedAt,
+            category: failure.category,
+            code: failure.code,
+            status: failure.status,
+            cause_code: failure.causeCode,
+            error_name: failure.name,
+            message: sanitizeDiagnosticMessage(error),
+          }),
+        );
+      }
+      if (isNonRetryableError(error)) {
+        console.warn('[product-events-store] insert failed:', msg);
+        return;
+      }
+
+      if (attempt === 0) {
+        console.warn('[product-events-store] insert failed (will retry):', msg);
+        await new Promise((r) => setTimeout(r, 1000));
+      } else {
+        console.warn('[product-events-store] insert failed after retry:', msg);
+      }
+    } catch (err) {
+      const msg = formatPersistFailureLog(err);
+      const failure = classifyPersistFailure(err);
+      if (diagnosticEnabled) {
+        console.warn(
+          '[product-events-store][diagnostic]',
+          JSON.stringify({
+            trace_id: traceId,
+            request_id: requestId,
+            event_name: eventName,
+            attempt: attempt + 1,
+            elapsed_ms: Date.now() - startedAt,
+            category: failure.category,
+            code: failure.code,
+            status: failure.status,
+            cause_code: failure.causeCode,
+            error_name: failure.name,
+            message: sanitizeDiagnosticMessage(err),
+          }),
+        );
+      }
+      if (isNonRetryableError(err)) {
+        console.warn('[product-events-store] persist error:', msg);
+        return;
+      }
+
+      if (attempt === 0) {
+        console.warn('[product-events-store] persist error (will retry):', msg);
+        await new Promise((r) => setTimeout(r, 1000));
+      } else {
+        console.warn('[product-events-store] persist error after retry:', msg);
+      }
+    }
+  }
+}
+
 /** Fire-and-forget insert; never throws to callers. */
 export function persistProductEventAsync(
   eventName: ProductEventName,
@@ -219,94 +358,23 @@ export function persistProductEventAsync(
 
   const { user_id: _uid, userId: _legacy, event_name: _en, event: _e, ...rest } = props;
   const cleanProps = sanitizeProps(rest);
+  const diagnosticEnabled = isProductEventTraceEnabled();
+  const requestId = diagnosticEnabled
+    ? (typeof props.request_id === 'string'
+        ? props.request_id
+        : typeof props.requestId === 'string'
+          ? props.requestId
+          : null)
+    : null;
+  const traceId = diagnosticEnabled ? (requestId ?? `pe-${Math.random().toString(36).slice(2, 10)}`) : null;
+  const startedAt = diagnosticEnabled ? Date.now() : 0;
 
-  void (async () => {
-    const diagnosticEnabled = isProductEventTraceEnabled();
-    const svc = getServiceClient();
-    if (!svc) return;
-    const requestId = diagnosticEnabled
-      ? (typeof props.request_id === 'string'
-          ? props.request_id
-          : typeof props.requestId === 'string'
-            ? props.requestId
-            : null)
-      : null;
-    const traceId = diagnosticEnabled ? (requestId ?? `pe-${Math.random().toString(36).slice(2, 10)}`) : null;
-    const startedAt = diagnosticEnabled ? Date.now() : 0;
-
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const { error } = await svc.from('product_events').insert({
-          event_name: eventName,
-          user_id: userId,
-          props: cleanProps,
-        });
-        if (!error) return; // success
-
-        const msg = formatErrorMessage(error);
-        const failure = classifyPersistFailure(error);
-        if (diagnosticEnabled) {
-          console.warn(
-            '[product-events-store][diagnostic]',
-            JSON.stringify({
-              trace_id: traceId,
-              request_id: requestId,
-              event_name: eventName,
-              attempt: attempt + 1,
-              elapsed_ms: Date.now() - startedAt,
-              category: failure.category,
-              code: failure.code,
-              status: failure.status,
-              cause_code: failure.causeCode,
-              error_name: failure.name,
-              message: sanitizeDiagnosticMessage(error),
-            }),
-          );
-        }
-        if (isNonRetryableError(error)) {
-          console.warn('[product-events-store] insert failed:', msg);
-          return;
-        }
-
-        if (attempt === 0) {
-          console.warn('[product-events-store] insert failed (will retry):', msg);
-          await new Promise((r) => setTimeout(r, 1000));
-        } else {
-          console.warn('[product-events-store] insert failed after retry:', msg);
-        }
-      } catch (err) {
-        const msg = formatErrorMessage(err);
-        const failure = classifyPersistFailure(err);
-        if (diagnosticEnabled) {
-          console.warn(
-            '[product-events-store][diagnostic]',
-            JSON.stringify({
-              trace_id: traceId,
-              request_id: requestId,
-              event_name: eventName,
-              attempt: attempt + 1,
-              elapsed_ms: Date.now() - startedAt,
-              category: failure.category,
-              code: failure.code,
-              status: failure.status,
-              cause_code: failure.causeCode,
-              error_name: failure.name,
-              message: sanitizeDiagnosticMessage(err),
-            }),
-          );
-        }
-        if (isNonRetryableError(err)) {
-          console.warn('[product-events-store] persist error:', msg);
-          return;
-        }
-
-        if (attempt === 0) {
-          console.warn('[product-events-store] persist error (will retry):', msg);
-          await new Promise((r) => setTimeout(r, 1000));
-        } else {
-          console.warn('[product-events-store] persist error after retry:', msg);
-        }
-      }
-    }
-  })();
+  scheduleServerlessBackgroundWork(() =>
+    persistProductEventWork(eventName, userId, cleanProps, {
+      diagnosticEnabled,
+      requestId,
+      traceId,
+      startedAt,
+    }),
+  );
 }
