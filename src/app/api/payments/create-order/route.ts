@@ -25,6 +25,12 @@ import {
   getEffectivePlanPrice,
   type EffectivePlanPrice,
 } from '@/lib/pricing/effective-price';
+import {
+  type Attribution,
+  getAttributionFromRequest,
+  hasAttribution,
+  normalizeAttribution,
+} from '@/lib/analytics/attribution';
 
 const TIER_ORDER: Record<PlanTier, number> = {
   free: 0,
@@ -104,9 +110,22 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('plan_tier, plan_status, plan_expires_at')
+    .select('plan_tier, plan_status, plan_expires_at, first_touch_attribution')
     .eq('id', user.id)
     .maybeSingle();
+
+  // Resolve attribution snapshot:
+  //   1. Authenticated user's DB first-touch (server-written at signup, immutable)
+  //   2. Server request cookie (ie_attribution) as fallback
+  //   3. NULL — payment creation always succeeds regardless
+  const resolvedFirstTouch = normalizeAttribution(
+    (profile as Record<string, unknown> | null)?.first_touch_attribution,
+  );
+  const attributionSnapshot: Attribution | null = hasAttribution(resolvedFirstTouch)
+    ? resolvedFirstTouch
+    : hasAttribution(getAttributionFromRequest(request))
+      ? getAttributionFromRequest(request)
+      : null;
 
   const currentTier = (profile?.plan_tier ?? 'free') as PlanTier;
   if (currentTier === 'campus' || currentTier === 'campus_admin') {
@@ -309,6 +328,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         userId: user.id,
         orderId: order.order_id,
         currency: order.currency,
+        attributionSnapshot,
       });
 
       if (!attached) {
@@ -337,6 +357,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         list_amount_paise: listAmountPaise,
         discount_paise: discountPaise,
         ...(pricingCampaignId ? { pricing_campaign_id: pricingCampaignId } : {}),
+        attribution_snapshot: attributionSnapshot,
       });
 
       if (insertErr) {

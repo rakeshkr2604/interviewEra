@@ -61,6 +61,24 @@ describe('global pricing campaign', () => {
     expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(79900);
   });
 
+  it('ignores a paused campaign even during its active window', () => {
+    const row = campaign({ status: 'paused', is_active: false });
+    expect(isPricingCampaignLive(row, NOW)).toBe(false);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+  });
+
+  it('ignores an archived campaign', () => {
+    const row = campaign({ status: 'archived', is_active: false });
+    expect(isPricingCampaignLive(row, NOW)).toBe(false);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+  });
+
+  it('ignores a draft campaign', () => {
+    const row = campaign({ status: 'draft', is_active: false });
+    expect(isPricingCampaignLive(row, NOW)).toBe(false);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+  });
+
   it('applies only to Starter when targeted', () => {
     const row = campaign({ applies_to_plans: ['starter'] });
     expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(23900);

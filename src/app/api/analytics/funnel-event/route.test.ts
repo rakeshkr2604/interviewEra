@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ATTRIBUTION_COOKIE_NAME } from '@/lib/analytics/attribution';
 
 const getUser = vi.fn();
 const checkRateLimit = vi.fn();
@@ -30,15 +31,22 @@ vi.mock('@/lib/analytics/product-events-server', () => ({
 
 import { POST } from './route';
 
-function request(body: Record<string, unknown>): Request {
+function request(body: Record<string, unknown>, cookie?: string): Request {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-forwarded-for': '127.0.0.1',
+  };
+  if (cookie) headers.cookie = cookie;
+
   return new Request('http://localhost/api/analytics/funnel-event', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-forwarded-for': '127.0.0.1',
-    },
+    headers,
     body: JSON.stringify(body),
   });
+}
+
+function attributionCookie(values: Record<string, string>): string {
+  return `${ATTRIBUTION_COOKIE_NAME}=${encodeURIComponent(JSON.stringify(values))}`;
 }
 
 describe('POST /api/analytics/funnel-event', () => {
@@ -140,5 +148,71 @@ describe('POST /api/analytics/funnel-event', () => {
     );
 
     expect(trackProductEventServer).not.toHaveBeenCalled();
+  });
+
+  it('persists server cookie attribution on durable funnel events', async () => {
+    getUser.mockResolvedValue({
+      data: { user: { id: 'server-user' } },
+      error: null,
+    });
+
+    await POST(
+      request(
+        {
+          event_name: 'pricing_page_viewed',
+          source_page: '/pricing',
+          utm_source: 'client',
+        },
+        attributionCookie({ utm_source: 'server', utm_medium: 'social' }),
+      ),
+    );
+
+    expect(trackProductEventServer).toHaveBeenCalledWith({
+      event_name: 'pricing_page_viewed',
+      source_page: '/pricing',
+      utm_source: 'server',
+      utm_medium: 'social',
+      user_id: 'server-user',
+    });
+  });
+
+  it('uses client attribution fallback when cookie is absent', async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    await POST(
+      request({
+        event_name: 'plan_selected',
+        plan: 'starter',
+        source: 'pricing_grid',
+        utm_source: 'client-fallback',
+      }),
+    );
+
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_name: 'plan_selected',
+        utm_source: 'client-fallback',
+      }),
+    );
+  });
+
+  it('ignores malformed cookie and still persists the event', async () => {
+    getUser.mockResolvedValue({ data: { user: null }, error: null });
+
+    const response = await POST(
+      request(
+        {
+          event_name: 'pricing_page_viewed',
+          source_page: '/pricing',
+        },
+        `${ATTRIBUTION_COOKIE_NAME}=not-json`,
+      ),
+    );
+
+    expect(response.status).toBe(204);
+    expect(trackProductEventServer).toHaveBeenCalledWith({
+      event_name: 'pricing_page_viewed',
+      source_page: '/pricing',
+    });
   });
 });

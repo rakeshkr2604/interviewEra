@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
+import {
+  attributionToEventProps,
+  resolveDurableEventAttribution,
+} from '@/lib/analytics/attribution';
 import { CLIENT_DURABLE_FUNNEL_PRODUCT_EVENT_NAMES } from '@/lib/analytics/funnel';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import type { ProductEventName } from '@/lib/analytics/product-events';
@@ -116,6 +120,8 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const event_name = record.event_name;
     let props = pickAllowedProps(event_name, record);
+    const attribution = resolveDurableEventAttribution(request, record);
+    props = { ...props, ...attributionToEventProps(attribution) };
 
     if (event_name === 'payment_started') {
       const orderId = typeof props.order_id === 'string' ? props.order_id : null;

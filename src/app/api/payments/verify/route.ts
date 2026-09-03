@@ -199,6 +199,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       order_id: razorpay_order_id,
       payment_id: razorpay_payment_id,
       source: 'verify',
+      ...(expected.attributionSnapshot ?? {}),
     });
   }
 

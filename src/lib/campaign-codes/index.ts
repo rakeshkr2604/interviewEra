@@ -4,6 +4,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+import type { Attribution } from '@/lib/analytics/attribution';
 
 export type CampaignCodeKind = 'promo' | 'sponsorship';
 export type CampaignDiscountType = 'percent' | 'flat_paise';
@@ -294,6 +295,10 @@ export async function reserveCampaignCode(
 /**
  * Atomically attach a Razorpay order and its local payment row to the exact
  * reservation that authorized the discounted amount.
+ *
+ * `attributionSnapshot` — optional normalized UTM attribution written into the
+ * payment row at creation time. Pass NULL/undefined when unavailable; the column
+ * is nullable and has no effect on financial logic.
  */
 export async function attachCampaignOrder(
   svc: SupabaseClient,
@@ -303,6 +308,7 @@ export async function attachCampaignOrder(
     orderId: string;
     currency: string;
     gateway?: string;
+    attributionSnapshot?: Attribution | null;
   },
 ): Promise<boolean> {
   const { data, error } = await svc.rpc('attach_campaign_order', {
@@ -311,6 +317,7 @@ export async function attachCampaignOrder(
     p_order_id: params.orderId,
     p_currency: params.currency,
     p_gateway: params.gateway ?? 'razorpay',
+    p_attribution_snapshot: params.attributionSnapshot ?? null,
   });
   if (error) {
     console.error('[campaign-codes] attach order failed:', error.message, {

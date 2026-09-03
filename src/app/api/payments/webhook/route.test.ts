@@ -137,6 +137,7 @@ describe('Razorpay webhook campaign ownership', () => {
       amountPaise: 20900,
       currency: 'INR',
       campaignRedemptionId: 'red-a',
+      attributionSnapshot: null,
     });
     activatePlanAfterPayment
       .mockResolvedValueOnce({
@@ -326,6 +327,7 @@ describe('Razorpay webhook runtime Supabase isolation', () => {
       amountPaise: 20900,
       currency: 'INR',
       campaignRedemptionId: null,
+      attributionSnapshot: null,
     });
     activatePlanAfterPayment.mockResolvedValue({
       activated: true,
@@ -530,5 +532,103 @@ describe('Razorpay webhook runtime Supabase isolation', () => {
     expect(response.status).toBe(400);
     expect(createServiceClient).not.toHaveBeenCalled();
     expect(activatePlanAfterPayment).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5: attribution immutability + payment_completed event (webhook path)
+// ---------------------------------------------------------------------------
+
+describe('POST /api/payments/webhook payment_completed attribution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    verifyWebhookSignature.mockReturnValue(true);
+    vi.unstubAllEnvs();
+    createServiceClient.mockReturnValue({});
+    fetchRazorpayOrder.mockResolvedValue({
+      id: 'order-a',
+      amount: 20900,
+      currency: 'INR',
+      status: 'paid',
+      notes: { user_id: 'user-a', plan: 'starter', campaign_redemption_id: 'red-a' },
+    });
+    fetchRazorpayPayment.mockResolvedValue({
+      id: 'pay-a',
+      order_id: 'order-a',
+      amount: 20900,
+      currency: 'INR',
+      status: 'captured',
+    });
+    activatePlanAfterPayment.mockResolvedValue({
+      activated: true,
+      alreadyActivated: false,
+      plan: 'starter',
+      planExpiresAt: '2026-09-16T00:00:00.000Z',
+    });
+  });
+
+  // 6. Webhook payment_completed uses payment row's historical attribution
+  it('6: webhook payment_completed includes attribution from payment snapshot', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: 'user-a',
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-a',
+      attributionSnapshot: { utm_source: 'google', utm_campaign: 'summer' },
+    });
+
+    const response = await POST(webhook(capturedEvent));
+
+    expect(response.status).toBe(200);
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_name: 'payment_completed',
+        utm_source: 'google',
+        utm_campaign: 'summer',
+      }),
+    );
+  });
+
+  // 7. Later attribution does not affect historical webhook payment_completed
+  it('7: payment_completed attribution from snapshot is independent of current user state', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: 'user-a',
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-a',
+      attributionSnapshot: { utm_source: 'original' },
+    });
+
+    const response = await POST(webhook(capturedEvent));
+
+    expect(response.status).toBe(200);
+    const callArg = trackProductEventServer.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg?.utm_source).toBe('original');
+  });
+
+  // 8. Missing attribution_snapshot does not break webhook
+  it('8: missing attribution_snapshot does not break webhook payment_completed', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: 'user-a',
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-a',
+      attributionSnapshot: null,
+    });
+
+    const response = await POST(webhook(capturedEvent));
+
+    expect(response.status).toBe(200);
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({ event_name: 'payment_completed' }),
+    );
+    const callArg = trackProductEventServer.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('utm_source');
   });
 });

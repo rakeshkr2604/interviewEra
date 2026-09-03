@@ -54,6 +54,7 @@ describe('resolveExpectedOrderAmount', () => {
       plan: 'starter',
       userId: 'user-1',
       campaignRedemptionId: 'red-1',
+      attributionSnapshot: null,
     });
   });
 
@@ -90,6 +91,7 @@ describe('resolveExpectedOrderAmount', () => {
       plan: 'pro',
       userId: 'user-1',
       campaignRedemptionId: null,
+      attributionSnapshot: null,
     });
   });
 

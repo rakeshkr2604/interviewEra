@@ -2,6 +2,12 @@
  * Durable page_view — GA4 page_path + product_events persistence.
  */
 
+import {
+  attributionToEventProps,
+  captureAttributionFromSearchParams,
+  hasAttribution,
+  parseAttributionFromSearchParams,
+} from '@/lib/analytics/attribution';
 import { pageview, trackEvent } from '@/lib/analytics/gtag';
 import { markAnalyticsDedupeKey } from '@/lib/analytics/dedupe';
 import { trackProductEventClient } from '@/lib/analytics/product-events';
@@ -18,6 +24,14 @@ export function normalizePagePath(path: string): string {
   const trimmed = path.trim();
   if (!trimmed) return '/';
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+function searchParamsFromRawPath(rawPath: string): URLSearchParams | null {
+  const queryStart = rawPath.indexOf('?');
+  if (queryStart < 0) return null;
+  const query = rawPath.slice(queryStart + 1);
+  if (!query) return null;
+  return new URLSearchParams(query);
 }
 
 /**
@@ -38,6 +52,17 @@ export function trackDurablePageView(
     return false;
   }
 
+  const urlSearchParams = searchParamsFromRawPath(rawPath);
+  const landingAttribution = urlSearchParams
+    ? parseAttributionFromSearchParams(urlSearchParams)
+    : {};
+
+  // Persist attribution synchronously before the durable beacon so the first
+  // landing page_view cannot race AttributionCapture's separate effect.
+  if (urlSearchParams && hasAttribution(landingAttribution)) {
+    captureAttributionFromSearchParams(urlSearchParams);
+  }
+
   const payload: PageViewPayload = {
     page_path: pagePath,
     ...(options.userId ? { user_id: options.userId } : {}),
@@ -52,7 +77,10 @@ export function trackDurablePageView(
     headers: { 'Content-Type': 'application/json' },
     credentials: 'same-origin',
     keepalive: true,
-    body: JSON.stringify({ path: pagePath }),
+    body: JSON.stringify({
+      path: pagePath,
+      ...attributionToEventProps(landingAttribution),
+    }),
   }).catch(() => {
     /* best-effort */
   });

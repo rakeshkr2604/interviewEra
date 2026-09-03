@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const campaignInsert = vi.fn();
 const productEventInsert = vi.fn();
+const auditInsert = vi.fn();
 const overlapSelect = vi.fn();
 
 vi.mock('@/lib/admin/auth', () => ({
@@ -20,6 +21,7 @@ vi.mock('@/lib/supabase/server', () => ({
           select: overlapSelect,
         };
       }
+      if (table === 'campaign_audit_logs') return { insert: auditInsert };
       if (table === 'product_events') return { insert: productEventInsert };
       throw new Error(`Unexpected table: ${table}`);
     },
@@ -51,7 +53,9 @@ describe('POST /api/admin/pricing-campaigns', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     overlapSelect.mockReturnValue({
-      eq: () => Promise.resolve({ data: [], error: null }),
+      eq: () => ({
+        gt: () => Promise.resolve({ data: [], error: null }),
+      }),
     });
     campaignInsert.mockImplementation((row: Record<string, unknown>) => ({
       select: () => ({
@@ -61,6 +65,7 @@ describe('POST /api/admin/pricing-campaigns', () => {
         }),
       }),
     }));
+    auditInsert.mockResolvedValue({ error: null });
     productEventInsert.mockResolvedValue({ error: null });
   });
 
@@ -78,7 +83,7 @@ describe('POST /api/admin/pricing-campaigns', () => {
     expect(campaignInsert).not.toHaveBeenCalled();
   });
 
-  it('creates a draft 20% campaign', async () => {
+  it('creates a draft 20% campaign with reusable display name', async () => {
     const response = await POST(request(baseCampaign));
     expect(response.status).toBe(201);
     expect(campaignInsert).toHaveBeenCalledWith(
@@ -86,7 +91,7 @@ describe('POST /api/admin/pricing-campaigns', () => {
         name: 'Limited Time Offer',
         discount_value: 20,
         is_active: false,
-        slug: 'limited-time-offer',
+        status: 'draft',
       }),
     );
   });

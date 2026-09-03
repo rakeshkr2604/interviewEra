@@ -7,6 +7,8 @@ import { sendSignupVerificationEmail } from '@/lib/email/lifecycle/send-verifica
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { sanitizeNext } from '@/lib/auth/auth-params';
 import { captureReferralFromCode } from '@/lib/referral/capture-referral';
+import { getAttributionFromRequest } from '@/lib/analytics/attribution';
+import { persistUserAttributionOnce } from '@/lib/analytics/persist-user-attribution';
 
 const GENERIC_SIGNUP_SUCCESS =
   'If this address can be registered, check your inbox for a verification email.';
@@ -102,6 +104,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (placementDate) {
     await service.from('users').update({ placement_date: placementDate }).eq('id', userId);
   }
+
+  const attribution = getAttributionFromRequest(request);
+  await persistUserAttributionOnce(service, userId, attribution).catch((err) => {
+    console.error('[auth/signup] attribution persistence failed:', err);
+  });
 
   const cookieStore = await cookies();
   const referralCode = cookieStore.get('referral_code')?.value;

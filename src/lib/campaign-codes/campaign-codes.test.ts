@@ -272,6 +272,7 @@ describe('campaign reservation ownership helpers', () => {
       p_order_id: 'order-a',
       p_currency: 'INR',
       p_gateway: 'razorpay',
+      p_attribution_snapshot: null,
     });
   });
 

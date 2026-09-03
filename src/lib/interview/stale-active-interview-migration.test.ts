@@ -2,10 +2,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-const sql = fs.readFileSync(
-  path.join(process.cwd(), 'supabase', 'migrations', '096_stale_active_interview_start.sql'),
-  'utf8',
-);
+const sql = fs
+  .readFileSync(
+    path.join(process.cwd(), 'supabase', 'migrations', '096_stale_active_interview_start.sql'),
+    'utf8',
+  )
+  .replace(/\r\n/g, '\n');
 
 describe('096 stale active interview start contract', () => {
   it('adds created_at without rewriting historical interview rows as now()', () => {

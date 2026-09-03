@@ -195,6 +195,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           order_id: orderId,
           payment_id: paymentId,
           source: 'webhook',
+          ...(expected.attributionSnapshot ?? {}),
         });
       }
 

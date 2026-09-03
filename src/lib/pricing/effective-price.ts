@@ -12,10 +12,19 @@ import {
 } from '@/lib/campaign-codes';
 import { getPaidPlan, PAID_PLANS, type PaidPlanId } from '@/lib/pricing/plans';
 
+export type CampaignStatus =
+  | 'draft'
+  | 'scheduled'
+  | 'active'
+  | 'paused'
+  | 'ended'
+  | 'archived';
+
 export type PricingCampaignRecord = {
   id: string;
   name: string;
   slug: string;
+  status: CampaignStatus;
   is_active: boolean;
   discount_type: CampaignDiscountType;
   discount_value: number;
@@ -24,6 +33,9 @@ export type PricingCampaignRecord = {
   ends_at: string;
   display_label: string | null;
   display_badge: string | null;
+  parent_campaign_id?: string | null;
+  archived_at?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type EffectivePlanPrice = {
@@ -96,10 +108,15 @@ export function parseAppliesToPlans(value: unknown): PaidPlanId[] {
 }
 
 export function isPricingCampaignLive(
-  campaign: Pick<PricingCampaignRecord, 'is_active' | 'starts_at' | 'ends_at'>,
+  campaign: Pick<PricingCampaignRecord, 'is_active' | 'starts_at' | 'ends_at'> & {
+    status?: CampaignStatus;
+  },
   now: Date,
 ): boolean {
   if (!campaign.is_active) return false;
+  if (campaign.status && campaign.status !== 'active' && campaign.status !== 'scheduled') {
+    return false;
+  }
   return (
     campaignWindowStatus(new Date(campaign.starts_at), new Date(campaign.ends_at), now) ===
     'active'
@@ -192,11 +209,15 @@ function isMissingPricingCampaignsTable(message: string): boolean {
 }
 
 function mapCampaignRow(row: Record<string, unknown>): PricingCampaignRecord {
+  const isActive = Boolean(row.is_active);
+  const rawStatus = typeof row.status === 'string' ? (row.status as CampaignStatus) : null;
+  const status: CampaignStatus = rawStatus ?? (isActive ? 'active' : 'draft');
   return {
     id: String(row.id),
     name: String(row.name),
-    slug: String(row.slug),
-    is_active: Boolean(row.is_active),
+    slug: String(row.slug ?? ''),
+    status,
+    is_active: isActive,
     discount_type: row.discount_type === 'flat_paise' ? 'flat_paise' : 'percent',
     discount_value: Number(row.discount_value),
     applies_to_plans: parseAppliesToPlans(row.applies_to_plans),
@@ -204,6 +225,9 @@ function mapCampaignRow(row: Record<string, unknown>): PricingCampaignRecord {
     ends_at: String(row.ends_at),
     display_label: (row.display_label as string | null) ?? null,
     display_badge: (row.display_badge as string | null) ?? null,
+    parent_campaign_id: (row.parent_campaign_id as string | null) ?? null,
+    archived_at: (row.archived_at as string | null) ?? null,
+    metadata: (row.metadata as Record<string, unknown> | null) ?? {},
   };
 }
 
@@ -215,7 +239,7 @@ export async function loadLivePricingCampaigns(
   const { data, error } = await svc
     .from('pricing_campaigns')
     .select(
-      'id, name, slug, is_active, discount_type, discount_value, applies_to_plans, starts_at, ends_at, display_label, display_badge',
+      'id, name, slug, status, is_active, discount_type, discount_value, applies_to_plans, starts_at, ends_at, display_label, display_badge, parent_campaign_id, archived_at, metadata',
     )
     .eq('is_active', true)
     .lte('starts_at', nowIso)

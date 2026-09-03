@@ -4,6 +4,7 @@ import {
   getAttributionFromRequest,
   parseAttributionFromSearchParams,
 } from '@/lib/analytics/attribution';
+import { persistUserAttributionOnce } from '@/lib/analytics/persist-user-attribution';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { sendWelcomeEmailIfNeeded } from '@/lib/email/lifecycle/send-welcome';
 import { isAuthV2Enabled } from '@/lib/auth/flags';
@@ -94,6 +95,12 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         );
 
         if (userId) {
+          await persistUserAttributionOnce(createServiceClient(), userId, attribution).catch(
+            (err) => {
+              console.error('[auth/callback] attribution persistence failed:', err);
+            },
+          );
+
           void sendWelcomeEmailIfNeeded(userId).catch((err) => {
             console.error('[auth/callback] welcome email failed:', err);
           });

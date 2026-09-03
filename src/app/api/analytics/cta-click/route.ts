@@ -5,6 +5,10 @@
 
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import {
+  attributionToEventProps,
+  resolveDurableEventAttribution,
+} from '@/lib/analytics/attribution';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { CTA_KEYS, type CtaKey } from '@/lib/analytics/cta-keys';
@@ -61,6 +65,8 @@ export async function POST(request: Request): Promise<NextResponse> {
     const ctaText =
       typeof record.cta_text === 'string' ? record.cta_text.slice(0, 120) : '';
 
+    const attribution = resolveDurableEventAttribution(request, record);
+
     trackProductEventServer({
       event_name: 'landing_cta_clicked',
       ...(user?.id ? { user_id: user.id } : {}),
@@ -70,6 +76,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       section,
       authenticated: Boolean(user),
       source: 'client_cta',
+      ...attributionToEventProps(attribution),
     });
 
     return NO_CONTENT;

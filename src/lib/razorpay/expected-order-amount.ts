@@ -8,6 +8,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+import { type Attribution, normalizeAttribution, hasAttribution } from '@/lib/analytics/attribution';
 
 export type ExpectedOrderAmount =
   | {
@@ -17,6 +18,8 @@ export type ExpectedOrderAmount =
       plan: PaidPlanId;
       userId: string;
       campaignRedemptionId: string | null;
+      /** Immutable attribution snapshot from the payment row; NULL when not captured. */
+      attributionSnapshot: Attribution | null;
     }
   | { ok: false; error: string; code: 'not_found' | 'plan_invalid' | 'redemption_mismatch' };
 
@@ -27,7 +30,7 @@ export async function resolveExpectedOrderAmount(
 ): Promise<ExpectedOrderAmount> {
   const { data: payment, error } = await svc
     .from('payments')
-    .select('user_id, plan, amount, currency, campaign_redemption_id')
+    .select('user_id, plan, amount, currency, campaign_redemption_id, attribution_snapshot')
     .eq('order_id', orderId)
     .maybeSingle();
 
@@ -67,6 +70,11 @@ export async function resolveExpectedOrderAmount(
     }
   }
 
+  const normalized = normalizeAttribution(
+    (payment as Record<string, unknown>).attribution_snapshot,
+  );
+  const attributionSnapshot: Attribution | null = hasAttribution(normalized) ? normalized : null;
+
   return {
     ok: true,
     amountPaise,
@@ -74,5 +82,6 @@ export async function resolveExpectedOrderAmount(
     plan: payment.plan as PaidPlanId,
     userId: payment.user_id as string,
     campaignRedemptionId: redemptionId,
+    attributionSnapshot,
   };
 }

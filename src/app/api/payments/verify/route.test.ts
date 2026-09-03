@@ -106,6 +106,7 @@ describe('POST /api/payments/verify provider validation', () => {
       amountPaise: 20900,
       currency: 'INR',
       campaignRedemptionId: 'red-1',
+      attributionSnapshot: null,
     });
     activatePlanAfterPayment.mockResolvedValue({
       activated: true,
@@ -134,6 +135,7 @@ describe('POST /api/payments/verify provider validation', () => {
       currency: 'INR',
       campaignRedemptionId:
         amount === 29900 || amount === 79800 || amount === 79900 ? null : 'red-1',
+      attributionSnapshot: null,
     });
     activatePlanAfterPayment.mockResolvedValueOnce({
       activated: true,
@@ -189,6 +191,7 @@ describe('POST /api/payments/verify provider validation', () => {
       amountPaise: 20900,
       currency: 'INR',
       campaignRedemptionId: null,
+      attributionSnapshot: null,
     });
 
     const response = await POST(request());
@@ -207,5 +210,155 @@ describe('POST /api/payments/verify provider validation', () => {
 
     expect(response.status).toBe(400);
     expect(activatePlanAfterPayment).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 5: attribution immutability + payment_completed event
+// ---------------------------------------------------------------------------
+
+describe('POST /api/payments/verify payment_completed attribution', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubEnv('RAZORPAY_KEY_SECRET', 'test-key-secret');
+    getUser.mockResolvedValue({ data: { user: { id: USER_ID } }, error: null });
+    verifyPaymentSignature.mockReturnValue(true);
+    fetchRazorpayOrder.mockResolvedValue(providerOrder());
+    fetchRazorpayPayment.mockResolvedValue(providerPayment());
+    activatePlanAfterPayment.mockResolvedValue({
+      activated: true,
+      alreadyActivated: false,
+      plan: 'starter',
+      planExpiresAt: '2026-09-16T00:00:00.000Z',
+    });
+  });
+
+  // 1. payment_completed includes attribution from payment snapshot
+  it('1: payment_completed event includes utm fields from attribution_snapshot', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-1',
+      attributionSnapshot: { utm_source: 'google', utm_campaign: 'summer' },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_name: 'payment_completed',
+        utm_source: 'google',
+        utm_campaign: 'summer',
+      }),
+    );
+  });
+
+  // 2. Attribution snapshot survives payment; completion event does not change it
+  it('2: payment_completed attribution uses snapshot, not current cookie/user state', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-1',
+      // Snapshot reflects original acquisition; later user state is irrelevant
+      attributionSnapshot: { utm_source: 'original_source' },
+    });
+
+    const laterCookieRequest = new Request('http://localhost/api/payments/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        cookie: 'ie_attribution=' + encodeURIComponent(JSON.stringify({ utm_source: 'later_source' })),
+      },
+      body: JSON.stringify({
+        razorpay_order_id: ORDER_ID,
+        razorpay_payment_id: PAYMENT_ID,
+        razorpay_signature: 'valid-signature',
+      }),
+    });
+
+    const response = await POST(laterCookieRequest);
+
+    expect(response.status).toBe(200);
+    const callArg = trackProductEventServer.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg?.utm_source).toBe('original_source');
+    expect(callArg?.utm_source).not.toBe('later_source');
+  });
+
+  // 3. Missing attribution_snapshot → payment_completed succeeds without UTM fields
+  it('3: missing attribution_snapshot does not break payment_completed event', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-1',
+      attributionSnapshot: null,
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({ event_name: 'payment_completed' }),
+    );
+    const callArg = trackProductEventServer.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg).not.toHaveProperty('utm_source');
+  });
+
+  // 4. Campaign payment + attribution both present — uses default campaignRedemptionId: 'red-1'
+  it('4: campaign payment with attribution_snapshot includes both in payment_completed', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-1',
+      attributionSnapshot: { utm_source: 'twitter', utm_medium: 'social' },
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event_name: 'payment_completed',
+        utm_source: 'twitter',
+        utm_medium: 'social',
+      }),
+    );
+  });
+
+  // 5. Idempotent retry (alreadyActivated) does not re-track payment_completed
+  it('5: idempotent retry does not emit duplicate payment_completed event', async () => {
+    resolveExpectedOrderAmount.mockResolvedValue({
+      ok: true,
+      userId: USER_ID,
+      plan: 'starter',
+      amountPaise: 20900,
+      currency: 'INR',
+      campaignRedemptionId: 'red-1',
+      attributionSnapshot: { utm_source: 'google' },
+    });
+    activatePlanAfterPayment.mockResolvedValue({
+      activated: false,
+      alreadyActivated: true,
+      plan: 'starter',
+      planExpiresAt: '2026-09-16T00:00:00.000Z',
+    });
+
+    const response = await POST(request());
+
+    expect(response.status).toBe(200);
+    // shouldTrackPaymentCompleted returns false for alreadyActivated
+    expect(trackProductEventServer).not.toHaveBeenCalled();
   });
 });

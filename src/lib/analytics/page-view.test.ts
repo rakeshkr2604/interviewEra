@@ -61,4 +61,43 @@ describe('trackDurablePageView', () => {
     expect(trackProductEventClient).toHaveBeenCalledWith('page_view', expect.objectContaining({ page_path: '/pricing' }));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('persists landing UTMs on the first durable page_view beacon before cookie exists', () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 204 });
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('document', { cookie: '' });
+    vi.stubGlobal('localStorage', {
+      store: {} as Record<string, string>,
+      getItem(key: string) {
+        return this.store[key] ?? null;
+      },
+      setItem(key: string, value: string) {
+        this.store[key] = value;
+      },
+    });
+    vi.stubGlobal('sessionStorage', {
+      store: {} as Record<string, string>,
+      getItem(key: string) {
+        return this.store[key] ?? null;
+      },
+      setItem(key: string, value: string) {
+        this.store[key] = value;
+      },
+    });
+
+    trackDurablePageView(
+      '/some-page?utm_source=x&utm_medium=y&utm_campaign=z',
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
+    expect(body).toEqual({
+      path: '/some-page?utm_source=x&utm_medium=y&utm_campaign=z',
+      utm_source: 'x',
+      utm_medium: 'y',
+      utm_campaign: 'z',
+    });
+    expect(document.cookie).toContain('ie_attribution');
+  });
 });

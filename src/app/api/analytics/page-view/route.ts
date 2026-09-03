@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 import { createClient } from '@/lib/supabase/server';
+import {
+  attributionToEventProps,
+  resolveDurableEventAttribution,
+} from '@/lib/analytics/attribution';
 import { normalizePagePath } from '@/lib/analytics/page-view';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
@@ -39,6 +43,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? normalizePagePath(String((body as { path: unknown }).path ?? ''))
         : '/';
 
+    const clientRecord =
+      typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : undefined;
+    const attribution = resolveDurableEventAttribution(request, clientRecord);
+
     try {
       const rl = await checkRateLimit(`page-view:${clientIp(request)}`, 60, 120);
       if (!rl.allowed) return NO_CONTENT;
@@ -56,6 +64,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       user_id: user?.id,
       page_path: path,
       source: 'client_navigation',
+      ...attributionToEventProps(attribution),
     };
     if (PRODUCT_EVENT_TRACE_ENABLED) {
       eventPayload.request_id = requestId ?? undefined;
