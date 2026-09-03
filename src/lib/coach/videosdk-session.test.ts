@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { forceEndCoachRoom } from './videosdk-session'
-import { mintCoachJoinToken } from './videosdk-token'
+import { mintCoachJoinToken, mintVideoSdkManagementToken } from './videosdk-token'
 
 describe('coach videosdk force end (hard cutoff)', () => {
   const fetchMock = vi.fn()
@@ -91,5 +91,51 @@ describe('coach join token', () => {
     expect(payload.roles).toEqual(['rtc'])
     expect(payload.permissions).toEqual(['allow_join'])
     expect(payload.version).toBe(2)
+  })
+})
+
+describe('coach management token', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('mints a management JWT with allow_mod and no roomId/rtc scope', () => {
+    vi.stubEnv('VIDEOSDK_API_KEY', 'test-api-key')
+    vi.stubEnv('VIDEOSDK_SECRET', 'test-secret')
+
+    const result = mintVideoSdkManagementToken()
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const [, payloadB64] = result.token.split('.')
+    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf8')) as {
+      apikey: string
+      permissions: string[]
+      version: number
+      roomId?: string
+      roles?: string[]
+      iat: number
+      exp: number
+    }
+
+    expect(payload.apikey).toBe('test-api-key')
+    expect(payload.permissions).toContain('allow_join')
+    expect(payload.permissions).toContain('allow_mod')
+    expect(payload.version).toBe(2)
+    // Management token must NOT be room-scoped — these would lock it to one room
+    expect(payload.roomId).toBeUndefined()
+    expect(payload.roles).toBeUndefined()
+    // TTL: 5 minutes per-request
+    expect(payload.exp - payload.iat).toBe(5 * 60)
+  })
+
+  it('returns an error when signing env vars are absent', () => {
+    vi.stubEnv('VIDEOSDK_API_KEY', '')
+    vi.stubEnv('VIDEOSDK_SECRET', '')
+
+    const result = mintVideoSdkManagementToken()
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error).toMatch(/VIDEOSDK_API_KEY/)
   })
 })

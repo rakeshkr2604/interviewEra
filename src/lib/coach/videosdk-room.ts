@@ -1,3 +1,5 @@
+import { mintVideoSdkManagementToken } from './videosdk-token'
+
 export type VideoSdkRoomConfig = {
   token: string
   roomId: string
@@ -5,20 +7,31 @@ export type VideoSdkRoomConfig = {
   versionId: string
 }
 
+/**
+ * Read VideoSDK agent config and mint a fresh short-lived management JWT.
+ *
+ * The static VIDEOSDK_AUTH_TOKEN (dashboard temporary token) has been replaced
+ * with dynamically-minted tokens to avoid production expiry (4002 errors).
+ * The management JWT is signed with VIDEOSDK_API_KEY + VIDEOSDK_SECRET — the
+ * same credentials already used by mintCoachJoinToken — but without the roomId
+ * or roles:rtc restrictions, so it can call any management REST endpoint.
+ */
 export function readVideoSdkEnv():
   | { ok: true; token: string; agentId: string; versionId: string }
   | { ok: false; error: string } {
-  const token = process.env.VIDEOSDK_AUTH_TOKEN?.trim()
   const agentId = process.env.VIDEOSDK_AGENT_ID?.trim()
   const versionId = process.env.VIDEOSDK_VERSION_ID?.trim()
-  if (!token || !agentId || !versionId) {
+  if (!agentId || !versionId) {
     return {
       ok: false,
-      error:
-        'Missing VideoSDK env: VIDEOSDK_AUTH_TOKEN, VIDEOSDK_AGENT_ID, and/or VIDEOSDK_VERSION_ID',
+      error: 'Missing VideoSDK env: VIDEOSDK_AGENT_ID and/or VIDEOSDK_VERSION_ID',
     }
   }
-  return { ok: true, token, agentId, versionId }
+  const minted = mintVideoSdkManagementToken()
+  if (!minted.ok) {
+    return { ok: false, error: `VideoSDK management token: ${minted.error}` }
+  }
+  return { ok: true, token: minted.token, agentId, versionId }
 }
 
 export async function createVideoSdkRoom(token: string): Promise<
