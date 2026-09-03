@@ -204,5 +204,25 @@ describe('Coach API Routes Access Gate', () => {
 
       expect(dispatchVideoSdkAgent).not.toHaveBeenCalled()
     })
+
+    it('returns 401 without side effects when refresh_token_not_found occurs', async () => {
+      const { dispatchVideoSdkAgent } = await import('@/lib/coach/videosdk-session')
+
+      mockUser = null
+      mockAuthError = new Error('Invalid Refresh Token: Refresh Token Not Found') as Error & { code: string }
+      ;(mockAuthError as unknown as { code: string }).code = 'refresh_token_not_found'
+
+      const req = new Request('http://localhost/api/coach/session/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: 'room-123' }),
+      })
+      const res = await connectPOST(req)
+
+      expect(res.status).toBe(401)
+      const data = await res.json()
+      expect(data.error).toBe('Unauthorized')
+      expect(dispatchVideoSdkAgent).not.toHaveBeenCalled()
+    })
   })
 })

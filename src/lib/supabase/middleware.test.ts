@@ -51,5 +51,46 @@ describe('updateSession auth refresh path', () => {
       expect.stringContaining('"correlation_id":"corr-1"'),
     );
   });
+
+  it('marks sb-* cookies with maxAge 0 when refresh_token_not_found occurs', async () => {
+    getUserMock.mockResolvedValueOnce({
+      data: { user: null },
+      error: { code: 'refresh_token_not_found', message: 'Invalid Refresh Token: Refresh Token Not Found' },
+    });
+
+    const { updateSession } = await import('@/lib/supabase/middleware');
+    const request = new NextRequest('http://localhost/dashboard', {
+      headers: { cookie: 'sb-proj-auth-token=dead-token; other-cookie=val' },
+    });
+
+    const result = await updateSession(request);
+    expect(result.user).toBeNull();
+
+    // Check that sb-proj-auth-token has been cleared with maxAge: 0
+    const cleared = result.response.cookies.get('sb-proj-auth-token');
+    expect(cleared).toBeDefined();
+    expect(cleared?.value).toBe('');
+    expect(cleared?.maxAge).toBe(0);
+  });
+
+  it('returns valid user without clearing cookies when session is valid', async () => {
+    const mockUser = { id: 'usr_valid', email: 'valid@example.com' };
+    getUserMock.mockResolvedValueOnce({
+      data: { user: mockUser },
+      error: null,
+    });
+
+    const { updateSession } = await import('@/lib/supabase/middleware');
+    const request = new NextRequest('http://localhost/dashboard', {
+      headers: { cookie: 'sb-proj-auth-token=live-token' },
+    });
+
+    const result = await updateSession(request);
+    expect(result.user).toEqual(mockUser);
+    expect(result.response.status).toBe(200);
+    // Should NOT clear the cookie
+    const cleared = result.response.cookies.get('sb-proj-auth-token');
+    expect(cleared).toBeUndefined();
+  });
 });
 

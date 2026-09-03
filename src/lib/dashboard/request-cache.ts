@@ -3,16 +3,32 @@ import { fetchDashboardUserRow } from '@/lib/candidate/load-snapshot'
 import { createClient } from '@/lib/supabase/server'
 import type { User } from '@supabase/supabase-js'
 
+import { isAuthInfrastructureError } from '@/lib/supabase/session'
+
 /** One Supabase server client per RSC request (layout + page share it). */
 export const getCachedSupabase = cache(async () => createClient())
 
 /** Dedupes `auth.getUser()` across dashboard layout and page in the same request. */
 export const getCachedAuthUser = cache(async (): Promise<User | null> => {
   const supabase = await getCachedSupabase()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-  return user
+  try {
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
+    if (error) {
+      if (isAuthInfrastructureError(error)) {
+        throw error
+      }
+      return null
+    }
+    return user ?? null
+  } catch (err) {
+    if (isAuthInfrastructureError(err)) {
+      throw err
+    }
+    return null
+  }
 })
 
 /** Full dashboard `users` row — shared by layout (plan_tier) and /dashboard page. */

@@ -202,9 +202,14 @@ export async function middleware(request: NextRequest) {
     pathname === '/help-center' ||
     pathname.startsWith('/open/badges') ||
     isSeoSitemapPath;
+  const hasSupabaseCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.startsWith('sb-'));
+
   const needsAuthResolution =
     AUTH_ROUTES.has(pathname) ||
     (!isPublic && !isApi) ||
+    (isApi && hasSupabaseCookie) ||
     resumeApiNeedsSession ||
     requiresVerifiedEmailApi(pathname);
 
@@ -235,9 +240,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Trusted crawlers: skip Supabase session refresh (edge cost) after rate limits.
+  // Trusted crawlers: skip Supabase session refresh (edge cost) on public pages after rate limits.
   // Marketing/SEO pages are public for humans too — crawlability does not depend on this.
   if (
+    isPublic &&
     isTrustedCrawlerUserAgent(request.headers.get('user-agent')) &&
     !resumeApiNeedsSession
   ) {
@@ -308,21 +314,26 @@ export async function middleware(request: NextRequest) {
     if (isAuthV2Enabled()) {
       loginUrl.searchParams.set('reason', 'session_required');
     }
-    return NextResponse.redirect(loginUrl);
+    const redirect = NextResponse.redirect(loginUrl);
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   if (user && AUTH_ROUTES.has(pathname)) {
     const rawNext = request.nextUrl.searchParams.get('next');
+    let dest = '/dashboard';
     if (isAuthV2Enabled()) {
       const inviteToken = extractInviteTokenFromNext(rawNext);
-      const dest = await resolvePostAuthDestination(user.id, {
+      dest = await resolvePostAuthDestination(user.id, {
         next: rawNext,
         inviteToken,
       });
-      return NextResponse.redirect(new URL(dest, request.url));
+    } else if (isSafePath(rawNext)) {
+      dest = rawNext!;
     }
-    const dest = isSafePath(rawNext) ? rawNext : '/dashboard';
-    return NextResponse.redirect(new URL(dest, request.url));
+    const redirect = NextResponse.redirect(new URL(dest, request.url));
+    response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   return response;

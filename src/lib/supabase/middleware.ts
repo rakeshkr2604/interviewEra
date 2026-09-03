@@ -27,21 +27,26 @@ export async function updateSession(
       request.headers.get('x-vercel-id') ??
       crypto.randomUUID().slice(0, 12))
     : null;
-  // Forward request can be rewritten so RSC/route handlers do not see dead sb-* cookies
-  // on the same request (response Set-Cookie clear alone does not remove them from req).
-  let forwardRequest: NextRequest = request;
-  let supabaseResponse = NextResponse.next({ request: forwardRequest });
+  let forwardHeaders = new Headers(request.headers);
+  let supabaseResponse = NextResponse.next({
+    request: {
+      headers: forwardHeaders,
+    },
+  });
 
   const rewriteForwardRequestWithoutSupabaseCookies = () => {
-    const h = new Headers(request.headers);
-    const nextCookie = cookieHeaderWithoutSupabase(h.get('cookie'));
-    if (nextCookie) h.set('cookie', nextCookie);
-    else h.delete('cookie');
+    forwardHeaders = new Headers(request.headers);
+    const nextCookie = cookieHeaderWithoutSupabase(forwardHeaders.get('cookie'));
+    if (nextCookie) forwardHeaders.set('cookie', nextCookie);
+    else forwardHeaders.delete('cookie');
     // RSC `cookies()` can still see original sb-* cookies; server client filters when this is set.
-    h.set('x-ie-sb-cookies-stripped', '1');
-    if (correlationId) h.set('x-ie-correlation-id', correlationId);
-    forwardRequest = new NextRequest(request.url, { headers: h });
-    supabaseResponse = NextResponse.next({ request: forwardRequest });
+    forwardHeaders.set('x-ie-sb-cookies-stripped', '1');
+    if (correlationId) forwardHeaders.set('x-ie-correlation-id', correlationId);
+    supabaseResponse = NextResponse.next({
+      request: {
+        headers: forwardHeaders,
+      },
+    });
   };
 
   const clearSupabaseAuthCookies = () => {
@@ -68,7 +73,11 @@ export async function updateSession(
           cookiesToSet.forEach(({ name, value }) =>
             request.cookies.set(name, value)
           );
-          supabaseResponse = NextResponse.next({ request: forwardRequest });
+          supabaseResponse = NextResponse.next({
+            request: {
+              headers: forwardHeaders,
+            },
+          });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
