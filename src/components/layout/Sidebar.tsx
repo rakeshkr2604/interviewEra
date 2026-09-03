@@ -31,6 +31,7 @@ import {
   Star,
   FilePenLine,
   Users,
+  Bot,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { performClientLogout } from '@/lib/supabase/client-logout'
@@ -87,16 +88,23 @@ const PINNED_DASHBOARD: NavLinkItem = {
   exact: true,
 }
 
-function buildNavSections(): NavSection[] {
+function buildNavSections(canAccessCoach = false): NavSection[] {
+  const practiceItems: NavItem[] = [
+    { href: getDefaultInterviewStartPath(), label: 'Start Interview', icon: Play },
+  ]
+  if (canAccessCoach) {
+    practiceItems.push({ href: '/coach', label: 'Coach', icon: Bot })
+  }
+  practiceItems.push(
+    { href: '/resume', label: 'Resume', icon: FileText },
+    { href: '/history', label: 'Interview History', icon: History },
+  )
+
   return [
     {
       id: 'practice',
       label: 'Practice',
-      items: [
-        { href: getDefaultInterviewStartPath(), label: 'Start Interview', icon: Play },
-        { href: '/resume', label: 'Resume', icon: FileText },
-        { href: '/history', label: 'Interview History', icon: History },
-      ],
+      items: practiceItems,
     },
     {
       id: 'tools',
@@ -341,12 +349,14 @@ export function Sidebar({
   initialStreak,
   canAccessAdmin,
   showWorkspaceSwitcher = false,
+  canAccessCoach = false,
 }: {
   className?: string
   onNavigate?: () => void
   initialStreak: number
   canAccessAdmin: boolean
   showWorkspaceSwitcher?: boolean
+  canAccessCoach?: boolean
 }) {
   const pathname = usePathname()
   const [loggingOut, setLoggingOut] = useState(false)
@@ -354,14 +364,14 @@ export function Sidebar({
 
   const sections = useMemo(
     () =>
-      buildNavSections().map((section) => ({
+      buildNavSections(canAccessCoach).map((section) => ({
         ...section,
         items: section.items.filter(
           (item) =>
             !isLinkItem(item) || item.href !== '/college/dashboard' || canAccessAdmin,
         ),
       })),
-    [canAccessAdmin],
+    [canAccessAdmin, canAccessCoach],
   )
 
   const handleLogout = () => {

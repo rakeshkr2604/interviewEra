@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { DashboardChrome } from '@/components/layout/DashboardChrome'
 import { isPlatformAdminUser } from '@/lib/admin/auth'
+import { assertCoachAccess } from '@/lib/coach/access'
 import {
   getCachedAuthUser,
   getCachedDashboardUserRow,
@@ -20,17 +21,20 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   let initialStreak = 0
   let canAccessAdmin = false
   let isPlatformAdmin = false
+  let canAccessCoach = false
 
   if (user) {
-    const [{ data: profile }, { data: progress }, platformAdmin] = await Promise.all([
+    const [{ data: profile }, { data: progress }, platformAdmin, coachAccess] = await Promise.all([
       getCachedDashboardUserRow(user.id),
       getCachedUserProgressRow(user.id),
       isPlatformAdminUser(user.id, user.email),
+      assertCoachAccess(user),
     ])
 
     isPlatformAdmin = platformAdmin
     canAccessAdmin =
       (profile?.plan_tier as PlanTier | undefined) === 'campus_admin' || platformAdmin
+    canAccessCoach = coachAccess.allowed
     const streak = Number(progress?.current_streak ?? 0)
     initialStreak = Number.isFinite(streak) ? streak : 0
   }
@@ -40,6 +44,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       initialStreak={initialStreak}
       canAccessAdmin={canAccessAdmin}
       showWorkspaceSwitcher={isPlatformAdmin}
+      canAccessCoach={canAccessCoach}
     >
       {children}
     </DashboardChrome>

@@ -16,12 +16,14 @@ export function DashboardChrome({
   initialStreak,
   canAccessAdmin,
   showWorkspaceSwitcher = false,
+  canAccessCoach = false,
 }: {
   children: React.ReactNode
   initialStreak: number
   canAccessAdmin: boolean
   /** Platform admin only — Student / Campus / Hiring / Funnel switcher in sidebar. */
   showWorkspaceSwitcher?: boolean
+  canAccessCoach?: boolean
 }) {
   useHeartbeat(true);
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -101,6 +103,7 @@ export function DashboardChrome({
           initialStreak={initialStreak}
           canAccessAdmin={canAccessAdmin}
           showWorkspaceSwitcher={showWorkspaceSwitcher}
+          canAccessCoach={canAccessCoach}
         />
       </div>
 

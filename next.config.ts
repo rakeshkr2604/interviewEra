@@ -182,7 +182,9 @@ const nextConfig: NextConfig = {
       "media-src 'self' blob:",
       // wss://api.deepgram.com: Deepgram STT WebSocket connection.
       // https://api.elevenlabs.io: ElevenLabs TTS API requests.
-      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${ga4Connect} ${clarityConnect} https://va.vercel-scripts.com wss://api.deepgram.com https://api.elevenlabs.io`,
+      // VideoSDK Coach (/coach): API + signaling/media/TURN hosts.
+      // Firewall reference: https://docs.videosdk.live/javascript/guide/video-and-audio-calling-api-sdk/security/firewall-setup
+      `connect-src 'self' ${siteTwin} https://*.supabase.co wss://*.supabase.co ${razorpayConnect} ${ga4Connect} ${clarityConnect} https://va.vercel-scripts.com wss://api.deepgram.com https://api.elevenlabs.io https://*.videosdk.live wss://*.videosdk.live`,
       "frame-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "child-src 'self' https://checkout.razorpay.com https://api.razorpay.com",
       "worker-src 'self' blob:",

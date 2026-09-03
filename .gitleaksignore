@@ -19,3 +19,7 @@ f40091d994aa727683b2cdfdca7cc28a1fb2c112:src/lib/voice/elevenlabs-health.test.ts
 # INDEXNOW_DEFAULT_KEY is the intentional public IndexNow ownership key (also in public/<key>.txt).
 # HEAD has gitleaks:allow; fingerprint covers the introducing commit before the comment.
 243a61c07d6ec1f204965d091ec5e7d6a7fdddea:src/lib/seo/indexnow.ts:generic-api-key:20
+
+# Mock test secret in coach lifecycle integration test (not a real secret)
+eff3ee8a4d4f0313259e040947ba795dd748a1d1:src/app/api/coach/coach-lifecycle-integration.test.ts:generic-api-key:145
+

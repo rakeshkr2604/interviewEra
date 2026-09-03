@@ -12,6 +12,7 @@ import {
   Wrench,
   Gift,
   Building2,
+  Bot,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
@@ -30,6 +31,7 @@ const NAV_ITEMS = [
 
 const SYSTEM_ITEMS = [
   { href: '/platform/campus-approvals', label: 'Campus Approvals', icon: Building2, exact: false },
+  { href: '/platform/coach', label: 'AI Interview Coach', icon: Bot, exact: false },
 ] as const;
 
 function NavItem({
