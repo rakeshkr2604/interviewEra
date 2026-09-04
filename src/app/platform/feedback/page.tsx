@@ -622,6 +622,8 @@ function FeedbackCard({
   const hasDevice  = ctx && (ctx.browser_name || ctx.os || ctx.device_type);
   const technicalCase = row.technical_failure_case ?? null;
   const isTechnicalIssue = Boolean(technicalCase);
+  const isInterviewFeedback = row.feedback_source === 'interview';
+  const isExitFeedback = row.feedback_source === 'exit';
 
   // Text preview: structured liked / confusion / bugs (dropdown answers)
   const likedPreview = row.liked_text?.trim() ?? '';
@@ -699,6 +701,22 @@ function FeedbackCard({
             <div className="flex flex-wrap items-center gap-2">
               <SeverityBadge severity={row.severity} />
               <RatingStars rating={row.rating} />
+              {isInterviewFeedback && (
+                <span
+                  className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ borderColor: '#c4b5fd', background: '#f5f3ff', color: '#6d28d9' }}
+                >
+                  After interview feedback
+                </span>
+              )}
+              {isExitFeedback && (
+                <span
+                  className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
+                  style={{ borderColor: '#fdba74', background: '#fff7ed', color: '#c2410c' }}
+                >
+                  Interview exit feedback
+                </span>
+              )}
               {isTechnicalIssue && (
                 <span
                   className="rounded-full border px-2 py-0.5 text-[10px] font-semibold"
@@ -754,6 +772,52 @@ function FeedbackCard({
                 >
                   Credit restoration: {creditRestoration}
                 </Chip>
+              </div>
+            )}
+
+            {row.interview_context && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <Chip style={{ background: isExitFeedback ? '#fff7ed' : '#f5f3ff', color: isExitFeedback ? '#c2410c' : '#6d28d9' }}>
+                  Role: {row.interview_context.role || 'General'} ({row.interview_context.difficulty || 'medium'})
+                </Chip>
+                {row.interview_context.engine && (
+                  <Chip>Engine: {row.interview_context.engine}</Chip>
+                )}
+                {row.interview_context.status && (
+                  <Chip>Status: {row.interview_context.status}</Chip>
+                )}
+                {row.interview_context.exit_reason && (
+                  <Chip style={{ background: '#fff7ed', color: '#c2410c' }}>
+                    Reason: {row.interview_context.exit_reason}
+                  </Chip>
+                )}
+                {row.interview_context.issue_type && (
+                  <Chip style={{ background: '#fee2e2', color: '#991b1b' }}>
+                    Issue: {row.interview_context.issue_type}
+                  </Chip>
+                )}
+                {row.interview_context.question_index != null && (
+                  <Chip>Question: {row.interview_context.question_index}</Chip>
+                )}
+                {row.interview_context.progress_percent != null && (
+                  <Chip>Progress: {row.interview_context.progress_percent}%</Chip>
+                )}
+                <a
+                  href={
+                    row.interview_context.report_id
+                      ? `/report/${row.interview_context.report_id}`
+                      : row.interview_context.engine === 'v2.1'
+                        ? `/report/script/${row.interview_context.interview_id}`
+                        : `/interview/${row.interview_context.interview_id}`
+                  }
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+                >
+                  <span>View interview</span>
+                  <ExternalLink className="h-3 w-3" />
+                </a>
               </div>
             )}
 
@@ -1342,6 +1406,7 @@ function RetryEmailsButton({
 const PAGE_SIZE = 20;
 
 interface Filters {
+  source:       string;   // '' | 'all' | 'platform' | 'interview'
   q:            string;
   severity:     string;
   rating:       string;
@@ -1371,6 +1436,7 @@ function dateRangeToParams(range: string): { date_from?: string; date_to?: strin
 
 export default function PlatformFeedbackPage() {
   const [filters, setFilters] = useState<Filters>({
+    source:        '',
     q:             '',
     severity:      '',
     rating:        '',
@@ -1446,6 +1512,7 @@ export default function PlatformFeedbackPage() {
     setError(null);
     try {
       const p = new URLSearchParams({ page: String(page), limit: String(PAGE_SIZE), sort });
+      if (filters.source)      p.set('source',        filters.source);
       if (debouncedQ)          p.set('q',             debouncedQ);
       if (filters.severity)    p.set('severity',      filters.severity);
       if (filters.rating)      p.set('rating',        filters.rating);
@@ -1472,7 +1539,7 @@ export default function PlatformFeedbackPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, sort, debouncedQ, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.consent_public, filters.date_range, filters.label]);
+  }, [page, sort, debouncedQ, filters.source, filters.severity, filters.rating, filters.is_read, filters.is_resolved, filters.is_pinned, filters.show_archived, filters.consent_public, filters.date_range, filters.label]);
 
   useEffect(() => { void fetchData(); }, [fetchData]);
 
@@ -1574,14 +1641,14 @@ export default function PlatformFeedbackPage() {
 
   // Clear all filters
   function clearFilters() {
-    setFilters({ q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', consent_public: '', date_range: '', label: '' });
+    setFilters({ source: '', q: '', severity: '', rating: '', is_read: '', is_resolved: '', is_pinned: '', show_archived: '', consent_public: '', date_range: '', label: '' });
     setDebouncedQ('');
     setSort('newest');
     setPage(1);
   }
 
   const hasActiveFilters = !!(
-    filters.severity || filters.rating || filters.is_read || filters.is_resolved ||
+    filters.source || filters.severity || filters.rating || filters.is_read || filters.is_resolved ||
     filters.is_pinned || filters.show_archived || filters.consent_public || filters.date_range || filters.label || debouncedQ
   );
 
@@ -1657,7 +1724,18 @@ export default function PlatformFeedbackPage() {
       </div>
 
       {/* ── Filters (dropdown system — mirrors submit form upgrades) ── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+        <FilterSelect
+          label="Source"
+          value={filters.source || 'all'}
+          onChange={(v) => setFilter('source', v === 'all' ? '' : v)}
+        >
+          <option value="all">All sources</option>
+          <option value="platform">Platform General</option>
+          <option value="interview">After Interview</option>
+          <option value="exit">Interview Exit</option>
+        </FilterSelect>
+
         <FilterSelect
           label="Severity"
           value={filters.severity}

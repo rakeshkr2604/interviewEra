@@ -9,6 +9,7 @@ import '@/components/interview/interview-effects.css'
 import { CandidatePreview } from '@/components/interview/CandidatePreview'
 import { TimerCircle } from '@/components/interview/TimerCircle'
 import { FillerWordBadge } from '@/components/interview/FillerWordBadge'
+import { InterviewExitFeedbackModal } from '@/components/interview/InterviewExitFeedbackModal'
 import { useAvatarSync } from '@/hooks/useAvatarSync'
 import { useTimer } from '@/hooks/useTimer'
 import { useSpeechRecognition } from '@/hooks/useSpeechRecognition'
@@ -298,6 +299,7 @@ export default function InterviewSessionPage() {
   const [questionGenActive, setQuestionGenActive] = useState(false)
   const [prepareContext, setPrepareContext] = useState<PrepareContext | null>(null)
   const [reloadNonce, setReloadNonce] = useState(0)
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   // ─── Interview Data ───────────────────────────────────────
   const [interviewData, setInterviewData] = useState<InterviewData | null>(null)
@@ -3127,14 +3129,7 @@ export default function InterviewSessionPage() {
   const sessionExitButton = (
     <button
       type="button"
-      onClick={() => {
-        if (window.confirm('Exit this interview? Your progress on this question will be lost.')) {
-          void fetch(`/api/interview/${interviewId}/abandon`, { method: 'POST' }).catch(() => {})
-          trackInterviewEventClient('interview_abandoned', { interviewId, source: 'exit_button' })
-          clearDraft()
-          router.push('/dashboard')
-        }
-      }}
+      onClick={() => setIsExitModalOpen(true)}
       className={`flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors hover:border-red-300 hover:bg-red-50 hover:text-red-600 sm:px-3 ${IE_FOCUS_VISIBLE}`}
       style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
       aria-label="Exit interview"
@@ -3911,6 +3906,19 @@ export default function InterviewSessionPage() {
           </div>
         </div>
       </div>
+      <InterviewExitFeedbackModal
+        isOpen={isExitModalOpen}
+        interviewId={interviewId}
+        questionIndex={currentIndex + 1}
+        progressPercent={sessionProgressPct}
+        engine="standard_v1"
+        onContinue={() => setIsExitModalOpen(false)}
+        onLeave={() => {
+          setIsExitModalOpen(false)
+          clearDraft()
+          router.push('/dashboard')
+        }}
+      />
     {celebrationDialog}
     </>
   )

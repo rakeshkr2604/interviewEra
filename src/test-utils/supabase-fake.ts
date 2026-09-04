@@ -35,8 +35,9 @@ class QueryBuilder implements PromiseLike<QueryResult> {
   private filters: Filter[] = [];
   private orderBy: { col: string; asc: boolean } | null = null;
   private limitN: number | null = null;
-  private mode: 'select' | 'update' | 'insert' = 'select';
+  private mode: 'select' | 'update' | 'insert' | 'upsert' | 'delete' = 'select';
   private payload: Row | Row[] | null = null;
+  private upsertOpts: { onConflict?: string } | null = null;
   private selectOpts: SelectOpts | null = null;
 
   constructor(
@@ -79,6 +80,16 @@ class QueryBuilder implements PromiseLike<QueryResult> {
     this.payload = payload;
     return this;
   }
+  upsert(payload: Row | Row[], opts?: { onConflict?: string }): this {
+    this.mode = 'upsert';
+    this.payload = payload;
+    this.upsertOpts = opts ?? null;
+    return this;
+  }
+  delete(): this {
+    this.mode = 'delete';
+    return this;
+  }
 
   private rows(): Row[] {
     let rows = (this.db[this.table] ?? []).filter((r) => matches(r, this.filters));
@@ -102,7 +113,13 @@ class QueryBuilder implements PromiseLike<QueryResult> {
     if (this.mode === 'update') {
       const targets = (this.db[this.table] ?? []).filter((r) => matches(r, this.filters));
       for (const t of targets) Object.assign(t, this.payload);
-      return { data: null, error: null };
+      return { data: targets, error: null };
+    }
+    if (this.mode === 'delete') {
+      const arr = (this.db[this.table] ?? []);
+      const toDelete = arr.filter((r) => matches(r, this.filters));
+      this.db[this.table] = arr.filter((r) => !matches(r, this.filters));
+      return { data: toDelete, error: null };
     }
     if (this.mode === 'insert') {
       const arr = (this.db[this.table] ??= []);
@@ -113,6 +130,24 @@ class QueryBuilder implements PromiseLike<QueryResult> {
         return row;
       });
       return { data: inserted, error: null };
+    }
+    if (this.mode === 'upsert') {
+      const arr = (this.db[this.table] ??= []);
+      const items = Array.isArray(this.payload) ? this.payload : [this.payload ?? {}];
+      const conflictCol = this.upsertOpts?.onConflict;
+      const upserted = items.map((it) => {
+        if (conflictCol && it[conflictCol] !== undefined) {
+          const existing = arr.find((r) => r[conflictCol] === it[conflictCol]);
+          if (existing) {
+            Object.assign(existing, it);
+            return existing;
+          }
+        }
+        const row = { id: it.id ?? `gen_${arr.length + 1}`, ...it };
+        arr.push(row);
+        return row;
+      });
+      return { data: upserted.length === 1 ? upserted[0] : upserted, error: null };
     }
     const rows = this.rows();
     const result: QueryResult = { data: this.selectOpts?.head ? null : rows, error: null };

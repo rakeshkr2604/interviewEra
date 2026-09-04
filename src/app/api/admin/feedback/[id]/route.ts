@@ -3,6 +3,7 @@
  * DELETE /api/admin/feedback/[id]
  *
  * Triage mutations + hard-delete for a single feedback row.
+ * Works across both general platform feedbacks and interview_feedbacks tables.
  * PATCH allowed fields: is_read, is_resolved, is_archived, is_pinned, notes, assigned_to.
  * Immutable fields (rating, email, user_id, etc.) are rejected if present in body.
  * DELETE permanently removes the row (for clearing test submissions).
@@ -79,22 +80,56 @@ export async function PATCH(
 
   const service = createServiceClient();
 
-  const { data, error: updateError } = await service
+  // Try updating feedbacks first
+  const { data: generalData, error: updateError } = await service
     .from('feedbacks')
     .update(patch)
     .eq('id', id)
     .select('id, is_read, is_resolved, is_archived, is_pinned, notes, assigned_to')
-    .single();
+    .maybeSingle();
 
-  if (updateError) {
-    console.error('[admin/feedback/[id]] Update error:', updateError.message);
-    if (updateError.code === 'PGRST116') {
-      return NextResponse.json({ error: 'Feedback not found.' }, { status: 404 });
-    }
+  if (generalData) {
+    return NextResponse.json({ ok: true, row: generalData });
+  }
+
+  if (updateError && updateError.code !== 'PGRST116') {
+    console.error('[admin/feedback/[id]] Update general feedback error:', updateError.message);
+  }
+
+  // Fallback to updating interview_feedbacks
+  const { data: interviewData, error: interviewError } = await service
+    .from('interview_feedbacks')
+    .update(patch)
+    .eq('id', id)
+    .select('id, is_read, is_resolved, is_archived, is_pinned, notes')
+    .maybeSingle();
+
+  if (interviewData) {
+    return NextResponse.json({ ok: true, row: interviewData });
+  }
+
+  if (interviewError && interviewError.code !== 'PGRST116') {
+    console.error('[admin/feedback/[id]] Update interview feedback error:', interviewError.message);
+  }
+
+  // Fallback to updating interview_exit_feedbacks
+  const { data: exitData, error: exitError } = await service
+    .from('interview_exit_feedbacks')
+    .update(patch)
+    .eq('id', id)
+    .select('id, is_read, is_resolved, is_archived, is_pinned, notes')
+    .maybeSingle();
+
+  if (exitData) {
+    return NextResponse.json({ ok: true, row: exitData });
+  }
+
+  if (exitError) {
+    console.error('[admin/feedback/[id]] Update interview exit feedback error:', exitError.message);
     return NextResponse.json({ error: 'Update failed.' }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, row: data });
+  return NextResponse.json({ error: 'Feedback not found.' }, { status: 404 });
 }
 
 export async function DELETE(
@@ -111,27 +146,60 @@ export async function DELETE(
 
   const service = createServiceClient();
 
-  const { data, error: deleteError } = await service
+  // Try deleting from feedbacks table
+  const { data: generalData, error: deleteError } = await service
     .from('feedbacks')
     .delete()
     .eq('id', id)
     .select('id')
     .maybeSingle();
 
+  if (generalData) {
+    return NextResponse.json({ ok: true, id: generalData.id });
+  }
+
   if (deleteError) {
-    console.error('[admin/feedback/[id]] Delete error:', deleteError.message);
+    console.error('[admin/feedback/[id]] Delete general feedback error:', deleteError.message);
     if (deleteError.code === '23503') {
       return NextResponse.json(
         { error: 'Feedback linked to a technical failure case cannot be deleted.' },
         { status: 409 },
       );
     }
+  }
+
+  // Fallback to deleting from interview_feedbacks table
+  const { data: interviewData, error: interviewDeleteError } = await service
+    .from('interview_feedbacks')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+
+  if (interviewData) {
+    return NextResponse.json({ ok: true, id: interviewData.id });
+  }
+
+  if (interviewDeleteError) {
+    console.error('[admin/feedback/[id]] Delete interview feedback error:', interviewDeleteError.message);
+  }
+
+  // Fallback to deleting from interview_exit_feedbacks table
+  const { data: exitData, error: exitDeleteError } = await service
+    .from('interview_exit_feedbacks')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle();
+
+  if (exitData) {
+    return NextResponse.json({ ok: true, id: exitData.id });
+  }
+
+  if (exitDeleteError) {
+    console.error('[admin/feedback/[id]] Delete interview exit feedback error:', exitDeleteError.message);
     return NextResponse.json({ error: 'Delete failed.' }, { status: 500 });
   }
 
-  if (!data) {
-    return NextResponse.json({ error: 'Feedback not found.' }, { status: 404 });
-  }
-
-  return NextResponse.json({ ok: true, id: data.id });
+  return NextResponse.json({ error: 'Feedback not found.' }, { status: 404 });
 }

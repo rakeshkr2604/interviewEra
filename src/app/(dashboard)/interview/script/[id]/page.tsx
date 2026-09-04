@@ -2,12 +2,13 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { AvatarPlayer } from '@/components/avatar/AvatarPlayer'
 import { CaptionDisplay } from '@/components/avatar/CaptionDisplay'
 import { TimerCircle } from '@/components/interview/TimerCircle'
 import { CandidatePreview } from '@/components/interview/CandidatePreview'
+import { AfterInterviewFeedback } from '@/components/interview/AfterInterviewFeedback'
+import { InterviewExitFeedbackModal } from '@/components/interview/InterviewExitFeedbackModal'
 import { getInterviewerById, readInitialScriptInterviewerId, stashScriptInterviewerId } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import type { ScriptType } from '@/lib/ai/scripts/script-loader'
@@ -234,6 +235,7 @@ export default function ScriptInterviewPage() {
   const [questionNumber, setQuestionNumber] = useState<number>(0)
   const [currentPhase, setCurrentPhase] = useState<string>('warmup')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [isExitModalOpen, setIsExitModalOpen] = useState(false)
 
   // Recursion + timers use refs to stay free of stale closures across renders.
   const loadTurnRef = useRef<(p: LoadTurnParams) => Promise<void>>(async () => {})
@@ -2403,20 +2405,8 @@ export default function ScriptInterviewPage() {
   }, [submitAnswer])
 
   const handleRestart = useCallback(() => {
-    if (!window.confirm('Restart this interview? Your progress will be lost.')) return
-    void (async () => {
-      try {
-        await fetch(`/api/interview/${interviewId}/abandon`, {
-          method: 'POST',
-          credentials: 'include',
-          keepalive: true,
-        })
-      } catch {
-        // User confirmed leave; still navigate if abandon is unreachable.
-      }
-      router.push('/dashboard')
-    })()
-  }, [interviewId, router])
+    setIsExitModalOpen(true)
+  }, [])
 
   // iOS Safari unlock CTA — tap unlocks AudioContext, then runs turn ∥ mic warm.
   const handleUnlockAudio = useCallback(() => {
@@ -2821,12 +2811,20 @@ export default function ScriptInterviewPage() {
           </div>
         </div>
 
-        {/* ── Right: Answer Panel ── */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-0 divide-y divide-(--card-border)/60 overflow-hidden">
-
-          {/* Main content area */}
-          <div className="session-flush-panel dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-4">
-            <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
+        {/* ── Right: Answer Panel or Completed Feedback Panel ── */}
+        {uiPhase === 'completed' ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-3 sm:p-5 lg:p-6">
+            <AfterInterviewFeedback
+              interviewId={interviewId}
+              reportHref={`/report/script/${interviewId}`}
+              isReportReady={true}
+            />
+          </div>
+        ) : (
+          <div className="flex min-h-0 min-w-0 flex-col gap-0 divide-y divide-(--card-border)/60 overflow-hidden">
+            {/* Main content area */}
+            <div className="session-flush-panel dashboard-premium-card flex min-h-0 w-full min-w-0 flex-1 flex-col overflow-hidden p-4">
+              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden">
 
               {/* ── AUDIO UNLOCK (iOS Safari) — tap gesture required before TTS ── */}
               {uiPhase === 'awaiting_audio_unlock' && (
@@ -3214,25 +3212,8 @@ export default function ScriptInterviewPage() {
                 </div>
               )}
 
-              {/* ── COMPLETED ── */}
-              {uiPhase === 'completed' && (
-                <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-4 text-center">
-                  <h2 className="text-2xl font-bold text-(--text-primary)">Interview Complete</h2>
-                  {currentTurn?.speech && (
-                    <p className="max-w-md text-base text-(--text-secondary)">{currentTurn.speech}</p>
-                  )}
-                  <Link
-                    href={`/report/script/${interviewId}`}
-                    className="mt-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white"
-                    style={{ background: 'linear-gradient(135deg, #6366F1, #818CF8)' }}
-                  >
-                    View Report
-                  </Link>
-                </div>
-              )}
-
               {/* ── ERROR ── */}
-              {errorMessage && uiPhase !== 'completed' && (
+              {errorMessage && (
                 <div className="space-y-3">
                   <div className={IE_ALERT_BANNER_CLASS} style={IE_ALERT_ERROR_STYLE} role="alert">
                     {errorMessage}
@@ -3419,6 +3400,7 @@ export default function ScriptInterviewPage() {
             </div>
           )}
         </div>
+      )}
       </div>
 
       {/* ── FULL-WINDOW REVIEW: step 1 transcript → step 2 coaching + score ── */}
@@ -3727,6 +3709,21 @@ export default function ScriptInterviewPage() {
           </div>
         )
       })()}
+
+      {uiPhase !== 'completed' && (
+        <InterviewExitFeedbackModal
+          isOpen={isExitModalOpen}
+          interviewId={interviewId}
+          questionIndex={questionNumber}
+          progressPercent={progressPct}
+          engine="script"
+          onContinue={() => setIsExitModalOpen(false)}
+          onLeave={() => {
+            setIsExitModalOpen(false)
+            router.push('/dashboard')
+          }}
+        />
+      )}
     </div>
   )
 }

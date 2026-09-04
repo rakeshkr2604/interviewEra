@@ -11,6 +11,10 @@ const scriptSession = fs.readFileSync(
   path.join(root, 'src', 'app', '(dashboard)', 'interview', 'script', '[id]', 'page.tsx'),
   'utf8',
 );
+const exitModal = fs.readFileSync(
+  path.join(root, 'src', 'components', 'interview', 'InterviewExitFeedbackModal.tsx'),
+  'utf8',
+);
 
 describe('script start/exit client contract', () => {
   it('guards duplicate start clicks before the fetch and resumes a 409 active interview', () => {
@@ -21,14 +25,15 @@ describe('script start/exit client contract', () => {
     expect(scriptStart).not.toContain("status === 409 && body?.error !== 'active_interview'");
   });
 
-  it('abandons on Exit/Restart before navigating and does not abandon on reload', () => {
-    const abandonAt = scriptSession.indexOf(`/api/interview/\${interviewId}/abandon`);
-    const awaitAbandonAt = scriptSession.indexOf('await fetch(`/api/interview/${interviewId}/abandon`');
-    const navigateAt = scriptSession.indexOf("router.push('/dashboard')");
+  it('abandons on Exit/Restart via exit feedback modal before navigating and does not abandon on reload', () => {
+    expect(scriptSession).toContain('InterviewExitFeedbackModal');
+    expect(scriptSession).toContain("router.push('/dashboard')");
+
+    const abandonAt = exitModal.indexOf(`/api/interview/\${interviewId}/abandon`);
+    const exitFeedbackAt = exitModal.indexOf('/api/interview/exit-feedback');
 
     expect(abandonAt).toBeGreaterThan(-1);
-    expect(awaitAbandonAt).toBeGreaterThan(-1);
-    expect(awaitAbandonAt).toBeLessThan(navigateAt);
+    expect(exitFeedbackAt).toBeGreaterThan(-1);
     expect(scriptSession).not.toContain('beforeunload');
     expect(scriptSession).not.toContain('visibilitychange');
   });
