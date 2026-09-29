@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolvePlaywrightBaseUrl } from './src/lib/e2e/playwright-base-url';
 
-const PORT = process.env.PLAYWRIGHT_PORT ?? '3000';
-const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
+const baseURL = resolvePlaywrightBaseUrl(process.env);
 
 export default defineConfig({
   testDir: './e2e',

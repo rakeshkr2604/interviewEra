@@ -127,6 +127,7 @@ export interface CandidateSnapshot {
   completedSessionCount: number;
   inProgressInterviewId: string | null;
   inProgressInterviewRole: string | null;
+  inProgressInterviewEngine: string | null;
   dimensionAverages: ReportDimensionAverages;
   recentReportIds: string[];
   collegeEnrollmentAccepted: boolean;

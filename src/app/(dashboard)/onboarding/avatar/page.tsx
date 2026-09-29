@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
+import { SCRIPT_INTERVIEW_START_PATH } from '@/lib/interview/default-interview-start-path'
 
 export default function AvatarSelectionRedirectPage() {
-  redirect('/onboarding')
+  redirect(SCRIPT_INTERVIEW_START_PATH)
 }

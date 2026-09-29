@@ -1,7 +1,7 @@
 /**
  * Single source of truth for which interview statuses are resumable.
  *
- * The server write paths (answer, process-answer, checkpoint) only accept
+ * The server write paths (answer, script turn, abandon) only accept
  * interviews in `pending`/`in_progress`; `completed`/`abandoned` are terminal
  * (checkpoint returns 409, answer routes return 400). Any UI that offers to
  * open a session as-is MUST use `isResumableInterviewStatus`. Abandoned

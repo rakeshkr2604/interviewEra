@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { chromium, type FullConfig } from '@playwright/test';
 import { createClient } from '@supabase/supabase-js';
 import { loadSelectedE2eEnvironment } from './helpers/e2e-environment';
+import { resolvePlaywrightBaseUrl } from '../src/lib/e2e/playwright-base-url';
 import { isNonMutatingE2eTarget, resolveE2eSupabaseTarget } from '../src/lib/e2e/target-guard';
 import {
   createE2eUser,
@@ -26,8 +27,7 @@ export default async function globalSetup(_config: FullConfig): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-  const PORT = process.env.PLAYWRIGHT_PORT ?? '3000';
-  const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? `http://localhost:${PORT}`;
+  const baseURL = resolvePlaywrightBaseUrl(process.env);
   const target = resolveE2eSupabaseTarget(url);
 
   if (

@@ -28,9 +28,10 @@ export function activeInterviewResumePath(
   interviewId: string | undefined,
 ): string {
   if (!interviewId || interviewId === 'unknown') return '/dashboard';
+  // v1 session UI retired — non-v2.1 engines resume to dashboard
   return engine === 'v2.1'
     ? `/interview/script/${interviewId}`
-    : `/interview/session/${interviewId}`;
+    : '/dashboard';
 }
 
 export function activeInterviewAgeMs(startedAt: string | null | undefined): number | null {

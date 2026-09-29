@@ -68,7 +68,7 @@ export function DangerZoneCard() {
         return
       }
       setAccountOpen(false)
-      window.location.href = '/login'
+      router.replace('/login')
     } catch {
       setAccountError('Network error. Try again.')
       setBusy(null)

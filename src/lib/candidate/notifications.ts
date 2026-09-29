@@ -1,3 +1,4 @@
+import { activeInterviewResumePath } from '@/lib/interview/active-interview-policy';
 import type { CandidateNotification, CandidateSnapshot } from './types';
 
 export function buildCandidateNotifications(snapshot: CandidateSnapshot): CandidateNotification[] {
@@ -12,7 +13,10 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
       body: snapshot.inProgressInterviewRole
         ? `Your ${snapshot.inProgressInterviewRole} session is still in progress.`
         : 'You have an interview session waiting to be completed.',
-      href: `/interview/session/${snapshot.inProgressInterviewId}`,
+      href: activeInterviewResumePath(
+        snapshot.inProgressInterviewEngine,
+        snapshot.inProgressInterviewId,
+      ),
       createdAt: now,
       read: false,
     });

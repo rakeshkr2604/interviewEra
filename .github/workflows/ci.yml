@@ -5,7 +5,7 @@ name: CI
 # - push → main only: lightweight post-merge safety net (quality + security)
 # - workflow_dispatch: manual full validation re-run
 # Direct pushes to non-main branches without an open PR no longer run CI —
-# open a PR (or dispatch) to verify. See docs/CI_CD_ARCHITECTURE.md.
+# open a PR (or dispatch) to verify. See docs/Operations/RELEASE.md.
 on:
   push:
     branches:

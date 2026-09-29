@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
+import { SCRIPT_INTERVIEW_START_PATH } from '@/lib/interview/default-interview-start-path'
 
 export default function BriefingRedirectPage() {
-  redirect('/onboarding')
+  redirect(SCRIPT_INTERVIEW_START_PATH)
 }

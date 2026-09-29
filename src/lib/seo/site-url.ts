@@ -7,7 +7,7 @@ import { safeCanonicalUrl } from './url-safety'
 
 const PRODUCTION_ORIGIN = 'https://interviewera.com' as const;
 
-/** Apex host only (no scheme, no www) — keep in sync with `middleware.ts` + `vercel.json`. */
+/** Apex host only (no scheme, no www) — keep in sync with `src/proxy.ts` + `vercel.json`. */
 export const CANONICAL_HOST = 'interviewera.com' as const;
 
 function isLocalhostHost(hostname: string): boolean {

@@ -25,6 +25,7 @@ export type CandidateSnapshotInterviewRow = {
   id: string;
   role: string;
   status: string;
+  engine?: string | null;
   reports?:
     | {
         id: string;
@@ -182,7 +183,7 @@ export async function loadCandidateSnapshot(
       ? Promise.resolve({ data: prefetch!.interviews ?? null })
       : supabase
           .from('interviews')
-          .select('id, role, status, reports(id, radar_data, generated_at)')
+          .select('id, role, status, engine, reports(id, radar_data, generated_at)')
           .eq('user_id', userId)
           .order('started_at', { ascending: false })
           .limit(20),
@@ -288,6 +289,7 @@ export async function loadCandidateSnapshot(
     completedSessionCount: completedInterviews.length,
     inProgressInterviewId: inProgress ? (inProgress.id as string) : null,
     inProgressInterviewRole: inProgress ? (inProgress.role as string) : null,
+    inProgressInterviewEngine: inProgress ? (inProgress.engine ?? null) : null,
     dimensionAverages: aggregateDimensionAverages(radarRows),
     recentReportIds,
     collegeEnrollmentAccepted: enrollment?.enrollment_status === 'active',

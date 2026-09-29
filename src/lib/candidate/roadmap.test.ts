@@ -19,6 +19,7 @@ describe('generatePersonalizedRoadmap', () => {
       completedSessionCount: 1,
       inProgressInterviewId: null,
       inProgressInterviewRole: null,
+      inProgressInterviewEngine: null,
       dimensionAverages: {
         communication_clarity: 6.5,
         technical_depth: 4.2,

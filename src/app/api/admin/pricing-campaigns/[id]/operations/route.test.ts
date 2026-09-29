@@ -148,7 +148,8 @@ describe('POST /api/admin/pricing-campaigns/[id]/operations', () => {
   });
 
   it('extends a campaign window with future ends_at', async () => {
-    const newEnd = '2026-09-20T00:00:00.000Z';
+    // Must stay strictly after Date.now() — hardcoded near-term dates time-bomb in CI.
+    const newEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     const res = await POST(
       request('camp-123', { action: 'extend', new_ends_at: newEnd }),
       { params: Promise.resolve({ id: 'camp-123' }) },

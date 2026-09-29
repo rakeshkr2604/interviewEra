@@ -1,6 +1,6 @@
 import type { InterviewDifficulty } from '@/types/app.types';
 
-/** Integer count sent to `/api/interview/start` (clamped server-side to [4, 10]). */
+/** Integer question count for interview start (clamped server-side to [4, 10]). */
 export function difficultyQuestionCount(difficulty: InterviewDifficulty): number {
   switch (difficulty) {
     case 'easy':

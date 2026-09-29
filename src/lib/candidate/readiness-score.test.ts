@@ -18,6 +18,7 @@ function baseSnapshot(overrides: Partial<CandidateSnapshot> = {}): CandidateSnap
     completedSessionCount: 0,
     inProgressInterviewId: null,
     inProgressInterviewRole: null,
+    inProgressInterviewEngine: null,
     dimensionAverages: {
       communication_clarity: null,
       technical_depth: null,

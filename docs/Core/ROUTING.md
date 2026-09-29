@@ -1,0 +1,74 @@
+# Routing
+
+> Status: CANONICAL
+> Last Verified: 2026-09-27
+> Verification Scope: Key App Router + API paths for current product
+> Authority: Route map (code wins if drift)
+
+## Purpose
+
+Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
+
+## Current State
+
+### App (pages)
+
+| Path | Notes |
+|---|---|
+| `/interview/script/start` | V2.1 entry |
+| `/interview/script/[id]` | Live script session |
+| `/interview/script/test` | Script harness (dev/ops) |
+| `/onboarding`, `/interview/new` | **Redirect** → `/interview/script/start` |
+| `/interview/session/[id]` | **Retired notice** only (not a live V1 engine) |
+| `/dashboard`, `/resume`, `/settings`, … | Candidate shell |
+| `/pricing`, `/blog`, `/interview-questions/**` | Marketing / SEO |
+| `/college/**`, `/platform/**`, `/admin/**` | Org / platform |
+| `/auth/callback` | OAuth |
+| `/report/script/[id]` | V2.1 script reports |
+| `/report/[id]` | Legacy compatibility reports for historical rows |
+
+**Removed:** `/interview/session/[id]/v2` (V1 voice experiment). Live V1 dual-agent APIs (`/api/interview/start`, `process-answer`, …) deleted.
+
+### API (selected)
+
+| Prefix | Domain |
+|---|---|
+| `/api/interview/script/*` | V2.1 engine |
+| `/api/interview/{answer,complete,abandon,exit-feedback,…}` | Shared / legacy-compatible |
+| `GET /api/interview/[id]` | **410 Gone** (V1 session payload retired) |
+| `/api/resume/*` | Upload, parse, file |
+| `/api/payments/*` | create-order, verify, webhook |
+| `/api/stt/*`, `/api/tts` | Voice |
+| `/api/product-events` | Funnel beacon ingest |
+| `/api/cron/*` | Bearer `CRON_SECRET` |
+| `/api/report/*` | Legacy report generate / PDF |
+| `/api/report/script/*` | Script report PDF |
+
+Long routes: `maxDuration: 60` in `vercel.json` for upload/parse/extract/`script/start` (and related heavy paths).
+
+## Architecture / Rules
+
+- Protected pages gated in `src/proxy.ts` (with `src/app`, keep the file under `src/` — root placement is not discovered on Next 16)
+- Rate limits by prefix before heavy work
+- Some pages (e.g. `/report/[id]`) also call `getUser()` + `redirect('/login')` as defense-in-depth; retired `/interview/session/[id]` and client `/interview/script/start` depend on the proxy auth gate
+- V1 compatibility: `/interview/new` and `/onboarding` **redirect →** `/interview/script/start` (not a login redirect by themselves; unauthenticated callers are stopped by the proxy first)
+
+## Dependencies
+
+[SYSTEM_DESIGN](SYSTEM_DESIGN.md) · [FLOWS](FLOWS.md) · [INTERVIEW_ENGINE](INTERVIEW_ENGINE.md)
+
+## Failure Modes
+
+Stale docs listing V1 start as primary — treat as archived only.
+
+## Verification
+
+Grep `src/app` when adding routes; register marketing URLs in sitemap registry.
+
+## Change Triggers
+
+New page/API · removing engine routes · sitemap-facing marketing paths
+
+## Related Documents
+
+[SEO_AEO_GEO](SEO_AEO_GEO.md) · [INTERVIEW_ENGINE](INTERVIEW_ENGINE.md)

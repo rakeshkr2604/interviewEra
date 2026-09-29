@@ -7,7 +7,7 @@
 export const STARTUP_POST_READY_TIMEOUT_MS = 20_000
 
 /**
- * Client prepare poll ceiling — must match {@link useInterviewPrepare} loop budget (~72s).
+ * Legacy V1 prepare poll ceiling (~72s). Retained as a telemetry constant reference.
  * Used as the watchdog while question generation is actively running.
  */
 export const PREPARE_CLIENT_TIMEOUT_MS = 72_000

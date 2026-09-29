@@ -62,7 +62,7 @@ export async function createInterviewWithCredit(
     p_started_at: input.startedAt,
     p_interviewer_id: input.interviewerId,
     p_session_context: input.sessionContext,
-    p_engine: input.engine ?? 'v1',
+    p_engine: input.engine ?? 'v2.1',
     p_script_type: input.scriptType ?? null,
     p_self_intro_enabled: input.selfIntroEnabled ?? true,
     p_follow_up_enabled: input.followUpEnabled ?? true,

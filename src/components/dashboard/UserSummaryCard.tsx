@@ -19,6 +19,7 @@ import {
 } from '@/lib/pricing/plan-status';
 import { DashboardMetricTile } from '@/components/dashboard/DashboardMetricTile';
 import { ProfileActions } from '@/components/dashboard/ProfileActions';
+import { activeInterviewResumePath } from '@/lib/interview/active-interview-policy';
 import type { UserRow } from '@/app/(dashboard)/dashboard/dashboard-types';
 import type { PlanTier } from '@/types/app.types';
 
@@ -32,7 +33,7 @@ interface UserSummaryCardProps {
   email: string;
   avatarPath?: string | null;
   oauthPictureUrl?: string | null;
-  inProgressInterview?: { id: string; role: string } | null;
+  inProgressInterview?: { id: string; role: string; engine?: string | null } | null;
 }
 
 const QUICK_LINKS = [
@@ -171,7 +172,7 @@ export function UserSummaryCard({
 
         {inProgressInterview ? (
           <Link
-            href={`/interview/session/${inProgressInterview.id}`}
+            href={activeInterviewResumePath(inProgressInterview.engine, inProgressInterview.id)}
             className="dashboard-hover-lift flex min-h-12 items-center justify-between gap-3 rounded-xl border-2 px-4 py-3.5 shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
             style={{
               borderColor: 'color-mix(in srgb, var(--accent-primary) 45%, var(--card-border))',

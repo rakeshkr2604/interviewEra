@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolvePlaywrightBaseUrl } from './src/lib/e2e/playwright-base-url';
 import { loadSafeStagingEnvironment } from './src/lib/env/staging-environment';
 
 const environmentSource =
@@ -8,8 +9,7 @@ const environmentSource =
 
 loadSafeStagingEnvironment(environmentSource);
 
-const baseURL =
-  process.env.PLAYWRIGHT_BASE_URL?.trim() || process.env.NEXT_PUBLIC_APP_URL!.trim();
+const baseURL = resolvePlaywrightBaseUrl(process.env);
 
 export default defineConfig({
   testDir: './e2e',

@@ -4,7 +4,7 @@ import {
   remainingSpeechAfterPrefix,
   speechPrefixMatchesCanonical,
 } from '@/lib/interview/json-speech-extractor'
-import { SentenceStreamBuffer } from '@/lib/interview/followup-stream'
+import { SentenceStreamBuffer } from '@/lib/interview/sentence-stream-buffer'
 
 function collectSpeech(chunks: string[]): { text: string; status: string } {
   let text = ''

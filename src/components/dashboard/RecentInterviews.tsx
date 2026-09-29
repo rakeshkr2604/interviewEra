@@ -62,7 +62,7 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
           interview.continueHref ??
           (interview.engine === 'v2.1'
             ? `/interview/script/${interview.id}`
-            : `/interview/session/${interview.id}`)
+            : '/dashboard')
         const reportHref =
           interview.reportHref ??
           (isCompleted && interview.reportId

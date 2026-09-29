@@ -10,10 +10,6 @@ const migrationPath = path.join(
   '085_phase6a_credit_interview_ownership.sql',
 );
 const sql = fs.readFileSync(migrationPath, 'utf8');
-const legacyStart = fs.readFileSync(
-  path.join(root, 'src', 'app', 'api', 'interview', 'start', 'route.ts'),
-  'utf8',
-);
 const scriptStart = fs.readFileSync(
   path.join(root, 'src', 'app', 'api', 'interview', 'script', 'start', 'route.ts'),
   'utf8',
@@ -105,15 +101,13 @@ describe('Phase 6A credit ownership migration contract', () => {
     );
   });
 
-  it('routes both interview engines through the canonical ownership helper', () => {
-    for (const source of [legacyStart, scriptStart]) {
-      expect(source).toContain('createInterviewWithCredit({');
-      expect(source).not.toContain('checkAndDeductCredit');
-      expect(source).not.toMatch(/\.from\(['"]interviews['"]\)\s*\.insert/);
-      expect(source.indexOf('deduped: true')).toBeLessThan(
-        source.indexOf('createInterviewWithCredit({'),
-      );
-    }
-    expect(legacyStart).toContain('await refundCredit(user.id, interviewId)');
+  it('routes the script interview start through the canonical ownership helper', () => {
+    expect(scriptStart).toContain('createInterviewWithCredit({');
+    expect(scriptStart).not.toContain('checkAndDeductCredit');
+    expect(scriptStart).not.toMatch(/\.from\(['"]interviews['"]\)\s*\.insert/);
+    expect(scriptStart.indexOf('deduped: true')).toBeLessThan(
+      scriptStart.indexOf('createInterviewWithCredit({'),
+    );
+    expect(scriptStart).toContain("engine: 'v2.1'");
   });
 });

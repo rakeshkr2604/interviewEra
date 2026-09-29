@@ -21,7 +21,7 @@ describe('active interview policy', () => {
       '/interview/script/33333333-3333-4333-8333-333333333333',
     );
     expect(activeInterviewResumePath('v1', '33333333-3333-4333-8333-333333333333')).toBe(
-      '/interview/session/33333333-3333-4333-8333-333333333333',
+      '/dashboard',
     );
   });
 

@@ -258,7 +258,7 @@ export async function generateQuestions({
     `JSON only:{"questions":[{"order":0,"question_text":"","category":"technical|behavioral|situational",` +
     `"rubric":{"ideal_keywords":[],"ideal_structure":"","red_flags":[]}}]}`;
 
-  /** Single LLM call — resolve-interview-questions uses deterministic fallback on failure. */
+  /** Single LLM call — callers use deterministic fallback on failure. */
   const MAX_ATTEMPTS = 1;
   let lastError: QuestionGenerationError | null = null;
 

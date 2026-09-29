@@ -88,7 +88,7 @@ describe('interview credit ownership helpers', () => {
       p_resume_id: input.resumeId,
       p_status: 'pending',
       p_session_context: input.sessionContext,
-      p_engine: 'v1',
+      p_engine: 'v2.1',
     }));
   });
 

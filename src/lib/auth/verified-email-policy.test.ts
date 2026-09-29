@@ -29,7 +29,7 @@ describe('verified email access policy', () => {
   });
 
   it('requires verification for sensitive product APIs including account onboarding', () => {
-    expect(requiresVerifiedEmailApi('/api/interview/start')).toBe(true);
+    expect(requiresVerifiedEmailApi('/api/interview/script/start')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/report/report-1')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/resume/upload')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/payments/create-order')).toBe(true);
@@ -74,7 +74,7 @@ describe('verified email access policy', () => {
 
   it('forbids sensitive APIs for unverified users and allows them for verified users', () => {
     const input = {
-      pathname: '/api/interview/start',
+      pathname: '/api/interview/script/start',
       isApi: true,
       isPublic: false,
       isAuthRoute: false,

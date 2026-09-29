@@ -132,8 +132,9 @@ Thumbs.db
 # ignored by default; only the files named below are explicitly re-included.
 !CLAUDE.md
 !DEAD_CODE_REPORT.md
-!docs/RELEASE_STRATEGY.md
-!docs/OBSERVABILITY_EXECUTION_PLAN.md
+# Archived 2026-09-27 from docs/RELEASE_STRATEGY.md and docs/OBSERVABILITY_EXECUTION_PLAN.md
+!docs/archive/pre-governance-2026-09-27/RELEASE_STRATEGY.md
+!docs/archive/pre-governance-2026-09-27/OBSERVABILITY_EXECUTION_PLAN.md
 
 # One-off DB audit / test-user cleanup artifacts (Jul 2026) — may contain PII
 scripts/_backups/

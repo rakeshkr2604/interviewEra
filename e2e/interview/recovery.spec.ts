@@ -1,12 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Interview API resilience guards — complements vitest coverage in
- * `voice-recovery.test.ts` (draft reconcile) and `deduplicate-questions.test.ts`.
+ * Interview API resilience guards — complements vitest coverage.
+ * V1 prepare/process-answer routes removed; auth-gate script + legacy-compatible paths.
  */
 test.describe('Interview API resilience', () => {
-  test('prepare endpoint requires authentication', async ({ request }) => {
-    const res = await request.post('/api/interview/00000000-0000-4000-8000-000000000002/prepare');
+  test('script turn endpoint requires authentication', async ({ request }) => {
+    const res = await request.post('/api/interview/script/turn', {
+      data: { interviewId: '00000000-0000-4000-8000-000000000002' },
+    });
     expect(res.status()).toBe(401);
   });
 
@@ -21,16 +23,10 @@ test.describe('Interview API resilience', () => {
     expect(res.status()).toBe(401);
   });
 
-  test('process-answer endpoint requires authentication', async ({ request }) => {
-    const res = await request.post('/api/interview/process-answer', {
-      data: {
-        interview_id: '00000000-0000-4000-8000-000000000002',
-        question: 'Tell me about your project.',
-        answer: 'I built a React dashboard.',
-        context: { role: 'Software Engineer', difficulty: 'medium', interview_style: 'mixed', focus_areas: [] },
-      },
-    });
-    expect(res.status()).toBe(401);
+  test('legacy session GET returns gone or unauthorized', async ({ request }) => {
+    const res = await request.get('/api/interview/00000000-0000-4000-8000-000000000002');
+    // Unauthenticated may hit 401 via middleware/auth before 410.
+    expect([401, 410]).toContain(res.status());
   });
 
   test('report generate endpoint requires authentication', async ({ request }) => {

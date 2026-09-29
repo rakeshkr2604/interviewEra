@@ -11,4 +11,4 @@ Historical unnumbered draft (2026-05-14) for retention / campus / roadmap object
 
 Canonical live schema for retention comes from the **numbered** migrations (notably `015_*`, `017_tier_config.sql`, and later campus migrations). This file is preserved for archaeology and comparison only — do not apply it to staging or production as part of a chain replay.
 
-See also `docs/ARCHITECTURE.md` (deprecated / unreferenced tables note).
+See also [`docs/Core/BACKEND_SCHEMA.md`](../../docs/Core/BACKEND_SCHEMA.md) (deprecated / unreferenced tables note).

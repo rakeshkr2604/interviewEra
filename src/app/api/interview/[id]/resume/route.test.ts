@@ -79,7 +79,7 @@ describe('POST /api/interview/[id]/resume', () => {
     await expect(response.json()).resolves.toMatchObject({
       error: 'active_interview',
       interviewId: '44444444-4444-4444-8444-444444444444',
-      resumeUrl: '/interview/session/44444444-4444-4444-8444-444444444444',
+      resumeUrl: '/dashboard',
     });
   });
 

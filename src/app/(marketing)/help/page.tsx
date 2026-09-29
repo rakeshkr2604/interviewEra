@@ -104,7 +104,7 @@ const SECTIONS = [
       },
       {
         q: 'What is the avatar interview mode?',
-        a: 'The avatar session (/interview/session/…) uses a looping AI avatar video and text-to-speech to simulate a live interviewer. It also tracks filler words in your spoken answers and gives speech-pattern feedback. The classic text mode (/interview/…) is always available as a fallback.',
+        a: 'Practice interviews use the scripted voice session at /interview/script/…. Your answers are scored after each turn, and you get a full report when you finish.',
       },
       {
         q: 'How are questions personalised to my resume?',

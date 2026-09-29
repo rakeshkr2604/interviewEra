@@ -7,8 +7,7 @@
  * Integration points (verified from codebase):
  * - evaluate-answer.ts: calls recordProviderOutcome() after each tier attempt
  * - generate-questions.ts: calls completeInterviewChat()
- * - agent-evaluator.ts: calls completeInterviewChat()
- * - followup-generator.ts: calls completeInterviewChat()
+ * - interview completion / script scoring paths call completeInterviewChat()
  * - parse-resume.ts: calls completeInterviewChat()
  *
  * Usage: call logAICall() right after each provider attempt resolves.

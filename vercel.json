@@ -30,7 +30,7 @@
     "src/app/api/resume/upload/route.ts": { "maxDuration": 60 },
     "src/app/api/resume/parse/route.ts": { "maxDuration": 60 },
     "src/app/api/job-description/extract/route.ts": { "maxDuration": 60 },
-    "src/app/api/interview/start/route.ts": { "maxDuration": 60 }
+    "src/app/api/interview/script/start/route.ts": { "maxDuration": 60 }
   },
   "redirects": [
     {

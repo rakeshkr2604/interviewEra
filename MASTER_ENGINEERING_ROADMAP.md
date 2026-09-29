@@ -3,7 +3,7 @@
 **This is the single source of truth for InterviewEra engineering. It supersedes every previous roadmap.**
 Frozen 2026-07-05. Future work is implementation of this document. No new planning documents unless production evidence demands one.
 
-**Superseded as roadmaps** (they remain valuable as *reference specs* for how to build individual items, but their sequencing/priorities are dead): `docs/OBSERVABILITY_EXECUTION_PLAN.md` (6 sprints), `docs/IMPLEMENTATION_BACKLOG.md` (P1–P8), `docs/REPO_RECOVERY.md` Phase 5, `REPOSITORY_CONFIDENCE_PROGRAM.md` Phase 5, **`docs/BRANCH_PROTECTION_SETUP.md` (2026-07-05 — superseded by the permanent GitHub Free decision below; kept for history, describes a path that will not be taken)**. Still-authoritative references: CLAUDE.md (invariants), subsystem docs (`docs/{ARCHITECTURE,AI_PIPELINE,VOICE,PAYMENTS,SEO}.md`), design specs (`docs/OBSERVABILITY.md`, `docs/OBSERVABILITY_RFCS.md`, `docs/{CI_CD_ARCHITECTURE,GITHUB_ACTIONS_ROADMAP,QUALITY_GATES,RELEASE_STRATEGY,SOLO_FOUNDER_WORKFLOW}.md`), and the audit records (`DEAD_CODE_REPORT.md`, `TECH_DEBT.md`).
+**Superseded as roadmaps** (they remain valuable as *reference specs* for how to build individual items, but their sequencing/priorities are dead): `docs/archive/pre-governance-2026-09-27/OBSERVABILITY_EXECUTION_PLAN.md` (6 sprints), `docs/archive/pre-governance-2026-09-27/IMPLEMENTATION_BACKLOG.md` (P1–P8), `docs/archive/pre-governance-2026-09-27/REPO_RECOVERY.md` Phase 5, `docs/archive/pre-governance-2026-09-27/REPOSITORY_CONFIDENCE_PROGRAM.md` Phase 5, **`docs/archive/pre-governance-2026-09-27/BRANCH_PROTECTION_SETUP.md` (2026-07-05 — superseded by the permanent GitHub Free decision below; kept for history, describes a path that will not be taken)**. Still-authoritative references: [`AGENTS.md`](AGENTS.md) (invariants; thin adapter [`CLAUDE.md`](CLAUDE.md)), canonical docs under `docs/Core/`, `docs/Guidelines/`, `docs/Operations/` (see [`docs/INDEX.md`](docs/INDEX.md)). Historical specs and audits live under `docs/archive/pre-governance-2026-09-27/`.
 
 The objective, verbatim: **a stable, trustworthy, maintainable SaaS that a solo founder can safely evolve with AI coding tools.** Not feature velocity. Not engineering beauty.
 
@@ -18,7 +18,7 @@ Four planning tracks were produced (observability 17 RFCs / 6 sprints; platform 
 - Branch protection — Platform P2 manual follow-up *and* Confidence M5.4. One task (Phase 1).
 - AI emit-path consolidation (RFC-012) — observability Sprint 6 *and* flagged again in Confidence Phase 4. Listed once — in Future Considerations (see removals).
 - Recovery roadmap items 1–3, 10 — already **done** in Platform P1 (docs restored, `.env.example`, `verify:voice`); items 4–8 re-appear refined in Confidence M1/M2. The recovery roadmap is fully absorbed.
-- `docs/FLAGS.md` — platform design *and* Confidence M4.1. Once (Phase 1).
+- `docs/Operations/FEATURE_FLAGS.md` — platform design *and* Confidence M4.1. Once (Phase 1).
 
 **Conflicts (resolved):**
 - *Observability Sprint 3 (middleware request-ID) vs. ungated main*: the platform docs themselves flagged that P2 must precede it. Resolved by ordering: branch protection is Phase 1; middleware change is Phase 5.
@@ -54,7 +54,7 @@ No task was added, removed in substance, or re-ranked. Nothing here contradicts 
 
 **InterviewEra will remain on GitHub Free. We are not upgrading to GitHub Pro. Branch protection is not a future prerequisite — it is off the table permanently.** This is a standing engineering decision, not a temporary budget constraint; do not re-propose the Pro upgrade or branch protection in any future task unless one is explicitly asked to produce a cost/benefit analysis.
 
-**Why this changes the execution strategy, honestly**: every safety property in this roadmap that depended on "merged to main ⇒ CI-green" rested entirely on branch protection's required-status-checks feature — verified this session (`gh api repos/.../branches/main/protection` → `403 Upgrade to GitHub Pro or make this repository public`) to be unavailable on the current plan for a private repo. **There is no GitHub Free feature that replicates this.** No CI configuration, no Actions workflow, no repo setting can force a red pull request to stay unmerged on this plan — that enforcement is a paid-tier capability, full stop. Pretending otherwise would be exactly the kind of dishonest automation `docs/QUALITY_GATES.md`'s own "gate philosophy" warns against.
+**Why this changes the execution strategy, honestly**: every safety property in this roadmap that depended on "merged to main ⇒ CI-green" rested entirely on branch protection's required-status-checks feature — verified this session (`gh api repos/.../branches/main/protection` → `403 Upgrade to GitHub Pro or make this repository public`) to be unavailable on the current plan for a private repo. **There is no GitHub Free feature that replicates this.** No CI configuration, no Actions workflow, no repo setting can force a red pull request to stay unmerged on this plan — that enforcement is a paid-tier capability, full stop. Pretending otherwise would be exactly the kind of dishonest automation `docs/Operations/QUALITY_GATES.md`'s own "gate philosophy" warns against.
 
 The honest redesign shifts from **prevention** (a gate that mechanically blocks a bad merge) to **friction + detection** (make an accidental bad merge harder to do without noticing, and impossible to miss once it happens) — built entirely from tools that cost nothing: GitHub Actions, CI, pull requests, squash merge, documentation, review discipline, and local automation. Concretely, this means:
 
@@ -77,18 +77,18 @@ Every item here is documentation, process, CI-only, or read-only investigation �
 
 | # | Task | Source | Effort |
 |---|---|---|---|
-| 1A.1 | **GitHub-Free workflow safety net** (permanent — no branch protection available on this plan, verified via `gh api` 403 this session; see the Founder Decision above): (a) a local pre-push git hook (Husky) that blocks direct `git push origin main` and runs lint/typecheck before any push; (b) a CI "Merge Readiness" summary job that aggregates every required check's result into one clear PR comment so nothing red hides in a separate tab; (c) a "main-red-alert" workflow that opens/updates a loud rolling GitHub issue if any required check fails on a commit that reaches `main`. Detection + friction, not a server-enforced gate — that's the honest ceiling on this plan | Redefines Platform P2 / `docs/BRANCH_PROTECTION_SETUP.md` (superseded) | Medium |
+| 1A.1 | **GitHub-Free workflow safety net** (permanent — no branch protection available on this plan, verified via `gh api` 403 this session; see the Founder Decision above): (a) a local pre-push git hook (Husky) that blocks direct `git push origin main` and runs lint/typecheck before any push; (b) a CI "Merge Readiness" summary job that aggregates every required check's result into one clear PR comment so nothing red hides in a separate tab; (c) a "main-red-alert" workflow that opens/updates a loud rolling GitHub issue if any required check fails on a commit that reaches `main`. Detection + friction, not a server-enforced gate — that's the honest ceiling on this plan | Redefines Platform P2 / `docs/archive/pre-governance-2026-09-27/BRANCH_PROTECTION_SETUP.md` (superseded) | Medium |
 | 1A.2 | Doc truth pass: README stack facts; archive `Skills/`; fix `.env.example` Mistral auto-failover prose; reword CLAUDE.md invariant #9 (mistral dir is dead, not a "disabled fallback") | Confidence M1.3 | Small |
-| 1A.3 | `docs/AI_BOUNDARIES.md` (do-not-edit: migrations-in-place, middleware/vercel.json/next.config trinity, razorpay, noindex-audit, workflows; read-only: voice v2) + `.cursorrules` one-liner pointing at CLAUDE.md + `docs/FLAGS.md` registry (forces writing AUTH_V2 exit criteria) | Confidence M1.2/M4.1 | Small |
+| 1A.3 | `docs/Guidelines/CODE_ORGANIZATION.md` (do-not-edit: migrations-in-place, middleware/vercel.json/next.config trinity, razorpay, noindex-audit, workflows; read-only: voice v2) + `.cursorrules` one-liner pointing at CLAUDE.md + `docs/Operations/FEATURE_FLAGS.md` registry (forces writing AUTH_V2 exit criteria) | Confidence M1.2/M4.1 | Small |
 | 1A.4 | **Gitleaks CI job** (secret scanning, blocking) — pulled forward from Phase 4.1: CI-only, zero runtime impact, and Phase 1B is exactly the highest file-churn period this roadmap has before Phase 4 would otherwise add it | Platform GITHUB_ACTIONS_ROADMAP #1 (moved up) | Small |
 | 1A.5 | Repo hygiene, all doc/config-only: gitignore `logs/` + `.voice-verify-out/`; ghost-table deprecation notes (comment-only — a doc note or a harmless `COMMENT ON TABLE` migration; **not** a DROP); ticket Navbar's 2 TODOs; resolve CLAUDE.md gitignore-tracking oddity | Confidence M1.4, recovery leftovers | Small |
-| 1A.6 | **`anon`-grant enumeration** (read-only investigation: what can the `anon` role actually SELECT today) — write findings to TECH_DEBT.md. The tightening migration itself stays in Phase 5.6, unchanged | TECH_DEBT H5 (split out) | Small |
+| 1A.6 | **`anon`-grant enumeration** (read-only investigation: what can the `anon` role actually SELECT today) — write findings to docs/archive/pre-governance-2026-09-27/TECH_DEBT.md. The tightening migration itself stays in Phase 5.6, unchanged | TECH_DEBT H5 (split out) | Small |
 
 **ROI**: effort ~1.5 days (1A.1's redefinition adds real implementation work vs. the original 15-minute paid checkbox) · business value High (AI tools stop being lied to; secret-scanning gap closes before peak file-churn; main-red-alert closes the detection gap left by having no branch protection) · stability +++ · risk ≈0. **Rank: #1.**
 
 ### Phase 1B — Repository Cleanup *(Day 2–4; one logical subsystem per PR, full gate each)* — **COMPLETE (2026-07-05)**
 
-All 11 rows below executed, each gated by lint/typecheck/test/build (1B.8 also e2e-gated). 26 confirmed-dead files + 4 dead directories removed across Batches 1–10B plus the `placement-date.ts` orphan; zero regressions, zero rollbacks. 1B.11 (scripts triage) fully closed: one script deleted (`generate-pwa-icons.cjs`), one confirmed keeper left in place (`regenerate-voice-fixture.mjs`, documented in `docs/VOICE.md`), 5 archive-approved scripts moved to `scripts/manual/`, and the remaining 9 moved to a sibling `scripts-archive/` directory (not nested under `scripts/`) so their `../src/...`-relative imports keep resolving without any code edits — `tsconfig.json`/`eslint.config.mjs` exclude entries for `scripts` were mirrored for `scripts-archive` to preserve identical lint/typecheck exemption, the only infra change made. 6 scripts still need founder business-intent input before any classification and remain untouched in `scripts/`. See the Repository Confidence Refresh and Batch 11 audit for full evidence — those remain historical snapshots, not updated here.
+All 11 rows below executed, each gated by lint/typecheck/test/build (1B.8 also e2e-gated). 26 confirmed-dead files + 4 dead directories removed across Batches 1–10B plus the `placement-date.ts` orphan; zero regressions, zero rollbacks. 1B.11 (scripts triage) fully closed: one script deleted (`generate-pwa-icons.cjs`), one confirmed keeper left in place (`regenerate-voice-fixture.mjs`, documented in `docs/Core/VOICE_PIPELINE.md`), 5 archive-approved scripts moved to `scripts/manual/`, and the remaining 9 moved to a sibling `scripts-archive/` directory (not nested under `scripts/`) so their `../src/...`-relative imports keep resolving without any code edits — `tsconfig.json`/`eslint.config.mjs` exclude entries for `scripts` were mirrored for `scripts-archive` to preserve identical lint/typecheck exemption, the only infra change made. 6 scripts still need founder business-intent input before any classification and remain untouched in `scripts/`. See the Repository Confidence Refresh and Batch 11 audit for full evidence — those remain historical snapshots, not updated here.
 
 Every PR here must pass `lint` + `typecheck` + `test` + `build` before merge (e2e too, where the deleted surface is interview/voice-adjacent). Each row is a separate PR — this is the concrete answer to "no cleanup PR should delete more than one logical subsystem," since the source plan's "two batches" of 20 unrelated components violated that rule the moment you check which directories were mixed.
 
@@ -110,7 +110,7 @@ Every PR here must pass `lint` + `typecheck` + `test` + `build` before merge (e2
 
 ### Phase 2 — Make failures durable *(Weeks 2–3)*
 
-Observability Sprint 1's core, unchanged — it survived every re-review because signals that currently *evaporate* are unrecoverable retroactively. Specs: `docs/OBSERVABILITY_RFCS.md` RFC-001/002/003/004/005/006 + the RFC-001 blueprint already written.
+Observability Sprint 1's core, unchanged — it survived every re-review because signals that currently *evaporate* are unrecoverable retroactively. Specs: `docs/archive/pre-governance-2026-09-27/OBSERVABILITY_RFCS.md` RFC-001/002/003/004/005/006 + the RFC-001 blueprint already written.
 
 | # | Task | Effort |
 |---|---|---|
@@ -134,7 +134,7 @@ Run the v2 route through the certification checklist + real-device mobile smoke 
 
 ### Phase 4 — Make the pipeline safe and releases real *(Weeks 5–6)*
 
-Platform P3/P4/P5-lite/P7, merged and trimmed. Specs: `docs/GITHUB_ACTIONS_ROADMAP.md` #1/#3/#6, `docs/RELEASE_STRATEGY.md`.
+Platform P3/P4/P5-lite/P7, merged and trimmed. Specs: `docs/archive/pre-governance-2026-09-27/GITHUB_ACTIONS_ROADMAP.md` #1/#3/#6, `docs/archive/pre-governance-2026-09-27/RELEASE_STRATEGY.md`.
 
 | # | Task | Effort |
 |---|---|---|
@@ -173,8 +173,8 @@ The original end-goal, kept — but at minimum viable scope: RFC-016 read-only D
 1. **Extraction-on-touch ratchet**: any PR touching the giants (session page, Navbar, 2,000-line SEO templates) leaves them same-size or smaller. Never larger.
 2. **No new single-file `lib/` dirs; nothing new in `lib/utils/`** — domain logic moves out of utils opportunistically when touched (credits.ts with full payments ritual).
 3. **Fold-on-touch**: single-file dirs (`lib/interviewer`, `lib/evaluation`, `lib/client`+`services`) fold into real homes when next edited — never as dedicated churn PRs.
-4. **Flags need exit criteria** in `docs/FLAGS.md` before merging; a flag without one is a review rejection.
-5. **AI workflow** per `docs/SOLO_FOUNDER_WORKFLOW.md`: AI never autonomously touches payments, applied migrations, the redirect/CSP trinity, or deletes what it didn't create; `/review` + `/security` before human read on risky diffs; "verification not run" = "verification failed."
+4. **Flags need exit criteria** in `docs/Operations/FEATURE_FLAGS.md` before merging; a flag without one is a review rejection.
+5. **AI workflow** per `docs/archive/pre-governance-2026-09-27/SOLO_FOUNDER_WORKFLOW.md`: AI never autonomously touches payments, applied migrations, the redirect/CSP trinity, or deletes what it didn't create; `/review` + `/security` before human read on risky diffs; "verification not run" = "verification failed."
 6. **Quarterly** (~1 hour): re-run the confidence scans (weekly-health automates most), re-score, promote/demote TECH_DEBT. No new roadmap documents — findings become tasks inside these phases or Future Considerations.
 
 ## Future Considerations (build only on production evidence)

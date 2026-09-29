@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Interview session guards', () => {
-  test('redirects unauthenticated users from session page', async ({ page }) => {
+  test('legacy session page requires authentication (redirects to login)', async ({ page }) => {
     await page.goto('/interview/session/00000000-0000-4000-8000-000000000001', {
       waitUntil: 'domcontentloaded',
     });
@@ -13,20 +13,24 @@ test.describe('Interview session guards', () => {
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('redirects unauthenticated users from new interview page', async ({ page }) => {
+  test('legacy /interview/new redirects unauthenticated users to login', async ({ page }) => {
     await page.goto('/interview/new');
     await expect(page).toHaveURL(/\/login/);
+  });
+
+  test('script start requires authentication', async ({ page }) => {
+    await page.goto('/interview/script/start', { waitUntil: 'domcontentloaded' });
+    await expect(page).toHaveURL(/\/login/, { timeout: 20_000 });
   });
 });
 
 test.describe('Interview API auth', () => {
-  test('start endpoint requires authentication', async ({ request }) => {
-    const res = await request.post('/api/interview/start', {
+  test('script start endpoint requires authentication', async ({ request }) => {
+    const res = await request.post('/api/interview/script/start', {
       data: {
         resumeId: '00000000-0000-4000-8000-000000000001',
         role: 'Software Engineer',
         difficulty: 'medium',
-        interviewerId: 'priya',
       },
     });
     expect(res.status()).toBe(401);

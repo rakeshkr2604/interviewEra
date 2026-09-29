@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase/middleware', () => ({
   updateSession: (req: NextRequest) => mockUpdateSession(req),
 }))
 
-vi.mock('@/lib/ratelimit', () => ({
+vi.mock('@/lib/redis/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => ({ allowed: true, resetInSeconds: 60 })),
 }))
 
@@ -42,14 +42,14 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: null,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     const request = new NextRequest('http://localhost:3000/dashboard', {
       headers: {
         cookie: 'sb-proj-auth-token=dead-refresh-token',
       },
     })
 
-    const response = await middleware(request)
+    const response = await proxy(request)
 
     // Should redirect to /login?next=/dashboard
     expect(response.status).toBe(307)
@@ -73,14 +73,14 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: validVerifiedUser,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     const request = new NextRequest('http://localhost:3000/dashboard', {
       headers: {
         cookie: 'sb-proj-auth-token=existing-valid-token',
       },
     })
 
-    const response = await middleware(request)
+    const response = await proxy(request)
     expect(response.status).toBe(200)
     // Refreshed cookie is preserved on response
     expect(response.cookies.get('sb-proj-auth-token')?.value).toBe('valid-refreshed-token')
@@ -94,14 +94,14 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: validVerifiedUser,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     const request = new NextRequest('http://localhost:3000/login', {
       headers: {
         cookie: 'sb-proj-auth-token=valid-token',
       },
     })
 
-    const response = await middleware(request)
+    const response = await proxy(request)
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/dashboard')
 
@@ -121,7 +121,7 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: null,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     const request = new NextRequest('http://localhost:3000/api/coach/session', {
       method: 'POST',
       headers: {
@@ -129,8 +129,8 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       },
     })
 
-    const response = await middleware(request)
-    // API route is not redirected to /login by middleware; it receives the modified response
+    const response = await proxy(request)
+    // API route is not redirected to /login by proxy; it receives the modified response
     expect(response.status).toBe(200)
     expect(mockUpdateSession).toHaveBeenCalled()
     // Stale cookies are marked for deletion
@@ -146,7 +146,7 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: null,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     // Next.js App Router RSC client navigation
     const request = new NextRequest('http://localhost:3000/dashboard?_rsc=123', {
       headers: {
@@ -155,7 +155,7 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       },
     })
 
-    const response = await middleware(request)
+    const response = await proxy(request)
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/login')
 
@@ -163,6 +163,35 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
     const cleared = response.cookies.get('sb-proj-auth-token')
     expect(cleared?.maxAge).toBe(0)
     expect(cleared?.value).toBe('')
+  })
+
+  it('does not hijack /auth/error?code= catalogue params as OAuth codes', async () => {
+    const { proxy } = await import('../../proxy')
+    const request = new NextRequest(
+      'http://localhost:3000/auth/error?code=invalid_credentials',
+    )
+
+    const response = await proxy(request)
+
+    // Public recovery hub must render — never redirect to /auth/callback.
+    expect(response.status).toBe(200)
+    expect(response.headers.get('location')).toBeNull()
+    expect(mockUpdateSession).not.toHaveBeenCalled()
+  })
+
+  it('still forwards stray OAuth ?code= on non-auth-error routes to /auth/callback', async () => {
+    const { proxy } = await import('../../proxy')
+    const request = new NextRequest(
+      'http://localhost:3000/?code=oauth-pkce-example-code&next=%2Fdashboard',
+    )
+
+    const response = await proxy(request)
+
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location')
+    expect(location).toContain('/auth/callback')
+    expect(location).toContain('code=oauth-pkce-example-code')
+    expect(location).toContain('next=%2Fdashboard')
   })
 
   it('does not bypass auth for crawlers requesting protected routes', async () => {
@@ -173,7 +202,7 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       user: null,
     })
 
-    const { middleware } = await import('../../../middleware')
+    const { proxy } = await import('../../proxy')
     const request = new NextRequest('http://localhost:3000/dashboard', {
       headers: {
         'user-agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
@@ -181,7 +210,7 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
       },
     })
 
-    const response = await middleware(request)
+    const response = await proxy(request)
     // Protected route must NOT let crawler through without auth
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/login')

@@ -79,9 +79,10 @@ export default async function HistoryPage() {
             : null
         : null
 
+    // V1 session UI retired — non-script in-progress rows continue via dashboard.
     const continueHref = isScript
       ? `/interview/script/${interview.id}`
-      : `/interview/session/${interview.id}`
+      : '/dashboard'
 
     return {
       id: interview.id as string,

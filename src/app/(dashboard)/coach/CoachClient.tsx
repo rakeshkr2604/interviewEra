@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   MeetingConsumer,
   MeetingProvider,
@@ -1006,6 +1007,7 @@ function PreSessionPanel({
 }
 
 export default function CoachClient() {
+  const router = useRouter()
   const [entitlement, setEntitlement] = useState<CoachEntitlementResponse | null>(null)
   const [durationMinutes, setDurationMinutes] =
     useState<CoachDurationMinutes>(3)
@@ -1021,7 +1023,7 @@ export default function CoachClient() {
     try {
       const res = await fetch('/api/coach/entitlement', { cache: 'no-store' })
       if (res.status === 401) {
-        window.location.href = `/login?next=${encodeURIComponent('/coach')}`
+        router.replace(`/login?next=${encodeURIComponent('/coach')}`)
         return
       }
       const data = (await res.json()) as CoachEntitlementResponse & { error?: string }
@@ -1057,7 +1059,7 @@ export default function CoachClient() {
         cache: 'no-store',
       })
       if (res.status === 401) {
-        window.location.href = `/login?next=${encodeURIComponent('/coach')}`
+        router.replace(`/login?next=${encodeURIComponent('/coach')}`)
         return
       }
       const data = (await res.json()) as Partial<CoachSessionConfig> & {

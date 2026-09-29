@@ -10,4 +10,4 @@ Not wired into `package.json`/CI. Kept as a sibling of `scripts/` (not nested un
 - `validate-seo-metadata.ts` — validates SEO title/description lengths from codebase metadata. Run: `npx tsx scripts-archive/validate-seo-metadata.ts`
 - `generate-react-hub-images.mjs` — converts committed premium PNG blog images to WebP. Run: `node scripts-archive/generate-react-hub-images.mjs`
 - `voice-app-verify.mjs` — real-mic, headed-Chrome voice runtime verification on localhost. Run: `node scripts-archive/voice-app-verify.mjs`
-- `voice-interview-verify.mjs` — full authenticated-session voice verification (magic-link auth). Run: `node scripts-archive/voice-interview-verify.mjs`
+- `voice-interview-verify.mjs` — **HISTORICAL / BROKEN against current code** (calls deleted `/api/interview/start` + `/interview/session/...`). Kept only as archive evidence; do not run against V2.1.

@@ -22,4 +22,14 @@ describe('Playwright E2E production-safety contract', () => {
     );
     expect(envHelper).toContain('assertE2eSupabaseTargetNotProduction');
   });
+
+  it('resolves Playwright base URL via shared helper (empty env wipe safe)', () => {
+    const setup = readFileSync(join(process.cwd(), 'e2e/global-setup.ts'), 'utf8');
+    const staging = readFileSync(
+      join(process.cwd(), 'playwright.staging.config.ts'),
+      'utf8',
+    );
+    expect(setup).toContain('resolvePlaywrightBaseUrl');
+    expect(staging).toContain('resolvePlaywrightBaseUrl');
+  });
 });

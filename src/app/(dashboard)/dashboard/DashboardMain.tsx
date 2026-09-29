@@ -168,7 +168,7 @@ export function DashboardMain({
                       : null
                   : null,
               continueHref:
-                engine === 'v2.1' ? `/interview/script/${row.id}` : `/interview/session/${row.id}`,
+                engine === 'v2.1' ? `/interview/script/${row.id}` : '/dashboard',
               score: scoreMap.get(row.id) ?? null,
               abandonedResumeUsed: row.abandoned_resume_used === true,
               creditDeducted: row.credit_deducted === true,

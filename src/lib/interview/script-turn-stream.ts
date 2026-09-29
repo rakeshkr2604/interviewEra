@@ -4,7 +4,7 @@
  */
 
 import { completeInterviewChatStream } from '@/lib/ai/interview-completion'
-import { SentenceStreamBuffer } from '@/lib/interview/followup-stream'
+import { SentenceStreamBuffer } from '@/lib/interview/sentence-stream-buffer'
 import { JsonSpeechExtractor } from '@/lib/interview/json-speech-extractor'
 import type OpenAI from 'openai'
 

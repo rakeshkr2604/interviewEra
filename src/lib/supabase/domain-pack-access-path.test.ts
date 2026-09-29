@@ -9,39 +9,23 @@ function read(relativePath: string): string {
 }
 
 describe('Domain pack access-path regression (static)', () => {
-  it('interview/new loads active packs through the authenticated server client', () => {
+  it('script interview start does not query domain pack tables', () => {
+    const page = read('src/app/(dashboard)/interview/script/start/page.tsx');
+    const route = read('src/app/api/interview/script/start/route.ts');
+
+    expect(page).not.toContain("from('domain_packs')");
+    expect(page).not.toContain("from('domain_pack_questions')");
+    expect(route).not.toContain("from('domain_packs')");
+    expect(route).not.toContain("from('domain_pack_questions')");
+  });
+
+  it('legacy /interview/new redirects to script start (no domain pack queries)', () => {
     const page = read('src/app/(dashboard)/interview/new/page.tsx');
 
-    expect(page).toContain("from '@/lib/supabase/server'");
-    expect(page).toContain('createClient');
-    expect(page).toContain(".from('domain_packs')");
-    expect(page).toContain(".eq('is_active', true)");
-    expect(page).not.toContain('createServiceClient');
+    expect(page).toContain('SCRIPT_INTERVIEW_START_PATH');
+    expect(page).toContain('redirect');
+    expect(page).not.toContain("from('domain_packs')");
     expect(page).not.toContain("from('domain_pack_questions')");
-  });
-
-  it('interview start loads questions only through service-role', () => {
-    const route = read('src/app/api/interview/start/route.ts');
-
-    expect(route).toContain('createServiceClient');
-    expect(route).toContain('const serviceClient = createServiceClient()');
-    expect(route).toMatch(
-      /serviceClient\s*\n\s*\.from\('domain_pack_questions'\)/,
-    );
-    expect(route).not.toMatch(
-      /(?:await\s+)?supabase[\s\S]{0,80}\.from\('domain_pack_questions'\)/,
-    );
-  });
-
-  it('browser StartInterviewForm never queries domain tables directly', () => {
-    const form = read('src/app/(dashboard)/interview/new/StartInterviewForm.tsx');
-
-    expect(form).toContain('domainPacks');
-    expect(form).toContain('domainPackId');
-    expect(form).not.toContain("from('domain_packs')");
-    expect(form).not.toContain("from('domain_pack_questions')");
-    expect(form).not.toContain('createClient');
-    expect(form).not.toContain('createServiceClient');
   });
 
   it('SEO question registries do not depend on domain pack tables', () => {

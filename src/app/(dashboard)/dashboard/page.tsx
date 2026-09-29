@@ -221,7 +221,11 @@ export default async function DashboardPage() {
           oauthPictureUrl={oauthPictureUrl}
           inProgressInterview={
             inProgressInterview
-              ? { id: inProgressInterview.id, role: inProgressInterview.role }
+              ? {
+                  id: inProgressInterview.id,
+                  role: inProgressInterview.role,
+                  engine: inProgressInterview.engine,
+                }
               : null
           }
         />
