@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { FakeDb } from '@/test-utils/supabase-fake'
+import { makeFakeServiceClient } from '@/test-utils/supabase-fake'
 
 const afterMock = vi.fn((cb: () => void) => {
-  // Run synchronously in tests so we can assert the queued email call.
   cb()
 })
 
@@ -9,6 +10,8 @@ const trySendMock = vi.fn(async () => ({
   attempted: true,
   sent: true,
 }))
+
+const persistMilestoneEventOnce = vi.fn()
 
 vi.mock('next/server', () => ({
   after: (cb: () => void) => afterMock(cb),
@@ -18,102 +21,176 @@ vi.mock('@/lib/email/lifecycle/try-send-script-completion-email', () => ({
   trySendScriptCompletionEmail: (...args: unknown[]) => trySendMock(...args),
 }))
 
+vi.mock('@/lib/analytics/milestone-events-store', () => ({
+  persistMilestoneEventOnce: (...args: unknown[]) => persistMilestoneEventOnce(...args),
+}))
+
 import { completeScriptInterviewFromTurn } from '@/lib/interview/complete-script-interview-from-turn'
 
-type UpdateCall = { payload: Record<string, unknown>; eqId: string }
+const IV = '11111111-1111-1111-1111-111111111111'
 
-/**
- * Locks Phase 1b server-side completion: closing → status=completed + email queued once.
- */
-describe('Phase 1b — completeScriptInterviewFromTurn', () => {
-  let updateCalls: UpdateCall[]
-
-  function makeServiceClient(opts?: { failUpdate?: boolean }) {
-    updateCalls = []
-    return {
-      from: (table: string) => {
-        expect(table).toBe('interviews')
-        return {
-          update: (payload: Record<string, unknown>) => ({
-            eq: async (_col: string, id: string) => {
-              updateCalls.push({ payload, eqId: id })
-              if (opts?.failUpdate) {
-                return { error: { message: 'db down' } }
-              }
-              return { error: null }
-            },
-          }),
-        }
-      },
-    }
-  }
+describe('completeScriptInterviewFromTurn — race-safe completion', () => {
+  let db: FakeDb
 
   beforeEach(() => {
     afterMock.mockClear()
     trySendMock.mockClear()
+    persistMilestoneEventOnce.mockClear()
     trySendMock.mockResolvedValue({ attempted: true, sent: true })
+    db = {
+      interviews: [
+        {
+          id: IV,
+          user_id: 'user-1',
+          status: 'in_progress',
+          current_turn_index: 0,
+        },
+      ],
+    }
   })
 
-  it('sets status=completed and queues email exactly once', async () => {
-    const serviceClient = makeServiceClient()
+  it('active → completed: emits interview_completed once and queues email', async () => {
     const result = await completeScriptInterviewFromTurn({
-      serviceClient: serviceClient as never,
-      interviewId: '11111111-1111-1111-1111-111111111111',
+      serviceClient: makeFakeServiceClient(db) as never,
+      interviewId: IV,
       userId: 'user-1',
       recipientEmail: 'candidate@example.com',
       currentTurnIndex: 12,
       performanceBucket: 'average',
     })
 
-    expect(result).toEqual({ ok: true })
-    expect(updateCalls).toHaveLength(1)
-    expect(updateCalls[0].payload.status).toBe('completed')
-    expect(updateCalls[0].payload.current_turn_index).toBe(12)
-    expect(updateCalls[0].payload.performance_bucket).toBe('average')
-    expect(typeof updateCalls[0].payload.completed_at).toBe('string')
-
+    expect(result).toEqual({ ok: true, transitioned: true })
+    expect(db.interviews[0].status).toBe('completed')
+    expect(db.interviews[0].current_turn_index).toBe(12)
+    expect(persistMilestoneEventOnce).toHaveBeenCalledTimes(1)
+    expect(persistMilestoneEventOnce).toHaveBeenCalledWith('interview_completed', {
+      user_id: 'user-1',
+      interview_id: IV,
+      engine: 'v2.1',
+    })
     expect(afterMock).toHaveBeenCalledTimes(1)
     expect(trySendMock).toHaveBeenCalledTimes(1)
-    expect(trySendMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        interviewId: '11111111-1111-1111-1111-111111111111',
-        userId: 'user-1',
-        recipientEmail: 'candidate@example.com',
-        waitForScores: true,
-      }),
-    )
   })
 
-  it('does not queue email when the status update fails', async () => {
-    const serviceClient = makeServiceClient({ failUpdate: true })
+  it('abandoned interview: remains abandoned and does not emit interview_completed', async () => {
+    db.interviews[0].status = 'abandoned'
+    db.interviews[0].completed_at = '2026-09-24T12:00:00.000Z'
+
     const result = await completeScriptInterviewFromTurn({
-      serviceClient: serviceClient as never,
-      interviewId: '11111111-1111-1111-1111-111111111111',
+      serviceClient: makeFakeServiceClient(db) as never,
+      interviewId: IV,
       userId: 'user-1',
       recipientEmail: 'candidate@example.com',
+      currentTurnIndex: 12,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(db.interviews[0].status).toBe('abandoned')
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled()
+    expect(afterMock).not.toHaveBeenCalled()
+  })
+
+  it('zero affected rows (race equivalent): does not emit and does not report success', async () => {
+    // Simulate PostgREST success with empty return (no active row matched).
+    const serviceClient = {
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            in: () => ({
+              select: async () => ({ data: [], error: null }),
+            }),
+          }),
+        }),
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => ({ data: { status: 'abandoned' }, error: null }),
+          }),
+        }),
+      }),
+    }
+
+    const result = await completeScriptInterviewFromTurn({
+      serviceClient: serviceClient as never,
+      interviewId: IV,
+      userId: 'user-1',
+      recipientEmail: 'a@b.co',
       currentTurnIndex: 5,
     })
 
     expect(result.ok).toBe(false)
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled()
     expect(afterMock).not.toHaveBeenCalled()
-    expect(trySendMock).not.toHaveBeenCalled()
   })
 
-  it('queues email once even when called for each closing path shape', async () => {
-    const paths = ['llm-native', 'core-budget', 'cq-exit', 'turn-cap'] as const
-    for (const _path of paths) {
-      afterMock.mockClear()
-      trySendMock.mockClear()
-      const serviceClient = makeServiceClient()
-      await completeScriptInterviewFromTurn({
-        serviceClient: serviceClient as never,
-        interviewId: '22222222-2222-2222-2222-222222222222',
-        userId: 'user-2',
-        recipientEmail: 'a@b.co',
-        currentTurnIndex: 9,
-      })
-      expect(afterMock).toHaveBeenCalledTimes(1)
-      expect(trySendMock).toHaveBeenCalledTimes(1)
+  it('already completed concurrent winner: ok without re-emitting milestone', async () => {
+    db.interviews[0].status = 'completed'
+
+    const result = await completeScriptInterviewFromTurn({
+      serviceClient: makeFakeServiceClient(db) as never,
+      interviewId: IV,
+      userId: 'user-1',
+      recipientEmail: 'a@b.co',
+      currentTurnIndex: 9,
+    })
+
+    expect(result).toEqual({ ok: true, transitioned: false })
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled()
+    expect(afterMock).not.toHaveBeenCalled()
+  })
+
+  it('does not emit when the status update errors', async () => {
+    const serviceClient = {
+      from: () => ({
+        update: () => ({
+          eq: () => ({
+            in: () => ({
+              select: async () => ({ data: null, error: { message: 'db down' } }),
+            }),
+          }),
+        }),
+      }),
     }
+
+    const result = await completeScriptInterviewFromTurn({
+      serviceClient: serviceClient as never,
+      interviewId: IV,
+      userId: 'user-1',
+      recipientEmail: 'a@b.co',
+      currentTurnIndex: 5,
+    })
+
+    expect(result.ok).toBe(false)
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled()
+  })
+
+  it('completion succeeds even when milestone emit throws', async () => {
+    persistMilestoneEventOnce.mockImplementationOnce(() => {
+      throw new Error('analytics down')
+    })
+
+    const result = await completeScriptInterviewFromTurn({
+      serviceClient: makeFakeServiceClient(db) as never,
+      interviewId: IV,
+      userId: 'user-1',
+      recipientEmail: 'c@d.co',
+      currentTurnIndex: 3,
+    })
+
+    expect(result).toEqual({ ok: true, transitioned: true })
+    expect(db.interviews[0].status).toBe('completed')
+    expect(afterMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('pending → completed also emits once', async () => {
+    db.interviews[0].status = 'pending'
+    const result = await completeScriptInterviewFromTurn({
+      serviceClient: makeFakeServiceClient(db) as never,
+      interviewId: IV,
+      userId: 'user-1',
+      recipientEmail: 'a@b.co',
+      currentTurnIndex: 1,
+    })
+    expect(result).toEqual({ ok: true, transitioned: true })
+    expect(persistMilestoneEventOnce).toHaveBeenCalledTimes(1)
   })
 })

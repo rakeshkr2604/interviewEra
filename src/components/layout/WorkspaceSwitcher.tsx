@@ -9,6 +9,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard';
 
 export type WorkspaceSwitcherCurrent = 'student' | 'campus' | 'hiring' | 'platform';
 
@@ -34,6 +35,8 @@ type WorkspaceSwitcherProps = {
  * Platform-admin only — switch Student / Campus / Hiring / Funnel from one place.
  */
 export function WorkspaceSwitcher({ current, onNavigate, className }: WorkspaceSwitcherProps) {
+  const { isGuarding, interceptNavigation } = useActiveInterviewNavGuard();
+
   return (
     <div className={cn('space-y-1', className)} aria-label="Workspace switcher">
       <p
@@ -49,9 +52,20 @@ export function WorkspaceSwitcher({ current, onNavigate, className }: WorkspaceS
             <li key={id}>
               <Link
                 href={href}
-                onClick={onNavigate}
+                aria-disabled={isGuarding || undefined}
+                title={isGuarding ? 'Interview in progress' : undefined}
+                onClick={(e) => {
+                  if (interceptNavigation()) {
+                    e.preventDefault();
+                    return;
+                  }
+                  onNavigate?.();
+                }}
                 aria-current={active ? 'page' : undefined}
-                className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium transition-none"
+                className={cn(
+                  'flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium transition-none',
+                  isGuarding && 'cursor-not-allowed opacity-60',
+                )}
                 style={
                   active
                     ? {
@@ -61,7 +75,7 @@ export function WorkspaceSwitcher({ current, onNavigate, className }: WorkspaceS
                     : { color: 'var(--text-secondary)' }
                 }
                 onMouseEnter={(e) => {
-                  if (active) return;
+                  if (active || isGuarding) return;
                   e.currentTarget.style.background =
                     'color-mix(in srgb, var(--accent-primary) 8%, transparent)';
                   e.currentTarget.style.color = 'var(--text-primary)';

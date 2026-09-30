@@ -9,6 +9,8 @@ import { TimerCircle } from '@/components/interview/TimerCircle'
 import { CandidatePreview } from '@/components/interview/CandidatePreview'
 import { AfterInterviewFeedback } from '@/components/interview/AfterInterviewFeedback'
 import { InterviewExitFeedbackModal } from '@/components/interview/InterviewExitFeedbackModal'
+import { useRegisterActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { getInterviewerById, readInitialScriptInterviewerId, stashScriptInterviewerId } from '@/lib/config/interviewers'
 import type { InterviewerId } from '@/lib/config/interviewers'
 import type { ScriptType } from '@/lib/ai/scripts/script-loader'
@@ -236,6 +238,29 @@ export default function ScriptInterviewPage() {
   const [currentPhase, setCurrentPhase] = useState<string>('warmup')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+
+  const openExitFlow = useCallback(() => {
+    setIsExitModalOpen(true)
+  }, [])
+
+  // Guard dashboard chrome navigation while this session is active. Released on
+  // intentional leave, UI completion, or boot redirect away from the session.
+  const guardEnabled =
+    uiPhase !== 'completed' &&
+    (interview === null || isResumableInterviewStatus(interview.status))
+  const { releaseGuard } = useRegisterActiveInterviewNavGuard({
+    enabled: guardEnabled,
+    onRequestExit: openExitFlow,
+  })
+
+  const leaveSessionToDashboard = useCallback(() => {
+    releaseGuard()
+    setIsExitModalOpen(false)
+    router.push('/dashboard')
+  }, [releaseGuard, router])
+
+  const releaseGuardRef = useRef(releaseGuard)
+  releaseGuardRef.current = releaseGuard
 
   // Recursion + timers use refs to stay free of stale closures across renders.
   const loadTurnRef = useRef<(p: LoadTurnParams) => Promise<void>>(async () => {})
@@ -1866,12 +1891,14 @@ export default function ScriptInterviewPage() {
         if (cancelled || !mountedRef.current) return
 
         if (!sessionSettled.ok) {
+          releaseGuardRef.current()
           router.replace('/dashboard')
           return
         }
 
         const row = sessionSettled.value
         if (row.engine !== 'v2.1' || row.status === 'completed' || row.status === 'abandoned') {
+          releaseGuardRef.current()
           router.replace('/dashboard')
           return
         }
@@ -2029,6 +2056,7 @@ export default function ScriptInterviewPage() {
         await applyTurnPayloadRef.current(turnSettled.value)
       } catch {
         if (cancelled || !mountedRef.current) return
+        releaseGuardRef.current()
         router.replace('/dashboard')
       }
     }
@@ -2405,8 +2433,8 @@ export default function ScriptInterviewPage() {
   }, [submitAnswer])
 
   const handleRestart = useCallback(() => {
-    setIsExitModalOpen(true)
-  }, [])
+    openExitFlow()
+  }, [openExitFlow])
 
   // iOS Safari unlock CTA — tap unlocks AudioContext, then runs turn ∥ mic warm.
   const handleUnlockAudio = useCallback(() => {
@@ -3718,10 +3746,7 @@ export default function ScriptInterviewPage() {
           progressPercent={progressPct}
           engine="script"
           onContinue={() => setIsExitModalOpen(false)}
-          onLeave={() => {
-            setIsExitModalOpen(false)
-            router.push('/dashboard')
-          }}
+          onLeave={leaveSessionToDashboard}
         />
       )}
     </div>

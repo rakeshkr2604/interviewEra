@@ -1,9 +1,13 @@
 /**
- * Durable milestone/lifecycle event persistence — best-effort, non-blocking.
+ * Durable milestone/lifecycle event persistence — best-effort.
  * Uses service-role Supabase client directly (no next/headers dependency).
  * No `server-only` guard, matching `product-events-store.ts`: this is the
  * low-level insert primitive, unit-tested directly; callers that compose it
  * into a route/server action carry the `server-only` guard instead.
+ *
+ * - `persistMilestoneEventOnce` — fire-and-forget (request paths).
+ * - `persistMilestoneEventOnceAsync` — awaited (cron / batch paths that want
+ *   to shrink the crash window without rolling back business mutations).
  */
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
@@ -26,6 +30,10 @@ export type MilestoneEventName = Extract<
   | 'interview_completed'
   | 'interview_abandoned'
 >;
+
+export type PersistMilestoneResult =
+  | { ok: true; alreadyRecorded?: boolean }
+  | { ok: false; error: string; skipped?: boolean };
 
 let cachedServiceClient: SupabaseClient | null | undefined;
 
@@ -67,40 +75,50 @@ function sanitizeProps(
 }
 
 /**
- * Fire-and-forget insert for exactly-once milestone/lifecycle events.
- *
- * Dedup is enforced by the partial unique indexes in migration 052
- * (event_name, interview_id[, run_id]) — a 23505 here means "already
- * recorded", which is the expected/successful outcome for a repeat fire, not
- * a failure, so it is swallowed rather than logged as a warning. Any other
- * error is a real persistence failure and is logged (best-effort — this must
- * never throw into the caller's request path).
+ * Awaitable insert for at-most-one milestone/lifecycle events (migration 052).
+ * Never throws — returns { ok: false } on persistence failure so callers can
+ * keep business outcomes successful.
+ */
+export async function persistMilestoneEventOnceAsync(
+  eventName: MilestoneEventName,
+  props: Record<string, string | number | boolean | undefined>,
+): Promise<PersistMilestoneResult> {
+  const userId = typeof props.user_id === 'string' ? props.user_id : null;
+  const { user_id: _uid, ...rest } = props;
+  const cleanProps = sanitizeProps(rest);
+
+  try {
+    const svc = getServiceClient();
+    if (!svc) {
+      return { ok: false, error: 'service_client_unavailable', skipped: true };
+    }
+    const { error } = await svc.from('product_events').insert({
+      event_name: eventName,
+      user_id: userId,
+      props: cleanProps,
+    });
+    if (!error) return { ok: true };
+    if (error.code === UNIQUE_VIOLATION) {
+      return { ok: true, alreadyRecorded: true };
+    }
+    console.warn('[milestone-events-store] insert failed:', error.message);
+    return { ok: false, error: error.message };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[milestone-events-store] persist error:', message);
+    return { ok: false, error: message };
+  }
+}
+
+/**
+ * Fire-and-forget wrapper — schedules `persistMilestoneEventOnceAsync`.
+ * Must never throw into the caller's request path.
  */
 export function persistMilestoneEventOnce(
   eventName: MilestoneEventName,
   props: Record<string, string | number | boolean | undefined>,
 ): void {
-  const userId = typeof props.user_id === 'string' ? props.user_id : null;
-  const { user_id: _uid, ...rest } = props;
-  const cleanProps = sanitizeProps(rest);
-
   scheduleServerlessBackgroundWork(async () => {
-    try {
-      const svc = getServiceClient();
-      if (!svc) return;
-      const { error } = await svc.from('product_events').insert({
-        event_name: eventName,
-        user_id: userId,
-        props: cleanProps,
-      });
-      if (error && error.code !== UNIQUE_VIOLATION) {
-        console.warn('[milestone-events-store] insert failed:', error.message);
-      }
-    } catch (err) {
-      console.warn(
-        '[milestone-events-store] persist error:',
-        err instanceof Error ? err.message : String(err),
-      );
-    }
+    await persistMilestoneEventOnceAsync(eventName, props);
   });
 }

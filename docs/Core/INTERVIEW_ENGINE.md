@@ -1,8 +1,8 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Script engine routes, tables, lifecycle (code reverse-engineering)
+> Last Verified: 2026-09-30
+> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup
 > Authority: Production interview path
 
 ## Purpose
@@ -38,6 +38,31 @@ Document the **current** mock-interview engine: V2.1 script engine. Legacy V1 du
 - `answer_evaluations`
 - `script_interview_reports`
 - `resume_interview_snapshots`
+
+### Lifecycle authority + durable analytics
+
+- **Authoritative completion** = `interviews.status = 'completed'` (transactional DB state). Admin COMPLETED counts this — **not** `product_events`.
+- On successful V2.1 completion (`completeScriptInterviewFromTurn` and `PATCH .../script/complete`), attempt durable `product_events.interview_completed` via `persistMilestoneEventOnce`. Migration 052 unique index keeps **at most one** durable row per interview when persistence succeeds; a persistence failure can still yield zero rows. Analytics failure must not fail completion.
+- Turn-path completion UPDATEs only `status IN ('pending','in_progress')` and emits only when a row actually transitioned — abandoned cannot become completed through that helper.
+- On abandon (`POST /api/interview/[id]/abandon`, exit-feedback abandon), attempt durable `interview_abandoned` via fire-and-forget `persistMilestoneEventOnce` (at-most-one durable row when persistence succeeds; delivery is not guaranteed). Abandoned rows must not emit `interview_completed`.
+- `completed_at` is a **terminal timestamp** (set on both successful complete and abandon). Do not treat `abandoned.completed_at` as “successful completion” in admin LAST INTERVIEW — prefer `started_at` (see `recent-user-interview-stats.ts`).
+
+### Stale active sessions
+
+- Policy: **45 minutes** since `interview_last_activity_at` (`ACTIVE_INTERVIEW_STALE_AFTER_MS` ↔ migrations 096/108/109).
+- Cleanup paths: (1) inside `create_interview_with_credit` on next start (status abandon only — **no** `interview_abandoned` milestone in this path; deferred follow-up); (2) proactive cron `GET /api/cron/abandon-stale-interviews` → RPC `abandon_stale_active_interviews` (V2.1 only, no credit refund, `SKIP LOCKED`). The RPC re-checks the stale predicate on the authoritative UPDATE so a recently active session is not abandoned from a stale candidate set.
+- **Cron analytics (migration 109):** RPC returns `(interview_id, user_id)` for each successfully transitioned row. The cron helper awaits `persistMilestoneEventOnceAsync('interview_abandoned', { engine: 'v2.1', source: 'stale_cron', ... })` per returned row. Migration 052 keeps **at most one** durable row per interview when persistence succeeds; delivery is not guaranteed. Analytics failure must not roll back or fail a successful abandonment (HTTP 200 with `milestoneFailures` counted).
+- Cron is daily on Vercel Hobby (sub-daily forbidden); start-path cleanup still covers users who begin another interview sooner.
+
+### Active interview navigation policy
+
+While a V2.1 session is **active** (`pending` / `in_progress`, and the session UI has not reached local `completed`):
+
+- Ordinary in-app dashboard navigation (sidebar Links, workspace switcher, logout) is **intercepted**. A blocked attempt does **not** abandon the interview and does **not** emit `interview_abandoned` / `interview_completed`.
+- The candidate is directed to the existing **Exit** control → `InterviewExitFeedbackModal` (confirmation + optional reason) → abandon / exit-feedback APIs as today.
+- Browser `beforeunload` may prompt on refresh/close while active; unload **must not** be treated as durable lifecycle truth (no abandon/analytics from unload). Stale sessions remain the job of activity/heartbeat + 45-minute cleanup.
+- Browser Back/Forward is re-pushed to the session URL and shows the same intercept UX (no history loop after the guard is released on leave/complete).
+- After UI completion or intentional leave (guard released), normal navigation works again (including report redirect).
 
 ### Turn model
 
@@ -81,7 +106,7 @@ One LLM call: relevance / content_accuracy / communication_clarity / structure /
 
 ## Dependencies
 
-[AI_PIPELINES](AI_PIPELINES.md) · [VOICE_PIPELINE](VOICE_PIPELINE.md) · [RESUME_PIPELINE](RESUME_PIPELINE.md) · OpenRouter · credit RPCs
+[AI_PIPELINES](AI_PIPELINES.md) · [VOICE_PIPELINE](VOICE_PIPELINE.md) · [RESUME_PIPELINE](RESUME_PIPELINE.md) · OpenRouter · credit RPCs · [SEO_AEO_GEO](SEO_AEO_GEO.md) (`product_events` milestones)
 
 ## Failure Modes
 
@@ -91,16 +116,17 @@ One LLM call: relevance / content_accuracy / communication_clarity / structure /
 | Active interview conflict | HTTP 409 from start RPC |
 | SSE unsupported / flag off | JSON turn fallback |
 | Historical V1 report open | Serve legacy report route if present; do not revive V1 engine |
+| Milestone insert fail | Logged; completion/abandon still succeed |
 
 ## Verification
 
-- Unit: `src/lib/interview/**`, script API tests
+- Unit: `src/lib/interview/**`, script API tests, `recent-user-interview-stats`, abandon-stale cron
 - Manual: start → turn → score → complete → report on `/interview/script/*`
 - Voice: `npm run verify:voice` when mic path touched
 
 ## Change Triggers
 
-Script prompt versions · turn/score/complete contracts · `engine` column semantics · new script types · resurrecting any V1 path (forbidden without new DEC)
+Script prompt versions · turn/score/complete contracts · `engine` column semantics · new script types · resurrecting any V1 path (forbidden without new DEC) · stale policy / cron · milestone emit sites
 
 ## Related Documents
 

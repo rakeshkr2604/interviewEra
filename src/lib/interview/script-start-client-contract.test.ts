@@ -27,6 +27,8 @@ describe('script start/exit client contract', () => {
 
   it('abandons on Exit/Restart via exit feedback modal before navigating and does not abandon on reload', () => {
     expect(scriptSession).toContain('InterviewExitFeedbackModal');
+    expect(scriptSession).toContain('useRegisterActiveInterviewNavGuard');
+    expect(scriptSession).toContain('leaveSessionToDashboard');
     expect(scriptSession).toContain("router.push('/dashboard')");
 
     const abandonAt = exitModal.indexOf(`/api/interview/\${interviewId}/abandon`);
@@ -34,7 +36,10 @@ describe('script start/exit client contract', () => {
 
     expect(abandonAt).toBeGreaterThan(-1);
     expect(exitFeedbackAt).toBeGreaterThan(-1);
+    // beforeunload lives in the shared nav-guard hook as a *prompt only* —
+    // reload must never call abandon from the session page itself.
     expect(scriptSession).not.toContain('beforeunload');
     expect(scriptSession).not.toContain('visibilitychange');
+    expect(scriptSession).not.toMatch(/addEventListener\(\s*['"]beforeunload['"]/);
   });
 });

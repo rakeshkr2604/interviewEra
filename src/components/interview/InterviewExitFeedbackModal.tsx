@@ -196,7 +196,8 @@ export function InterviewExitFeedbackModal({
               Leave this interview?
             </h2>
             <p id="exit-feedback-desc" className="mt-0.5 text-xs text-(--text-muted)">
-              You haven't completed this interview yet. Before you leave, what happened?
+              You have an interview in progress. If you leave now, this interview will be marked as
+              abandoned. Optional: tell us what happened.
             </p>
           </div>
           <button

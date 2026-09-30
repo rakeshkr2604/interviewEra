@@ -1,8 +1,8 @@
 # SEO / AEO / GEO
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Sitemap, noindex audit, analytics SoT
+> Last Verified: 2026-09-30
+> Verification Scope: Sitemap, noindex audit, analytics SoT + interview milestones / admin COMPLETED
 > Authority: Indexing + funnel analytics
 
 ## Purpose
@@ -25,6 +25,11 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 - Client: GA4 + Clarity + Vercel Analytics
 - **SoT for funnel/payments:** server `product_events` (service-role writes). GA4 is backup.
 - Critical client events: `sendBeacon` → `/api/product-events` (204)
+- **Interview lifecycle milestones (durable; at most one row per interview when persistence succeeds — migration 052 unique index; delivery is not guaranteed if the background insert fails):**
+  - `interview_started` — V2.1 script start
+  - `interview_completed` — after a successful active→`completed` transition (V2.1 turn-complete + script/complete repair; legacy complete route)
+  - `interview_abandoned` — after a fresh active→abandoned transition (abandon route / exit-feedback fire-and-forget path; stale cron awaits `persistMilestoneEventOnceAsync` with `source: 'stale_cron'`). At-most-one durable row when persistence succeeds; delivery is not guaranteed; analytics failure does not roll back abandonment. Start-path `create_interview_with_credit` stale abandon does **not** yet emit this event (deferred).
+- **Admin All Users (`/api/admin/recent-users`):** COMPLETED = `interviews.status === 'completed'` (transactional), **not** `product_events`. LAST INTERVIEW = `started_at` (activity/start); do not use `abandoned.completed_at` as successful completion time.
 
 ## Architecture / Rules
 

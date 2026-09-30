@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { StreakCounter } from '@/components/layout/StreakCounter'
+import { ActiveInterviewNavGuardProvider } from '@/components/interview/active-interview-nav-guard'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { NAV_SHELL_HEIGHT_CLASS } from '@/lib/theme/nav-classes'
 import { cn } from '@/lib/utils'
@@ -77,6 +78,7 @@ export function DashboardChrome({
   }, [mobileOpen])
 
   return (
+    <ActiveInterviewNavGuardProvider>
     <div className={cn('flex', !isImmersiveViewport && 'min-h-screen')} style={{ background: 'var(--bg-secondary)' }}>
       {mobileOpen ? (
         <button
@@ -242,5 +244,6 @@ export function DashboardChrome({
         </main>
       </div>
     </div>
+    </ActiveInterviewNavGuardProvider>
   )
 }

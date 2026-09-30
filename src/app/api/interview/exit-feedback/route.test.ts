@@ -29,6 +29,11 @@ vi.mock('@/lib/analytics/product-events-server', () => ({
   trackProductEventServer: (...args: unknown[]) => trackProductEventServer(...args),
 }));
 
+const persistMilestoneEventOnce = vi.fn();
+vi.mock('@/lib/analytics/milestone-events-store', () => ({
+  persistMilestoneEventOnce: (...args: unknown[]) => persistMilestoneEventOnce(...args),
+}));
+
 import { POST, GET } from '@/app/api/interview/exit-feedback/route';
 
 const IV_INCOMPLETE = '11111111-1111-4111-8111-111111111111';
@@ -53,6 +58,7 @@ describe('POST /api/interview/exit-feedback', () => {
   beforeEach(() => {
     currentUser = USER;
     trackProductEventServer.mockClear();
+    persistMilestoneEventOnce.mockClear();
     db = {
       interviews: [
         { id: IV_INCOMPLETE, user_id: USER.id, status: 'in_progress', role: 'Full Stack Engineer', engine: 'script' },
@@ -91,7 +97,14 @@ describe('POST /api/interview/exit-feedback', () => {
     const updatedIv = db.interviews.find((i) => i.id === IV_INCOMPLETE);
     expect(updatedIv?.status).toBe('abandoned');
 
-    // Analytics tracked
+    // Lifecycle milestone once; feedback product event kept; no duplicate interview_abandoned track
+    expect(persistMilestoneEventOnce).toHaveBeenCalledTimes(1);
+    expect(persistMilestoneEventOnce).toHaveBeenCalledWith('interview_abandoned', {
+      user_id: USER.id,
+      interview_id: IV_INCOMPLETE,
+      previous_status: 'in_progress',
+      source: 'exit_feedback',
+    });
     expect(trackProductEventServer).toHaveBeenCalledWith(
       expect.objectContaining({
         event_name: 'interview_exit_feedback_submitted',
@@ -100,13 +113,27 @@ describe('POST /api/interview/exit-feedback', () => {
         exit_reason: 'I ran into a technical problem',
       }),
     );
-    expect(trackProductEventServer).toHaveBeenCalledWith(
-      expect.objectContaining({
-        event_name: 'interview_abandoned',
-        user_id: USER.id,
-        interview_id: IV_INCOMPLETE,
-        source: 'exit_feedback',
+    expect(trackProductEventServer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event_name: 'interview_abandoned' }),
+    );
+  });
+
+  it('already abandoned: persists feedback without a second lifecycle milestone', async () => {
+    db.interviews[0].status = 'abandoned';
+    const res = await POST(
+      postReq({
+        interviewId: IV_INCOMPLETE,
+        exitReason: 'I need to leave for a personal reason',
       }),
+    );
+    expect(res.status).toBe(200);
+    expect(db.interview_exit_feedbacks).toHaveLength(1);
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled();
+    expect(trackProductEventServer).toHaveBeenCalledWith(
+      expect.objectContaining({ event_name: 'interview_exit_feedback_submitted' }),
+    );
+    expect(trackProductEventServer).not.toHaveBeenCalledWith(
+      expect.objectContaining({ event_name: 'interview_abandoned' }),
     );
   });
 
@@ -122,6 +149,7 @@ describe('POST /api/interview/exit-feedback', () => {
     const body = (await res.json()) as { error: string };
     expect(body.error).toContain('already been completed');
     expect(db.interview_exit_feedbacks).toHaveLength(0);
+    expect(persistMilestoneEventOnce).not.toHaveBeenCalled();
   });
 
   it('rejects unauthenticated requests with 401', async () => {

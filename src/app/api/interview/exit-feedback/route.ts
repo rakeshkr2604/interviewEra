@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
 import { interviewExitFeedbackSubmitSchema } from '@/lib/validations/interview-exit-feedback';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
+import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
@@ -98,12 +99,33 @@ export async function POST(request: Request): Promise<NextResponse> {
       );
     }
 
-    // Mark interview as abandoned if it is still in_progress or pending
+    // Mark interview as abandoned if still active. Status filter is on the UPDATE;
+    // emit durable interview_abandoned only when a row actually transitioned.
+    // Do not also trackProductEventServer('interview_abandoned') — that duplicated
+    // the lifecycle milestone. Keep interview_exit_feedback_submitted below.
     if (interview.status === 'in_progress' || interview.status === 'pending') {
-      await serviceClient
+      const previousStatus = interview.status;
+      const { data: abandonedRows, error: abandonError } = await serviceClient
         .from('interviews')
         .update({ status: 'abandoned', completed_at: new Date().toISOString() })
-        .eq('id', interviewId);
+        .eq('id', interviewId)
+        .in('status', ['pending', 'in_progress'])
+        .select('id');
+      if (!abandonError && Array.isArray(abandonedRows) && abandonedRows.length > 0) {
+        try {
+          persistMilestoneEventOnce('interview_abandoned', {
+            user_id: user.id,
+            interview_id: interviewId,
+            previous_status: previousStatus,
+            source: 'exit_feedback',
+          });
+        } catch (err) {
+          console.warn('[interview/exit-feedback] interview_abandoned milestone threw (ignored)', {
+            interviewId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
     }
 
     // Upsert exit feedback record for idempotency
@@ -144,13 +166,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       interview_id: interviewId,
       exit_reason: exitReason,
       issue_type: issueType,
-    });
-
-    trackProductEventServer({
-      event_name: 'interview_abandoned',
-      user_id: user.id,
-      interview_id: interviewId,
-      source: 'exit_feedback',
     });
 
     return NextResponse.json({ ok: true, feedback: insertedRow }, { status: 200 });

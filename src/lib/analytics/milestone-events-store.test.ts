@@ -7,12 +7,13 @@ vi.mock('next/server', () => ({
 }));
 
 /**
- * `persistMilestoneEventOnce` is the exactly-once insert path backing the
- * startup-funnel milestones and interview_started/interview_completed. The
- * partial unique indexes in migration 052 do the actual dedupe; this suite
- * verifies the client-side contract: a unique_violation (23505) is treated as
- * "already recorded" (silent, not warned), while any other DB error is a real
- * failure and is logged.
+ * `persistMilestoneEventOnce` is the at-most-one insert path backing the
+ * startup-funnel milestones and interview_started/interview_completed/
+ * interview_abandoned. The partial unique indexes in migration 052 do the
+ * actual dedupe; this suite verifies the client-side contract: a
+ * unique_violation (23505) is treated as "already recorded" (silent, not
+ * warned), while any other DB error is a real failure and is logged.
+ * Delivery is not guaranteed.
  */
 
 let insertResult: { error: { code: string; message: string } | null };
@@ -23,7 +24,11 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({ from: fromMock }),
 }));
 
-import { persistMilestoneEventOnce, resetMilestoneEventServiceClientCacheForTests } from '@/lib/analytics/milestone-events-store';
+import {
+  persistMilestoneEventOnce,
+  persistMilestoneEventOnceAsync,
+  resetMilestoneEventServiceClientCacheForTests,
+} from '@/lib/analytics/milestone-events-store';
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -93,5 +98,62 @@ describe('persistMilestoneEventOnce', () => {
     await flush();
 
     expect(insertMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('persistMilestoneEventOnceAsync', () => {
+  const originalUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const originalKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  afterEach(() => {
+    insertMock.mockClear();
+    fromMock.mockClear();
+    resetMilestoneEventServiceClientCacheForTests();
+    process.env.NEXT_PUBLIC_SUPABASE_URL = originalUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalKey;
+  });
+
+  it('returns ok:true on insert success and ok with alreadyRecorded on 23505', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+    insertResult = { error: null };
+    await expect(
+      persistMilestoneEventOnceAsync('interview_abandoned', {
+        user_id: 'user-1',
+        interview_id: 'iv-1',
+        source: 'stale_cron',
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    insertResult = {
+      error: { code: '23505', message: 'duplicate key value violates unique constraint' },
+    };
+    await expect(
+      persistMilestoneEventOnceAsync('interview_abandoned', {
+        user_id: 'user-1',
+        interview_id: 'iv-1',
+        source: 'stale_cron',
+      }),
+    ).resolves.toEqual({ ok: true, alreadyRecorded: true });
+  });
+
+  it('returns ok:false without throwing on DB or credential failure', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://example.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+    insertResult = { error: { code: '42501', message: 'permission denied' } };
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(
+      persistMilestoneEventOnceAsync('interview_abandoned', { interview_id: 'iv-1' }),
+    ).resolves.toEqual({ ok: false, error: 'permission denied' });
+    expect(warnSpy).toHaveBeenCalled();
+
+    delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    resetMilestoneEventServiceClientCacheForTests();
+    await expect(
+      persistMilestoneEventOnceAsync('interview_abandoned', { interview_id: 'iv-1' }),
+    ).resolves.toEqual({ ok: false, error: 'service_client_unavailable', skipped: true });
   });
 });

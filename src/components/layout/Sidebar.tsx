@@ -40,6 +40,7 @@ import { StreakCounter } from './StreakCounter'
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher'
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community'
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
+import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
 
 const BRAND_MARK = '/brand/logos/icon-only.svg'
 const SIDEBAR_EXPANDED_STORAGE_KEY = 'ie:sidebar-sections-expanded'
@@ -269,16 +270,26 @@ function NavLinkRow({
   item,
   active,
   onNavigate,
+  navigationLocked = false,
+  onNavigationBlocked,
 }: {
   item: NavLinkItem
   active: boolean
   onNavigate?: () => void
+  /** Active interview: Links stay visible but navigation is intercepted. */
+  navigationLocked?: boolean
+  onNavigationBlocked?: () => void
 }) {
   const Icon = item.icon
   return (
     <Link
       href={item.href}
-      className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-none"
+      aria-disabled={navigationLocked || undefined}
+      title={navigationLocked ? 'Interview in progress' : undefined}
+      className={cn(
+        'flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-bold leading-snug transition-none',
+        navigationLocked && 'cursor-not-allowed opacity-60',
+      )}
       style={{
         background: active
           ? 'linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, #5b21b6))'
@@ -288,19 +299,25 @@ function NavLinkRow({
           ? '0 6px 20px color-mix(in srgb, var(--accent-primary) 17%, transparent)'
           : 'none',
       }}
-      onClick={() => onNavigate?.()}
-      onMouseEnter={(e) => {
-        if (!active) {
-          e.currentTarget.style.background =
-            'color-mix(in srgb, var(--accent-primary) 12%, transparent)'
-          e.currentTarget.style.color = 'var(--text-primary)'
+      onClick={(e) => {
+        if (navigationLocked) {
+          e.preventDefault()
+          e.stopPropagation()
+          onNavigationBlocked?.()
+          return
         }
+        onNavigate?.()
+      }}
+      onMouseEnter={(e) => {
+        if (navigationLocked || active) return
+        e.currentTarget.style.background =
+          'color-mix(in srgb, var(--accent-primary) 12%, transparent)'
+        e.currentTarget.style.color = 'var(--text-primary)'
       }}
       onMouseLeave={(e) => {
-        if (!active) {
-          e.currentTarget.style.background = 'transparent'
-          e.currentTarget.style.color = 'var(--text-secondary)'
-        }
+        if (active) return
+        e.currentTarget.style.background = 'transparent'
+        e.currentTarget.style.color = 'var(--text-secondary)'
       }}
     >
       <Icon size={18} strokeWidth={2.25} className="shrink-0" />
@@ -361,6 +378,7 @@ export function Sidebar({
   const pathname = usePathname()
   const [loggingOut, setLoggingOut] = useState(false)
   const [expanded, toggleSection] = useSidebarSectionExpanded()
+  const { isGuarding, interceptNavigation } = useActiveInterviewNavGuard()
 
   const sections = useMemo(
     () =>
@@ -376,9 +394,15 @@ export function Sidebar({
 
   const handleLogout = () => {
     if (loggingOut) return
+    if (interceptNavigation()) return
     setLoggingOut(true)
     onNavigate?.()
     void performClientLogout({ redirectTo: '/login' })
+  }
+
+  const handleNavAttempt = () => {
+    if (interceptNavigation()) return
+    onNavigate?.()
   }
 
   return (
@@ -432,7 +456,11 @@ export function Sidebar({
           <NavLinkRow
             item={PINNED_DASHBOARD}
             active={isItemActive(pathname, PINNED_DASHBOARD)}
-            onNavigate={onNavigate}
+            onNavigate={handleNavAttempt}
+            navigationLocked={isGuarding}
+            onNavigationBlocked={() => {
+              interceptNavigation()
+            }}
           />
         </div>
 
@@ -510,7 +538,15 @@ export function Sidebar({
                   const active = isItemActive(pathname, item)
                   return (
                     <li key={item.href}>
-                      <NavLinkRow item={item} active={active} onNavigate={onNavigate} />
+                      <NavLinkRow
+                        item={item}
+                        active={active}
+                        onNavigate={handleNavAttempt}
+                        navigationLocked={isGuarding}
+                        onNavigationBlocked={() => {
+                          interceptNavigation()
+                        }}
+                      />
                     </li>
                   )
                 })}

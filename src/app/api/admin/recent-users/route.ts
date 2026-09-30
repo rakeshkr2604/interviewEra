@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { parseAdminDateBounds, resolveUsersJoinPreset } from '@/lib/admin/date-range';
+import { aggregateInterviewsByUser } from '@/lib/admin/recent-user-interview-stats';
 
 export type RecentUsersRange = 'today' | '7d' | 'month' | 'all' | 'custom';
 
@@ -26,16 +27,16 @@ export interface RecentUser {
   interviews_count: number;
   /** status IN ('pending', 'in_progress') — not yet finished. */
   pending_interviews: number;
-  /** status = 'completed'. */
+  /** status = 'completed' (transactional lifecycle — not product_events). */
   completed_interviews: number;
-  /** Most recent interview's completed_at ?? started_at. */
+  /**
+   * Most recent interview activity/start (`started_at`, with completed_at
+   * fallback only for successful completions missing started_at).
+   * Abandoned.completed_at is intentionally not used here.
+   */
   last_interview_at: string | null;
   last_seen_at: string | null;
   is_online: boolean;
-}
-
-function isPendingStatus(status: string): boolean {
-  return status === 'pending' || status === 'in_progress';
 }
 
 export async function GET(request: NextRequest) {
@@ -104,30 +105,14 @@ export async function GET(request: NextRequest) {
       (activities ?? []).map((a) => [a.user_id, a.last_seen_at as string]),
     );
 
-    type Agg = {
-      total: number;
-      pending: number;
-      completed: number;
-      lastAt: string | null;
-    };
-    const interviewAgg = new Map<string, Agg>();
-
-    for (const iv of interviews ?? []) {
-      const prev = interviewAgg.get(iv.user_id) ?? {
-        total: 0,
-        pending: 0,
-        completed: 0,
-        lastAt: null,
-      };
-      prev.total += 1;
-      if (isPendingStatus(iv.status)) prev.pending += 1;
-      if (iv.status === 'completed') prev.completed += 1;
-
-      const ts = (iv.completed_at as string | null) ?? (iv.started_at as string | null);
-      if (ts && (!prev.lastAt || ts > prev.lastAt)) prev.lastAt = ts;
-
-      interviewAgg.set(iv.user_id, prev);
-    }
+    const interviewAgg = aggregateInterviewsByUser(
+      (interviews ?? []).map((iv) => ({
+        user_id: iv.user_id as string,
+        status: iv.status as string,
+        started_at: (iv.started_at as string | null) ?? null,
+        completed_at: (iv.completed_at as string | null) ?? null,
+      })),
+    );
 
     const enriched: RecentUser[] = users.map((u) => {
       const lastSeen = activityMap.get(u.id) ?? null;

@@ -4,6 +4,8 @@ import Link from 'next/link'
 import { motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
+import { cn } from '@/lib/utils'
 
 const STREAK_EVENT = 'ie-streak-updated'
 
@@ -45,6 +47,7 @@ export function StreakCounter({
   const [streak, setStreak] = useState<number>(initialStreak)
   const lastKnown = useRef(initialStreak)
   const [pulse, setPulse] = useState(0)
+  const { isGuarding, interceptNavigation } = useActiveInterviewNavGuard()
 
   useEffect(() => {
     let cancelled = false
@@ -86,9 +89,16 @@ export function StreakCounter({
   return (
     <Link
       href="/profile/badges"
-      className={className}
+      className={cn(className, isGuarding && 'cursor-not-allowed opacity-60')}
       aria-label={`${n} day quality streak`}
+      aria-disabled={isGuarding || undefined}
+      title={isGuarding ? 'Interview in progress' : undefined}
       prefetch={false}
+      onClick={(e) => {
+        if (interceptNavigation()) {
+          e.preventDefault()
+        }
+      }}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

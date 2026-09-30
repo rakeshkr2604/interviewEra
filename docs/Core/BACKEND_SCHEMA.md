@@ -1,8 +1,8 @@
 # Backend Schema
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Core + V2.1 + billing tables (migrations + code usage)
+> Last Verified: 2026-09-30
+> Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC
 > Authority: Schema overview for agents (migrations remain legal SoT)
 
 ## Purpose
@@ -29,6 +29,7 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 | `answer_evaluations` | per-answer scores |
 | `script_interview_reports` | completion reports |
 | `resume_interview_snapshots` | resume freeze at interview |
+| `abandon_stale_active_interviews()` | service-role RPC (migration 109 replaces return type); returns `(interview_id, user_id)` per transitioned stale V2.1 active row; 45m last-activity; stale predicate re-checked on UPDATE; no credit change; no `product_events` write in SQL |
 
 ### Billing
 
