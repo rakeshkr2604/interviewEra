@@ -1,9 +1,13 @@
 /**
  * Pure aggregation for /api/admin/recent-users interview columns.
  *
+ * INCOMPLETE (`pending` / `pending_interviews` API field): transactional status
+ * is `pending`, `in_progress`, or `abandoned` — unfinished interviews.
  * COMPLETED = transactional `status === 'completed'` only (not product_events).
  * LAST INTERVIEW = activity/start timestamp — prefer `started_at`.
  * Do not treat abandoned.completed_at as successful-completion time.
+ *
+ * Unknown statuses increment `total` only (neither incomplete nor completed).
  */
 
 export type InterviewAggRow = {
@@ -15,13 +19,30 @@ export type InterviewAggRow = {
 
 export type UserInterviewAgg = {
   total: number;
+  /**
+   * Incomplete count (API field `pending_interviews`).
+   * Includes pending, in_progress, and abandoned.
+   */
   pending: number;
   completed: number;
   lastAt: string | null;
 };
 
+/** Unfinished interview statuses counted in the admin Incomplete column. */
+export function isIncompleteInterviewStatus(status: string): boolean {
+  return (
+    status === 'pending' ||
+    status === 'in_progress' ||
+    status === 'abandoned'
+  );
+}
+
+/**
+ * @deprecated Prefer `isIncompleteInterviewStatus` — same predicate; kept for
+ * call-site clarity where the API field is still named `pending`.
+ */
 export function isPendingInterviewStatus(status: string): boolean {
-  return status === 'pending' || status === 'in_progress';
+  return isIncompleteInterviewStatus(status);
 }
 
 /**
@@ -52,7 +73,7 @@ export function aggregateInterviewsByUser(
       lastAt: null,
     };
     prev.total += 1;
-    if (isPendingInterviewStatus(iv.status)) prev.pending += 1;
+    if (isIncompleteInterviewStatus(iv.status)) prev.pending += 1;
     if (iv.status === 'completed') prev.completed += 1;
 
     const ts = interviewLastActivityAt(iv);

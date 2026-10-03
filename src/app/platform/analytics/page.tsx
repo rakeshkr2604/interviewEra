@@ -601,7 +601,7 @@ function RecentUsersTable({
               <th className="px-5 py-3">User</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3 text-center">Credits</th>
-              <th className="px-4 py-3 text-center">Pending</th>
+              <th className="px-4 py-3 text-center">Incomplete</th>
               <th className="px-4 py-3 text-center">Completed</th>
               <th className="px-4 py-3">Last Interview</th>
               <th className="px-4 py-3">Last Active</th>

@@ -25,7 +25,11 @@ export interface RecentUser {
   created_at: string;
   /** All interviews (any status) for this user. */
   interviews_count: number;
-  /** status IN ('pending', 'in_progress') — not yet finished. */
+  /**
+   * Incomplete interviews (UI: "Incomplete").
+   * status IN ('pending', 'in_progress', 'abandoned') — unfinished.
+   * Field name kept for API compatibility; not limited to status=pending.
+   */
   pending_interviews: number;
   /** status = 'completed' (transactional lifecycle — not product_events). */
   completed_interviews: number;
