@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { formatInterviewDateTimeEnIn } from '@/lib/datetime/ist'
-import { isResumableInterviewStatus, shouldOfferHistoryContinue } from '@/lib/interview/interview-status'
+import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
+import { getInterviewRecoveryPresentation } from '@/lib/interview/interview-recovery-ui'
 import { CommunityCTA } from '@/components/community/CommunityCTA'
 import {
   Dialog,
@@ -108,14 +109,18 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
           </div>
         ) : (
           filteredItems.map((interview) => {
-            const isCompleted = interview.status === 'completed'
             const isResumable = isResumableInterviewStatus(interview.status)
-            const canContinue = shouldOfferHistoryContinue({
+            const reportHref = interview.reportHref
+            const presentation = getInterviewRecoveryPresentation({
               status: interview.status,
               abandonedResumeUsed: interview.abandonedResumeUsed,
               creditDeducted: interview.creditDeducted,
+              hasReportHref: Boolean(reportHref),
             })
+            const canContinue =
+              presentation.mode === 'continue' || presentation.mode === 'resume'
             const isEnded = interview.status === 'abandoned'
+            const isCompleted = presentation.badge === 'Completed'
             const date = formatInterviewDateTimeEnIn(interview.startedAt, interview.completedAt)
             const isScript = interview.engine === 'v2.1'
 
@@ -160,7 +165,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                         color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
                       }}
                     >
-                      {isCompleted ? 'Completed' : interview.status === 'abandoned' ? 'Ended' : 'Incomplete'}
+                      {presentation.badge}
                     </span>
                   </div>
 
@@ -174,7 +179,7 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                       className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-xl px-4 py-2 text-xs font-semibold text-white transition-opacity hover:opacity-90 active:opacity-90 sm:text-sm"
                       style={{ background: 'var(--accent-primary)' }}
                     >
-                      Continue
+                      {presentation.cta}
                     </button>
                   ) : interview.reportHref ? (
                     <Link
@@ -190,8 +195,8 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
 
                 {isEnded ? (
                   <p className="w-full text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {canContinue
-                      ? 'Session ended without completion — one continue left on this credit, same questions.'
+                    {presentation.mode === 'resume'
+                      ? 'Session ended without completion — one resume left on this credit, same questions.'
                       : 'Session ended without completion — credit was deducted'}
                   </p>
                 ) : null}
@@ -236,10 +241,14 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
       >
         <DialogContent className="max-w-md sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Continue your interview?</DialogTitle>
+            <DialogTitle>
+              {continueTarget?.status === 'abandoned'
+                ? 'Resume your interview?'
+                : 'Continue your interview?'}
+            </DialogTitle>
             <DialogDescription>
               {continueTarget?.status === 'abandoned'
-                ? 'This is your one continue on this credit. You will resume the same questions. If you leave again, the session ends for good.'
+                ? 'This is your one resume on this credit. You will reopen the same interview. If you leave again, the session ends for good.'
                 : continueTarget?.engine === 'v2.1'
                   ? 'You will resume from the last question you reached. Finish the session to generate your report and use this credit fully.'
                   : 'You will resume this session. If you exit, you still have one continue from history on this credit.'}
@@ -281,7 +290,11 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
                 })()
               }}
             >
-              {continueBusy ? 'Opening…' : 'Continue Interview'}
+              {continueBusy
+                ? 'Opening…'
+                : continueTarget?.status === 'abandoned'
+                  ? 'Resume interview'
+                  : 'Continue interview'}
             </Button>
           </DialogFooter>
         </DialogContent>

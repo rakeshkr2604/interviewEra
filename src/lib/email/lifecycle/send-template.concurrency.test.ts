@@ -193,4 +193,81 @@ describe('sendLifecycleTemplate — claim-before-send concurrency', () => {
     expect(second.sent).toBe(true)
     expect(sendEmailMock).toHaveBeenCalledTimes(2)
   })
+
+  it('stuck claim (crash after claim, before Resend) permanently occupies sent slot', async () => {
+    // Simulate claim insert without provider call: status=sent, claim_in_progress.
+    store.rows.push({
+      id: 'stuck-1',
+      idempotency_key: 'interview_recovery:int-stuck:r1',
+      status: 'sent',
+      provider_message_id: null,
+      error_message: 'claim_in_progress',
+      sent_at: new Date().toISOString(),
+    })
+
+    const result = await sendLifecycleTemplate({
+      template: 'interview_recovery' as const,
+      to: 'candidate@example.com',
+      userId: 'user-1',
+      idempotencyKey: 'interview_recovery:int-stuck:r1',
+      props: { roleLabel: 'SDE' },
+    })
+
+    expect(result.skipped).toBe(true)
+    expect(result.sent).toBe(false)
+    expect(sendEmailMock).not.toHaveBeenCalled()
+    expect(store.rows.filter((r) => r.status === 'sent')).toHaveLength(1)
+    expect(store.rows[0].error_message).toBe('claim_in_progress')
+    expect(store.rows[0].provider_message_id).toBeNull()
+  })
+
+  it('provider accept without id confirms with unknown and blocks resend', async () => {
+    sendEmailMock.mockResolvedValueOnce({ success: true, id: undefined })
+    const key = 'interview_recovery:int-noid:r1'
+    const first = await sendLifecycleTemplate({
+      template: 'interview_recovery' as const,
+      to: 'candidate@example.com',
+      userId: 'user-1',
+      idempotencyKey: key,
+      props: { roleLabel: 'SDE' },
+    })
+    expect(first.sent).toBe(true)
+    const confirmed = store.rows.find((r) => r.idempotency_key === key)
+    expect(confirmed?.status).toBe('sent')
+    expect(confirmed?.provider_message_id).toBe('unknown')
+    expect(confirmed?.error_message).toBeNull()
+
+    const second = await sendLifecycleTemplate({
+      template: 'interview_recovery' as const,
+      to: 'candidate@example.com',
+      userId: 'user-1',
+      idempotencyKey: key,
+      props: { roleLabel: 'SDE' },
+    })
+    expect(second.skipped).toBe(true)
+    expect(sendEmailMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not auto-reset ambiguous sent+claim_in_progress (operator must not resend blindly)', async () => {
+    store.rows.push({
+      id: 'ambiguous-1',
+      idempotency_key: 'interview_recovery:int-amb:r1',
+      status: 'sent',
+      provider_message_id: null,
+      error_message: 'claim_in_progress',
+      sent_at: new Date().toISOString(),
+    })
+    // Schema cannot tell "never sent" vs "sent then crash before confirm".
+    // Recovery must not release this automatically.
+    const again = await sendLifecycleTemplate({
+      template: 'interview_recovery' as const,
+      to: 'candidate@example.com',
+      userId: 'user-1',
+      idempotencyKey: 'interview_recovery:int-amb:r1',
+      props: {},
+    })
+    expect(again.skipped).toBe(true)
+    expect(store.rows[0].status).toBe('sent')
+    expect(sendEmailMock).not.toHaveBeenCalled()
+  })
 })

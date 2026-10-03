@@ -1,8 +1,8 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-09-30
-> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup
+> Last Verified: 2026-10-01
+> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails
 > Authority: Production interview path
 
 ## Purpose
@@ -63,6 +63,56 @@ While a V2.1 session is **active** (`pending` / `in_progress`, and the session U
 - Browser `beforeunload` may prompt on refresh/close while active; unload **must not** be treated as durable lifecycle truth (no abandon/analytics from unload). Stale sessions remain the job of activity/heartbeat + 45-minute cleanup.
 - Browser Back/Forward is re-pushed to the session URL and shows the same intercept UX (no history loop after the guard is released on leave/complete).
 - After UI completion or intentional leave (guard released), normal navigation works again (including report redirect).
+
+### Candidate resume discoverability (Phase 1)
+
+Presentation-only recovery UX — **does not** rewrite statuses, credits, or completion definitions.
+
+| Candidate-facing state | Badge | CTA | Mechanism |
+|---|---|---|---|
+| `pending` / `in_progress` | In progress | Continue interview | Open `/interview/script/{id}` directly |
+| `abandoned` + `credit_deducted` + `!abandoned_resume_used` | Incomplete | Resume interview | `POST /api/interview/{id}/resume` → `resume_abandoned_interview` (same row, no debit/refund, one shot) |
+| `abandoned` ineligible | Ended | — | No resume CTA |
+| `completed` | Completed | View report | Existing report routes |
+
+**Deterministic recovery selection** (`fetchPrimaryRecoveryInterview`) — independent of the dashboard recent-list window (limit 20 / slice 5):
+
+1. Newest **active** V2.1 (`pending` \| `in_progress`) by `started_at`
+2. Else newest **abandoned** V2.1 with `credit_deducted = true` AND `abandoned_resume_used = false`
+
+Each arm is a bounded `LIMIT 1` query. Completed / ineligible abandoned rows never enter the result set, so they cannot hide an older eligible target.
+
+- Dashboard hero + in-app `interview_reminder` use this helper (notifications page via snapshot).
+- Recent interviews UI may still show only the latest rows — recovery CTA does not.
+- Explicit Exit / exit-feedback / 45-minute stale policy / nav guard are unchanged.
+
+### Unfinished-interview recovery emails (Phase 2)
+
+Lifecycle reminders complement Phase 1 in-app recovery. **Default off** until product enables `INTERVIEW_RECOVERY_EMAIL_ENABLED=1`.
+
+| Rule | Contract |
+|---|---|
+| Audience | V2.1 `abandoned` + `credit_deducted` + `!abandoned_resume_used` (same one-continue eligibility as Phase 1) |
+| Preference gate | `users.notification_preferences.interviewReminders === true` (default true). Missing prefs fail closed. |
+| Global unsubscribe | Suppress when `users.email_digest_unsubscribed === true` **or** `email_preferences.unsubscribed_all === true` (Settings digest flag + legacy PreferenceManager). Unknown digest state fails closed. |
+| Recipient | Verified Auth email required |
+| Cadence (approved) | Mutually exclusive: `r1` ∈ [24h, 72h); `r2` ∈ [72h, 7d] inclusive; neither before 24h or after 7d. Late first cron ≥72h skips `r1` (no same-day dual send). |
+| Scheduler | Daily UTC cron `GET /api/cron/interview-recovery-reminders` (Hobby-safe; after stale-abandon cron). Timing jitter accepted. |
+| Idempotency | `lifecycle_email_log` key `interview_recovery:{interviewId}:{r1\|r2}` via claim→confirm/release |
+| CTA | Authenticated `/dashboard` (Phase 1 hero/CTA); no interview id in email query params |
+| Suppression | Resume used, completed/active, reminders off, global unsub, missing/unverified email, stage not due, already claimed/sent, flag off (non-dry-run) |
+| Credits / status | **Never** mutated by reminder processing |
+| Dry-run | `?dryRun=1` (or any other dryRun value) is **read-only** and works with the flag **off**. Real sends require flag=`1` **and** absent dryRun param. |
+| Batch | Scan up to 200 oldest-in-window rows; at most 40 send attempts/run; already-claimed skips do not consume the send budget |
+| Settings copy | Interview reminders describes practice nudges **and** unfinished-interview recovery |
+
+**Stuck / ambiguous claims:** Claim inserts `status=sent` with `error_message=claim_in_progress` before Resend. Crash before provider call leaves that row forever (blocks resend). Provider accept without confirm clears `claim_in_progress` when confirm succeeds; confirm failure may leave `sent` with null/unknown provider id. Schema **cannot** distinguish “never accepted” vs “accepted then crash before confirm”. Do **not** auto-release ambiguous `sent` rows. Ops: inspect `error_message` + `provider_message_id`; manual release only with dual confirmation that Resend has no message.
+
+**Residual race:** Interview/prefs are re-loaded immediately before claim. Race remains between that revalidation and provider acceptance (resume/opt-out in that window can still receive mail). Not atomic with Resend.
+
+`?dryRun=1` reports candidates without Resend. Provider acceptance ≠ delivery; do not attribute `interview_completed` / resume rates to email without separate measurement. Open/click tracking is not claimed.
+
+Disable procedure: unset `INTERVIEW_RECOVERY_EMAIL_ENABLED` (or any value other than `1`). Cron may still run; without dryRun it no-ops when disabled.
 
 ### Turn model
 

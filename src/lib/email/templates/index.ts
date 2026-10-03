@@ -6,6 +6,7 @@ import WelcomeEmail from '../../../emails/WelcomeEmail';
 import VerificationEmail from '../../../emails/VerificationEmail';
 import ResetPasswordEmail from '../../../emails/ResetPasswordEmail';
 import InterviewCompletedEmail from '../../../emails/InterviewCompletedEmail';
+import InterviewRecoveryEmail from '../../../emails/InterviewRecoveryEmail';
 import WeeklyProgressEmail from '../../../emails/WeeklyProgressEmail';
 import ProductUpdateEmail from '../../../emails/ProductUpdateEmail';
 
@@ -38,6 +39,17 @@ export class TemplateRegistry {
       name: 'interview_completed',
       subject: (props: Record<string, unknown>) => `Mock Interview Completed: Score ${props.overallScore || 0}/100`,
       component: InterviewCompletedEmail as React.ComponentType,
+    });
+    this.register('interview_recovery', {
+      name: 'interview_recovery',
+      subject: (props: Record<string, unknown>) => {
+        const role =
+          typeof props.roleLabel === 'string' && props.roleLabel.trim()
+            ? props.roleLabel.trim()
+            : 'your mock interview';
+        return `Resume your unfinished interview (${role})`;
+      },
+      component: InterviewRecoveryEmail as React.ComponentType,
     });
     this.register('weekly_progress', {
       name: 'weekly_progress',

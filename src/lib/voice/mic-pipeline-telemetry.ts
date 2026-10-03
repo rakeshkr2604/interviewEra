@@ -4,6 +4,10 @@
  * Structured production telemetry for the voice capture pipeline.
  * Every event includes mandatory correlation + runtime snapshot fields.
  */
+import {
+  diagnosticTypeForMicEvent,
+  emitInterviewDiagnostic,
+} from '@/lib/diagnostics/client'
 import { interviewTelemetry, getInterviewTelemetryRunId } from '@/lib/telemetry/interview-telemetry'
 import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-telemetry'
 import { getPlatformContext } from '@/lib/voice/lifecycle-log'
@@ -199,6 +203,25 @@ export function emitMicPipelineTelemetry(
       critical,
       level: level ?? (critical ? 'warn' : 'info'),
     })
+
+    // Durable diagnostics (best-effort) — failure-biased subset only.
+    if (critical && ctx.interviewId) {
+      const diagType = diagnosticTypeForMicEvent(event)
+      if (diagType) {
+        emitInterviewDiagnostic({
+          interviewId: ctx.interviewId,
+          eventType: diagType,
+          errorCode: event,
+          turnIndex: ctx.questionIndex,
+          metadata: {
+            component: 'mic',
+            platform: String(payload.platform ?? ''),
+            browser: String(payload.browser ?? ''),
+            phase: ctx.phase,
+          },
+        })
+      }
+    }
   })
 }
 

@@ -25,6 +25,7 @@ import {
   logVoiceHealthSnapshot,
   type DeepgramTelemetryContext,
 } from '@/lib/voice/deepgram-telemetry'
+import { emitInterviewDiagnostic } from '@/lib/diagnostics/client'
 
 type TrackFn = (
   type: 'VOICE' | 'RECOVERY',
@@ -463,6 +464,12 @@ export class DeepgramSessionController {
     trackDeepgramEvent('deepgram_connect_failure', this.telemetryCtx, this.track, {
       error: err.message,
     })
+    emitInterviewDiagnostic({
+      interviewId: this.interviewId,
+      eventType: is429 ? 'stt_timeout' : 'stt_connection_failed',
+      errorCode: is429 ? 'stt_rate_limited' : 'stt_ws_error',
+      metadata: { component: 'stt', provider: 'deepgram', voice_engine: 'deepgram' },
+    })
     this.breaker.recordFailure(err.message)
     this.health.setLastError(err.message)
     this.stop()
@@ -496,6 +503,17 @@ export class DeepgramSessionController {
         fallback: err instanceof STTTokenError ? err.fallback : undefined,
       },
     )
+
+    emitInterviewDiagnostic({
+      interviewId: this.interviewId,
+      eventType: is429Error(err) ? 'stt_timeout' : 'stt_connection_failed',
+      errorCode: isRefresh ? 'stt_refresh_failed' : 'stt_token_failed',
+      metadata: {
+        component: 'stt',
+        provider: 'deepgram',
+        http_status: err instanceof STTTokenError && typeof err.status === 'number' ? err.status : 0,
+      },
+    })
 
     trackDeepgramEvent('voice_session_abandoned', this.telemetryCtx, this.track, {
       error: message,

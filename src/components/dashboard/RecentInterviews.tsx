@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { formatInterviewDateEnIn } from '@/lib/datetime/ist'
-import { isResumableInterviewStatus, shouldOfferHistoryContinue } from '@/lib/interview/interview-status'
+import { getInterviewRecoveryPresentation } from '@/lib/interview/interview-recovery-ui'
 import { requestInterviewResume } from '@/lib/interview/request-interview-resume'
 
 interface Interview {
@@ -50,12 +50,18 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
   return (
     <div className="space-y-2.5">
       {interviews.map((interview) => {
-        const isCompleted = interview.status === 'completed'
-        const isResumable = isResumableInterviewStatus(interview.status)
-        const canContinue = shouldOfferHistoryContinue({
+        const reportHref =
+          interview.reportHref ??
+          (interview.status === 'completed' && interview.reportId
+            ? interview.engine === 'v2.1'
+              ? `/report/script/${interview.id}`
+              : `/report/${interview.reportId}`
+            : null)
+        const presentation = getInterviewRecoveryPresentation({
           status: interview.status,
           abandonedResumeUsed: interview.abandonedResumeUsed,
           creditDeducted: interview.creditDeducted,
+          hasReportHref: Boolean(reportHref),
         })
         const date = formatInterviewDateEnIn(interview.started_at, interview.completed_at)
         const continueHref =
@@ -63,13 +69,7 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
           (interview.engine === 'v2.1'
             ? `/interview/script/${interview.id}`
             : '/dashboard')
-        const reportHref =
-          interview.reportHref ??
-          (isCompleted && interview.reportId
-            ? interview.engine === 'v2.1'
-              ? `/report/script/${interview.id}`
-              : `/report/${interview.reportId}`
-            : null)
+        const isCompleted = presentation.badge === 'Completed'
 
         return (
           <div
@@ -101,20 +101,19 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
                     color: isCompleted ? 'var(--accent-success)' : 'var(--accent-warning)',
                   }}
                 >
-                  {isCompleted ? 'Completed' : interview.status === 'abandoned' ? 'Ended' : 'Incomplete'}
+                  {presentation.badge}
                 </span>
               </div>
 
-              {canContinue ? (
-                isResumable ? (
+              {presentation.mode === 'continue' ? (
                 <Link
                   href={continueHref}
                   className={actionBtnClass}
                   style={{ background: 'var(--accent-primary)' }}
                 >
-                  Continue
+                  Continue interview
                 </Link>
-                ) : (
+              ) : presentation.mode === 'resume' ? (
                 <button
                   type="button"
                   disabled={busyId === interview.id}
@@ -144,9 +143,8 @@ export function RecentInterviews({ interviews }: RecentInterviewsProps) {
                     })()
                   }}
                 >
-                  {busyId === interview.id ? 'Opening…' : 'Continue'}
+                  {busyId === interview.id ? 'Opening…' : 'Resume interview'}
                 </button>
-                )
               ) : reportHref ? (
                 <Link
                   href={reportHref}

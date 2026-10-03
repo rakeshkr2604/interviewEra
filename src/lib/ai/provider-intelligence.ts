@@ -51,6 +51,9 @@ export interface ProviderCallOutcome {
   jsonValid: boolean;
   inputTokens?: number;
   outputTokens?: number;
+  /** Optional interview correlation for ai_call_logs admin joins. */
+  interviewId?: string;
+  userId?: string;
 }
 
 export interface ProviderStats {
@@ -208,6 +211,8 @@ export function recordProviderOutcome(outcome: ProviderCallOutcome): void {
 
   // Fire-and-forget: DB telemetry row
   void logAICall({
+    user_id:        outcome.userId,
+    interview_id:   outcome.interviewId,
     operation:      outcome.operation,
     provider:       outcome.provider,
     model:          resolvedModel,

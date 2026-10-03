@@ -1,24 +1,46 @@
 import { activeInterviewResumePath } from '@/lib/interview/active-interview-policy';
 import type { CandidateNotification, CandidateSnapshot } from './types';
 
+/**
+ * Derived in-app notifications (not durable). Each unfinished interview uses a
+ * stable `id` so repeated dashboard/notifications loads do not stack duplicates.
+ */
 export function buildCandidateNotifications(snapshot: CandidateSnapshot): CandidateNotification[] {
   const items: CandidateNotification[] = [];
-  const now = new Date().toISOString();
+  // Stable timestamp for derived items — avoids "just now" churn implying new events.
+  const derivedAt =
+    snapshot.progress?.updated_at ??
+    snapshot.latestResume?.createdAt ??
+    '1970-01-01T00:00:00.000Z';
 
   if (snapshot.inProgressInterviewId) {
     items.push({
       id: `interview-${snapshot.inProgressInterviewId}`,
       type: 'interview_reminder',
-      title: 'Resume your mock interview',
+      title: 'Interview in progress',
       body: snapshot.inProgressInterviewRole
-        ? `Your ${snapshot.inProgressInterviewRole} session is still in progress.`
+        ? `Your ${snapshot.inProgressInterviewRole} session is still open — continue where you left off.`
         : 'You have an interview session waiting to be completed.',
       href: activeInterviewResumePath(
         snapshot.inProgressInterviewEngine,
         snapshot.inProgressInterviewId,
       ),
-      createdAt: now,
+      createdAt: derivedAt,
       read: false,
+      ctaLabel: 'Continue interview',
+    });
+  } else if (snapshot.abandonedResumeInterviewId) {
+    // One recovery notification for the primary abandoned-eligible session only.
+    items.push({
+      id: `interview-abandoned-${snapshot.abandonedResumeInterviewId}`,
+      type: 'interview_reminder',
+      title: 'Your interview is still available',
+      body: 'You can continue where you left off.',
+      href: null,
+      createdAt: derivedAt,
+      read: false,
+      resumeInterviewId: snapshot.abandonedResumeInterviewId,
+      ctaLabel: 'Resume interview',
     });
   }
 
@@ -64,7 +86,7 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
       title: 'Interview report ready',
       body: 'Review scores, strengths, and AI recommendations.',
       href: `/report/${reportId}`,
-      createdAt: now,
+      createdAt: derivedAt,
       read: false,
     });
   }
@@ -78,7 +100,7 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
         ? `You are enrolled at ${snapshot.collegeName}.`
         : 'Your campus admin can now track your placement progress.',
       href: '/college/join',
-      createdAt: now,
+      createdAt: derivedAt,
       read: true,
     });
   }
@@ -93,7 +115,7 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
         ? 'Strong consistency — keep quality sessions going.'
         : 'Great momentum — one more session tomorrow extends your streak.',
       href: '/dashboard',
-      createdAt: now,
+      createdAt: derivedAt,
       read: streak < 7,
     });
   }

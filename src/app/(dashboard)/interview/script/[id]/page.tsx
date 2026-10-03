@@ -131,6 +131,15 @@ import {
   type ReviewCorrectionReason,
 } from '@/lib/interview/review-correction-source'
 import { withSuggestedParagraphBreaks } from '@/lib/interview/transcript-readability'
+import { emitInterviewDiagnostic } from '@/lib/diagnostics/client'
+import {
+  classifyTtsFailureMessage,
+  classifyTurnLoadFailure,
+} from '@/lib/diagnostics/classify'
+import {
+  installInterviewExceptionDiagnostics,
+  installInterviewNetworkDiagnostics,
+} from '@/lib/diagnostics/session-instrumentation'
 
 // ── iOS browser detection ──────────────────────────────────────────────────────
 // Apple forces all iOS browsers (CriOS/Chrome, FxiOS/Firefox, OPiOS/Opera, etc.)
@@ -551,6 +560,35 @@ export default function ScriptInterviewPage() {
   useEffect(() => {
     currentTurnRef.current = currentTurn
   }, [currentTurn])
+
+  // Narrow diagnostic hooks — never block interview lifecycle.
+  useEffect(() => {
+    if (!interviewId) return
+    const getPhase = () => uiPhaseRef.current
+    const offNet = installInterviewNetworkDiagnostics({ interviewId, getPhase })
+    const offEx = installInterviewExceptionDiagnostics({ interviewId, getPhase })
+    return () => {
+      offNet()
+      offEx()
+    }
+  }, [interviewId])
+
+  const emitTtsDiagnostic = useCallback(
+    (message?: string) => {
+      if (!interviewId) return
+      const classified = classifyTtsFailureMessage(message)
+      emitInterviewDiagnostic({
+        interviewId,
+        eventType: classified.eventType,
+        errorCode: classified.errorCode,
+        turnIndex: currentTurnIndexRef.current,
+        metadata: { component: 'tts', phase: uiPhaseRef.current },
+      })
+    },
+    [interviewId],
+  )
+  const emitTtsDiagnosticRef = useRef(emitTtsDiagnostic)
+  emitTtsDiagnosticRef.current = emitTtsDiagnostic
 
   // ── Thinking-phase countdown ─────────────────────────────────────────────────
   // Ticks thinkingCountdown down to 0, then sets the countdown gate. If the
@@ -1172,7 +1210,10 @@ export default function ScriptInterviewPage() {
                             })
                           },
                           onPlaybackComplete: () => resolve(),
-                          onPlaybackFailed: () => resolve(),
+                          onPlaybackFailed: (msg) => {
+                            emitTtsDiagnosticRef.current(msg)
+                            resolve()
+                          },
                         },
                         speakVoice,
                       )
@@ -1467,7 +1508,10 @@ export default function ScriptInterviewPage() {
               {
                 onPlaybackStarted: () => revealQuestionText(),
                 onPlaybackComplete: finish,
-                onPlaybackFailed: finish,
+                onPlaybackFailed: (msg) => {
+                  emitTtsDiagnosticRef.current(msg)
+                  finish()
+                },
               },
               speakVoice,
             )
@@ -1496,7 +1540,10 @@ export default function ScriptInterviewPage() {
               })
             },
             onPlaybackComplete: finish,
-            onPlaybackFailed: finish,
+            onPlaybackFailed: (msg) => {
+              emitTtsDiagnosticRef.current(msg)
+              finish()
+            },
           },
           speakVoice,
         )
@@ -1786,6 +1833,26 @@ export default function ScriptInterviewPage() {
         prepControllerRef.current?.setTrack('turn', 'failed', {
           error: err instanceof Error ? err.message : 'turn_failed',
         })
+
+        // Client-boundary diagnostic only (no server duplicate for the same UX failure).
+        const classified = classifyTurnLoadFailure({
+          lastAnswer: p.lastAnswer,
+          prevTurnIndex: p.prevTurnIndex,
+          submittedAs: p.submittedAs,
+          errorMessage: err instanceof Error ? err.message : undefined,
+        })
+        emitInterviewDiagnostic({
+          interviewId,
+          eventType: classified.eventType,
+          errorCode: classified.errorCode,
+          turnIndex: p.prevTurnIndex ?? currentTurnIndexRef.current,
+          metadata: {
+            component: 'api',
+            endpoint: '/api/interview/script/turn',
+            phase: currentPhaseRef.current,
+          },
+        })
+
         if (err instanceof Error && err.message === 'invalid_turn_output') {
           setErrorMessage('The interviewer produced an unexpected response. Please try again.')
           setUiPhase('turn_ready')
@@ -3395,7 +3462,8 @@ export default function ScriptInterviewPage() {
                           setUiPhase('candidate_answering')
                         }, 0)
                       },
-                      onPlaybackFailed: () => {
+                      onPlaybackFailed: (msg) => {
+                        emitTtsDiagnosticRef.current(msg)
                         if (!mountedRef.current) return
                         if (activeTurnIndexRef.current !== rehearTurnIndex) return
                         if (!canEnterCandidateAnswering(currentTurn)) return

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient as createSupabase } from '@/lib/supabase/server';
+import { createClient as createSupabase, createServiceClient } from '@/lib/supabase/server';
 import { releaseSessionLease } from '@/lib/quota/stt-session-lease';
+import { logSTTSession } from '@/lib/telemetry/voice-logger';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,6 +12,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       interview_id?: string;
       session_lease_id?: string;
       duration_seconds?: number;
+      success?: boolean;
+      error_category?: string;
     };
 
     const interviewId = body.interview_id?.trim();
@@ -34,6 +37,29 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         : undefined;
 
     await releaseSessionLease(user.id, leaseId, duration);
+
+    // Ownership check before durable STT usage log (service role write).
+    const service = createServiceClient();
+    const { data: interview } = await service
+      .from('interviews')
+      .select('id, user_id')
+      .eq('id', interviewId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (interview) {
+      const success = body.success !== false;
+      const sttDurationMs = typeof duration === 'number' ? duration * 1000 : 0;
+      void logSTTSession({
+        user_id: user.id,
+        interview_id: interviewId,
+        stt_duration_ms: sttDurationMs,
+        stt_model: 'nova-3',
+        success,
+        error_category: success ? undefined : (body.error_category ?? 'session_error'),
+        session_id: leaseId.slice(0, 64),
+      });
+    }
 
     console.info('[DEEPGRAM]', JSON.stringify({
       event: 'voice_session_released',

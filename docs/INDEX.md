@@ -1,7 +1,7 @@
 # Documentation Index
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
+> Last Verified: 2026-10-01
 > Verification Scope: Doc tree layout + agent entrypoints
 > Authority: Navigation map for humans and agents
 
@@ -37,6 +37,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | Doc | When to read |
 |---|---|
 | [DOCUMENTATION_GOVERNANCE.md](Guidelines/DOCUMENTATION_GOVERNANCE.md) | Doc impact contract (mandatory on every change) |
+| [ENGINEERING_WORKFLOW.md](Guidelines/ENGINEERING_WORKFLOW.md) | Multi-phase work, deferred push, hygiene, pre-push / pre-merge / post-merge |
 | [HLD_PRINCIPLES.md](Guidelines/HLD_PRINCIPLES.md) | System-level design rules |
 | [LLD_PRINCIPLES.md](Guidelines/LLD_PRINCIPLES.md) | Module-level design rules |
 | [SECURITY.md](Guidelines/SECURITY.md) | Authz, CSP, RLS, secrets |
@@ -54,6 +55,9 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [RELEASE.md](Operations/RELEASE.md) | CI/CD, deploy, release ritual |
 | [FEATURE_FLAGS.md](Operations/FEATURE_FLAGS.md) | Env-gated behavior registry |
 | [QUALITY_GATES.md](Operations/QUALITY_GATES.md) | Gate levels and philosophy |
+| [STAGING_PROD_ALIGNMENT_CLOSURE.md](Operations/STAGING_PROD_ALIGNMENT_CLOSURE.md) | Prod–staging alignment / privilege cleanup record (point-in-time) |
+| [LEGACY_PROD_TABLES_OWNER_DECISIONS.md](Operations/LEGACY_PROD_TABLES_OWNER_DECISIONS.md) | Prod-only orphan table owner decision packet |
+| [DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md](Operations/DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md) | Diagnostics 110/111 staging gates, apply sequence, E2E matrix |
 
 ## Root keepers
 

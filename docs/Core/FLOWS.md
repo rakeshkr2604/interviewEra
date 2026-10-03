@@ -1,7 +1,7 @@
 # Flows
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
+> Last Verified: 2026-10-01
 > Verification Scope: Primary user journeys vs current routes
 > Authority: End-to-end product flows
 
@@ -18,6 +18,29 @@ Short maps of the main journeys. Route inventory → [ROUTING.md](ROUTING.md).
 3. **Start Interview** → `/interview/script/start` → `POST /api/interview/script/start`
 4. Session `/interview/script/[id]`: turns ± TTS/STT → answer-score
 5. Complete → script report
+
+### A2. Resume unfinished V2.1 (same interview row)
+
+1. Dashboard / History / Notifications surface unfinished sessions:
+   - Active (`pending`/`in_progress`): **Continue interview** → session URL
+   - Abandoned one-continue eligible (`credit_deducted` + `!abandoned_resume_used`): **Resume interview** → `POST /api/interview/{id}/resume` → same row reopened to `in_progress` (no extra credit)
+2. Hero / notification recovery target is resolved by `fetchPrimaryRecoveryInterview` (dedicated `LIMIT 1` queries), **not** by the recent-interviews pagination window
+3. Finish session → complete as usual → report
+4. Second abandon after resume is terminal (`abandoned_resume_used`)
+
+Does **not** convert historical abandoned → completed without the candidate finishing.
+
+### A3. Recovery email reminders (Phase 2, flag-gated)
+
+1. Daily UTC cron `GET /api/cron/interview-recovery-reminders` (Bearer `CRON_SECRET`); timing jitter accepted
+2. Dry-run inventory: `?dryRun=1` (works with flag off; never claims/sends). Ambiguous dryRun values also force dry-run.
+3. Real sends only when `INTERVIEW_RECOVERY_EMAIL_ENABLED=1` and dryRun is absent
+4. Stages (abandon `completed_at` age): `r1` ∈ [24h, 72h); `r2` ∈ [72h, 7d]; late ≥72h skips `r1`
+5. Suppress if `interviewReminders` off **or** global unsub (`email_digest_unsubscribed` / `email_preferences.unsubscribed_all`)
+6. Revalidate eligibility twice → Resend `interview_recovery` via `sendLifecycleTemplate` / `lifecycle_email_log`
+7. CTA → `/dashboard`; prefs → `/settings`
+
+Off by default. Does not change credits, interview status, or in-app notification content.
 
 ### B. Checkout
 
@@ -41,6 +64,7 @@ Legacy `/report/[id]` may open **old V1 rows**. New completions use script repor
 - One active non-terminal interview per user
 - Credits deducted at script start (service-role RPC)
 - Scores always present on complete
+- Abandoned one-continue uses the same interview row (no second debit / no refund)
 
 ## Dependencies
 

@@ -58,6 +58,8 @@ function emitOpenRouterTelemetry(opts: {
   jsonValid?: boolean;
   httpStatus?: number;
   usage?: InterviewChatCompletionResult['usage'];
+  interviewId?: string;
+  userId?: string;
 }): void {
   const inputTokens = opts.usage?.prompt_tokens;
   const outputTokens = opts.usage?.completion_tokens;
@@ -73,6 +75,8 @@ function emitOpenRouterTelemetry(opts: {
     jsonValid: opts.jsonValid ?? true,
     inputTokens,
     outputTokens,
+    interviewId: opts.interviewId,
+    userId: opts.userId,
   });
 
   logInterviewAiCompletion({
@@ -108,6 +112,9 @@ export async function completeInterviewChat(options: {
    * Structured stdout + DB rows always use the resolved `model` id.
    */
   recordTelemetry?: boolean;
+  /** Optional correlation for ai_call_logs admin investigation joins. */
+  interviewId?: string;
+  userId?: string;
 }): Promise<InterviewChatCompletionResult> {
   const client = createOpenRouterClient();
   if (!client) {
@@ -160,6 +167,8 @@ export async function completeInterviewChat(options: {
         latencyMs: Date.now() - t0,
         success: true,
         usage,
+        interviewId: options.interviewId,
+        userId: options.userId,
       });
     }
     return { content, provider: 'openrouter', model, usage };
@@ -180,6 +189,8 @@ export async function completeInterviewChat(options: {
         timeout: isTimeout,
         quotaExhausted: isQuota,
         httpStatus: statusCode,
+        interviewId: options.interviewId,
+        userId: options.userId,
       });
     }
 
@@ -200,6 +211,8 @@ export async function completeInterviewChat(options: {
             latencyMs: Date.now() - t1,
             success: true,
             usage,
+            interviewId: options.interviewId,
+            userId: options.userId,
           });
         }
         return { content, provider: 'openrouter', model, usage };
@@ -217,6 +230,8 @@ export async function completeInterviewChat(options: {
             success: false,
             timeout: timeout2,
             httpStatus: sc,
+            interviewId: options.interviewId,
+            userId: options.userId,
           });
         }
         console.warn(`[interview-ai] OpenRouter "${model}" (plain) failed:`, e2);

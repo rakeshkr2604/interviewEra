@@ -1,8 +1,8 @@
 # Voice Pipeline
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Importers of `src/lib/voice/**` + script session page + mic coordinator
+> Last Verified: 2026-10-03
+> Verification Scope: Importers of `src/lib/voice/**` + script session page + mic coordinator + diagnostic emit points
 > Authority: Speech capture and playback for **current** product path
 
 ## Purpose
@@ -18,7 +18,8 @@ STT/TTS architecture, mic ownership rules, and verification rituals.
 | Session UI | `src/app/(dashboard)/interview/script/[id]/page.tsx` |
 | Mic PCM | `useMicrophone` → `pcm-capture-graph` via `micCaptureCoordinator` |
 | STT | `DeepgramSessionController` + `stt-client` (`StreamingSTT`) → `/api/stt/*` |
-| TTS | session speak helpers / `useVoicePlayer` → `/api/tts` (ElevenLabs) |
+| Diagnostics | Mic/STT failures → `emitInterviewDiagnostic` → `POST /api/interview/diagnostics`; TTS request vs playback failures classified on `onPlaybackFailed`; STT session release → `logSTTSession` → `voice_usage_logs` (best-effort; never blocks voice) |
+| TTS | session speak helpers / `useVoicePlayer` → `/api/tts` (ElevenLabs); playback failures ≠ synthesis/request failures in diagnostics |
 | Early TTS | optional SSE first-sentence from `POST /api/interview/script/turn` when `VOICE_LLM_TTS_STREAMING` is on |
 
 **Singleton mic gate:** `micCaptureCoordinator` (`idle|acquiring|active`). Chrome treats concurrent `getUserMedia` + Web Speech as **silent input** — never run both (Invariant #5).

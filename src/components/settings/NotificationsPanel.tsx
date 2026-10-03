@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { SettingsSwitch } from '@/components/settings/SettingsSwitch'
 import { CommunityNotificationsStrip } from '@/components/community/CommunityNotificationsStrip'
 import type { NotificationPreferences } from '@/lib/settings/notification-preferences'
+import { INTERVIEW_REMINDERS_SETTINGS_DESCRIPTION } from '@/lib/settings/interview-reminders-copy'
 
 type RowProps = {
   title: string
@@ -86,7 +87,7 @@ export function NotificationsPanel({
     <div className="space-y-2.5">
       <NotifRow
         title="Interview reminders"
-        description="Nudges before scheduled or in-progress practice sessions (email when available)."
+        description={INTERVIEW_REMINDERS_SETTINGS_DESCRIPTION}
         checked={prefs.interviewReminders}
         disabled={busyKey !== null}
         onChange={(next) => {

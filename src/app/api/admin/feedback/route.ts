@@ -516,7 +516,9 @@ async function fetchInterviewExitFeedbacks(
           interview_id: r.interview_id,
           role: (interview?.role as string | null) ?? null,
           difficulty: (interview?.difficulty as string | null) ?? null,
-          engine: r.engine || ((interview?.engine as string | null) ?? null),
+          // Prefer interviews.engine (canonical: 'v2.1'). Exit rows often store
+          // client nickname 'script' — that is not the interviews.engine value.
+          engine: (interview?.engine as string | null) ?? r.engine ?? null,
           status: (interview?.status as string | null) ?? null,
           completed_at: (interview?.completed_at as string | null) ?? null,
           report_id: reportId,

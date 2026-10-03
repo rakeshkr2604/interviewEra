@@ -1,8 +1,8 @@
 # Feature Flags
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired
+> Last Verified: 2026-10-01
+> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired; recovery email kill switch
 > Authority: Flag registry
 
 ## Purpose
@@ -31,6 +31,7 @@ Every temporary/permanent env toggle. **New flags without an entry here = review
 | `BLOCK_SEARCH_INDEXING` | off in prod | Force noindex |
 | `VOICE_LLM_TTS_STREAMING` (+ `NEXT_PUBLIC_`) | unset → off | Script turn SSE first sentence |
 | `ELEVENLABS_OPTIMIZE_LATENCY` | unset → `'3'` | TTS optimize level |
+| `INTERVIEW_RECOVERY_EMAIL_ENABLED` | unset → **off** | Phase 2 unfinished-interview recovery emails (`'1'` on). Cron registered; dry-run inventory works with flag off; real sends only when enabled and non-dry-run. |
 | Staging contract (`APP_ENV`, `EXPECTED_SUPABASE_PROJECT_REF`, …) | fail closed | Staging safety |
 
 Client `localStorage.VOICE_DEBUG='1'` — prod verbose voice logs.

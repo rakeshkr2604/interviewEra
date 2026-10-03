@@ -1,8 +1,8 @@
 # Routing
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Key App Router + API paths for current product
+> Last Verified: 2026-10-03
+> Verification Scope: Key App Router + API paths for current product + admin interview review
 > Authority: Route map (code wins if drift)
 
 ## Purpose
@@ -23,8 +23,10 @@ Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
 | `/dashboard`, `/resume`, `/settings`, … | Candidate shell |
 | `/pricing`, `/blog`, `/interview-questions/**` | Marketing / SEO |
 | `/college/**`, `/platform/**`, `/admin/**` | Org / platform |
+| `/platform/feedback` | Platform-admin feedback inbox |
+| `/platform/feedback/interview/[id]` | Platform-admin **read-only** Interview Investigation Center (durable evidence join; not a live session; no credit mutations) |
 | `/auth/callback` | OAuth |
-| `/report/script/[id]` | V2.1 script reports |
+| `/report/script/[id]` | V2.1 script reports (candidate-owned) |
 | `/report/[id]` | Legacy compatibility reports for historical rows |
 
 **Removed:** `/interview/session/[id]/v2` (V1 voice experiment). Live V1 dual-agent APIs (`/api/interview/start`, `process-answer`, …) deleted.
@@ -40,9 +42,11 @@ Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
 | `/api/payments/*` | create-order, verify, webhook |
 | `/api/stt/*`, `/api/tts` | Voice |
 | `/api/product-events` | Funnel beacon ingest |
-| `/api/cron/*` | Bearer `CRON_SECRET` |
+| `/api/cron/*` | Bearer `CRON_SECRET` (includes `prune-interview-diagnostics` for 90d diagnostic retention) |
 | `/api/report/*` | Legacy report generate / PDF |
 | `/api/report/script/*` | Script report PDF |
+| `GET /api/admin/interviews/[id]` | Platform-admin read-only investigation payload: session, turns, credits, product_events, AI/voice logs, `interview_diagnostic_events`, linked feedback (`requirePlatformAdmin` + service client; no mutations) |
+| `POST /api/interview/diagnostics` | Authenticated owner ingest for schema-v1 diagnostic events (best-effort 204; rate-limited; service-role insert after ownership check) |
 
 Long routes: `maxDuration: 60` in `vercel.json` for upload/parse/extract/`script/start` (and related heavy paths).
 

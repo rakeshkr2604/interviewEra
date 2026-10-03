@@ -5,7 +5,7 @@ import {
   registerCaptureAudioContext,
   unregisterCaptureAudioContext,
 } from '@/lib/voice/audio-gesture';
-import { createPcmCaptureGraph } from '@/lib/voice/audio/pcm-capture-graph';
+import { createPcmCaptureGraph, type PcmCaptureGraph } from '@/lib/voice/audio/pcm-capture-graph';
 import {
   buildMicErrorContext,
   lifecycleLog,
@@ -23,6 +23,7 @@ import { emitMicPipelineTelemetry } from '@/lib/voice/mic-pipeline-telemetry';
 import { voicePipelineDiagnostics } from '@/lib/voice/voice-pipeline-diagnostics';
 
 type CleanupFn = () => void;
+const FIRST_PCM_FRAME_TIMEOUT_MS = 3_000;
 
 export interface UseMicrophoneOptions {
   /** Fired when the OS/browser ends or mutes the capture track mid-session. */
@@ -135,7 +136,13 @@ export function useMicrophone(
 
       let stream: MediaStream | null = null;
       let audioContext: AudioContext | null = null;
+      let captureGraph: PcmCaptureGraph | null = null;
       let captureLostHandled = false;
+      let firstPcmFrameResolve: (() => void) | null = null;
+      const firstPcmFrame = new Promise<void>((resolve) => {
+        firstPcmFrameResolve = resolve;
+      });
+      let firstPcmFrameTimeout: ReturnType<typeof setTimeout> | null = null;
 
       const handleCaptureLost = (reason: MicCaptureLostReason) => {
         if (captureLostHandled) return;
@@ -209,10 +216,12 @@ export function useMicrophone(
         voicePipelineDiagnostics.recordAudioContext(audioContext.state, audioContext.sampleRate);
 
         let framesProcessed = 0;
-        const captureGraph = await createPcmCaptureGraph(
+        captureGraph = await createPcmCaptureGraph(
           audioContext,
           stream,
           (buffer) => {
+            firstPcmFrameResolve?.();
+            firstPcmFrameResolve = null;
             framesProcessed += 1;
             voicePipelineDiagnostics.recordPcmFrame(buffer);
             if (framesProcessed === 1 || framesProcessed % 50 === 0) {
@@ -231,6 +240,20 @@ export function useMicrophone(
             },
           },
         );
+
+        try {
+          await Promise.race([
+            firstPcmFrame,
+            new Promise<never>((_, reject) => {
+              firstPcmFrameTimeout = setTimeout(
+                () => reject(new Error('Microphone capture produced no audio frames. Tap Retry Mic.')),
+                FIRST_PCM_FRAME_TIMEOUT_MS,
+              );
+            }),
+          ]);
+        } finally {
+          if (firstPcmFrameTimeout) clearTimeout(firstPcmFrameTimeout);
+        }
 
         removeVisibilityHandler();
         const onVisible = () => {
@@ -251,13 +274,14 @@ export function useMicrophone(
         });
 
         const capturedCtx = audioContext;
+        const capturedGraph = captureGraph;
         let cleanedUp = false;
         const cleanup: CleanupFn = () => {
           if (cleanedUp) return;
           cleanedUp = true;
           captureLostHandled = true;
           removeVisibilityHandler();
-          try { captureGraph.disconnect(); } catch { /* */ }
+          try { capturedGraph.disconnect(); } catch { /* */ }
           micCaptureCoordinator.release('pcm');
           unregisterCaptureAudioContext(capturedCtx);
           try { capturedCtx.close().catch(() => {}); } catch { /* */ }
@@ -271,6 +295,8 @@ export function useMicrophone(
         lifecycleLog('mic', 'started');
         return cleanup;
       } catch (err) {
+        if (firstPcmFrameTimeout) clearTimeout(firstPcmFrameTimeout);
+        try { captureGraph?.disconnect(); } catch { /* */ }
         if (stream) micCaptureCoordinator.release('pcm');
         if (audioContext) {
           unregisterCaptureAudioContext(audioContext);

@@ -22,7 +22,7 @@ import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracke
 import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
 import { loadCandidateSnapshot, CANDIDATE_DASHBOARD_INTERVIEWS_SELECT } from '@/lib/candidate/load-snapshot'
-import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
+import { fetchPrimaryRecoveryInterview } from '@/lib/interview/fetch-primary-recovery-interview'
 import { computeReadinessScore } from '@/lib/candidate/readiness-score'
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
 import type { InterviewWithReportsRow } from './dashboard-types'
@@ -51,6 +51,7 @@ export default async function DashboardPage() {
     { data: interviewsRaw },
     { data: progressSnap, error: progressErr },
     { count: completedCountTotal },
+    recoveryTarget,
   ] = await Promise.all([
     getCachedDashboardUserRow(user.id),
     supabase
@@ -67,6 +68,8 @@ export default async function DashboardPage() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('status', 'completed'),
+    // Recovery CTA is independent of the recent-list window (limit 20).
+    fetchPrimaryRecoveryInterview(supabase, user.id),
   ])
 
   if (userError) {
@@ -146,10 +149,16 @@ export default async function DashboardPage() {
     userData && typeof userData.avatar_path === 'string' ? userData.avatar_path : null
   const oauthPictureUrl = resolveOAuthPictureUrl(user.user_metadata)
 
-  // Live session CTA: pending/in_progress only. Abandoned continue is offered
-  // on the recent-interview list after resume_abandoned_interview reopens it.
-  const inProgressInterview =
-    rows.find((row) => isResumableInterviewStatus(row.status)) ?? null
+  // Hero / practice demotion: dedicated recovery query (not recent-list limit 20).
+  // Prefer active v2.1; else newest abandoned one-continue eligible v2.1.
+  const recoveryInterview = recoveryTarget
+    ? {
+        id: recoveryTarget.id,
+        role: recoveryTarget.role,
+        engine: recoveryTarget.engine,
+        mode: recoveryTarget.mode,
+      }
+    : null
 
   const candidateSnapshot = await loadCandidateSnapshot(user.id, {
     userRow: userData
@@ -167,6 +176,7 @@ export default async function DashboardPage() {
       ? null
       : ((progressSnap as UserProgressRow | null) ?? null),
     interviews: (interviewsRaw ?? []) as InterviewWithReportsRow[],
+    recoveryTarget,
   })
   const profileOnboarding = resolveProfileOnboarding({
     name: userData?.name,
@@ -219,15 +229,7 @@ export default async function DashboardPage() {
           email={profileEmail}
           avatarPath={avatarPath}
           oauthPictureUrl={oauthPictureUrl}
-          inProgressInterview={
-            inProgressInterview
-              ? {
-                  id: inProgressInterview.id,
-                  role: inProgressInterview.role,
-                  engine: inProgressInterview.engine,
-                }
-              : null
-          }
+          recoveryInterview={recoveryInterview}
         />
 
         <CreditsOverviewCard
@@ -235,7 +237,7 @@ export default async function DashboardPage() {
           planTier={planTier}
           planExpiresAt={userData?.plan_expires_at ?? null}
           planStatus={userData?.plan_status ?? null}
-          demotePracticeCta={Boolean(inProgressInterview)}
+          demotePracticeCta={Boolean(recoveryInterview)}
         />
       </div>
 

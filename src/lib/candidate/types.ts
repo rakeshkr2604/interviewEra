@@ -81,6 +81,12 @@ export interface CandidateNotification {
   href: string | null;
   createdAt: string;
   read: boolean;
+  /**
+   * When set, the feed opens via POST /api/interview/{id}/resume (abandoned
+   * one-continue). Stable id prevents duplicate list entries across loads.
+   */
+  resumeInterviewId?: string;
+  ctaLabel?: string;
 }
 
 export interface CandidateProfileFields {
@@ -125,9 +131,17 @@ export interface CandidateSnapshot {
   resumeCompletionPct: number;
   progress: UserProgressRow | null;
   completedSessionCount: number;
+  /** Active pending/in_progress session (direct Continue). */
   inProgressInterviewId: string | null;
   inProgressInterviewRole: string | null;
   inProgressInterviewEngine: string | null;
+  /**
+   * Abandoned + one-continue eligible (credit deducted, resume unused).
+   * Requires POST /api/interview/{id}/resume before opening the session.
+   */
+  abandonedResumeInterviewId: string | null;
+  abandonedResumeInterviewRole: string | null;
+  abandonedResumeInterviewEngine: string | null;
   dimensionAverages: ReportDimensionAverages;
   recentReportIds: string[];
   collegeEnrollmentAccepted: boolean;

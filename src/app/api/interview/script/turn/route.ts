@@ -1106,6 +1106,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         operation: 'script_turn_generation',
         jsonMode: true,
         signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+        interviewId,
+        userId: user.id,
       });
       llmContent = completion.content;
     } catch (llmError) {

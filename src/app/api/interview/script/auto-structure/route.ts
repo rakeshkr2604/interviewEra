@@ -149,6 +149,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         jsonMode: true,
         maxTokens,
         signal: AbortSignal.timeout(llmTimeoutMs),
+        interviewId,
+        userId: user.id,
       });
       llmContent = completion.content;
       modelUsed = completion.model;

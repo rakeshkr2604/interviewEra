@@ -1,8 +1,8 @@
 # Database Migrations
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Namespace rules + remap notes (from MIGRATION_NAMESPACE)
+> Last Verified: 2026-10-03
+> Verification Scope: Namespace rules + remap notes + staging default-privilege cleanup (Phase 6A)
 > Authority: How to add SQL safely
 
 ## Purpose
@@ -24,6 +24,8 @@ Serial migration discipline and known historical remap facts.
 | 050 | Lock down credit RPCs + users UPDATE guard |
 | 039–045 | Historical unused numbers |
 | 056–058 | Fresh-replay no-ops; effects via `089_reconcile_historical_migration_order.sql` |
+| 090/092 | `ALTER DEFAULT PRIVILEGES FOR ROLE postgres` was staging-applied via `090`; production intentionally skipped those defaults (`092`). Do not replay `090` defaults on production. |
+| 2026-10-03 | Staging Phase 6A: `postgres` → `public` default table/sequence grants to `anon`/`authenticated`/`service_role` revoked. Future objects created by `postgres` need explicit GRANTs. See [`STAGING_PROD_ALIGNMENT_CLOSURE.md`](../Operations/STAGING_PROD_ALIGNMENT_CLOSURE.md). |
 
 Timestamp→serial remap table (072+) lives in archive: `docs/archive/pre-governance-2026-09-27/MIGRATION_NAMESPACE.md` — consult when debugging old apply history. Do not recreate timestamps.
 

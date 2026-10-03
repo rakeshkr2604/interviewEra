@@ -47,6 +47,7 @@ import {
   TECHNICAL_FAILURE_STATUS_LABELS,
   technicalCreditRestorationLabel,
 } from '@/lib/technical-failures/status';
+import { feedbackViewInterviewHref } from '@/lib/admin/interview-review';
 import {
   Dialog,
   DialogContent,
@@ -802,22 +803,33 @@ function FeedbackCard({
                 {row.interview_context.progress_percent != null && (
                   <Chip>Progress: {row.interview_context.progress_percent}%</Chip>
                 )}
-                <a
-                  href={
-                    row.interview_context.report_id
-                      ? `/report/${row.interview_context.report_id}`
-                      : row.interview_context.engine === 'v2.1'
-                        ? `/report/script/${row.interview_context.interview_id}`
-                        : `/interview/${row.interview_context.interview_id}`
+                {(() => {
+                  const reviewHref = feedbackViewInterviewHref(
+                    row.interview_context.interview_id,
+                  );
+                  if (!reviewHref) {
+                    return (
+                      <span
+                        className="inline-flex items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[10px] font-semibold text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-400"
+                        title="Interview id unavailable"
+                      >
+                        View interview unavailable
+                      </span>
+                    );
                   }
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
-                >
-                  <span>View interview</span>
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+                  return (
+                    <a
+                      href={reviewHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center gap-1 rounded-md border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 transition hover:bg-indigo-100 dark:border-indigo-800 dark:bg-indigo-950/40 dark:text-indigo-300"
+                    >
+                      <span>View interview</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  );
+                })()}
               </div>
             )}
 

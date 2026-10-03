@@ -31,4 +31,13 @@ describe('rate-limit fail-closed', () => {
     expect(http?.status).toBe(503);
     expect(http?.body.code).toBe('rate_limit_backend_unavailable');
   });
+
+  it('accepts cost option without throwing when Redis errors (fail-closed)', async () => {
+    const result = await checkRateLimit('test:cost', 60, 40, {
+      failClosed: true,
+      cost: 5,
+    });
+    expect(result.allowed).toBe(false);
+    expect(result.redisUnavailable).toBe(true);
+  });
 });

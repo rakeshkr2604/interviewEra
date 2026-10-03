@@ -14,13 +14,18 @@ export type RateLimitOptions = {
    * Default false — fail open for availability on low-risk endpoints.
    */
   failClosed?: boolean;
+  /**
+   * How much capacity this check consumes (default 1).
+   * Used by batch ingest to charge per event rather than per HTTP request.
+   */
+  cost?: number;
 };
 
 /**
- * Sliding-window rate limiter backed by Upstash Redis.
+ * Fixed-window rate limiter backed by Upstash Redis (slot = floor(now/window)).
  * @param key      Unique cache key, e.g. `start:${userId}`
  * @param windowSeconds  Length of the time window
- * @param maxRequests    Maximum allowed requests within the window
+ * @param maxRequests    Maximum allowed cost units within the window
  */
 export async function checkRateLimit(
   key: string,
@@ -29,7 +34,10 @@ export async function checkRateLimit(
   options: RateLimitOptions = {},
 ): Promise<RateLimitResult> {
   const { failClosed = false } = options;
+  const cost = Math.max(1, Math.min(100, Math.floor(options.cost ?? 1)));
 
+  // Unconfigured Redis (typical local): fail-open even for failClosed callers.
+  // Production must configure Upstash; failClosed applies on Redis errors below.
   if (typeof isRedisConfigured === 'function' && !isRedisConfigured()) {
     return { allowed: true, remaining: maxRequests, resetInSeconds: windowSeconds };
   }
@@ -40,7 +48,11 @@ export async function checkRateLimit(
     const redisKey = `rl:${key}:${windowSlot}`;
 
     const pipeline = redis.pipeline();
-    pipeline.incr(redisKey);
+    if (cost === 1) {
+      pipeline.incr(redisKey);
+    } else {
+      pipeline.incrby(redisKey, cost);
+    }
     pipeline.expire(redisKey, windowSeconds * 2); // 2x window as safety buffer
     const [count] = await pipeline.exec<[number, number]>();
 

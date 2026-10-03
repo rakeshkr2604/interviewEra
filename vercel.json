@@ -28,6 +28,14 @@
     {
       "path": "/api/cron/abandon-stale-interviews",
       "schedule": "20 1 * * *"
+    },
+    {
+      "path": "/api/cron/interview-recovery-reminders",
+      "schedule": "40 1 * * *"
+    },
+    {
+      "path": "/api/cron/prune-interview-diagnostics",
+      "schedule": "50 2 * * *"
     }
   ],
   "functions": {

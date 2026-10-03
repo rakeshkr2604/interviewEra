@@ -19,7 +19,10 @@ import {
 } from '@/lib/pricing/plan-status';
 import { DashboardMetricTile } from '@/components/dashboard/DashboardMetricTile';
 import { ProfileActions } from '@/components/dashboard/ProfileActions';
-import { activeInterviewResumePath } from '@/lib/interview/active-interview-policy';
+import {
+  DashboardRecoveryCta,
+  type DashboardRecoveryInterview,
+} from '@/components/dashboard/DashboardRecoveryCta';
 import type { UserRow } from '@/app/(dashboard)/dashboard/dashboard-types';
 import type { PlanTier } from '@/types/app.types';
 
@@ -33,7 +36,8 @@ interface UserSummaryCardProps {
   email: string;
   avatarPath?: string | null;
   oauthPictureUrl?: string | null;
-  inProgressInterview?: { id: string; role: string; engine?: string | null } | null;
+  /** Primary unfinished interview for hero CTA (active Continue or abandoned Resume). */
+  recoveryInterview?: DashboardRecoveryInterview | null;
 }
 
 const QUICK_LINKS = [
@@ -52,7 +56,7 @@ export function UserSummaryCard({
   email,
   avatarPath = null,
   oauthPictureUrl = null,
-  inProgressInterview = null,
+  recoveryInterview = null,
 }: UserSummaryCardProps) {
   const planTier = (userData?.plan_tier ?? 'free') as PlanTier;
   const planExpiresAt = userData?.plan_expires_at ?? null;
@@ -170,27 +174,7 @@ export function UserSummaryCard({
           </div>
         </div>
 
-        {inProgressInterview ? (
-          <Link
-            href={activeInterviewResumePath(inProgressInterview.engine, inProgressInterview.id)}
-            className="dashboard-hover-lift flex min-h-12 items-center justify-between gap-3 rounded-xl border-2 px-4 py-3.5 shadow-sm focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-            style={{
-              borderColor: 'color-mix(in srgb, var(--accent-primary) 45%, var(--card-border))',
-              background: 'color-mix(in srgb, var(--accent-primary) 12%, var(--bg-secondary))',
-              textDecoration: 'none',
-            }}
-          >
-            <div className="min-w-0">
-              <p className="dashboard-section-eyebrow">Resume session</p>
-              <p className="mt-0.5 truncate text-sm font-semibold sm:text-base" style={{ color: 'var(--text-primary)' }}>
-                {inProgressInterview.role}
-              </p>
-            </div>
-            <span className="shrink-0 text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
-              Continue →
-            </span>
-          </Link>
-        ) : null}
+        {recoveryInterview ? <DashboardRecoveryCta interview={recoveryInterview} /> : null}
 
         <ProfileActions
           planTier={planTier}

@@ -11,7 +11,10 @@ import type {
   ResumeSnapshot,
 } from './types';
 import type { UserProgressRow } from '@/lib/retention/types';
-import { isResumableInterviewStatus } from '@/lib/interview/interview-status';
+import {
+  fetchPrimaryRecoveryInterview,
+  type PrimaryRecoveryTarget,
+} from '@/lib/interview/fetch-primary-recovery-interview';
 import type { DimensionScores } from '@/types/app.types';
 import { normalizeRadarRowToDimensionKey } from '@/lib/utils/report-radar-dimensions';
 
@@ -26,6 +29,8 @@ export type CandidateSnapshotInterviewRow = {
   role: string;
   status: string;
   engine?: string | null;
+  credit_deducted?: boolean | null;
+  abandoned_resume_used?: boolean | null;
   reports?:
     | {
         id: string;
@@ -39,6 +44,8 @@ export type CandidateSnapshotPrefetch = {
   userRow?: CandidateSnapshotUserRow | null;
   progressSnap?: UserProgressRow | null;
   interviews?: CandidateSnapshotInterviewRow[] | null;
+  /** Independent of the recent-list window; when set, skips recovery DB fetch. */
+  recoveryTarget?: PrimaryRecoveryTarget | null;
 };
 
 /** Shared select for dashboard + snapshot interview hydration (20-row cap). */
@@ -169,12 +176,14 @@ export async function loadCandidateSnapshot(
 
   const hasPrefetchedProgress = Boolean(prefetch && 'progressSnap' in prefetch);
   const hasPrefetchedInterviews = Boolean(prefetch && 'interviews' in prefetch);
+  const hasPrefetchedRecovery = Boolean(prefetch && 'recoveryTarget' in prefetch);
 
   const [
     { data: progressSnap },
     { data: interviews },
     { data: resumes },
     { data: enrollment },
+    recoveryTarget,
   ] = await Promise.all([
     hasPrefetchedProgress
       ? Promise.resolve({ data: prefetch!.progressSnap ?? null })
@@ -200,6 +209,9 @@ export async function loadCandidateSnapshot(
       .eq('user_id', userId)
       .eq('enrollment_status', 'active')
       .maybeSingle(),
+    hasPrefetchedRecovery
+      ? Promise.resolve(prefetch!.recoveryTarget ?? null)
+      : fetchPrimaryRecoveryInterview(supabase, userId),
   ]);
 
   const draft = parsePersistedDraft(userRow?.onboarding_draft ?? null);
@@ -256,10 +268,16 @@ export async function loadCandidateSnapshot(
   }
 
   const completedInterviews = (interviews ?? []).filter((i) => i.status === 'completed');
-  // Live session CTA: pending/in_progress only. Abandoned continue is a
-  // history/dashboard action that must reopen via resume_abandoned_interview.
+  // Recovery fields come from fetchPrimaryRecoveryInterview (not the recent-20 window).
+  const recovery = recoveryTarget;
   const inProgress =
-    (interviews ?? []).find((i) => isResumableInterviewStatus(i.status)) ?? null;
+    recovery?.mode === 'continue'
+      ? recovery
+      : null;
+  const abandonedResume =
+    recovery?.mode === 'resume'
+      ? recovery
+      : null;
 
   const radarRows = completedInterviews.flatMap((interview) => {
     const reports = (interview.reports ?? []) as { radar_data?: { dimension: string; score: number }[] }[];
@@ -287,9 +305,14 @@ export async function loadCandidateSnapshot(
     resumeCompletionPct: resumeCompletionPct(latestResume),
     progress: (progressSnap as UserProgressRow | null) ?? null,
     completedSessionCount: completedInterviews.length,
-    inProgressInterviewId: inProgress ? (inProgress.id as string) : null,
-    inProgressInterviewRole: inProgress ? (inProgress.role as string) : null,
+    inProgressInterviewId: inProgress ? inProgress.id : null,
+    inProgressInterviewRole: inProgress ? inProgress.role : null,
     inProgressInterviewEngine: inProgress ? (inProgress.engine ?? null) : null,
+    abandonedResumeInterviewId: abandonedResume ? abandonedResume.id : null,
+    abandonedResumeInterviewRole: abandonedResume ? abandonedResume.role : null,
+    abandonedResumeInterviewEngine: abandonedResume
+      ? (abandonedResume.engine ?? null)
+      : null,
     dimensionAverages: aggregateDimensionAverages(radarRows),
     recentReportIds,
     collegeEnrollmentAccepted: enrollment?.enrollment_status === 'active',

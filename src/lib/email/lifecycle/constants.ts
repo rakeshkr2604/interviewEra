@@ -10,4 +10,5 @@ export type LifecycleTemplateName =
   | 'verification'
   | 'welcome'
   | 'interview_completed'
+  | 'interview_recovery'
   | 'weekly_progress';

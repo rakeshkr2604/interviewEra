@@ -381,6 +381,8 @@ async function runSynthesis(args: {
   targetRole: string;
   scriptType: string | null;
   aggregate: Extract<AggregatedScriptReport, { kind: 'scored' }>;
+  interviewId?: string;
+  userId?: string;
 }): Promise<{
   synthesis: ScriptReportSynthesis;
   model: string | null;
@@ -432,6 +434,8 @@ async function runSynthesis(args: {
         operation: 'script_report_synthesis',
         jsonMode: true,
         signal: AbortSignal.timeout(SYNTHESIS_TIMEOUT_MS),
+        interviewId: args.interviewId,
+        userId: args.userId,
       });
       modelUsed = completion.model;
       rawOutputs.push(completion.content);
@@ -610,6 +614,8 @@ async function buildAndPersistReport(args: {
     targetRole: role ?? '',
     scriptType,
     aggregate,
+    interviewId,
+    userId,
   });
 
   const perQuestion = mergeModelAnswers(aggregate, synthesis);
