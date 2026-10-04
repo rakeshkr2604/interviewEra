@@ -74,12 +74,20 @@ describe('PATCH /api/interview/script/complete', () => {
     )
     expect(res.status).toBe(200)
     expect(db.interviews[0].status).toBe('completed')
+    expect(db.interviews[0].performance_bucket).toBe('average')
     expect(persistMilestoneEventOnce).toHaveBeenCalledTimes(1)
     expect(persistMilestoneEventOnce).toHaveBeenCalledWith('interview_completed', {
       user_id: USER.id,
       interview_id: IV,
       engine: 'v2.1',
     })
+  })
+
+  it('ignores client-supplied performanceBucket (integrity)', async () => {
+    const res = await PATCH(req({ interviewId: IV, performanceBucket: 'strong' }))
+    expect(res.status).toBe(200)
+    expect(db.interviews[0].status).toBe('completed')
+    expect(db.interviews[0].performance_bucket).toBe('average')
   })
 
   it('already-completed repair emits interview_completed (052 dedupe)', async () => {

@@ -1,7 +1,7 @@
 /**
  * Admin analytics API — AI infrastructure metrics.
  *
- * Access: restricted to emails listed in ADMIN_EMAILS env var (comma-separated).
+ * Access: requirePlatformAdmin (ADMIN_EMAILS + builtin founders + platform_role=admin).
  * All queries read from the telemetry tables created in supabase/migrations/023_ai_telemetry.sql.
  *
  * GET /api/admin/metrics?section=overview|finance|providers|users|abuse
@@ -9,17 +9,11 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
+import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { getIntelligenceSummary } from '@/lib/ai/provider-intelligence';
 
 type MetricsSection = 'overview' | 'finance' | 'providers' | 'users' | 'abuse';
-
-function getAdminEmails(): Set<string> {
-  const raw = process.env.ADMIN_EMAILS ?? '';
-  return new Set(
-    raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
-  );
-}
 
 function todayUTC(): string {
   return new Date().toISOString().slice(0, 10);
@@ -31,17 +25,9 @@ function thisMonthUTC(): string {
 }
 
 export async function GET(request: NextRequest) {
-  // ── 1. Auth ────────────────────────────────────────────────────────────────
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // ── 2. Admin gate ──────────────────────────────────────────────────────────
-  const adminEmails = getAdminEmails();
-  if (!adminEmails.has(user.email?.toLowerCase() ?? '')) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const { admin, error: adminError } = await requirePlatformAdmin();
+  if (adminError || !admin) {
+    return adminError ?? NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const section = (request.nextUrl.searchParams.get('section') ?? 'all') as MetricsSection | 'all';

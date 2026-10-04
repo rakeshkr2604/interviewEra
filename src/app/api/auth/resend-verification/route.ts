@@ -42,15 +42,27 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const email = parsed.data.email.trim().toLowerCase();
   const next = sanitizeNext(parsed.data.next);
 
-  const rlIp = await checkRateLimit(`resend-verification:${ip}`, 3600, 5);
-  const rlEmail = await checkRateLimit(`resend-verification:${email}`, 3600, 3);
+  const rlIp = await checkRateLimit(`resend-verification:${ip}`, 3600, 5, { failClosed: true });
+  const rlEmail = await checkRateLimit(`resend-verification:${email}`, 3600, 3, {
+    failClosed: true,
+  });
   if (!rlIp.allowed || !rlEmail.allowed) {
+    const redisUnavailable = Boolean(rlIp.redisUnavailable || rlEmail.redisUnavailable);
     return NextResponse.json(
       {
-        error: 'Too many requests. Please wait before requesting another email.',
-        code: 'RATE_LIMITED',
+        error: redisUnavailable
+          ? 'Service temporarily unavailable. Please retry in a moment.'
+          : 'Too many requests. Please wait before requesting another email.',
+        code: redisUnavailable ? 'RATE_LIMIT_UNAVAILABLE' : 'RATE_LIMITED',
       },
-      { status: 429 },
+      {
+        status: redisUnavailable ? 503 : 429,
+        headers: {
+          'Retry-After': String(
+            Math.max(rlIp.resetInSeconds ?? 0, rlEmail.resetInSeconds ?? 0) || 60,
+          ),
+        },
+      },
     );
   }
 

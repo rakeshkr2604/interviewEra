@@ -20,6 +20,7 @@ import {
   type QgQuestion,
   type QgResultMeta,
 } from '@/lib/question-engine/schemas';
+import { validateJobDescriptionDocumentText } from '@/lib/documents/validate-resume-document-text';
 
 export interface GenerateResult {
   questions?: QgQuestion[];
@@ -76,6 +77,10 @@ export async function generateQuestionsAction(
     if (jd.length > QG_JD_MAX_CHARS) {
       return { error: 'Job description is too long (4,000 character max). Trim it and try again.' };
     }
+    const jdDoc = validateJobDescriptionDocumentText(jd);
+    if (!jdDoc.ok) {
+      return { error: jdDoc.message };
+    }
   } else if (mode === 'topic') {
     if (!topic || topic.length < TOPIC_MIN_CHARS || topic.length > QG_TOPIC_MAX_CHARS) {
       return { error: `Please enter a valid topic (${TOPIC_MIN_CHARS}–${QG_TOPIC_MAX_CHARS} characters).` };
@@ -97,7 +102,7 @@ export async function generateQuestionsAction(
   const signedIn = isSignedInFromHeaders(headersList);
 
   const limited = await checkAndConsumeFreeToolLimit('question-generator', ip, {
-    failClosed: false,
+    failClosed: true,
   });
   if (!limited.ok) {
     logToolUsage({ tool: 'question_generator', mode, event: 'rate_limited', signed_in: signedIn });

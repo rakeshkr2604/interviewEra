@@ -17,40 +17,47 @@ export async function GET(): Promise<NextResponse> {
       .limit(1)
 
     if (error) {
+      // Do not echo provider error strings to unauthenticated clients.
+      console.error('[health] db ping failed', error.message)
       return NextResponse.json(
-        { status: 'degraded', db: 'error', message: error.message },
-        { status: 503 }
+        { status: 'degraded', db: 'error', latencyMs: Date.now() - start },
+        { status: 503 },
       )
     }
 
-    let storageResumes: { ok: boolean; message?: string } = { ok: true }
+    let storageOk = true
     try {
       const { error: storageError } = await supabase.storage.from('resumes').list('', { limit: 1 })
       if (storageError) {
-        storageResumes = { ok: false, message: storageError.message }
+        storageOk = false
+        console.error('[health] storage resumes list failed', storageError.message)
       }
     } catch (e) {
-      storageResumes = {
-        ok: false,
-        message: e instanceof Error ? e.message : 'storage list failed',
-      }
+      storageOk = false
+      console.error(
+        '[health] storage resumes list threw',
+        e instanceof Error ? e.message : 'storage list failed',
+      )
     }
 
     return NextResponse.json({
-      status: storageResumes.ok ? 'ok' : 'degraded',
+      status: storageOk ? 'ok' : 'degraded',
       db: 'connected',
-      storageResumes,
+      storageResumes: { ok: storageOk },
       latencyMs: Date.now() - start,
       ts: new Date().toISOString(),
     })
   } catch (err) {
+    console.error(
+      '[health] unexpected',
+      err instanceof Error ? err.message : 'Unknown error',
+    )
     return NextResponse.json(
       {
         status: 'error',
-        message: err instanceof Error ? err.message : 'Unknown error',
         latencyMs: Date.now() - start,
       },
-      { status: 503 }
+      { status: 503 },
     )
   }
 }

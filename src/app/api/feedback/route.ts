@@ -24,11 +24,18 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   // ── Rate limit: max 5 submissions / 10 min per user. ────────────────────────
-  const rl = await checkRateLimit(`feedback:${user.id}`, 600, 5);
+  const rl = await checkRateLimit(`feedback:${user.id}`, 600, 5, { failClosed: true });
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: 'Too many submissions. Please try again in a few minutes.' },
-      { status: 429 },
+      {
+        error: rl.redisUnavailable
+          ? 'Service temporarily unavailable. Please retry in a moment.'
+          : 'Too many submissions. Please try again in a few minutes.',
+      },
+      {
+        status: rl.redisUnavailable ? 503 : 429,
+        headers: { 'Retry-After': String(rl.resetInSeconds) },
+      },
     );
   }
 

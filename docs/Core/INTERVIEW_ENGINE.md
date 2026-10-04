@@ -31,6 +31,18 @@ Document the **current** mock-interview engine: V2.1 script engine. Legacy V1 du
 | `complete` | Finish interview; backfill scores if needed |
 | `report` | Script interview report |
 
+### Request input ceilings (server Zod)
+
+Shared schemas: `src/lib/interview/script-turn-request-schema.ts` (`SCRIPT_ANSWER_MAX_CHARS = 12_000`).
+
+| Field | Max chars | Routes |
+|---|---|---|
+| `lastAnswer` / `sttRawTranscript` / `transcript` / `rawTranscript` | 12_000 | turn, answer-score, auto-structure |
+| `displayQuestion` | 2_000 | answer-score, auto-structure |
+| `targetRole` | 100 | answer-score, auto-structure |
+
+Oversized bodies → `400` with Zod `fieldErrors` before persistence or LLM calls. Special values `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` remain valid.
+
 ### Tables
 
 - `interviews` (+ v2.1 columns)

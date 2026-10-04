@@ -1,7 +1,7 @@
 /**
  * Gated upload / env diagnostics. Enable on Vercel only while debugging:
  * - IE_UPLOAD_DIAGNOSTICS=1 — richer JSON errors + stacks from resume upload route
- * - IE_DEBUG_ROUTES=1 — unlock /api/debug/env, /api/debug/storage, /api/debug/storage-upload
+ * - IE_DEBUG_ROUTES=1 — unlock /api/debug/* for platform admins only (not any logged-in user)
  * - IE_UPLOAD_SKIP_DB=1 — resume upload returns after storage only (see route)
  * - IE_UPLOAD_BYPASS_PARSE=1 — skip PDF/text extraction + doc checks; storage + DB test only
  */

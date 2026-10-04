@@ -17,13 +17,13 @@ import {
 } from '@/lib/pdf/parser';
 import { PDFTooManyPagesError } from '@/lib/pdf/parser-errors';
 import { assertPdfPageLimit, RESUME_PDF_MAX_PAGES } from '@/lib/pdf/page-count';
-import { assertLooksLikeResume } from '@/lib/documents/document-classification';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { MULTIPART_UPLOAD_MAX_BYTES, normalizedUploadContentType } from '@/lib/http/upload-limits';
 import { normalizeExtractedDocumentText } from '@/lib/utils/normalize-extracted-document-text';
 import { runLayeredTextExtraction } from '@/lib/resume/extraction-pipeline';
-import { isObviouslyGarbage, scoreExtractedText } from '@/lib/resume/extraction-quality';
+import { scoreExtractedText } from '@/lib/resume/extraction-quality';
 import { RESUME_HARD_FAIL_MESSAGES, resumeUserError } from '@/lib/resume/parse-outcome';
+import { validateResumeDocumentText } from '@/lib/documents/validate-resume-document-text';
 import { getAttributionFromRequest } from '@/lib/analytics/attribution';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEvent } from '@/lib/analytics/product-events';
@@ -43,7 +43,7 @@ export const maxDuration = 60;
 const MAX_FILE_SIZE = MULTIPART_UPLOAD_MAX_BYTES;
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.txt']);
 
-/** Placeholder body when IE_UPLOAD_BYPASS_PARSE=1 — must pass assertLooksLikeResume heuristics. */
+/** Placeholder body when IE_UPLOAD_BYPASS_PARSE=1 — must pass resume document heuristics. */
 const BYPASS_RESUME_PLACEHOLDER = `
 Resume — Debug Bypass Parse
 Work experience
@@ -548,13 +548,12 @@ export async function POST(request: Request): Promise<NextResponse> {
         return uploadReject('SCANNED_NO_TEXT', m.userMessage, m.suggestion, 422, reqId);
       }
 
-      if (isObviouslyGarbage(sanitizedRaw)) {
-        const m = RESUME_HARD_FAIL_MESSAGES.GARBAGE_CONTENT;
-        return uploadReject('GARBAGE_CONTENT', m.userMessage, m.suggestion, 422, reqId);
-      }
-
-      const resumeDocCheck = assertLooksLikeResume(sanitizedRaw);
+      const resumeDocCheck = validateResumeDocumentText(sanitizedRaw);
       if (!resumeDocCheck.ok) {
+        if (resumeDocCheck.code === 'GARBAGE_CONTENT') {
+          const m = RESUME_HARD_FAIL_MESSAGES.GARBAGE_CONTENT;
+          return uploadReject('GARBAGE_CONTENT', m.userMessage, m.suggestion, 422, reqId);
+        }
         const m = RESUME_HARD_FAIL_MESSAGES.WRONG_DOCUMENT_TYPE;
         return uploadReject(
           'WRONG_DOCUMENT_TYPE',
@@ -719,6 +718,24 @@ export async function POST(request: Request): Promise<NextResponse> {
     });
 
     if (writeError || !resume) {
+      // Best-effort cleanup: do not leave orphaned objects after a failed DB write.
+      try {
+        const { error: removeErr } = await serviceClient.storage.from(RESUME_BUCKET).remove([filePath]);
+        if (removeErr) {
+          console.warn('[UPLOAD_STAGE] storage_cleanup_failed_after_db_error', {
+            reqId,
+            filePath,
+            message: removeErr.message,
+          });
+        }
+      } catch (cleanupErr) {
+        console.warn('[UPLOAD_STAGE] storage_cleanup_threw_after_db_error', {
+          reqId,
+          filePath,
+          err: cleanupErr instanceof Error ? cleanupErr.message : String(cleanupErr),
+        });
+      }
+
       const isFk =
         writeError?.code === '23503' ||
         (typeof writeError?.message === 'string' && writeError.message.includes('foreign key'));

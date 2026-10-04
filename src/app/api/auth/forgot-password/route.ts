@@ -47,16 +47,21 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const ip = clientIp(request);
-  const rl = await checkRateLimit(`forgot-password:${ip}`, 60, 5);
+  const rl = await checkRateLimit(`forgot-password:${ip}`, 60, 5, { failClosed: true });
   if (!rl.allowed) {
-    console.warn('[password-reset] rate_limited', { reqId, ip });
+    console.warn('[password-reset] rate_limited', { reqId, ip, redisUnavailable: rl.redisUnavailable });
     return NextResponse.json(
       {
-        error: 'Too many reset attempts. Please wait a minute and try again.',
-        code: 'RATE_LIMITED',
+        error: rl.redisUnavailable
+          ? 'Service temporarily unavailable. Please retry in a moment.'
+          : 'Too many reset attempts. Please wait a minute and try again.',
+        code: rl.redisUnavailable ? 'RATE_LIMIT_UNAVAILABLE' : 'RATE_LIMITED',
         requestId: reqId,
       },
-      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } },
+      {
+        status: rl.redisUnavailable ? 503 : 429,
+        headers: { 'Retry-After': String(rl.resetInSeconds) },
+      },
     );
   }
 

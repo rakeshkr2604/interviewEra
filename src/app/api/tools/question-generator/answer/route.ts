@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   const ip = clientIp(request);
   const signedIn = isSignedInFromHeaders(request.headers);
   const limited = await checkAndConsumeFreeToolLimit('question-generator-answer', ip, {
-    failClosed: false,
+    failClosed: true,
   });
   if (!limited.ok) {
     logToolUsage({ tool: 'question_generator', mode: 'answer', event: 'rate_limited', signed_in: signedIn });

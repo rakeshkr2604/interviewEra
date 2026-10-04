@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { getScript } from '@/lib/ai/scripts/script-loader';
 import { buildRuntimeContext, experienceYearsToLevel } from '@/lib/ai/scripts/runtime-context';
@@ -65,30 +64,11 @@ import {
   selectCandidateQuestionGuidance,
 } from '@/lib/interview/candidate-questions/guidance';
 import { buildCandidateQuestionConversation } from '@/lib/interview/candidate-questions/context';
+import { turnRequestSchema } from '@/lib/interview/script-turn-request-schema';
 
 const SPECIAL_VALUES = ['[NONE]', '[SKIPPED]', '[TIMEOUT]'] as const;
 
 const LLM_TIMEOUT_MS = 45_000;
-
-const turnRequestSchema = z.object({
-  interviewId: z.string().uuid(),
-  lastAnswer: z.string(),
-  currentPhase: z.enum(['warmup', 'self_intro', 'core', 'candidate_questions', 'closing']),
-  /**
-   * Client-sent counter kept for request-contract compatibility.
-   * IGNORED — server derives question_number from script_turns (authority).
-   */
-  questionNumber: z.number(),
-  // 'structured' kept for legacy clients; new UI submits 'corrected' (STT cleanup only).
-  submittedAs: z.enum(['raw', 'corrected', 'structured', 'auto_submit']).optional(),
-  prevTurnIndex: z.number().optional(),
-  /**
-   * Original STT (or typed) transcript for the previous turn.
-   * Written once into script_turns.raw_transcript and never overwritten when
-   * the candidate later submits a corrected version as answer_text.
-   */
-  sttRawTranscript: z.string().optional(),
-});
 
 type InterviewRow = {
   interviewer_id: 'priya' | 'arjun';

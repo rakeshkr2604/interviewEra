@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { getTokenBudget } from '@/lib/ai/token-budget';
@@ -19,6 +18,7 @@ import { resolveQuestionType } from '@/lib/interview/answer-score/question-type'
 import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation';
 import { clampText } from '@/lib/ai/context-hygiene';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
+import { answerScoreRequestSchema } from '@/lib/interview/script-turn-request-schema';
 
 const MIN_SCOREABLE_WORDS = 5;
 /**
@@ -27,17 +27,6 @@ const MIN_SCOREABLE_WORDS = 5;
  * score_suspect (low_stt_confidence) for the audit queue.
  */
 const LOW_STT_CONFIDENCE_THRESHOLD = 0.6;
-
-const answerScoreRequestSchema = z.object({
-  interviewId: z.string().uuid(),
-  turnIndex: z.number(),
-  transcript: z.string(),
-  displayQuestion: z.string().min(1),
-  targetRole: z.string(),
-  questionType: z.enum(['technical', 'behavioral']).optional(),
-  /** Min Deepgram final-segment confidence (0–1) for this answer, when captured. */
-  sttMinConfidence: z.number().min(0).max(1).optional(),
-});
 
 function isTimeoutError(err: unknown): boolean {
   if (err instanceof DOMException && (err.name === 'AbortError' || err.name === 'TimeoutError')) {

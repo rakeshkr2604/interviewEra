@@ -1,7 +1,7 @@
 # CLAUDE.md — Thin adapter
 
 > Status: CANONICAL (adapter)
-> Last Verified: 2026-09-27
+> Last Verified: 2026-10-01
 > Verification Scope: Claude Code / Claude-in-Cursor entry
 > Authority: **Read [`AGENTS.md`](AGENTS.md) first.** This file only adds Claude-oriented command shortcuts. If this file and AGENTS.md disagree, **AGENTS.md wins.**
 
@@ -47,3 +47,4 @@ Migrations: [`docs/Guidelines/DATABASE_MIGRATIONS.md`](docs/Guidelines/DATABASE_
 - Every completion: include **Documentation Impact** per AGENTS.md.
 - Do not edit `src/`, `e2e/`, or `supabase/migrations` on docs-only tasks.
 - Archive under `docs/archive/**` is historical — not current SoT.
+- Multi-phase push/merge/hygiene: follow AGENTS.md summary → [`docs/Guidelines/ENGINEERING_WORKFLOW.md`](docs/Guidelines/ENGINEERING_WORKFLOW.md). Do not invent adapter-only Git rules.

@@ -10,3 +10,4 @@ If this file and AGENTS.md disagree, **AGENTS.md wins.**
 4. Migrations: `.cursor/rules/supabase-migrations.mdc` still applies (serial `NNN_snake_case.sql`, never rewrite, never timestamp names).
 5. Prefer minimal diffs; degrade-don't-fail; never claim unverified checks.
 6. If the task is docs-only, do not modify `src/`, `e2e/`, or `supabase/migrations`. Code tasks still require Documentation Impact.
+7. Multi-phase Git: deferred push, hygiene, pre-push/pre-merge — see AGENTS.md → [`docs/Guidelines/ENGINEERING_WORKFLOW.md`](docs/Guidelines/ENGINEERING_WORKFLOW.md). Do not duplicate conflicting push rules here.

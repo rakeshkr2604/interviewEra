@@ -3,9 +3,13 @@
  * Backed by shared Upstash Redis (`checkRateLimit`) so limits hold across
  * Vercel serverless instances. Policy numbers match the former in-memory limits.
  *
- * Fail-closed vs fail-open on Redis outage is chosen by each caller via options
- * (not hardcoded by tool id) so expensive tools can opt in without taking down
- * cheaper lead-gen tools during a Redis blip.
+ * ## Failure policy (LLM free tools)
+ * All LLM-backed free tools (ATS, Question Generator, QG answer, STAR) MUST call
+ * with `failClosed: true`. On Redis errors they return a generic 503-style message
+ * (`REDIS_UNAVAILABLE_MESSAGE`) — never raw provider exceptions.
+ *
+ * Local/dev without Redis configured still fail-open inside `checkRateLimit`
+ * (by design for DX). Production must configure Upstash so failClosed is meaningful.
  *
  * Tools may declare an optional `secondary` window (e.g. hourly + daily cap).
  * Windows are checked in order; the first blocked window denies the request.
@@ -22,8 +26,7 @@ export type FreeToolId =
 export type FreeToolRateLimitOptions = {
   /**
    * When true, deny the request if Redis is unavailable.
-   * Callers for expensive tools (e.g. ATS) should pass true; cheaper tools
-   * should pass false so a Redis outage does not kill availability.
+   * Required `true` for all LLM free-tool call sites (cost / abuse control).
    */
   failClosed: boolean;
 };

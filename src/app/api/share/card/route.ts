@@ -1,8 +1,27 @@
 import { ImageResponse } from 'next/og';
 import React from 'react';
 import { safeText } from '@/lib/utils/sanitize';
+import { buildRateLimitHttpResponse, checkRateLimit } from '@/lib/redis/rate-limit';
+
+function clientIp(request: Request): string {
+  return (
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
+    request.headers.get('x-real-ip')?.trim() ??
+    'unknown'
+  );
+}
 
 export async function GET(request: Request): Promise<Response> {
+  const ip = clientIp(request);
+  const rl = await checkRateLimit(`share-card:${ip}`, 60, 30, { failClosed: true });
+  const rlHttp = buildRateLimitHttpResponse(
+    rl,
+    'Too many share-card requests. Please try again shortly.',
+  );
+  if (rlHttp) {
+    return Response.json(rlHttp.body, { status: rlHttp.status, headers: rlHttp.headers });
+  }
+
   const { searchParams } = new URL(request.url);
   const score = parseFloat(searchParams.get('score') ?? '0');
   const role = safeText(searchParams.get('role') ?? 'Interview', 120);

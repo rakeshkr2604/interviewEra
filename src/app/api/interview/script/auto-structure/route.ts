@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { getTokenBudget } from '@/lib/ai/token-budget';
@@ -15,16 +14,7 @@ import {
 import { normalizeAutoStructureOutput } from '@/lib/interview/auto-structure/normalize';
 import type { NormalizedAutoStructure } from '@/lib/interview/auto-structure/normalize';
 import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
-
-const autoStructureSchema = z.object({
-  interviewId: z.string().uuid(),
-  turnIndex: z.number(),
-  rawTranscript: z.string(),
-  displayQuestion: z.string(),
-  targetRole: z.string(),
-  scriptType: z.enum(['SCRIPT_H', 'SCRIPT_T', 'SCRIPT_M']),
-  questionType: z.enum(['technical', 'behavioral']).optional(),
-});
+import { autoStructureSchema } from '@/lib/interview/script-turn-request-schema';
 
 /**
  * Single LLM call returns BOTH:

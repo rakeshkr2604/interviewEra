@@ -68,8 +68,9 @@ export const RESUME_HARD_FAIL_MESSAGES: Record<
     suggestion: '',
   },
   WRONG_DOCUMENT_TYPE: {
-    userMessage: 'This file reads like a job posting, not your resume.',
-    suggestion: 'Upload your CV here and paste the employer JD in the job description section.',
+    userMessage: 'This file does not look like a resume or CV.',
+    suggestion:
+      'Upload a CV with experience, education, or skills. Put job postings in the Job description section — not planners or unrelated PDFs.',
   },
   GARBAGE_CONTENT: {
     userMessage: 'The upload completed, but the resume content was unclear.',

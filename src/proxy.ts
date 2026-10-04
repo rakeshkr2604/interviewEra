@@ -52,6 +52,13 @@ const AUTH_ROUTES = new Set(['/login', '/signup', '/auth/verify-pending']);
 const RATE_LIMITS: [string, number, number][] = [
   ['/api/interview/answer', 60, 60],
   ['/api/interview/script/start', 10, 60],
+  // Expensive LLM paths — order more-specific prefixes before `/api/interview/script` if added later.
+  ['/api/interview/script/turn', 40, 60],
+  ['/api/interview/script/answer-score', 30, 60],
+  ['/api/interview/script/auto-structure', 30, 60],
+  ['/api/interview/script/report', 20, 60],
+  ['/api/interview/script/complete', 20, 60],
+  ['/api/report/generate', 10, 60],
   ['/api/resume/upload',     5, 60],
   ['/api/payments',         10, 60],
   ['/api/tools',             5, 60],
@@ -61,7 +68,6 @@ const RATE_LIMITS: [string, number, number][] = [
   ['/api/auth/forgot-password', 5, 60],
   ['/api/coach', 20, 60],
 ];
-
 /** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
 const PRODUCTION_APEX = 'interviewera.com';
 

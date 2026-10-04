@@ -23,7 +23,11 @@ function emitScriptInterviewCompleted(userId: string, interviewId: string): void
 
 const completeSchema = z.object({
   interviewId: z.string().uuid(),
-  performanceBucket: z.enum(['strong', 'average', 'low']),
+  /**
+   * @deprecated Client-supplied bucket is ignored. Kept optional for request compatibility.
+   * Server always persists a safe default on this repair path (turn-route completion is SoT).
+   */
+  performanceBucket: z.enum(['strong', 'average', 'low']).optional(),
 });
 
 export async function PATCH(request: Request): Promise<NextResponse> {
@@ -58,8 +62,10 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       );
     }
 
-    const { interviewId, performanceBucket } = validation.data;
+    const { interviewId } = validation.data;
     interviewIdForLog = interviewId;
+    // Never trust client performanceBucket — repair PATCH is not the scoring authority.
+    const performanceBucket = 'average' as const;
 
     // Step 2 — ownership
     const serviceClient = createServiceClient();

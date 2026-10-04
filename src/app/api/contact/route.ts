@@ -22,9 +22,17 @@ function escapeHtml(input: string): string {
 
 export async function POST(request: Request): Promise<NextResponse> {
   const ip = clientIp(request);
-  const rl = await checkRateLimit(`contact-form:${ip}`, 3600, 5);
+  const rl = await checkRateLimit(`contact-form:${ip}`, 3600, 5, { failClosed: true });
   if (!rl.allowed) {
-    return NextResponse.json({ error: 'Too many messages. Please try again later.' }, { status: 429 });
+    const status = rl.redisUnavailable ? 503 : 429;
+    return NextResponse.json(
+      {
+        error: rl.redisUnavailable
+          ? 'Service temporarily unavailable. Please retry in a moment.'
+          : 'Too many messages. Please try again later.',
+      },
+      { status, headers: { 'Retry-After': String(rl.resetInSeconds) } },
+    );
   }
 
   let body: unknown;

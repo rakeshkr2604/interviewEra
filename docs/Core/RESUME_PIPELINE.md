@@ -1,8 +1,8 @@
 # Resume Pipeline
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Upload/extract/parse + storage signed URL path
+> Last Verified: 2026-10-04
+> Verification Scope: Upload/extract/parse + content classification + storage privacy
 > Authority: Resume text extraction and AI parse
 
 ## Purpose
@@ -13,12 +13,19 @@ Funnel-critical path: file → text → structured `parsed_data`.
 
 ```
 POST /api/resume/upload
+  → size/ext + PDF magic/pages/encrypt checks
   → pdf/parser extractText
   → extraction-pipeline runLayeredTextExtraction
-  → quality gate → DB status: parsing
+  → validateResumeDocumentText (shared; positive CV signals; reject JD/trackers)
+  → storage upload → DB status: parsing (orphan object removed if DB write fails)
 POST /api/resume/parse
   → graceful-parse → OpenRouter parseResume (or regex fallback)
   → status: parsed
+
+ATS free tool (server action checkAtsAction) — separate entry, same semantic gate:
+  → size/ext + extract (PDF/DOCX/TXT)
+  → validateResumeDocumentText before cache/LLM
+  → optional JD → validateJobDescriptionDocumentText when ≥40 chars
 ```
 
 ### Extract fallbacks
@@ -27,13 +34,25 @@ POST /api/resume/parse
 2. `pdf-parse`
 3. OCR `tesseract.js` (≤3 pages / 12s / 4MB, 8/hour) if &lt; `MIN_USEFUL_CHARS` (12)
 
-Never hard-fail upload on weak text — degrade. Only `.pdf` / `.txt` (no docx).
+Weak extraction may still proceed with `extractionWarning`; empty/garbage/wrong-document-type hard-fail. Only `.pdf` / `.txt` (no docx).
+
+### Content validation
+
+- Classifier: `src/lib/documents/document-classification.ts`
+- Shared gate: `src/lib/documents/validate-resume-document-text.ts` — used by interview upload **and** ATS Resume Checker
+- Resume slot requires ≥2 resume-pattern hits (or clear `resume` kind); rejects clear JDs and non-resume planners/trackers
+- ATS optional JD field uses `validateJobDescriptionDocumentText` (reject resume-as-JD)
+- Product upload: `.pdf`/`.txt` only (no docx). ATS free tool also accepts `.docx`
+- AI parse treats `<resume_document>` as untrusted data (prompt fencing)
 
 ### Storage privacy
 
 - Canonical file presence: non-empty `storage_path`
 - Download: `GET /api/resume/:id/file` → 120s signed URL; `Cache-Control: private, no-store`
-- `file_url` deprecated for product behavior; bucket still public until later phase
+- `file_url` deprecated for product behavior (may still be dual-written; public object URLs do **not** serve content)
+- Migration `112_resumes_bucket_private_and_storage_policies.sql`: bucket `public=false` + own-path storage RLS
+  - **Staging** `iiowrzfwemaxytbykjrg`: applied (`20261004055215`)
+  - **Production** `plfuvgkycmxcyshrgpgv`: applied (`20261004064336`)
 
 Flags: `RESUME_OCR_ENABLED` (unset = **on**), `RESUME_PARSE_FORCE_AI`.
 
@@ -41,6 +60,7 @@ Flags: `RESUME_OCR_ENABLED` (unset = **on**), `RESUME_PARSE_FORCE_AI`.
 
 - Serverless: `next.config.ts` must trace `pdfjs-dist` / `@napi-rs/canvas` assets
 - Typed errors: `PDFEncryptedError`, `PDFScannedNoTextError`, …
+- Upload rate limit: fail-closed (`upload:{userId}`, 5 / 300s)
 
 ## Dependencies
 
@@ -54,14 +74,20 @@ pdfjs · pdf-parse · tesseract · OpenRouter · Supabase Storage · [AI_PIPELIN
 | Encrypted PDF | Typed error to user |
 | OCR cost spike | Bound + opt-out flag |
 | Low text | Regex `buildFallbackParsedResume` |
+| Non-resume PDF (tracker/JD) | `WRONG_DOCUMENT_TYPE` 422 before storage |
+| DB write fails after storage | Best-effort `storage.remove` |
 
 ## Verification
 
-`npm run verify:pdf` against fixtures before any extract-chain change.
+`npm run verify:pdf` against fixtures before any extract-chain change.  
+Classifier / shared gate:  
+`npx vitest run src/lib/documents/document-classification.test.ts src/lib/documents/validate-resume-document-text.test.ts`  
+ATS ordering + semantic rejects:  
+`npx vitest run "src/app/(marketing)/tools/ats-checker/ats-pipeline-order.test.ts"`
 
 ## Change Triggers
 
-Parser · OCR bounds · `MIN_USEFUL_CHARS` · storage path semantics · new upload route without tracing
+Parser · OCR bounds · `MIN_USEFUL_CHARS` · classifier thresholds · storage path semantics · bucket public flag · new upload route without tracing
 
 ## Related Documents
 

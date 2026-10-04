@@ -1,8 +1,8 @@
 # AGENTS.md — InterviewEra Agent Contract
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Agent governance + architecture facts reverse-engineered from code
+> Last Verified: 2026-10-01
+> Verification Scope: Agent governance + architecture facts reverse-engineered from code + multi-phase Git/hygiene gates
 > Authority: **Universal source of truth for all AI agents** (Cursor, Claude, others). Thin adapters (`CLAUDE.md`, `.cursorrules`) point here — they must not diverge.
 
 ## Purpose
@@ -102,6 +102,7 @@ Full meanings preserved — do not bypass. Detail in linked Core docs.
 | New migration | `docs/Guidelines/DATABASE_MIGRATIONS.md` + `.cursor/rules/supabase-migrations.mdc` |
 | Flags | `docs/Operations/FEATURE_FLAGS.md` |
 | Ship / CI | `docs/Operations/RELEASE.md`, `QUALITY_GATES.md` |
+| Multi-phase work / push / merge | `docs/Guidelines/ENGINEERING_WORKFLOW.md` |
 | Doc process | `docs/Guidelines/DOCUMENTATION_GOVERNANCE.md` |
 
 Edit-risk zones (do-not-edit / caution / safe): [`docs/Guidelines/CODE_ORGANIZATION.md`](docs/Guidelines/CODE_ORGANIZATION.md).
@@ -162,5 +163,16 @@ Mandatory completion section (include in the agent’s final report):
 2. Run verification for touched domains
 3. Fill **Documentation Impact** above
 4. If High Risk: name the Core doc you read
+
+### Multi-phase Git / hygiene (summary)
+
+Detail: [`docs/Guidelines/ENGINEERING_WORKFLOW.md`](docs/Guidelines/ENGINEERING_WORKFLOW.md).
+
+- Preserve the loop: DISCOVER → VERIFY → PLAN → IMPLEMENT → TEST → AUDIT → UPDATE DOCUMENTATION → VERIFY DOCUMENTATION → REPORT (+ phase report).
+- **Deferred push:** do not push intermediate phase commits during an in-progress multi-phase task unless the user explicitly authorizes an earlier push. Local commit ≠ on GitHub ≠ deployed.
+- Do not amend / reset / rebase / squash / rewrite history without explicit authorization. Preserve unrelated dirty/untracked files.
+- After all planned phases: **repository hygiene** → **pre-push verification** → push only with **explicit authorization** (normal non-force push). If remote diverged → stop and request review.
+- **Pre-merge hygiene** after push; merge only with **explicit authorization**. Push ≠ merge approval.
+- **Post-merge:** verify expected tip / CI / deploy as in scope; no unverified impact claims.
 
 Adapters: [`CLAUDE.md`](CLAUDE.md) · [`.cursorrules`](.cursorrules) · index [`docs/INDEX.md`](docs/INDEX.md)

@@ -1,25 +1,16 @@
 import { NextResponse } from 'next/server';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
-import { isDebugRoutesEnabled, isUploadDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
+import { createServiceClient } from '@/lib/supabase/server';
+import { isUploadDiagnosticsEnabled } from '@/lib/debug/upload-diagnostics';
+import { requireDebugAdminAccess } from '@/lib/debug/require-debug-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** Raw storage.list on `resumes` bucket (service role). Requires IE_DEBUG_ROUTES=1 + login. */
+/** Raw storage.list on `resumes` bucket (service role). Requires IE_DEBUG_ROUTES=1 + platform admin. */
 export async function GET(): Promise<NextResponse> {
-  if (!isDebugRoutesEnabled()) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireDebugAdminAccess();
+  if (gate.error) return gate.error;
+  const admin = gate.admin;
 
   try {
     const client = createServiceClient();
@@ -27,7 +18,7 @@ export async function GET(): Promise<NextResponse> {
 
     return NextResponse.json({
       ok: !error,
-      userIdPrefix: user.id.slice(0, 8),
+      userIdPrefix: admin.id.slice(0, 8),
       listError: error
         ? { message: error.message, name: (error as { name?: string }).name }
         : null,

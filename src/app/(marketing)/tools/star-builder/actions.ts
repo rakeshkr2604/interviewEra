@@ -317,7 +317,7 @@ export async function buildStarAction(
   const ip = getClientIp(headersList);
   const signedIn = isSignedInFromHeaders(headersList);
   const limited = await checkAndConsumeFreeToolLimit('star-builder', ip, {
-    failClosed: false,
+    failClosed: true,
   });
   if (!limited.ok) {
     logToolUsage({ tool: 'star', event: 'rate_limited', signed_in: signedIn });

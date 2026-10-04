@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
-import { createClient, createServiceClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 import { getMultipleFilesError } from '@/lib/http/form-data-single-file';
 import { normalizedUploadContentType } from '@/lib/http/upload-limits';
-import { isDebugRoutesEnabled } from '@/lib/debug/upload-diagnostics';
+import { requireDebugAdminAccess } from '@/lib/debug/require-debug-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,24 +12,19 @@ const MAX_DEBUG_BYTES = 32 * 1024;
 
 /**
  * Minimal path: multipart → small .txt only → Buffer → service storage upload.
- * No PDF parser. Requires IE_DEBUG_ROUTES=1 + login. Isolates storage/auth/env.
+ * No PDF parser. Requires IE_DEBUG_ROUTES=1 + platform admin.
  */
 export async function POST(request: Request): Promise<NextResponse> {
   const reqId = randomUUID().slice(0, 8);
 
-  if (!isDebugRoutesEnabled()) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  const gate = await requireDebugAdminAccess();
+  if (gate.error) {
+    const body = gate.error.status === 404
+      ? { error: 'Not found' }
+      : { error: gate.error.status === 401 ? 'Unauthorized' : 'Forbidden', requestId: reqId };
+    return NextResponse.json(body, { status: gate.error.status });
   }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized', requestId: reqId }, { status: 401 });
-  }
+  const admin = gate.admin;
 
   console.log('[UPLOAD_STAGE] debug_storage_upload formData_start', { reqId });
   let formData: FormData;
@@ -81,7 +76,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     );
   }
 
-  const path = `resumes/${user.id}/debug-${Date.now()}.txt`;
+  const path = `resumes/${admin.id}/debug-${Date.now()}.txt`;
   const contentType = normalizedUploadContentType(file.type, '.txt');
 
   console.log('[UPLOAD_STAGE] debug_storage_upload storage_upload_start', { reqId, path, size: buf.length });

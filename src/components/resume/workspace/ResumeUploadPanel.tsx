@@ -20,6 +20,7 @@ import type { UploadErrorKind, UploadPhase } from './types';
 
 /** Matches server MULTIPART_UPLOAD_MAX_BYTES (Vercel body cap). */
 const MAX_BYTES = 4 * 1024 * 1024;
+const ALLOWED_UPLOAD_EXT = new Set(['.pdf', '.txt']);
 const AUTH_TRACE_ENABLED = process.env.NEXT_PUBLIC_IE_DIAGNOSTICS_AUTH_TRACE === '1';
 
 const PHASE_LABEL: Record<string, string> = {
@@ -105,6 +106,16 @@ export function ResumeUploadPanel({
         setErrorMessage(
           `File exceeds ${Math.floor(MAX_BYTES / (1024 * 1024))} MB limit. Export a smaller PDF or use .txt.`,
         );
+        onBusyChange?.(false);
+        return;
+      }
+
+      const ext = `.${(file.name.split('.').pop() ?? '').toLowerCase()}`;
+      if (!ALLOWED_UPLOAD_EXT.has(ext)) {
+        if (gen !== generationRef.current) return;
+        setPhase('error');
+        setErrorKind('wrong_type');
+        setErrorMessage('Only PDF and TXT resume files are supported.');
         onBusyChange?.(false);
         return;
       }

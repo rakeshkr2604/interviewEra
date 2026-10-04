@@ -36,7 +36,18 @@ type JdMode = 'paste' | 'upload';
 /** Shared resume accept copy — keep SSR/client identical (avoids hydration drift). */
 const RESUME_ACCEPT_HINT = 'PDF, DOCX, or TXT · max 5 MB';
 const RESUME_DROPZONE_HINT = 'PDF, Word (.docx), or plain text · up to 5 MB';
+const MAX_RESUME_BYTES = 5 * 1024 * 1024;
 const JD_MAX_CHARS = ATS_JD_MAX_CHARS;
+
+function isAllowedResumeFile(file: File): boolean {
+  return (
+    /\.(pdf|txt|docx)$/i.test(file.name) ||
+    file.type === 'application/pdf' ||
+    file.type === 'text/plain' ||
+    file.type ===
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+  );
+}
 
 export function AtsCheckerForm() {
   const router = useRouter();
@@ -79,13 +90,14 @@ export function AtsCheckerForm() {
       setDragOver(false);
       const file = e.dataTransfer.files?.[0];
       if (!file || !fileInputRef.current) return;
-      const ok =
-        /\.(pdf|txt|docx)$/i.test(file.name) ||
-        file.type === 'application/pdf' ||
-        file.type === 'text/plain' ||
-        file.type ===
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      if (!ok) return;
+      if (!isAllowedResumeFile(file)) {
+        setClientError(`Unsupported file type. Use ${RESUME_ACCEPT_HINT}.`);
+        return;
+      }
+      if (file.size > MAX_RESUME_BYTES) {
+        setClientError('File exceeds 5 MB limit.');
+        return;
+      }
       setInputFile(fileInputRef.current, file);
       setFileLabel(file.name);
       setClientError(null);
@@ -104,9 +116,20 @@ export function AtsCheckerForm() {
           className="space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8"
           onSubmit={(e) => {
             setClientError(null);
-            if (!fileInputRef.current?.files?.length) {
+            const f = fileInputRef.current?.files?.[0];
+            if (!f) {
               e.preventDefault();
               setClientError(`Please upload a resume (${RESUME_ACCEPT_HINT}).`);
+              return;
+            }
+            if (!isAllowedResumeFile(f)) {
+              e.preventDefault();
+              setClientError(`Unsupported file type. Use ${RESUME_ACCEPT_HINT}.`);
+              return;
+            }
+            if (f.size > MAX_RESUME_BYTES) {
+              e.preventDefault();
+              setClientError('File exceeds 5 MB limit.');
             }
           }}
         >

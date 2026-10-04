@@ -19,10 +19,10 @@ export const dynamic = 'force-dynamic';
 function isAuthorized(req: NextRequest): boolean {
   const secret = process.env.INDEXNOW_SUBMIT_SECRET?.trim();
   if (!secret) return false;
+  // Bearer only — never accept secrets via query string (Referer/log leakage).
   const header = req.headers.get('authorization') ?? '';
   const bearer = header.startsWith('Bearer ') ? header.slice(7).trim() : '';
-  const queryKey = req.nextUrl.searchParams.get('secret')?.trim() ?? '';
-  return bearer === secret || queryKey === secret;
+  return bearer === secret;
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -36,11 +36,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  const MAX_SUBMIT_URLS = 200;
   let urls: string[] | undefined;
   try {
     const body = (await req.json().catch(() => null)) as { urls?: unknown } | null;
     if (body && Array.isArray(body.urls)) {
-      urls = body.urls.filter((u): u is string => typeof u === 'string');
+      if (body.urls.length > MAX_SUBMIT_URLS) {
+        return NextResponse.json(
+          { error: `At most ${MAX_SUBMIT_URLS} URLs per request.` },
+          { status: 400 },
+        );
+      }
+      urls = body.urls.filter(
+        (u): u is string => typeof u === 'string' && u.length > 0 && u.length <= 2048,
+      );
     }
   } catch {
     /* empty/invalid body → fall back to full sitemap */

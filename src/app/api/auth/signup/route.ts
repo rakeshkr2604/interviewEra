@@ -19,7 +19,13 @@ const bodySchema = z.object({
   name: displayNameSchema,
   next: z.string().optional(),
   placementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  metadata: z.record(z.string(), z.unknown()).optional(),
+  /** Allowlisted only — never accept arbitrary user_metadata bags. */
+  metadata: z
+    .object({
+      role: z.literal('college_admin'),
+    })
+    .strict()
+    .optional(),
 });
 
 function clientIp(request: NextRequest): string {
@@ -47,11 +53,19 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const ip = clientIp(request);
-  const rl = await checkRateLimit(`signup:${ip}`, 3600, 10);
+  const rl = await checkRateLimit(`signup:${ip}`, 3600, 10, { failClosed: true });
   if (!rl.allowed) {
     return NextResponse.json(
-      { error: 'Too many signup attempts. Please try again later.', code: 'RATE_LIMITED' },
-      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } },
+      {
+        error: rl.redisUnavailable
+          ? 'Service temporarily unavailable. Please retry in a moment.'
+          : 'Too many signup attempts. Please try again later.',
+        code: rl.redisUnavailable ? 'RATE_LIMIT_UNAVAILABLE' : 'RATE_LIMITED',
+      },
+      {
+        status: rl.redisUnavailable ? 503 : 429,
+        headers: { 'Retry-After': String(rl.resetInSeconds) },
+      },
     );
   }
 

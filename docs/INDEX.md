@@ -1,8 +1,8 @@
 # Documentation Index
 
 > Status: CANONICAL
-> Last Verified: 2026-10-01
-> Verification Scope: Doc tree layout + agent entrypoints
+> Last Verified: 2026-10-04
+> Verification Scope: Doc tree layout + agent entrypoints + security audit link
 > Authority: Navigation map for humans and agents
 
 ## Purpose
@@ -58,6 +58,8 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [STAGING_PROD_ALIGNMENT_CLOSURE.md](Operations/STAGING_PROD_ALIGNMENT_CLOSURE.md) | Prod–staging alignment / privilege cleanup record (point-in-time) |
 | [LEGACY_PROD_TABLES_OWNER_DECISIONS.md](Operations/LEGACY_PROD_TABLES_OWNER_DECISIONS.md) | Prod-only orphan table owner decision packet |
 | [DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md](Operations/DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md) | Diagnostics 110/111 staging gates, apply sequence, E2E matrix |
+| [SECURITY_AUDIT_2026-10-04.md](Operations/SECURITY_AUDIT_2026-10-04.md) | 2026-10-04 security audit, resume upload hardening, residual risks |
+| [API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md](Operations/API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md) | Point-in-time API route validation inventory (132 routes) |
 
 ## Root keepers
 

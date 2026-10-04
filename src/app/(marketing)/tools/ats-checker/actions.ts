@@ -31,6 +31,10 @@ import {
 } from '@/lib/redis/ats-result-cache';
 import type { AtsState } from './ats-types';
 import { RESUME_HARD_FAIL_MESSAGES } from '@/lib/resume/parse-outcome';
+import {
+  validateJobDescriptionDocumentText,
+  validateResumeDocumentText,
+} from '@/lib/documents/validate-resume-document-text';
 
 const PDF_USER_MESSAGES: Record<
   'ENCRYPTED' | 'SCANNED_NO_TEXT' | 'CORRUPT' | 'UNSUPPORTED' | 'PARSER_RUNTIME',
@@ -261,6 +265,16 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     };
   }
 
+  // Semantic gate — same classifier as interview resume upload. Reject trackers /
+  // planners / JDs / unrelated prose before cache or LLM spend.
+  const resumeDoc = validateResumeDocumentText(trimmed);
+  if (!resumeDoc.ok) {
+    return {
+      error: resumeDoc.message,
+      code: resumeDoc.code === 'GARBAGE_CONTENT' ? 'TOO_SHORT' : 'WRONG_DOCUMENT_TYPE',
+    };
+  }
+
   let jobDescription = pastedJd;
   if (jdFile && jdFile instanceof File && jdFile.size > 0) {
     const jdExt = `.${normalizeFileName(jdFile.name).split('.').pop()?.toLowerCase() ?? ''}`;
@@ -282,6 +296,17 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
       console.error('[ats-checker] JD extract error', err);
       const jdState = pdfErrorToState(err);
       return { error: 'Job description: ' + (jdState.error ?? ''), code: jdState.code };
+    }
+  }
+
+  // Optional JD slot: only classify when enough text would enter JD Match.
+  if (jobDescription.length >= 40) {
+    const jdDoc = validateJobDescriptionDocumentText(jobDescription);
+    if (!jdDoc.ok) {
+      return {
+        error: `Job description: ${jdDoc.message}`,
+        code: 'WRONG_JD_TYPE',
+      };
     }
   }
 

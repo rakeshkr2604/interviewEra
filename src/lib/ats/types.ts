@@ -117,7 +117,11 @@ export type AtsErrorCode =
   | 'AI_ERROR'
   | 'RATE_LIMIT'
   | 'NOT_CONFIGURED'
-  | 'TOO_SHORT';
+  | 'TOO_SHORT'
+  /** Uploaded resume slot failed positive resume / anti-tracker classification. */
+  | 'WRONG_DOCUMENT_TYPE'
+  /** Optional JD slot failed job-description classification. */
+  | 'WRONG_JD_TYPE';
 
 export interface AtsState {
   result?: AtsResultV2;

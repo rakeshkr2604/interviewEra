@@ -1,8 +1,8 @@
 # Release
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: CI vs Vercel topology + release ritual (CI_CD + RELEASE_STRATEGY merge)
+> Last Verified: 2026-10-01
+> Verification Scope: CI vs Vercel topology + release ritual + agent pre-push/pre-merge gates
 > Authority: How code reaches production
 
 ## Purpose
@@ -44,9 +44,21 @@ CI green · integration e2e if resume-critical · payments dual-order if touched
 - Docs-only changes should stay low-friction
 - Preview = de-facto staging
 
+### Agent / multi-phase shipping gates
+
+Full detail: [`ENGINEERING_WORKFLOW.md`](../Guidelines/ENGINEERING_WORKFLOW.md).
+
+- **Deferred push** during multi-phase work unless the user explicitly authorizes an earlier push
+- **Repository hygiene** after all planned phases, before push
+- **Pre-push verification** (outgoing commits/files, secrets, checks) then push only with explicit authorization — normal non-force only
+- **Pre-merge hygiene** on the full PR diff; merge only with explicit authorization (push ≠ merge)
+- **Post-merge** tip/CI/deploy smoke as in scope; no unverified impact claims
+
+These gates do not claim that GitHub branch protection currently blocks merges — see Current State above and [QUALITY_GATES](QUALITY_GATES.md).
+
 ## Dependencies
 
-[QUALITY_GATES](QUALITY_GATES.md) · [TESTING](../Guidelines/TESTING.md) · Vercel project
+[QUALITY_GATES](QUALITY_GATES.md) · [TESTING](../Guidelines/TESTING.md) · [ENGINEERING_WORKFLOW](../Guidelines/ENGINEERING_WORKFLOW.md) · Vercel project
 
 ## Failure Modes
 
@@ -58,8 +70,8 @@ Watch CI + Vercel deploy independently; post-deploy smoke
 
 ## Change Triggers
 
-ci.yml · vercel.json crons/redirects · release tagging process
+ci.yml · vercel.json crons/redirects · release tagging process · agent push/merge policy ([ENGINEERING_WORKFLOW](../Guidelines/ENGINEERING_WORKFLOW.md))
 
 ## Related Documents
 
-Archive CI_CD_ARCHITECTURE / RELEASE_STRATEGY / GITHUB_ACTIONS_ROADMAP for design backlog
+[QUALITY_GATES](QUALITY_GATES.md) · [ENGINEERING_WORKFLOW](../Guidelines/ENGINEERING_WORKFLOW.md) · Archive CI_CD_ARCHITECTURE / RELEASE_STRATEGY / GITHUB_ACTIONS_ROADMAP for design backlog

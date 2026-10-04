@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
 import {
   isDebugRoutesEnabled,
   redactSecretPrefix,
@@ -7,27 +6,19 @@ import {
   supabaseProjectRefFromUrl,
   supabaseServiceKeyFormat,
 } from '@/lib/debug/upload-diagnostics';
+import { requireDebugAdminAccess } from '@/lib/debug/require-debug-admin';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
- * Env shape check without leaking full secrets. Requires IE_DEBUG_ROUTES=1 + logged-in user.
+ * Env shape check without leaking full secrets.
+ * Requires IE_DEBUG_ROUTES=1 + platform admin.
  */
 export async function GET(): Promise<NextResponse> {
-  if (!isDebugRoutesEnabled()) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const gate = await requireDebugAdminAccess();
+  if (gate.error) return gate.error;
+  const admin = gate.admin;
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
@@ -49,7 +40,8 @@ export async function GET(): Promise<NextResponse> {
     node: process.version,
     vercelRegion: process.env.VERCEL_REGION ?? null,
     vercelEnv: process.env.VERCEL_ENV ?? null,
-    userIdPrefix: user.id.slice(0, 8),
+    debugRoutesEnabled: isDebugRoutesEnabled(),
+    userIdPrefix: admin.id.slice(0, 8),
     supabaseUrl: url ? 'present' : 'missing',
     supabaseUrlHostPrefix: url ? new URL(url).hostname.slice(0, 24) : null,
     projectRefFromUrl: refFromUrl,
