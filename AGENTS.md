@@ -1,8 +1,8 @@
 # AGENTS.md — InterviewEra Agent Contract
 
 > Status: CANONICAL
-> Last Verified: 2026-10-01
-> Verification Scope: Agent governance + architecture facts reverse-engineered from code + multi-phase Git/hygiene gates
+> Last Verified: 2026-10-04
+> Verification Scope: Agent governance + architecture facts reverse-engineered from code + multi-phase Git/hygiene gates + sequential migration apply rules
 > Authority: **Universal source of truth for all AI agents** (Cursor, Claude, others). Thin adapters (`CLAUDE.md`, `.cursorrules`) point here — they must not diverge.
 
 ## Purpose
@@ -118,6 +118,21 @@ Edit-risk zones (do-not-edit / caution / safe): [`docs/Guidelines/CODE_ORGANIZAT
 - Structured logs with existing prefixes (`[payment:*]`, `[VOICE_PIPELINE]`, …)
 - Migrations: next serial `NNN_snake_case.sql` only — never rewrite; never `supabase migration new`
 - `NEXT_PUBLIC_*` = browser-safe only
+
+---
+
+## Database migration contract (mandatory)
+
+Full procedure: [`docs/Guidelines/DATABASE_MIGRATIONS.md`](docs/Guidelines/DATABASE_MIGRATIONS.md). Non-negotiable rules for every agent:
+
+1. **Naming:** new files are `NNN_snake_case.sql` (e.g. `109_…`, `112_…`, `113_…`). Next `NNN` = highest existing serial in `supabase/migrations/` + 1 — confirm with `npm run verify:migrations` (prints the next required name).
+2. **Never** use `supabase migration new`, 14-digit timestamps, reused versions, or renumbered history.
+3. **Never rewrite** a migration already applied to any shared environment — add a follow-on serial file.
+4. **Audit before apply:** compare repo files to staging and production `schema_migrations` **and** probe live schema. Match historical timestamp ledger rows by migration **name** when serial versions differ. Confirm project identity (name + ref) independently.
+5. **Staging first**, then production — only after staging ledger + schema verification succeeds and production is re-queried against the same plan.
+6. **Success evidence** must include ledger rows **and** schema/security probes. A CLI/MCP exit code alone is not enough.
+7. **Drift:** if schema effects already exist but the ledger is missing/mismatched, do not invent silent ledger INSERTs and do not blindly re-run non-idempotent SQL — document and follow DATABASE_MIGRATIONS recovery rules.
+8. Do not create dummy migrations for application-only changes.
 
 ---
 
