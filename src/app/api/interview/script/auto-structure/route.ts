@@ -15,6 +15,10 @@ import { normalizeAutoStructureOutput } from '@/lib/interview/auto-structure/nor
 import type { NormalizedAutoStructure } from '@/lib/interview/auto-structure/normalize';
 import { questionTypeFromScript } from '@/lib/interview/answer-score/question-type';
 import { autoStructureSchema } from '@/lib/interview/script-turn-request-schema';
+import {
+  enforceScriptLlmRateLimit,
+  reserveScriptLlmCost,
+} from '@/lib/interview/script-llm-guards';
 
 /**
  * Single LLM call returns BOTH:
@@ -55,6 +59,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const rateLimited = await enforceScriptLlmRateLimit(user.id, 'auto_structure');
+    if (rateLimited) return rateLimited;
 
     let rawBody: unknown;
     try {
@@ -103,6 +110,17 @@ export async function POST(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Interview not found' }, { status: 404 });
     }
 
+    const { data: userProfile } = await serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+    const costReserve = await reserveScriptLlmCost(user.id, planTier, 'auto_structure');
+    if (!costReserve.ok) return costReserve.response;
+    const costReservation = costReserve.reservation;
+    let costCommitted = false;
+
     const inputBudget = getContextLimits('auto_structure').maxInputChars;
     const systemLen = AUTO_STRUCTURE_SYSTEM.length;
     const questionBudget = Math.min(400, Math.max(80, Math.floor(inputBudget * 0.15)));
@@ -124,140 +142,147 @@ export async function POST(request: Request): Promise<NextResponse> {
     const llmTimeoutMs = getOperationTimeoutMs('auto_structure');
     const promptChars = AUTO_STRUCTURE_SYSTEM.length + filledUser.length;
 
-    let llmContent: string;
-    let modelUsed = 'unknown';
-    let completionTokens: number | null = null;
-    const attemptStarted = Date.now();
     try {
-      const completion = await completeInterviewChat({
-        messages: [
-          { role: 'system', content: AUTO_STRUCTURE_SYSTEM },
-          { role: 'user', content: filledUser },
-        ],
-        temperature: 0.2,
-        operation: 'auto_structure',
-        jsonMode: true,
-        maxTokens,
-        signal: AbortSignal.timeout(llmTimeoutMs),
-        interviewId,
-        userId: user.id,
-      });
-      llmContent = completion.content;
-      modelUsed = completion.model;
-      completionTokens = completion.usage?.completion_tokens ?? null;
-      const hitTokenCeiling =
-        completionTokens != null && completionTokens >= maxTokens;
-      console.info(
-        JSON.stringify({
-          event: 'auto_structure_llm_ok',
+      let llmContent: string;
+      let modelUsed = 'unknown';
+      let completionTokens: number | null = null;
+      const attemptStarted = Date.now();
+      try {
+        const completion = await completeInterviewChat({
+          messages: [
+            { role: 'system', content: AUTO_STRUCTURE_SYSTEM },
+            { role: 'user', content: filledUser },
+          ],
+          temperature: 0.2,
           operation: 'auto_structure',
+          jsonMode: true,
+          maxTokens,
+          signal: AbortSignal.timeout(llmTimeoutMs),
           interviewId,
-          turnIndex,
-          attempt: 1,
-          model: modelUsed,
-          prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
-          prompt_chars: promptChars,
-          input_answer_chars: rawTranscript.length,
-          max_tokens: maxTokens,
-          prompt_tokens: completion.usage?.prompt_tokens ?? null,
-          completion_tokens: completionTokens,
-          hit_token_ceiling: hitTokenCeiling,
-          latency_ms: Date.now() - attemptStarted,
-          success: true,
-        }),
-      );
-    } catch (llmError) {
-      const timedOut = isTimeoutError(llmError);
-      console.error(
-        JSON.stringify({
-          event: 'auto_structure_failed',
-          operation: 'auto_structure',
-          reason: timedOut ? 'llm_timeout' : 'llm_error',
-          interviewId,
-          turnIndex,
-          attempt: 1,
-          model: modelUsed,
-          prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
-          prompt_chars: promptChars,
-          input_answer_chars: rawTranscript.length,
-          max_tokens: maxTokens,
-          latency_ms: Date.now() - attemptStarted,
-          success: false,
-        }),
-        llmError,
-      );
-      if (timedOut) {
-        return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+          userId: user.id,
+        });
+        llmContent = completion.content;
+        modelUsed = completion.model;
+        completionTokens = completion.usage?.completion_tokens ?? null;
+        costCommitted = true;
+        const hitTokenCeiling =
+          completionTokens != null && completionTokens >= maxTokens;
+        console.info(
+          JSON.stringify({
+            event: 'auto_structure_llm_ok',
+            operation: 'auto_structure',
+            interviewId,
+            turnIndex,
+            attempt: 1,
+            model: modelUsed,
+            prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
+            prompt_chars: promptChars,
+            input_answer_chars: rawTranscript.length,
+            max_tokens: maxTokens,
+            prompt_tokens: completion.usage?.prompt_tokens ?? null,
+            completion_tokens: completionTokens,
+            hit_token_ceiling: hitTokenCeiling,
+            latency_ms: Date.now() - attemptStarted,
+            success: true,
+          }),
+        );
+      } catch (llmError) {
+        const timedOut = isTimeoutError(llmError);
+        console.error(
+          JSON.stringify({
+            event: 'auto_structure_failed',
+            operation: 'auto_structure',
+            reason: timedOut ? 'llm_timeout' : 'llm_error',
+            interviewId,
+            turnIndex,
+            attempt: 1,
+            model: modelUsed,
+            prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
+            prompt_chars: promptChars,
+            input_answer_chars: rawTranscript.length,
+            max_tokens: maxTokens,
+            latency_ms: Date.now() - attemptStarted,
+            success: false,
+          }),
+          llmError,
+        );
+        if (timedOut) {
+          return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+        }
+        return NextResponse.json(
+          { error: 'llm_error', message: 'Answer structuring is temporarily unavailable.' },
+          { status: 502 },
+        );
       }
-      return NextResponse.json(
-        { error: 'llm_error', message: 'Answer structuring is temporarily unavailable.' },
-        { status: 502 },
+
+      let parsedOutput: unknown;
+      try {
+        parsedOutput = parseLlmJson(llmContent);
+      } catch {
+        // Degrade-don't-fail: truncated JSON (common when max_tokens is tight)
+        // must not blank the coaching panel — return raw + fallback coaching.
+        const hitTokenCeiling =
+          completionTokens != null && completionTokens >= maxTokens;
+        console.warn(
+          JSON.stringify({
+            event: 'auto_structure_degraded',
+            reason: 'invalid_json',
+            interviewId,
+            turnIndex,
+            model: modelUsed,
+            prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
+            max_tokens: maxTokens,
+            completion_tokens: completionTokens,
+            hit_token_ceiling: hitTokenCeiling,
+            content_chars: llmContent.length,
+          }),
+        );
+        parsedOutput = null;
+      }
+
+      const normalized: NormalizedAutoStructure = normalizeAutoStructureOutput(
+        parsedOutput,
+        rawTranscript,
       );
+
+      // Deterministic guardrail: never show / persist over-corrected STT cleanup.
+      const guard = guardCorrectedTranscript(rawTranscript, normalized.corrected_transcript);
+      if (!guard.accepted) {
+        console.warn(
+          `[interview/script/auto-structure] corrected_transcript rejected (interviewId=${interviewId}, turnIndex=${turnIndex}, reason=${guard.reason}, diffRatio=${guard.diffRatio.toFixed(3)}, disallowed=${guard.disallowedChangedWords}/${guard.totalWords})`,
+          {
+            diffRatio: guard.diffRatio,
+            reason: guard.reason,
+          },
+        );
+        normalized.corrected_transcript = guard.transcript; // raw fallback
+      }
+
+      const { error: updateError } = await serviceClient
+        .from('script_turns')
+        .update({ structured_answer: normalized })
+        .eq('interview_id', interviewId)
+        .eq('turn_index', turnIndex);
+
+      if (updateError) {
+        console.error(
+          JSON.stringify({
+            event: 'auto_structure_failed',
+            reason: 'db_update',
+            interviewId,
+            turnIndex,
+          }),
+          updateError,
+        );
+        return NextResponse.json({ error: 'Failed to save structured answer' }, { status: 500 });
+      }
+
+      return NextResponse.json({ structuredAnswer: normalized }, { status: 200 });
+    } finally {
+      if (!costCommitted) {
+        await costReservation.release();
+      }
     }
-
-    let parsedOutput: unknown;
-    try {
-      parsedOutput = parseLlmJson(llmContent);
-    } catch {
-      // Degrade-don't-fail: truncated JSON (common when max_tokens is tight)
-      // must not blank the coaching panel — return raw + fallback coaching.
-      const hitTokenCeiling =
-        completionTokens != null && completionTokens >= maxTokens;
-      console.warn(
-        JSON.stringify({
-          event: 'auto_structure_degraded',
-          reason: 'invalid_json',
-          interviewId,
-          turnIndex,
-          model: modelUsed,
-          prompt_version: AUTO_STRUCTURE_PROMPT_VERSION,
-          max_tokens: maxTokens,
-          completion_tokens: completionTokens,
-          hit_token_ceiling: hitTokenCeiling,
-          content_chars: llmContent.length,
-        }),
-      );
-      parsedOutput = null;
-    }
-
-    const normalized: NormalizedAutoStructure = normalizeAutoStructureOutput(
-      parsedOutput,
-      rawTranscript,
-    );
-
-    // Deterministic guardrail: never show / persist over-corrected STT cleanup.
-    const guard = guardCorrectedTranscript(rawTranscript, normalized.corrected_transcript);
-    if (!guard.accepted) {
-      console.warn(
-        `[interview/script/auto-structure] corrected_transcript rejected (interviewId=${interviewId}, turnIndex=${turnIndex}, reason=${guard.reason}, diffRatio=${guard.diffRatio.toFixed(3)}, disallowed=${guard.disallowedChangedWords}/${guard.totalWords})`,
-        {
-          diffRatio: guard.diffRatio,
-          reason: guard.reason,
-        },
-      );
-      normalized.corrected_transcript = guard.transcript; // raw fallback
-    }
-
-    const { error: updateError } = await serviceClient
-      .from('script_turns')
-      .update({ structured_answer: normalized })
-      .eq('interview_id', interviewId)
-      .eq('turn_index', turnIndex);
-
-    if (updateError) {
-      console.error(
-        JSON.stringify({
-          event: 'auto_structure_failed',
-          reason: 'db_update',
-          interviewId,
-          turnIndex,
-        }),
-        updateError,
-      );
-      return NextResponse.json({ error: 'Failed to save structured answer' }, { status: 500 });
-    }
-
-    return NextResponse.json({ structuredAnswer: normalized }, { status: 200 });
   } catch (err) {
     console.error(`[interview/script/auto-structure] Unexpected error (interviewId=${interviewIdForLog}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -1,8 +1,8 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-10-01
-> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails
+> Last Verified: 2026-10-04
+> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards
 > Authority: Production interview path
 
 ## Purpose
@@ -42,6 +42,30 @@ Shared schemas: `src/lib/interview/script-turn-request-schema.ts` (`SCRIPT_ANSWE
 | `targetRole` | 100 | answer-score, auto-structure |
 
 Oversized bodies → `400` with Zod `fieldErrors` before persistence or LLM calls. Special values `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` remain valid.
+
+### In-route LLM abuse controls (fail-closed)
+
+Independent of proxy IP rate limits. Shared helpers: `src/lib/interview/script-llm-guards.ts` + atomic `reserveLLMCost` in `src/lib/ai/llm-cost-guard.ts`.
+
+| Route | Per-user RL (60s) | Cost op | Notes |
+|---|---|---|---|
+| `POST .../turn` | 30 | `script_turn_generation` | RL after auth; cost reserve immediately before LLM (JSON + SSE). Canned turns skip cost reserve. |
+| `POST .../answer-score` | 20 | `answer_score` | Idempotent same-transcript hits skip LLM + cost reserve. |
+| `POST .../auto-structure` | 20 | `auto_structure` | Reserve after ownership, before provider. |
+| `GET .../report` | 10 | `script_report_synthesis` | RL on every GET; cost reserve only when synthesis LLM runs (claim owner path). |
+
+**Failure policy (Redis configured):**
+
+| Condition | HTTP | Stable `code` (where set) |
+|---|---|---|
+| Window exhausted | 429 | (message only; Retry-After via headers) |
+| Rate-limit Redis error | 503 | `rate_limit_backend_unavailable` |
+| Monthly plan cost exhausted | 429 | `llm_cost_limit_exceeded` |
+| Cost Redis error | 503 | `llm_cost_backend_unavailable` |
+
+**Accounting:** atomic incr-then-check reservation before provider; keep on successful provider response (or any raw output); `release()` on transport failure before any provider response. Unconfigured Redis (local DX) remains fail-open — same as `checkRateLimit`. Responses must not expose Redis/provider internals.
+
+Plan budgets: `users.plan_tier` → `getPlanLimits(...).max_llm_cost_per_month_usd` (free `$0.10`, starter `$0.50`, pro `$5`, …).
 
 ### Tables
 

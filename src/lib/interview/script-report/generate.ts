@@ -8,6 +8,7 @@
 import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
+import { reserveScriptLlmCost } from '@/lib/interview/script-llm-guards';
 import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
 import {
   aggregateScriptAnswers,
@@ -372,6 +373,19 @@ export async function claimReportGeneration(args: {
   return { claimed: false, pending: true };
 }
 
+/** Raised when in-route monthly LLM cost reserve denies report synthesis. */
+export class ScriptLlmCostGuardError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.name = 'ScriptLlmCostGuardError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 /** Test/prod hook: force synthesis LLM path to fail → deterministic fallback. */
 export function shouldForceSynthesisFailure(): boolean {
   return process.env.SCRIPT_REPORT_FORCE_SYNTHESIS_FAIL === '1';
@@ -610,13 +624,71 @@ async function buildAndPersistReport(args: {
     };
   }
 
-  const { synthesis, model, usedLlm, raw, coercions } = await runSynthesis({
-    targetRole: role ?? '',
-    scriptType,
-    aggregate,
-    interviewId,
-    userId,
-  });
+  const { data: userProfile } = await serviceClient
+    .from('users')
+    .select('plan_tier')
+    .eq('id', userId)
+    .maybeSingle();
+  const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+  const costReserve = await reserveScriptLlmCost(userId, planTier, 'report');
+  if (!costReserve.ok) {
+    const body = (await costReserve.response.clone().json()) as {
+      error?: string;
+      code?: string;
+    };
+    const guardErr = new ScriptLlmCostGuardError(
+      costReserve.response.status,
+      body.error ?? 'LLM cost guard denied',
+      body.code,
+    );
+    const failedPayload = {
+      interview_id: interviewId,
+      user_id: userId,
+      status: 'failed' as const,
+      scored_answer_count: aggregate.scoredAnswerCount,
+      overall: null,
+      dimension_averages: null,
+      score_band: null,
+      placement_signal: null,
+      per_question: [],
+      synthesis: null,
+      updated_at: new Date().toISOString(),
+    };
+    await serviceClient
+      .from('script_interview_reports')
+      .upsert(failedPayload, { onConflict: 'interview_id' });
+    throw guardErr;
+  }
+
+  let costCommitted = false;
+  let synthesis: ScriptReportSynthesis;
+  let model: string | null;
+  let usedLlm: boolean;
+  let raw: string | null;
+  let coercions: string[];
+  try {
+    const synthResult = await runSynthesis({
+      targetRole: role ?? '',
+      scriptType,
+      aggregate,
+      interviewId,
+      userId,
+    });
+    synthesis = synthResult.synthesis;
+    model = synthResult.model;
+    usedLlm = synthResult.usedLlm;
+    raw = synthResult.raw;
+    coercions = synthResult.coercions;
+    // Keep reservation if the provider was reached (usedLlm or any raw output).
+    // Unknown / force-fail with no provider call → release.
+    if (usedLlm || Boolean(raw)) {
+      costCommitted = true;
+    }
+  } finally {
+    if (!costCommitted) {
+      await costReserve.reservation.release();
+    }
+  }
 
   const perQuestion = mergeModelAnswers(aggregate, synthesis);
   const status: ScriptReportStatus = usedLlm ? 'ready' : 'partial';
@@ -688,7 +760,7 @@ export async function loadOrGenerateScriptReport(args: {
   skipOwedCompletionEmail?: boolean;
 }): Promise<
   | { ok: true; report: ScriptInterviewReportRecord; created: boolean }
-  | { ok: false; error: string; status: number }
+  | { ok: false; error: string; status: number; code?: string }
 > {
   const {
     serviceClient,
@@ -806,13 +878,26 @@ export async function loadOrGenerateScriptReport(args: {
     };
   }
 
-  const report = await buildAndPersistReport({
-    serviceClient,
-    interviewId,
-    userId,
-    role: interview.role,
-    scriptType: interview.script_type,
-  });
+  let report: ScriptInterviewReportRecord;
+  try {
+    report = await buildAndPersistReport({
+      serviceClient,
+      interviewId,
+      userId,
+      role: interview.role,
+      scriptType: interview.script_type,
+    });
+  } catch (err) {
+    if (err instanceof ScriptLlmCostGuardError) {
+      return {
+        ok: false,
+        error: err.message,
+        status: err.status,
+        code: err.code,
+      };
+    }
+    throw err;
+  }
 
   maybeQueueOwedCompletionEmail({
     skipOwedCompletionEmail,

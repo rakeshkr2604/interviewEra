@@ -61,7 +61,7 @@ A daily-routine-tracker PDF is a valid ≤10-page PDF with extractable text. It 
 | Leaked-password protection disabled (Supabase Auth) | Medium | Advisor WARN — enable in Supabase Dashboard |
 | Hardcoded founder admin email | Low | Intentional solo-founder backstop; env still required for others |
 | Public OG `/api/share/card` cost | Low | Unauthenticated render; monitor abuse |
-| Authenticated LLM cost amplification | Medium | Partially mitigated by new proxy rate limits; per-user Redis fail-closed still missing on turn/score |
+| Authenticated LLM cost amplification | Medium | **Mitigated addendum L** — in-route fail-closed RL + atomic monthly cost reserve on turn/score/auto-structure/report |
 
 ## D. Remediation summary
 
@@ -143,7 +143,7 @@ A daily-routine-tracker PDF is a valid ≤10-page PDF with extractable text. It 
 | Active resumes missing `storage_path` (~144) | Medium | Secure download already 404; public `file_url` works today until private | Historical rows; backfill script exists | Dry-run then apply `scripts/backfill-resume-storage-path.ts` before/with cutover | Acceptable briefly if download already degraded |
 | HaveIBeenPwned password check off | Medium | Weaker password quality | Dashboard toggle | Enable in Auth settings | Acceptable short-term |
 | Free-tool fail-open RL | Medium | ~~LLM cost if Redis outage~~ | **Resolved in addendum J** — all LLM free tools `failClosed: true` | N/A | N/A |
-| Per-route fail-closed RL on turn/score | Medium | Authenticated cost abuse | Edge RL only | Add route-level fail-closed + cost guard | Acceptable short-term |
+| Per-route fail-closed RL on turn/score | Medium | Authenticated cost abuse | ~~Edge RL only~~ | **Resolved addendum L** | N/A |
 | Full app E2E resume workspace on staging host | Low | Gaps in UI-level upload/replace/delete smoke | Staging `NEXT_PUBLIC_APP_URL` is localhost | Run `npm run test:e2e:staging` against Preview when available | Yes |
 
 ## G. Production readiness verdict
@@ -433,7 +433,7 @@ Maintained inventory: [`API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md`](API_ROUTE
 |---|---|---|
 | ATS / QG / STAR / QG-answer | Deny — generic “temporarily unavailable” | `checkRateLimit` still fail-opens (dev only) |
 | Contact / anon feedback / auth email | Deny — 503 | Same local DX exception |
-| Script LLM (proxy) | Still fail-open at edge | Deferred in-route fail-closed |
+| Script LLM (proxy) | Edge still fail-open | **In-route fail-closed resolved** (addendum L) |
 
 Errors never echo Redis/Upstash exception text.
 
@@ -461,7 +461,7 @@ Empty / `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` still valid. Exact max accepted; ma
 | Risk | Status |
 |---|---|
 | Prod resumes bucket public until migration 112 | **Resolved in addendum K** |
-| Script turn/score in-route fail-closed + cost guard | Deferred (proxy RL present) |
+| Script turn/score in-route fail-closed + cost guard | **Resolved addendum L** |
 | Campus/admin bulk-invite blast RL | Deferred |
 | ATS Playwright E2E | Blocked (infra) |
 
@@ -549,4 +549,73 @@ Empty / `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` still valid. Exact max accepted; ma
 
 ### J.8 Verdict
 
-**PARTIALLY COMPLETE** for website-wide input validation: inventory of all 132 routes is done; Critical/High gaps found in this pass are remediated; deferred medium items (in-route script LLM fail-closed, bulk-invite RL) and prod migration 112 remain open.
+**PARTIALLY COMPLETE** for website-wide input validation: inventory of all 132 routes is done; Critical/High gaps found in this pass are remediated. In-route script LLM fail-closed is closed in **addendum L**; remaining deferred: campus/admin bulk-invite blast RL. Prod migration 112 closed in addendum K.
+
+---
+
+## L. Addendum — Script LLM in-route fail-closed + cost guard (2026-10-04)
+
+> Closes residual authenticated LLM cost amplification when proxy/edge Redis RL fails open.
+
+### L.1 Confirmed gap (pre-fix)
+
+| Path | Auth / ownership | Proxy RL | In-route fail-closed RL | Cost reserve before provider |
+|---|---|---|---|---|
+| `POST /api/interview/script/turn` | Yes | Fail-open IP | Missing | Missing |
+| `POST /api/interview/script/answer-score` | Yes | Fail-open IP | Missing | Missing |
+| `POST /api/interview/script/auto-structure` | Yes | Fail-open IP | Missing | Missing |
+| `GET /api/interview/script/report` (synthesis) | Yes | Fail-open IP | Missing | Missing |
+
+Proxy limits alone were insufficient: authenticated users could still burn OpenRouter spend if Upstash errored at the edge.
+
+### L.2 Controls implemented
+
+| Control | Implementation |
+|---|---|
+| Per-user fixed-window RL | `enforceScriptLlmRateLimit` → `checkRateLimit(..., { failClosed: true })` |
+| Atomic monthly cost reserve | `reserveScriptLlmCost` → `reserveLLMCost(..., { failClosed: true })` (incr-then-check + rollback) |
+| Release on safe failure | `reservation.release()` when no provider response yet |
+| Keep on billed outcome | Any successful provider content / raw synthesis output keeps the reservation |
+| Stable client errors | `429` limit / `503` backend unavailable + codes `rate_limit_backend_unavailable`, `llm_cost_limit_exceeded`, `llm_cost_backend_unavailable` |
+| Local DX | Redis unconfigured → allow (same convention as existing `checkRateLimit`) |
+
+Route wiring: turn (JSON + SSE), answer-score (after idempotency short-circuit), auto-structure, report GET RL + synthesis-path reserve inside `buildAndPersistReport`.
+
+### L.3 Failure policy
+
+| Case | Behavior |
+|---|---|
+| Unauthenticated | `401` — no RL/cost/LLM |
+| Unauthorized interview | `404`/`403` — no cost/LLM |
+| Invalid body | `400` — no LLM |
+| RL exhausted | `429` + Retry-After headers where set |
+| RL Redis error | `503` + `rate_limit_backend_unavailable` |
+| Cost exhausted | `429` + `llm_cost_limit_exceeded` |
+| Cost Redis error | `503` + `llm_cost_backend_unavailable` |
+| Provider timeout/error before any content | Release reservation; existing `504`/`502` |
+| Provider returned content (even if later validation fails) | Keep reservation |
+
+### L.4 Concurrency / limitations
+
+- Monthly cost: Redis `INCRBYFLOAT` then compare — concurrent over-subscription is rolled back for the loser; residual race is bounded to one estimate per in-flight call (not check-then-act).
+- Report generation claim still prevents dual synthesis for the same interview; cost reserve runs only for the claim owner before `runSynthesis`.
+- Provider outcome “unknown” (timeout after spend at OpenRouter) may release reservation — accepted residual; prefer over unlimited unaccounted local abuse.
+- Edge/proxy RL remains fail-open; defense is layered via in-route controls.
+- No subscription entitlement changes; budgets remain `plan-limits.max_llm_cost_per_month_usd`.
+
+### L.5 Tests & verification (this addendum)
+
+| Command | Result |
+|---|---|
+| `npx vitest run` llm-cost-guard + script-llm-guards + answer-score/auto-structure/report route.guards + rate-limit (6 files / 33 tests) | **PASS** |
+| `npx vitest run` script-report claim + script start credit-ownership | **PASS** |
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** (exit 0; pre-existing CoachClient hooks warning) |
+| `npm run verify:pdf` | **PASS** |
+| `npm run verify:docs` | **PASS** (0 FAIL) |
+| `npm run build` (+ noindex) | **PASS** |
+| Live Redis / production spend | **NOT RUN** — mocked unit/route tests only |
+
+### L.6 Verdict
+
+**COMPLETE** for in-scope script LLM in-route fail-closed + cost guards. Unrelated deferred items (bulk-invite RL) unchanged.

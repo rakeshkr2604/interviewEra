@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { loadOrGenerateScriptReport } from '@/lib/interview/script-report/generate';
 import { trySendScriptCompletionEmail } from '@/lib/email/lifecycle/try-send-script-completion-email';
+import { enforceScriptLlmRateLimit } from '@/lib/interview/script-llm-guards';
 
 export const maxDuration = 60;
 
@@ -33,6 +34,9 @@ export async function GET(request: Request): Promise<NextResponse> {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const rateLimited = await enforceScriptLlmRateLimit(user.id, 'report');
+    if (rateLimited) return rateLimited;
+
     const url = new URL(request.url);
     const parsed = querySchema.safeParse({
       interviewId: url.searchParams.get('interviewId'),
@@ -54,7 +58,13 @@ export async function GET(request: Request): Promise<NextResponse> {
     });
 
     if (!result.ok) {
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json(
+        { error: result.error, ...(result.code ? { code: result.code } : {}) },
+        {
+          status: result.status,
+          headers: result.status === 503 ? { 'Retry-After': '30' } : undefined,
+        },
+      );
     }
 
     // Safety net: if complete()'s after() skipped email (score race), send now.

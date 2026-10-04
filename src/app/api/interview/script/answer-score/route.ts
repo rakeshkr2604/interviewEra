@@ -19,6 +19,10 @@ import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize
 import { clampText } from '@/lib/ai/context-hygiene';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { answerScoreRequestSchema } from '@/lib/interview/script-turn-request-schema';
+import {
+  enforceScriptLlmRateLimit,
+  reserveScriptLlmCost,
+} from '@/lib/interview/script-llm-guards';
 
 const MIN_SCOREABLE_WORDS = 5;
 /**
@@ -73,6 +77,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const rateLimited = await enforceScriptLlmRateLimit(user.id, 'answer_score');
+    if (rateLimited) return rateLimited;
 
     let rawBody: unknown;
     try {
@@ -212,180 +219,199 @@ export async function POST(request: Request): Promise<NextResponse> {
     const promptChars = systemPrompt.length + userPrompt.length;
     const llmTimeoutMs = getOperationTimeoutMs('answer_score');
 
-    const rawOutputs: string[] = [];
-    let validated: ValidatedAnswerScore | null = null;
-    let modelUsed = 'unknown';
-    let lastErrors: string[] = [];
+    const { data: userProfile } = await serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+    const costReserve = await reserveScriptLlmCost(user.id, planTier, 'answer_score');
+    if (!costReserve.ok) return costReserve.response;
+    const costReservation = costReserve.reservation;
+    /** True after any provider response (tokens may have been billed). */
+    let costCommitted = false;
 
-    // Attempt 1 + at most one repair retry (strategy (b) — see doc above).
-    for (let attempt = 0; attempt < 2 && !validated; attempt++) {
-      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
-      ];
-      if (attempt === 1) {
-        messages.push(
-          { role: 'assistant', content: rawOutputs[0] ?? '' },
-          { role: 'user', content: buildAnswerScoreRepairPrompt(lastErrors, expectedSubRubric) },
-        );
-      }
+    try {
+      const rawOutputs: string[] = [];
+      let validated: ValidatedAnswerScore | null = null;
+      let modelUsed = 'unknown';
+      let lastErrors: string[] = [];
 
-      let content: string;
-      const attemptStarted = Date.now();
-      try {
-        const completion = await completeInterviewChat({
-          messages,
-          temperature: 0.2,
-          operation: 'answer_score',
-          jsonMode: true,
-          maxTokens,
-          signal: AbortSignal.timeout(llmTimeoutMs),
-          interviewId,
-          userId: user.id,
-        });
-        content = completion.content;
-        modelUsed = completion.model;
-        console.info(
-          JSON.stringify({
-            event: 'answer_score_llm_ok',
+      // Attempt 1 + at most one repair retry (strategy (b) — see doc above).
+      for (let attempt = 0; attempt < 2 && !validated; attempt++) {
+        const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ];
+        if (attempt === 1) {
+          messages.push(
+            { role: 'assistant', content: rawOutputs[0] ?? '' },
+            { role: 'user', content: buildAnswerScoreRepairPrompt(lastErrors, expectedSubRubric) },
+          );
+        }
+
+        let content: string;
+        const attemptStarted = Date.now();
+        try {
+          const completion = await completeInterviewChat({
+            messages,
+            temperature: 0.2,
+            operation: 'answer_score',
+            jsonMode: true,
+            maxTokens,
+            signal: AbortSignal.timeout(llmTimeoutMs),
             interviewId,
-            turnIndex,
-            attempt: attempt + 1,
-            model: modelUsed,
-            prompt_chars: promptChars,
-            max_tokens: maxTokens,
-            prompt_tokens: completion.usage?.prompt_tokens ?? null,
-            completion_tokens: completion.usage?.completion_tokens ?? null,
-            latency_ms: Date.now() - attemptStarted,
-            timeout_ms: llmTimeoutMs,
-          }),
-        );
-      } catch (llmError) {
-        console.error(
-          JSON.stringify({
-            event: 'answer_score_llm_failed',
-            interviewId,
-            turnIndex,
-            attempt: attempt + 1,
-            prompt_chars: promptChars,
-            max_tokens: maxTokens,
-            latency_ms: Date.now() - attemptStarted,
-            timeout_ms: llmTimeoutMs,
-            timeout: isTimeoutError(llmError),
-          }),
-        );
-        if (isTimeoutError(llmError)) {
+            userId: user.id,
+          });
+          content = completion.content;
+          modelUsed = completion.model;
+          costCommitted = true;
+          console.info(
+            JSON.stringify({
+              event: 'answer_score_llm_ok',
+              interviewId,
+              turnIndex,
+              attempt: attempt + 1,
+              model: modelUsed,
+              prompt_chars: promptChars,
+              max_tokens: maxTokens,
+              prompt_tokens: completion.usage?.prompt_tokens ?? null,
+              completion_tokens: completion.usage?.completion_tokens ?? null,
+              latency_ms: Date.now() - attemptStarted,
+              timeout_ms: llmTimeoutMs,
+            }),
+          );
+        } catch (llmError) {
           console.error(
-            `[interview/script/answer-score] LLM timeout (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}):`,
+            JSON.stringify({
+              event: 'answer_score_llm_failed',
+              interviewId,
+              turnIndex,
+              attempt: attempt + 1,
+              prompt_chars: promptChars,
+              max_tokens: maxTokens,
+              latency_ms: Date.now() - attemptStarted,
+              timeout_ms: llmTimeoutMs,
+              timeout: isTimeoutError(llmError),
+            }),
+          );
+          if (isTimeoutError(llmError)) {
+            console.error(
+              `[interview/script/answer-score] LLM timeout (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}):`,
+              llmError,
+            );
+            return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+          }
+          console.error(
+            `[interview/script/answer-score] LLM error (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}):`,
             llmError,
           );
-          return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+          return NextResponse.json({ error: 'llm_error' }, { status: 502 });
         }
-        console.error(
-          `[interview/script/answer-score] LLM error (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}):`,
-          llmError,
+
+        rawOutputs.push(content);
+
+        let parsed: unknown;
+        try {
+          parsed = parseLlmJson(content);
+        } catch {
+          lastErrors = ['(root): output was not parseable JSON'];
+          continue;
+        }
+
+        const result = validateAnswerScoreOutput(parsed, expectedSubRubric, { lowSttConfidence });
+        const returnedSubRubric =
+          parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+            ? (parsed as Record<string, unknown>).sub_rubric
+            : undefined;
+        console.info(
+          JSON.stringify({
+            event: 'answer_score_validation',
+            interviewId,
+            turnIndex,
+            attempt: attempt + 1,
+            question_type: resolvedType,
+            authoritative_sub_rubric: expectedSubRubric,
+            returned_sub_rubric: returnedSubRubric ?? null,
+            validation_ok: result.ok,
+            latency_ms: Date.now() - attemptStarted,
+          }),
         );
-        return NextResponse.json({ error: 'llm_error' }, { status: 502 });
+        if (result.ok) {
+          validated = result.value;
+        } else {
+          lastErrors = result.errors;
+          console.warn(
+            `[interview/script/answer-score] validation failed (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}): ${result.errors.join('; ')}`,
+          );
+        }
       }
 
-      rawOutputs.push(content);
+      // Audit row — persisted for BOTH outcomes (scored and failed) so a
+      // disputed or missing score is always reconstructable.
+      const auditRow = {
+        interview_id: interviewId,
+        turn_index: turnIndex,
+        user_id: user.id,
+        question: displayQuestion,
+        transcript,
+        question_type: resolvedType,
+        type_source: typeSource,
+        sub_rubric: expectedSubRubric,
+        prompt_version: ANSWER_SCORE_PROMPT_VERSION,
+        model: modelUsed,
+        raw_model_output: rawOutputs.join('\n---RETRY---\n'),
+        stt_min_confidence: sttMinConfidence ?? null,
+        dimensions: validated ? validated.dimensions : null,
+        overall: validated ? validated.overall : null,
+        status: validated ? 'scored' : 'failed',
+        score_suspect: validated ? validated.score_suspect : false,
+        suspect_reasons: validated ? validated.suspect_reasons : lastErrors.slice(0, 5),
+      };
 
-      let parsed: unknown;
-      try {
-        parsed = parseLlmJson(content);
-      } catch {
-        lastErrors = ['(root): output was not parseable JSON'];
-        continue;
+      const { error: insertError } = await serviceClient.from('answer_evaluations').insert(auditRow);
+      if (insertError) {
+        // Duplicate (concurrent call won the race) — degrade to a log, the
+        // response below still carries the freshly-computed score.
+        const isDuplicate =
+          insertError.code === '23505' || /duplicate key|unique constraint/i.test(insertError.message ?? '');
+        if (!isDuplicate) {
+          console.error(
+            `[interview/script/answer-score] audit insert failed (interviewId=${interviewId}, turnIndex=${turnIndex}):`,
+            insertError,
+          );
+        }
       }
 
-      const result = validateAnswerScoreOutput(parsed, expectedSubRubric, { lowSttConfidence });
-      const returnedSubRubric =
-        parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? (parsed as Record<string, unknown>).sub_rubric
-          : undefined;
-      console.info(
-        JSON.stringify({
-          event: 'answer_score_validation',
-          interviewId,
-          turnIndex,
-          attempt: attempt + 1,
-          question_type: resolvedType,
-          authoritative_sub_rubric: expectedSubRubric,
-          returned_sub_rubric: returnedSubRubric ?? null,
-          validation_ok: result.ok,
-          latency_ms: Date.now() - attemptStarted,
-        }),
-      );
-      if (result.ok) {
-        validated = result.value;
-      } else {
-        lastErrors = result.errors;
+      if (!validated) {
+        console.error(
+          `[interview/script/answer-score] both attempts failed validation (interviewId=${interviewId}, turnIndex=${turnIndex}): ${lastErrors.join('; ')}`,
+        );
+        return NextResponse.json({ error: 'score_unavailable' }, { status: 422 });
+      }
+
+      if (validated.score_suspect) {
         console.warn(
-          `[interview/script/answer-score] validation failed (interviewId=${interviewId}, turnIndex=${turnIndex}, attempt=${attempt + 1}): ${result.errors.join('; ')}`,
+          `[interview/script/answer-score] score flagged suspect (interviewId=${interviewId}, turnIndex=${turnIndex}): ${validated.suspect_reasons.join(', ')}`,
         );
       }
-    }
 
-    // Audit row — persisted for BOTH outcomes (scored and failed) so a
-    // disputed or missing score is always reconstructable.
-    const auditRow = {
-      interview_id: interviewId,
-      turn_index: turnIndex,
-      user_id: user.id,
-      question: displayQuestion,
-      transcript,
-      question_type: resolvedType,
-      type_source: typeSource,
-      sub_rubric: expectedSubRubric,
-      prompt_version: ANSWER_SCORE_PROMPT_VERSION,
-      model: modelUsed,
-      raw_model_output: rawOutputs.join('\n---RETRY---\n'),
-      stt_min_confidence: sttMinConfidence ?? null,
-      dimensions: validated ? validated.dimensions : null,
-      overall: validated ? validated.overall : null,
-      status: validated ? 'scored' : 'failed',
-      score_suspect: validated ? validated.score_suspect : false,
-      suspect_reasons: validated ? validated.suspect_reasons : lastErrors.slice(0, 5),
-    };
-
-    const { error: insertError } = await serviceClient.from('answer_evaluations').insert(auditRow);
-    if (insertError) {
-      // Duplicate (concurrent call won the race) — degrade to a log, the
-      // response below still carries the freshly-computed score.
-      const isDuplicate =
-        insertError.code === '23505' || /duplicate key|unique constraint/i.test(insertError.message ?? '');
-      if (!isDuplicate) {
-        console.error(
-          `[interview/script/answer-score] audit insert failed (interviewId=${interviewId}, turnIndex=${turnIndex}):`,
-          insertError,
-        );
-      }
-    }
-
-    if (!validated) {
-      console.error(
-        `[interview/script/answer-score] both attempts failed validation (interviewId=${interviewId}, turnIndex=${turnIndex}): ${lastErrors.join('; ')}`,
-      );
-      return NextResponse.json({ error: 'score_unavailable' }, { status: 422 });
-    }
-
-    if (validated.score_suspect) {
-      console.warn(
-        `[interview/script/answer-score] score flagged suspect (interviewId=${interviewId}, turnIndex=${turnIndex}): ${validated.suspect_reasons.join(', ')}`,
-      );
-    }
-
-    return NextResponse.json(
-      {
-        score: {
-          dimensions: validated.dimensions,
-          overall: validated.overall,
-          one_line_summary: validated.one_line_summary,
-          score_suspect: validated.score_suspect,
+      return NextResponse.json(
+        {
+          score: {
+            dimensions: validated.dimensions,
+            overall: validated.overall,
+            one_line_summary: validated.one_line_summary,
+            score_suspect: validated.score_suspect,
+          },
         },
-      },
-      { status: 200 },
-    );
+        { status: 200 },
+      );
+    } finally {
+      if (!costCommitted) {
+        await costReservation.release();
+      }
+    }
   } catch (err) {
     console.error(
       `[interview/script/answer-score] Unexpected error (interviewId=${interviewIdForLog}):`,

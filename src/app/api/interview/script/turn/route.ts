@@ -19,6 +19,10 @@ import {
   wantsScriptTurnSse,
 } from '@/lib/interview/script-turn-stream';
 import {
+  enforceScriptLlmRateLimit,
+  reserveScriptLlmCost,
+} from '@/lib/interview/script-llm-guards';
+import {
   applyTurnAuthorityOverrides,
   cannedCandidateQuestionsTurn,
   cannedClosingTurn,
@@ -140,6 +144,9 @@ export async function POST(request: Request): Promise<NextResponse> {
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const rateLimited = await enforceScriptLlmRateLimit(user.id, 'turn');
+    if (rateLimited) return rateLimited;
 
     let rawBody: unknown;
     try {
@@ -990,6 +997,16 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // STEP 6 — LLM call. SSE path (flag + Accept) streams first speech sentence;
     // flag-off / non-SSE keeps the existing complete-then-respond behavior.
+    const { data: userProfile } = await serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .maybeSingle();
+    const planTier = (userProfile?.plan_tier as string | undefined) ?? 'free';
+    const costReserve = await reserveScriptLlmCost(user.id, planTier, 'turn');
+    if (!costReserve.ok) return costReserve.response;
+    const costReservation = costReserve.reservation;
+
     if (wantsScriptTurnSse(request)) {
       console.info(
         `[script-stream] sse_path_selected interviewId=${interviewId} script=${interview.script_type}`,
@@ -1005,6 +1022,7 @@ export async function POST(request: Request): Promise<NextResponse> {
           const send = (event: string, data: unknown) => {
             controller.enqueue(encoder.encode(encodeSseEvent(event, data)));
           };
+          let costCommitted = false;
           try {
             const streamed = await streamScriptTurnLlm({
               messages: llmMessages,
@@ -1028,6 +1046,9 @@ export async function POST(request: Request): Promise<NextResponse> {
             if (linked.aborted && !streamed.rawJson.trim()) {
               controller.close();
               return;
+            }
+            if (streamed.rawJson.trim()) {
+              costCommitted = true;
             }
 
             const finalized = await finalizeTurnFromLlmContent(streamed.rawJson);
@@ -1065,6 +1086,10 @@ export async function POST(request: Request): Promise<NextResponse> {
               });
             }
             controller.close();
+          } finally {
+            if (!costCommitted) {
+              await costReservation.release();
+            }
           }
         },
       });
@@ -1079,40 +1104,48 @@ export async function POST(request: Request): Promise<NextResponse> {
     }
 
     let llmContent: string;
+    let costCommitted = false;
     try {
-      const completion = await completeInterviewChat({
-        messages: llmMessages,
-        temperature: 0.7,
-        operation: 'script_turn_generation',
-        jsonMode: true,
-        signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
-        interviewId,
-        userId: user.id,
-      });
-      llmContent = completion.content;
-    } catch (llmError) {
-      if (isTimeoutError(llmError)) {
-        console.error(`[interview/script/turn] LLM timeout (interviewId=${interviewId}):`, llmError);
-        return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+      try {
+        const completion = await completeInterviewChat({
+          messages: llmMessages,
+          temperature: 0.7,
+          operation: 'script_turn_generation',
+          jsonMode: true,
+          signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+          interviewId,
+          userId: user.id,
+        });
+        llmContent = completion.content;
+        costCommitted = true;
+      } catch (llmError) {
+        if (isTimeoutError(llmError)) {
+          console.error(`[interview/script/turn] LLM timeout (interviewId=${interviewId}):`, llmError);
+          return NextResponse.json({ error: 'llm_timeout' }, { status: 504 });
+        }
+        console.error(`[interview/script/turn] LLM error (interviewId=${interviewId}):`, llmError);
+        return NextResponse.json(
+          { error: 'llm_error', message: 'The interviewer is temporarily unavailable. Please retry.' },
+          { status: 502 },
+        );
       }
-      console.error(`[interview/script/turn] LLM error (interviewId=${interviewId}):`, llmError);
-      return NextResponse.json(
-        { error: 'llm_error', message: 'The interviewer is temporarily unavailable. Please retry.' },
-        { status: 502 },
+
+      const finalized = await finalizeTurnFromLlmContent(llmContent);
+      if (!finalized.ok) {
+        return NextResponse.json(finalized.body, { status: finalized.status });
+      }
+
+      return turnResponse(
+        finalized.turn,
+        finalized.turnIndex,
+        interviewId,
+        finalized.questionNumber,
       );
+    } finally {
+      if (!costCommitted) {
+        await costReservation.release();
+      }
     }
-
-    const finalized = await finalizeTurnFromLlmContent(llmContent);
-    if (!finalized.ok) {
-      return NextResponse.json(finalized.body, { status: finalized.status });
-    }
-
-    return turnResponse(
-      finalized.turn,
-      finalized.turnIndex,
-      interviewId,
-      finalized.questionNumber,
-    );
   } catch (err) {
     console.error(`[interview/script/turn] Unexpected error (interviewId=${interviewIdForLog}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
