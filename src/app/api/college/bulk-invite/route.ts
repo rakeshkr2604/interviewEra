@@ -1,157 +1,28 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { isPlatformAdminUser } from '@/lib/admin/auth';
 import { canAccessCampusDashboard } from '@/lib/college/rbac';
-import { Resend } from 'resend';
-import { z } from 'zod';
-import type { NextRequest } from 'next/server';
 import { getBaseUrl } from '@/lib/server/get-base-url';
 import { trackCampusEvent } from '@/lib/analytics/campus-events';
+import {
+  acquireBulkInviteOrgLock,
+  bulkInviteBodySchema,
+  enforceBulkInviteRecipientBudget,
+  enforceBulkInviteRequestRateLimit,
+  escapeHtml,
+  normalizeBulkInviteEmails,
+  releaseBulkInviteRecipientBudget,
+} from '@/lib/college/bulk-invite-guards';
+import { sendCampusInviteEmails } from '@/lib/college/bulk-invite-send';
 
-const bodySchema = z.object({
-  emails: z.array(z.string().email()).min(1).max(500),
-  source: z.enum(['manual', 'csv']).optional(),
-});
-
-export async function POST(request: NextRequest): Promise<NextResponse> {
-  try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const serviceClient = createServiceClient();
-
-    const { data: profile } = await serviceClient
-      .from('users')
-      .select('plan_tier')
-      .eq('id', user.id)
-      .single();
-
-    const platformAdmin = await isPlatformAdminUser(user.id, user.email);
-    if (!canAccessCampusDashboard(profile?.plan_tier) && !platformAdmin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    const { data: org } = await serviceClient
-      .from('campus_organizations')
-      .select('id, name, seat_count, verification_status')
-      .eq('admin_user_id', user.id)
-      .single();
-
-    if (!org) {
-      return NextResponse.json({ error: 'Campus organization not found' }, { status: 404 });
-    }
-    if (org.verification_status !== 'approved') {
-      return NextResponse.json(
-        { error: 'Campus organization is pending verification.' },
-        { status: 403 },
-      );
-    }
-
-    let rawBody: unknown;
-    try {
-      rawBody = await request.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
-
-    const validation = bodySchema.safeParse(rawBody);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: validation.error.issues[0].message },
-        { status: 400 }
-      );
-    }
-    const { emails, source } = validation.data;
-
-    const { count: currentStudents } = await serviceClient
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .eq('campus_org_id', org.id);
-
-    const { count: pendingInvites } = await serviceClient
-      .from('campus_invites')
-      .select('id', { count: 'exact', head: true })
-      .eq('org_id', org.id)
-      .eq('status', 'pending');
-
-    const used = (currentStudents ?? 0) + (pendingInvites ?? 0);
-    const available = org.seat_count - used;
-
-    if (emails.length > available) {
-      return NextResponse.json(
-        {
-          error: `Only ${available} seats remaining. You are trying to invite ${emails.length} students.`,
-        },
-        { status: 422 }
-      );
-    }
-
-    const { data: existingInvites } = await serviceClient
-      .from('campus_invites')
-      .select('email')
-      .eq('org_id', org.id);
-
-    const { data: existingUsers } = await serviceClient
-      .from('users')
-      .select('email')
-      .in('email', emails);
-
-    const alreadyInvited = new Set([
-      ...(existingInvites ?? []).map((i) => i.email.toLowerCase()),
-      ...(existingUsers ?? []).map((u) => u.email.toLowerCase()),
-    ]);
-
-    const toInvite = emails.filter((e) => !alreadyInvited.has(e.toLowerCase()));
-    const skipped = emails.length - toInvite.length;
-
-    if (toInvite.length === 0) {
-      return NextResponse.json({
-        invited: 0,
-        skipped,
-        message: 'All emails already invited or enrolled.',
-      });
-    }
-
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
-
-    const { data: insertedInvites, error: insertError } = await serviceClient
-      .from('campus_invites')
-      .insert(
-        toInvite.map((email) => ({
-          org_id: org.id,
-          email,
-          expires_at: expiresAt.toISOString(),
-        }))
-      )
-      .select('email, token');
-
-    if (insertError || !insertedInvites) {
-      console.error('[college/bulk-invite] Insert error:', insertError);
-      return NextResponse.json({ error: 'Failed to create invites' }, { status: 500 });
-    }
-
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const appUrl = getBaseUrl();
-    let emailErrors = 0;
-
-    const BATCH_SIZE = 50;
-    for (let i = 0; i < insertedInvites.length; i += BATCH_SIZE) {
-      const batch = insertedInvites.slice(i, i + BATCH_SIZE);
-      const results = await Promise.allSettled(
-        batch.map((invite) =>
-          resend.emails.send({
-            from: 'InterviewEra <noreply@interviewera.com>',
-            to: invite.email,
-            subject: `You're invited to join ${org.name} on InterviewEra`,
-            html: `<!DOCTYPE html>
+function buildCollegeInviteHtml(args: {
+  orgNameSafe: string;
+  emailSafe: string;
+  inviteUrlSafe: string;
+}): string {
+  const { orgNameSafe, emailSafe, inviteUrlSafe } = args;
+  return `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -269,14 +140,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   <div class="container">
     <div class="header">
       <h1 class="header-title">You're Invited!</h1>
-      <p class="header-subtitle">Join ${org.name}'s placement preparation program</p>
+      <p class="header-subtitle">Join ${orgNameSafe}'s placement preparation program</p>
     </div>
 
     <div class="content">
       <p class="content-text">Hi there,</p>
 
       <p class="content-text">
-        <strong>${org.name}</strong> has invited you to join their campus placement preparation program on <strong>InterviewEra</strong>.
+        <strong>${orgNameSafe}</strong> has invited you to join their campus placement preparation program on <strong>InterviewEra</strong>.
       </p>
 
       <p class="content-text">
@@ -294,7 +165,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       </div>
 
       <div class="cta-section">
-        <a href="${appUrl}/college/join/${invite.token}" class="cta-button">Accept Invitation</a>
+        <a href="${inviteUrlSafe}" class="cta-button">Accept Invitation</a>
       </div>
 
       <div class="expiry-notice">
@@ -308,55 +179,223 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     <div class="footer">
       <p class="footer-text">
-        This invitation is unique to <strong>${invite.email}</strong>. Please don't share this link with others.
+        This invitation is unique to <strong>${emailSafe}</strong>. Please don't share this link with others.
       </p>
       <p class="footer-divider">—</p>
       <p class="footer-text">
         © 2026 InterviewEra. Helping students ace their placements.
       </p>
       <p class="footer-text">
-        If you didn't expect this invitation, you can safely ignore this email. Your T&P officer can provide more information about the program.
+        If you didn't expect this invitation, you can safely ignore this email. Your T&amp;P officer can provide more information about the program.
       </p>
     </div>
   </div>
 </body>
-</html>`,
-          })
-        )
-      );
+</html>`;
+}
 
-      for (const result of results) {
-        if (result.status === 'rejected') {
-          emailErrors++;
-          console.error('[college/bulk-invite] Email send failed:', result.reason);
-        }
-      }
+export async function POST(request: NextRequest): Promise<NextResponse> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    trackCampusEvent('campus_student_invite_sent', {
-      userId: user.id,
-      org_id: org.id,
-      invite_count: insertedInvites.length,
-      skipped,
-      source: source ?? 'manual',
-    });
+    const requestLimited = await enforceBulkInviteRequestRateLimit(user.id);
+    if (requestLimited) return requestLimited;
 
-    if (source === 'csv') {
-      trackCampusEvent('campus_csv_import_completed', {
-        userId: user.id,
-        org_id: org.id,
-        row_count: emails.length,
-        invited: insertedInvites.length,
+    const serviceClient = createServiceClient();
+
+    const { data: profile } = await serviceClient
+      .from('users')
+      .select('plan_tier')
+      .eq('id', user.id)
+      .single();
+
+    const platformAdmin = await isPlatformAdminUser(user.id, user.email);
+    if (!canAccessCampusDashboard(profile?.plan_tier) && !platformAdmin) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Tenant ownership is always derived from the authenticated admin — never client org ids.
+    const { data: org } = await serviceClient
+      .from('campus_organizations')
+      .select('id, name, seat_count, verification_status')
+      .eq('admin_user_id', user.id)
+      .single();
+
+    if (!org) {
+      return NextResponse.json({ error: 'Campus organization not found' }, { status: 404 });
+    }
+    if (org.verification_status !== 'approved') {
+      return NextResponse.json(
+        { error: 'Campus organization is pending verification.' },
+        { status: 403 },
+      );
+    }
+
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+    }
+
+    const validation = bulkInviteBodySchema.safeParse(rawBody);
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: validation.error.issues[0]?.message ?? 'Invalid request body' },
+        { status: 400 },
+      );
+    }
+    const { source } = validation.data;
+    const { unique: emails, duplicateCount } = normalizeBulkInviteEmails(validation.data.emails);
+
+    if (emails.length === 0) {
+      return NextResponse.json({ error: 'No valid email addresses provided.' }, { status: 400 });
+    }
+
+    const { count: currentStudents } = await serviceClient
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('campus_org_id', org.id);
+
+    const { count: pendingInvites } = await serviceClient
+      .from('campus_invites')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', org.id)
+      .eq('status', 'pending');
+
+    const used = (currentStudents ?? 0) + (pendingInvites ?? 0);
+    const available = org.seat_count - used;
+
+    if (emails.length > available) {
+      return NextResponse.json(
+        {
+          error: `Only ${available} seats remaining. You are trying to invite ${emails.length} students.`,
+        },
+        { status: 422 },
+      );
+    }
+
+    const { data: existingInvites } = await serviceClient
+      .from('campus_invites')
+      .select('email')
+      .eq('org_id', org.id);
+
+    const { data: existingUsers } = await serviceClient
+      .from('users')
+      .select('email')
+      .in('email', emails);
+
+    const alreadyInvited = new Set([
+      ...(existingInvites ?? []).map((i) => i.email.toLowerCase()),
+      ...(existingUsers ?? []).map((u) => u.email.toLowerCase()),
+    ]);
+
+    const toInvite = emails.filter((e) => !alreadyInvited.has(e));
+    const skipped = emails.length - toInvite.length + duplicateCount;
+
+    if (toInvite.length === 0) {
+      return NextResponse.json({
+        invited: 0,
         skipped,
+        message: 'All emails already invited or enrolled.',
       });
     }
 
-    return NextResponse.json({
-      invited: insertedInvites.length,
-      skipped,
-      emailErrors,
-      message: `${insertedInvites.length} invitation${insertedInvites.length !== 1 ? 's' : ''} sent${emailErrors > 0 ? ` (${emailErrors} email errors)` : ''}.`,
-    });
+    const lockResult = await acquireBulkInviteOrgLock(org.id);
+    if (!lockResult.ok) return lockResult.response;
+    const orgLock = lockResult.lock;
+
+    let budgetCharged = 0;
+    try {
+      const budgetBlocked = await enforceBulkInviteRecipientBudget(org.id, toInvite.length);
+      if (budgetBlocked) return budgetBlocked;
+      budgetCharged = toInvite.length;
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 7);
+
+      const { data: insertedInvites, error: insertError } = await serviceClient
+        .from('campus_invites')
+        .insert(
+          toInvite.map((email) => ({
+            org_id: org.id,
+            email,
+            expires_at: expiresAt.toISOString(),
+          })),
+        )
+        .select('email, token');
+
+      if (insertError || !insertedInvites) {
+        console.error('[college/bulk-invite] Insert error:', insertError);
+        await releaseBulkInviteRecipientBudget(org.id, budgetCharged);
+        budgetCharged = 0;
+        return NextResponse.json({ error: 'Failed to create invites' }, { status: 500 });
+      }
+
+      const appUrl = getBaseUrl();
+      const orgNameSafe = escapeHtml(org.name);
+      const sendResult = await sendCampusInviteEmails({
+        invites: insertedInvites,
+        from: 'InterviewEra <noreply@interviewera.com>',
+        subjectFor: () => `You're invited to join ${org.name} on InterviewEra`,
+        htmlFor: (invite) =>
+          buildCollegeInviteHtml({
+            orgNameSafe,
+            emailSafe: escapeHtml(invite.email),
+            inviteUrlSafe: escapeHtml(`${appUrl}/college/join/${invite.token}`),
+          }),
+        logPrefix: '[college/bulk-invite]',
+      });
+
+      console.info(
+        JSON.stringify({
+          event: 'bulk_invite_batch_complete',
+          route: 'college',
+          org_id: org.id,
+          invited: insertedInvites.length,
+          skipped,
+          email_errors: sendResult.emailErrors,
+          accepted: sendResult.accepted,
+          unknown_outcomes: sendResult.unknownOutcomes,
+          source: source ?? 'manual',
+        }),
+      );
+
+      trackCampusEvent('campus_student_invite_sent', {
+        userId: user.id,
+        org_id: org.id,
+        invite_count: insertedInvites.length,
+        skipped,
+        source: source ?? 'manual',
+      });
+
+      if (source === 'csv') {
+        trackCampusEvent('campus_csv_import_completed', {
+          userId: user.id,
+          org_id: org.id,
+          row_count: validation.data.emails.length,
+          invited: insertedInvites.length,
+          skipped,
+        });
+      }
+
+      return NextResponse.json({
+        invited: insertedInvites.length,
+        skipped,
+        emailErrors: sendResult.emailErrors,
+        message: `${insertedInvites.length} invitation${insertedInvites.length !== 1 ? 's' : ''} sent${sendResult.emailErrors > 0 ? ` (${sendResult.emailErrors} email errors)` : ''}.`,
+      });
+    } finally {
+      await orgLock.release();
+    }
   } catch (err) {
     console.error('[college/bulk-invite] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

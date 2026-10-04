@@ -462,7 +462,7 @@ Empty / `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` still valid. Exact max accepted; ma
 |---|---|
 | Prod resumes bucket public until migration 112 | **Resolved in addendum K** |
 | Script turn/score in-route fail-closed + cost guard | **Resolved addendum L** |
-| Campus/admin bulk-invite blast RL | Deferred |
+| Campus/admin bulk-invite blast RL | **Resolved addendum M** |
 | ATS Playwright E2E | Blocked (infra) |
 
 ---
@@ -549,7 +549,7 @@ Empty / `[NONE]` / `[SKIPPED]` / `[TIMEOUT]` still valid. Exact max accepted; ma
 
 ### J.8 Verdict
 
-**PARTIALLY COMPLETE** for website-wide input validation: inventory of all 132 routes is done; Critical/High gaps found in this pass are remediated. In-route script LLM fail-closed is closed in **addendum L**; remaining deferred: campus/admin bulk-invite blast RL. Prod migration 112 closed in addendum K.
+**PARTIALLY COMPLETE** for website-wide input validation: inventory of all 132 routes is done; Critical/High gaps found in this pass are remediated. In-route script LLM fail-closed is closed in **addendum L**; campus/admin bulk-invite blast RL is closed in **addendum M**. Prod migration 112 closed in addendum K.
 
 ---
 
@@ -618,4 +618,84 @@ Route wiring: turn (JSON + SSE), answer-score (after idempotency short-circuit),
 
 ### L.6 Verdict
 
-**COMPLETE** for in-scope script LLM in-route fail-closed + cost guards. Unrelated deferred items (bulk-invite RL) unchanged.
+**COMPLETE** for in-scope script LLM in-route fail-closed + cost guards. Bulk-invite RL closed separately in **addendum M**.
+
+---
+
+## M. Addendum — Bulk-invite Resend abuse protection (2026-10-04)
+
+> Closes deferred campus/admin bulk-invite blast rate limiting.
+
+### M.1 Execution map (confirmed)
+
+| Path | Auth | Tenant | Send |
+|---|---|---|---|
+| `POST /api/college/bulk-invite` | Session + `campus_admin` (or platform admin) | `campus_organizations.admin_user_id = user.id` | Resend sync batches of 50 |
+| `POST /api/admin/bulk-invite` | Session + `plan_tier === campus_admin` | Same org ownership | Resend sync batches of 50 |
+
+No background queue. Org is never taken from the client body.
+
+### M.2 Confirmed findings (pre-fix)
+
+| ID | Severity | Finding |
+|---|---|---|
+| BI-1 | High | No in-route fail-closed RL — authenticated campus admin could blast Resend |
+| BI-2 | Medium | No per-org concurrent send lock — overlapping requests amplified spend |
+| BI-3 | Medium | Resend `{ error }` responses were treated as success (`Promise.allSettled` only counted rejects) |
+| BI-4 | Low | Request emails not deduped/normalized server-side; org name/email HTML unescaped in templates |
+| BI-5 | Low (residual) | No `(org_id, email)` unique constraint / `email_sent` column — concurrent inserts can duplicate; failed sends leave pending invites that retries skip |
+
+### M.3 Controls implemented
+
+| Control | Value |
+|---|---|
+| Max recipients / request | 500 (existing product ceiling; email max 320 chars) |
+| Per-user request RL | 10 / hour, `failClosed` |
+| Per-org recipient budget | 500 / hour, atomic INCRBY + rollback, `failClosed` |
+| Per-org send lock | Redis SET NX TTL 180s, `failClosed` on Redis errors |
+| Dedup | Lowercase + trim; duplicates counted in `skipped` |
+| HTML escape | `escapeHtml` for org name, email, invite URL in templates |
+| Provider outcome | Count accepted vs `{ error }` vs reject; structured logs without recipient PII |
+| Insert failure | Refund recipient budget |
+
+Shared modules: `src/lib/college/bulk-invite-guards.ts`, `src/lib/college/bulk-invite-send.ts`.
+
+### M.4 Failure policy
+
+| Case | HTTP / code |
+|---|---|
+| Unauthenticated | 401 |
+| Unauthorized role / unapproved org | 403 |
+| Invalid / oversized payload | 400 |
+| Seat exhaustion | 422 |
+| Request or recipient limit | 429 (+ `bulk_invite_recipient_limit` / in-progress code) |
+| Redis unavailable (RL/lock/budget) | 503 / `rate_limit_backend_unavailable` |
+| Redis unconfigured (local) | Allow (DX convention) |
+
+### M.5 Idempotency / delivery limitations
+
+- Exactly-once email delivery is **not** claimed.
+- No unique `(org_id, email)` DB constraint and no durable `email_sent_at` — duplicate/retry delivery is not fully eliminated.
+- Pending invite rows prevent re-invite of the same email (retry will not re-send) — failed Resend after insert remains a residual ops issue (needs `email_sent_at` or unique+resend path; **no migration in this task**).
+- Seat checks remain check-then-act (pre-existing); org lock reduces concurrent double-spend of seats/emails.
+- Recipient-budget refund uses the current hour slot; a charge near an hour boundary can miss the original counter.
+- Org send lock TTL is 180s and may expire during longer sends before `DEL`.
+- Email **body** fields are HTML-escaped; raw `org.name` remains in the email **subject**.
+- Live Resend behavior / real mailbox delivery were **not** tested.
+
+### M.6 Tests & verification
+
+| Command | Result |
+|---|---|
+| `npx vitest run` bulk-invite-guards + send + college/admin route.guards (4 files / 24 tests) | **PASS** |
+| `npm run typecheck` | **PASS** |
+| `npm run lint` | **PASS** (exit 0; pre-existing CoachClient hooks warning) |
+| `npm run verify:pdf` | **PASS** |
+| `npm run verify:docs` | **PASS** (0 FAIL) |
+| `npm run build` (+ noindex) | **PASS** |
+| Live Resend sends | **NOT RUN** — mocked only |
+
+### M.7 Verdict
+
+**COMPLETE** for in-scope bulk-invite abuse controls on both send paths. Residual: DB unique/email_sent migration deferred (no production migration authorized).
+

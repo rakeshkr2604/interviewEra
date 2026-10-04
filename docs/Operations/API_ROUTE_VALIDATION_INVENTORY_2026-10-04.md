@@ -45,7 +45,7 @@ Server actions (ATS, QG, STAR) are **not** counted in the 132; they were audited
 | Item | Severity | Why deferred |
 |---|---|---|
 | In-route `failClosed` + atomic `reserveLLMCost` on script turn/score/auto-structure/report | Medium | **Resolved 2026-10-04** — see SECURITY_AUDIT addendum L + `script-llm-guards.ts` |
-| Bulk-invite campus/admin Resend blast RL | Medium | Auth + Zod max 500 + seat checks; compromised-admin risk accepted short-term |
+| Bulk-invite campus/admin Resend blast RL | Medium | **Resolved 2026-10-04** — see SECURITY_AUDIT addendum M + `bulk-invite-guards.ts` |
 | JD extract/parse RL fail-open | Medium | Auth + size Zod; lower priority than unauth sinks |
 | TTS abuseGate fail-open | Medium | Auth + char cap + quota |
 | College deadlines create field maxes | Low | Campus-admin only |
