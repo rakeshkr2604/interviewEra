@@ -9,7 +9,6 @@
  * (house style). Never hard-fail the interview.
  */
 
-import { isPraiseRecapNotActionable } from '@/lib/interview/coaching-feedback-view'
 import { DIMENSION_KEYS, type DimensionKey } from './rubric'
 
 export type ProbeNeeded = boolean | 'unknown'
@@ -20,16 +19,8 @@ export type ProbeScoreInput = {
   one_line_summary?: string | null
 }
 
-/** Required competency dims — communication-only weakness does not force a probe. */
-export const REQUIRED_PROBE_DIMENSIONS: readonly DimensionKey[] = [
-  'specificity',
-  'structure',
-  'relevance',
-  'content_accuracy',
-]
-
+/** Probe when any of the five canonical dimensions is strictly below this. */
 export const WEAK_DIMENSION_THRESHOLD = 7
-export const WEAK_OVERALL_THRESHOLD = 8
 
 export function parseOneLineSummaryFromRawModelOutput(raw: string | null | undefined): string | null {
   if (!raw) return null
@@ -60,29 +51,22 @@ function parseStoredDimensions(raw: unknown): Record<DimensionKey, { score: numb
 }
 
 /**
- * Score-driven probe decision.
- * - Weak required dimension or overall → probe.
- * - Praise-only next-step (e.g. "no major improvements") → no probe.
- * - Remaining actionable gap summary → probe.
- * - Null/unusable score → unknown (LLM decides).
+ * Score-driven probe decision from the five canonical dimensions only.
+ * - Any dimension < 7.0 → probe.
+ * - All five ≥ 7.0 → no probe (overall / summary ignored).
+ * - Null/unusable score or missing dimension → unknown (LLM decides).
  */
 export function answerNeedsFollowUpProbe(score: ProbeScoreInput | null | undefined): ProbeNeeded {
   if (!score) return 'unknown'
-  if (!Number.isFinite(score.overall)) return 'unknown'
   const dims = score.dimensions
   if (!dims) return 'unknown'
 
-  for (const key of REQUIRED_PROBE_DIMENSIONS) {
+  for (const key of DIMENSION_KEYS) {
     const v = dims[key]?.score
     if (typeof v !== 'number' || !Number.isFinite(v)) return 'unknown'
     if (v < WEAK_DIMENSION_THRESHOLD) return true
   }
-  if (score.overall < WEAK_OVERALL_THRESHOLD) return true
-
-  const summary = score.one_line_summary?.trim() ?? ''
-  if (!summary) return false
-  if (isPraiseRecapNotActionable(summary)) return false
-  return true
+  return false
 }
 
 export function probeNeededFromEvaluationRow(row: {

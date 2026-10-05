@@ -23,18 +23,155 @@ function dims(partial: Partial<Record<DimensionKey, number>>): ProbeScoreInput['
 }
 
 describe('answerNeedsFollowUpProbe', () => {
-  it('9.6 praise recap + communication-only 7.0 → no probe', () => {
+  it('all five dimensions exactly 7.0 → no probe (production regression)', () => {
     expect(
       answerNeedsFollowUpProbe({
-        overall: 9.6,
-        dimensions: dims({ communication_clarity: 7, content_accuracy: 10 }),
+        overall: 7.6,
+        dimensions: dims({
+          communication_clarity: 7,
+          content_accuracy: 7,
+          structure: 7,
+          specificity: 7,
+          relevance: 10,
+        }),
         one_line_summary:
-          'No major improvements needed; the answer is comprehensive and well-structured.',
+          'The adaptive interview behavior could be more concretely described.',
       }),
     ).toBe(false)
   })
 
-  it('8.1 specificity 5.0 + project-example gap → probe', () => {
+  it('communication_clarity 6.9 with others ≥7 → probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ communication_clarity: 6.9 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('content_accuracy 6.9 → probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ content_accuracy: 6.9 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('structure 6.9 → probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ structure: 6.9 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('specificity 6.9 → probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ specificity: 6.9 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('relevance 6.9 → probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ relevance: 6.9 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('all dimensions ≥7 with overall 6.5 → no probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 6.5,
+        dimensions: dims({
+          communication_clarity: 7,
+          content_accuracy: 7,
+          structure: 7,
+          specificity: 7,
+          relevance: 7,
+        }),
+      }),
+    ).toBe(false)
+  })
+
+  it('all dimensions ≥7 with actionable one_line_summary → no probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 8.5,
+        dimensions: dims({
+          communication_clarity: 7,
+          content_accuracy: 7,
+          structure: 7,
+          specificity: 7,
+          relevance: 10,
+        }),
+        one_line_summary:
+          'The adaptive interview behavior could be more concretely described.',
+      }),
+    ).toBe(false)
+  })
+
+  it('one dimension exactly 7.0 and others higher → no probe', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({
+          communication_clarity: 7,
+          content_accuracy: 8,
+          structure: 9,
+          specificity: 8,
+          relevance: 10,
+        }),
+      }),
+    ).toBe(false)
+  })
+
+  it('one dimension 6.99 → probe (strict < 7.0)', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: dims({ specificity: 6.99 }),
+      }),
+    ).toBe(true)
+  })
+
+  it('missing dimension → unknown', () => {
+    const incomplete = dims({}) as ProbeScoreInput['dimensions'] & {
+      specificity?: { score: number }
+    }
+    delete incomplete.specificity
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: incomplete,
+      }),
+    ).toBe('unknown')
+  })
+
+  it('invalid/non-numeric dimension → unknown', () => {
+    expect(
+      answerNeedsFollowUpProbe({
+        overall: 9,
+        dimensions: {
+          ...dims({}),
+          structure: { score: Number.NaN },
+        },
+      }),
+    ).toBe('unknown')
+  })
+
+  it('null / unusable score → unknown (LLM decides)', () => {
+    expect(answerNeedsFollowUpProbe(null)).toBe('unknown')
+    expect(answerNeedsFollowUpProbe(undefined)).toBe('unknown')
+  })
+
+  it('weak specificity still probes (regression)', () => {
     expect(
       answerNeedsFollowUpProbe({
         overall: 8.1,
@@ -45,96 +182,9 @@ describe('answerNeedsFollowUpProbe', () => {
           specificity: 5,
           relevance: 10,
         }),
-        one_line_summary:
-          'Provide a specific project example where these changes were applied and quantify the outcome.',
+        one_line_summary: 'Provide a specific project example.',
       }),
     ).toBe(true)
-  })
-
-  it('6.6 specificity 5.0 + quantify delivery → probe', () => {
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: 6.6,
-        dimensions: dims({
-          communication_clarity: 7,
-          content_accuracy: 7,
-          structure: 7,
-          specificity: 5,
-          relevance: 7,
-        }),
-        one_line_summary: 'Quantify the improvement in delivery speed or quality, even if an estimate.',
-      }),
-    ).toBe(true)
-  })
-
-  it('8.5 actionable trigger gap → probe', () => {
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: 8.5,
-        dimensions: dims({
-          communication_clarity: 7,
-          content_accuracy: 10,
-          structure: 7,
-          specificity: 7,
-          relevance: 10,
-        }),
-        one_line_summary: 'Clarify the initial trigger for identifying the weakness.',
-      }),
-    ).toBe(true)
-  })
-
-  it('8.6 all required dims ≥7 but actionable tool gap → probe', () => {
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: 8.6,
-        dimensions: dims({
-          communication_clarity: 7,
-          content_accuracy: 7,
-          structure: 10,
-          specificity: 10,
-          relevance: 10,
-        }),
-        one_line_summary:
-          'The candidate could elaborate on the specific tools or methods used for prioritization beyond user impact and production risk.',
-      }),
-    ).toBe(true)
-  })
-
-  it('strong overall with empty summary → no probe', () => {
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: 9.0,
-        dimensions: dims({}),
-        one_line_summary: '',
-      }),
-    ).toBe(false)
-  })
-
-  it('overall below 8 with no weak required dim → probe', () => {
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: 7.5,
-        dimensions: dims({
-          communication_clarity: 7,
-          content_accuracy: 7,
-          structure: 7,
-          specificity: 7,
-          relevance: 7,
-        }),
-        one_line_summary: 'Tighten the outcome.',
-      }),
-    ).toBe(true)
-  })
-
-  it('null / unusable score → unknown (LLM decides)', () => {
-    expect(answerNeedsFollowUpProbe(null)).toBe('unknown')
-    expect(answerNeedsFollowUpProbe(undefined)).toBe('unknown')
-    expect(
-      answerNeedsFollowUpProbe({
-        overall: Number.NaN,
-        dimensions: dims({}),
-      }),
-    ).toBe('unknown')
   })
 })
 
@@ -146,17 +196,23 @@ describe('probeNeededFromEvaluationRow', () => {
     )
   })
 
-  it('parses one_line_summary from raw_model_output', () => {
+  it('scored row with all dimensions ≥7 → no probe even with actionable summary', () => {
     const raw = JSON.stringify({
       sub_rubric: 'star',
       dimensions: dims({}),
-      one_line_summary: 'No major improvements needed; the answer is comprehensive.',
+      one_line_summary: 'Clarify the initial trigger for identifying the weakness.',
     })
     expect(
       probeNeededFromEvaluationRow({
         status: 'scored',
-        overall: 9.6,
-        dimensions: dims({ communication_clarity: 7 }),
+        overall: 7.6,
+        dimensions: dims({
+          communication_clarity: 7,
+          content_accuracy: 7,
+          structure: 7,
+          specificity: 7,
+          relevance: 10,
+        }),
         raw_model_output: raw,
       }),
     ).toBe(false)
