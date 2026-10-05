@@ -31,6 +31,7 @@ export type AiOperation =
   | 'agent_analysis'
   | 'answer_evaluation'
   | 'question_generation'
+  | 'script_question_plan'
   | 'resume_parse'
   | 'report_generation'
   | 'jd_parse'
@@ -157,6 +158,20 @@ const OPERATION_SPECS: Record<AiOperation, OperationSpec> = {
       maxHistoryTurnChars:  0,
     },
     estimatedInputTokens: 450,
+  },
+  script_question_plan: {
+    requestClass:         'lightweight_parse',
+    temperature:          0.4,
+    maxOutputTokens:      1_600,
+    llmAttemptTimeoutMs:    14_000,
+    timeoutMs:            18_000,
+    responseFormat:       'json',
+    context: {
+      maxInputChars:        3_200,
+      maxHistoryTurns:      0,
+      maxHistoryTurnChars:  0,
+    },
+    estimatedInputTokens: 900,
   },
   resume_parse: {
     requestClass:         'lightweight_parse',

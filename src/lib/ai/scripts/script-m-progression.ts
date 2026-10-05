@@ -5,11 +5,12 @@
  * technical → behavioral → technical → behavioral.
  * Follow-ups do not consume question_number and do not flip that sequence.
  *
- * There is no stored question bank (`question_pool` is "Not available").
- * After the follow-up cap, the next core must still be a new question of the
- * alternate type — never the parent / FU1 / FU2 restated as a core question.
+ * There is a persisted per-interview core plan for new V2.1 sessions.
+ * These templates are only the emergency last resort when that plan cannot
+ * supply the next alternate core. Callers must still reject duplicates.
  */
 
+import { findCoreDuplicate } from '@/lib/interview/question-plan/duplicate'
 import type { ScriptTurnOutput } from './turn-validator'
 import { followUpConflictsWithParentType, questionsAreEquivalent } from './follow-up-guards'
 
@@ -90,15 +91,21 @@ const SCRIPT_M_CORE_TEMPLATES: Record<
   ],
 }
 
+/**
+ * Next unused SCRIPT_M template, or null when every template for this type
+ * is already an asked core. Never returns the last template just because
+ * the list is exhausted.
+ */
 export function cannedScriptMNextCoreTurn(
   nextType: ScriptMQuestionType,
   alreadyAsked: string[],
   emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
-): ScriptTurnOutput {
+): ScriptTurnOutput | null {
   const templates = SCRIPT_M_CORE_TEMPLATES[nextType]
-  const picked =
-    templates.find((t) => !repeatsAlreadyAskedQuestion(t.display_question, alreadyAsked)) ??
-    templates[templates.length - 1]!
+  const picked = templates.find(
+    (template) => !findCoreDuplicate(template.display_question, alreadyAsked).duplicate,
+  )
+  if (!picked) return null
   const display_question = picked.display_question
   return {
     speech: `${picked.bridge} ${display_question}`,

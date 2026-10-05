@@ -25,6 +25,7 @@ const SMART_OPERATIONS = new Set<AiOperation>([
 /** Fast JSON generation — latency-sensitive structured ops. */
 const FAST_GENERATION_OPERATIONS = new Set<AiOperation>([
   'question_generation',
+  'script_question_plan',
   'answer_score',
   'auto_structure',
 ]);

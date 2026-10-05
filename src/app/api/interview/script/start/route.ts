@@ -5,6 +5,7 @@ import { createInterviewWithCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
 import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
+import { setQuestionPlanStatus } from '@/lib/interview/question-plan/persist';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 import {
@@ -251,6 +252,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         resumeId,
       });
     }
+
+    // Step 8b — mark this interview for a persisted core plan.
+    // Generation runs on the first turn so startup stays inside the 30s route budget.
+    // Interviews created before this marker stay on the legacy turn path.
+    await setQuestionPlanStatus(serviceClient, interviewId, 'pending');
 
     // Step 9 — analytics (grep `[product-event]` / durable milestone)
     trackInterviewEvent('interview_created', {

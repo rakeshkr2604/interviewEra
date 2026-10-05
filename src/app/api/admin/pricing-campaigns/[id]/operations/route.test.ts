@@ -163,11 +163,14 @@ describe('POST /api/admin/pricing-campaigns/[id]/operations', () => {
   });
 
   it('continues a campaign as a new instance linked via parent_campaign_id', async () => {
+    // Must stay strictly after Date.now() — hardcoded near-term dates time-bomb in CI.
+    const startsAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const endsAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
     const res = await POST(
       request('camp-123', {
         action: 'continue',
-        starts_at: '2026-10-01T00:00:00.000Z',
-        ends_at: '2026-10-05T00:00:00.000Z',
+        starts_at: startsAt,
+        ends_at: endsAt,
       }),
       { params: Promise.resolve({ id: 'camp-123' }) },
     );

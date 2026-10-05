@@ -391,8 +391,9 @@ describe('candidate-answering progression contract', () => {
     const turn = cannedScriptMNextCoreTurn('behavioral', [
       'What is the difference between stack memory and heap memory?',
     ])
-    expect(turn.is_question).toBe(true)
-    expect(canEnterCandidateAnswering(turn)).toBe(true)
+    expect(turn).not.toBeNull()
+    expect(turn!.is_question).toBe(true)
+    expect(canEnterCandidateAnswering(turn!)).toBe(true)
   })
 })
 
@@ -498,10 +499,12 @@ describe('ack TTS vs AUTO_ADVANCE_MS one-shot', () => {
     const behavioral = cannedScriptMNextCoreTurn('behavioral', [
       'What is the difference between stack memory and heap memory?',
     ])
-    expect(canEnterCandidateAnswering(behavioral)).toBe(true)
+    expect(behavioral).not.toBeNull()
+    expect(canEnterCandidateAnswering(behavioral!)).toBe(true)
     const technical = cannedScriptMNextCoreTurn('technical', [
-      behavioral.display_question ?? '',
+      behavioral!.display_question ?? '',
     ])
-    expect(canEnterCandidateAnswering(technical)).toBe(true)
+    expect(technical).not.toBeNull()
+    expect(canEnterCandidateAnswering(technical!)).toBe(true)
   })
 })

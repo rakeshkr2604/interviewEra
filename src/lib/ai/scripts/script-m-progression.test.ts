@@ -83,20 +83,36 @@ describe('cannedScriptMNextCoreTurn', () => {
   it('after a technical parent, emits a new behavioral core not equal to parent/FU', () => {
     const asked = [STACK_PARENT, STACK_FU, GRAPHQL_FU]
     const turn = cannedScriptMNextCoreTurn('behavioral', asked)
-    expect(turn.is_follow_up).toBe(false)
-    expect(turn.is_question).toBe(true)
-    expect(turn.phase).toBe('core')
-    expect(turn.question_type).toBe('behavioral')
-    expect(turn.display_question).toBeTruthy()
-    expect(repeatsAlreadyAskedQuestion(turn.display_question!, asked)).toBe(false)
-    expect(turn.speech).toContain(turn.display_question!)
+    expect(turn).not.toBeNull()
+    expect(turn!.is_follow_up).toBe(false)
+    expect(turn!.is_question).toBe(true)
+    expect(turn!.phase).toBe('core')
+    expect(turn!.question_type).toBe('behavioral')
+    expect(turn!.display_question).toBeTruthy()
+    expect(repeatsAlreadyAskedQuestion(turn!.display_question!, asked)).toBe(false)
+    expect(turn!.speech).toContain(turn!.display_question!)
   })
 
   it('after a behavioral parent, emits a new technical core', () => {
     const asked = [DEADLINE_Q]
     const turn = cannedScriptMNextCoreTurn('technical', asked)
-    expect(turn.question_type).toBe('technical')
-    expect(turn.is_follow_up).toBe(false)
-    expect(repeatsAlreadyAskedQuestion(turn.display_question!, asked)).toBe(false)
+    expect(turn).not.toBeNull()
+    expect(turn!.question_type).toBe('technical')
+    expect(turn!.is_follow_up).toBe(false)
+    expect(repeatsAlreadyAskedQuestion(turn!.display_question!, asked)).toBe(false)
+  })
+
+  it('returns null when every canned template of that type was already asked', () => {
+    for (const nextType of ['technical', 'behavioral'] as const) {
+      const asked: string[] = []
+      const first = cannedScriptMNextCoreTurn(nextType, asked)
+      expect(first?.display_question).toBeTruthy()
+      asked.push(first!.display_question!)
+      const second = cannedScriptMNextCoreTurn(nextType, asked)
+      expect(second?.display_question).toBeTruthy()
+      expect(second!.display_question).not.toBe(first!.display_question)
+      asked.push(second!.display_question!)
+      expect(cannedScriptMNextCoreTurn(nextType, asked)).toBeNull()
+    }
   })
 })

@@ -1,8 +1,8 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-10-04
-> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards
+> Last Verified: 2026-10-05
+> Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards + persisted V2.1 core-question plans (first-turn generation, duplicate-safe fallback)
 > Authority: Production interview path
 
 ## Purpose
@@ -69,7 +69,8 @@ Plan budgets: `users.plan_tier` → `getPlanLimits(...).max_llm_cost_per_month_u
 
 ### Tables
 
-- `interviews` (+ v2.1 columns)
+- `interviews` (+ v2.1 columns, `session_context.questionPlanStatus` for new plans)
+- `questions` (V2.1 core plan rows when `plan_status` is set; legacy V1 rows stay `plan_status` NULL)
 - `script_turns`
 - `answer_evaluations`
 - `script_interview_reports`
@@ -166,9 +167,35 @@ sequenceDiagram
   Score-->>UI: dimensions + overall
 ```
 
-- Follow-ups: same LLM call (`is_follow_up: true`), max 2 per parent core, do not consume `question_count`
+- Follow-ups: same LLM call (`is_follow_up: true`), max 2 per parent core, do not consume `question_count` and do not consume a planned core slot
 - Answer context recovered so ack auto-advance cannot wipe the real answer
 - Optional LLM→TTS SSE gated by `VOICE_LLM_TTS_STREAMING` (unset → JSON-only)
+
+### Core question plan (new V2.1 interviews)
+
+`POST /api/interview/script/start` only writes `session_context.questionPlanStatus = pending`. It does not call the planner, so startup stays on the 30s route budget. The first `POST /api/interview/script/turn` builds and persists the plan, then serves it.
+
+```text
+start → pending marker
+turn  → candidate pool (~2× question_count) → normalize / dedupe / novelty
+      → N planned rows in questions (plan_status = planned)
+      → select next planned core → persist the turn → mark asked
+      → LLM still writes follow-ups, probes, and the spoken bridge
+```
+
+| Rule | Contract |
+|---|---|
+| Who | Interviews whose `session_context.questionPlanStatus` is `pending` or `ready`. Older rows have no marker and keep the previous turn path, plus a server block on equivalent core repeats. |
+| Source of truth | `questions` rows with `plan_status` in `planned` / `asked` / `skipped`. Follow-ups stay on `script_turns` only. |
+| SCRIPT_M | Planned rows alternate technical, behavioral, technical, behavioral. Hardcoded templates are a last resort. If every template of the required type was already asked, the turn is an acknowledgment with `is_question: false`. It is not the last template again. |
+| Duplicate block | A new core is not saved when it matches an earlier core after normalization, lexical equivalence, same-topic overlap, or a same-competency family (authentication / session). A narrow probe, such as index write performance after an indexing core, stays a follow-up. If no unused planned row or fallback exists, the turn does not persist the duplicate core. |
+| Novelty | Recently asked cores, the candidate's earlier interviews, and other interviews' planned-but-unasked cores reduce a question's score. Resume, project, JD, and role raise it. Equal scores break on a stable hash of that candidate's role, skills, projects, and JD. Common concepts are not globally banned. |
+| New interview, plan cannot be stored | Missing migration, insert failure, LLM timeout, or invalid JSON does not switch that interview back to an uncontrolled core. The turn uses an in-memory candidate-specific plan that still passes the duplicate guard. Nothing is written to `questions`. The failure is logged as `question_plan_generation_failed`. |
+| Partial plan | If every stored row is still `planned` and the count is short, the next ensure fills only the missing slots and does not rewrite the rows already stored. |
+| History | Existing `questions` rows are not rewritten. In-progress interviews without a marker are not given a plan mid-session. |
+| Timing logs | `question_plan_persisted` includes `latency_ms` and `timings` for pool/LLM, duplicate filtering, novelty, persistence, and total. Resume and JD text are not logged. |
+
+Migration: `113_v21_question_plan.sql`. Applied on staging (`20261005075120`) and production (`20261005075253`). Columns are nullable, so existing `questions` rows stay valid. Only new interviews create plan rows after the application build that writes them is deployed. A new interview that cannot persist a plan uses the in-memory fallback above and does not fall through to an unplanned LLM core.
 
 ### Scoring
 

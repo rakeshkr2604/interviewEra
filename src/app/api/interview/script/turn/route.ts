@@ -52,6 +52,7 @@ import {
   shouldForceClosingBeforeLlm,
   shouldForceCoreEntryBeforeLlm,
   shouldShowCandidateQuestionGuidance,
+  turnIsFollowUp,
   type ScriptTurnRow,
 } from '@/lib/ai/scripts/turn-authority';
 import { resolveTurnContinuation } from '@/lib/ai/scripts/turn-continuation';
@@ -62,6 +63,15 @@ import {
   resolveFollowUpGenerationContext,
 } from '@/lib/ai/scripts/follow-up-context';
 import { nextScriptMCoreQuestionType } from '@/lib/ai/scripts/script-m-progression';
+import {
+  assignedCoreDirective,
+  bindPlannedCoreQuestion,
+} from '@/lib/interview/question-plan/bind-turn';
+import { questionPlanContext, ensureInterviewQuestionPlan } from '@/lib/interview/question-plan/ensure';
+import { logQuestionPlan } from '@/lib/interview/question-plan/log';
+import { markQuestionPlanRows } from '@/lib/interview/question-plan/persist';
+import { pickNextPlannedCore } from '@/lib/interview/question-plan/select';
+import type { PlannedCoreQuestion } from '@/lib/interview/question-plan/types';
 import { probeNeededFromEvaluationRow, type ProbeNeeded } from '@/lib/interview/answer-score/probe-needed';
 import {
   cannedCandidateQuestionGuidanceTurn,
@@ -86,6 +96,7 @@ type InterviewRow = {
     experienceYears?: number;
     interviewerId?: string;
     jobDescription?: string;
+    questionPlanStatus?: 'pending' | 'ready';
   } | null;
   current_turn_index: number;
   self_intro_enabled: boolean;
@@ -660,6 +671,73 @@ export async function POST(request: Request): Promise<NextResponse> {
       return persistCannedActiveTurn(cannedCandidateQuestionsTurn(), 'cq-entry');
     }
 
+    const planContext = questionPlanContext({
+      role: interview.role,
+      parsedResume: resumeCtx.parsed,
+      jobDescription: sessionContext.jobDescription,
+    });
+    const planMarker = sessionContext.questionPlanStatus;
+    let questionPlan: PlannedCoreQuestion[] | null = null;
+    if (planMarker === 'pending' || planMarker === 'ready') {
+      const difficulty =
+        interview.difficulty === 'easy' || interview.difficulty === 'hard'
+          ? interview.difficulty
+          : 'medium';
+      questionPlan = await ensureInterviewQuestionPlan(serviceClient, {
+        interviewId,
+        userId: user.id,
+        role: interview.role,
+        difficulty,
+        questionCount: interview.question_count,
+        scriptType: interview.script_type,
+        goal: sessionContext.goal ?? 'general_practice',
+        interviewMode:
+          sessionContext.interviewMode ??
+          (interview.script_type === 'SCRIPT_T'
+            ? 'technical'
+            : interview.script_type === 'SCRIPT_H'
+              ? 'hr_behavioral'
+              : 'mixed'),
+        experienceYears: sessionContext.experienceYears ?? 0,
+        jobDescription: sessionContext.jobDescription,
+        parsedResume: resumeCtx.parsed,
+      });
+    }
+
+    const askedCoreQuestions = allTurns
+      .filter((t) => t.phase === 'core' && t.is_question && !turnIsFollowUp(t.llm_output))
+      .map((t) => questionTextFromTurn(t))
+      .filter(Boolean);
+
+    const coreProbeRequired = probeIsRequired({
+      requestPhase: currentPhase,
+      followUpEnabled,
+      followUpsThisQuestion,
+      maxFollowUpsPerQuestion,
+      hasValidParentCoreQuestion: followUpCtx.has_valid_parent_core_question,
+      answerProbeNeeded,
+      lastAnswer,
+    });
+    const expectNewCore =
+      questionPlan !== null &&
+      currentPhase === 'core' &&
+      !coreProbeRequired &&
+      coreQuestionsAsked < interview.question_count &&
+      (followUpsThisQuestion >= maxFollowUpsPerQuestion ||
+        answerProbeNeeded === false ||
+        followUpCtx.previous_turn_was_acknowledgment ||
+        lastAnswer === '[SKIPPED]' ||
+        lastAnswer === '[TIMEOUT]');
+    const assignedCore =
+      expectNewCore && questionPlan
+        ? pickNextPlannedCore({
+            plan: questionPlan,
+            scriptType: interview.script_type,
+            lastQuestionType: interview.last_question_type,
+            alreadyAsked: askedCoreQuestions,
+          }).selected
+        : null;
+
     const runtimeContext = buildRuntimeContext({
       candidate_name: displayName,
       target_role: interview.role,
@@ -670,7 +748,11 @@ export async function POST(request: Request): Promise<NextResponse> {
       difficulty: interview.difficulty,
       resume_summary: resumeSummary,
       job_description: jdClamped ?? 'Not provided',
-      question_pool: 'Not available',
+      question_pool: assignedCore
+        ? `assigned_core: ${assignedCore.questionText}`
+        : questionPlan
+          ? 'plan_active'
+          : 'Not available',
       current_phase: promptPhase,
       question_number: coreQuestionsAsked,
       total_questions: interview.question_count,
@@ -789,9 +871,14 @@ export async function POST(request: Request): Promise<NextResponse> {
               ? `${continuation.instruction}${alreadyAskedBlock}${continuation.directive}`
               : `${followUpCtx.last_answer_for_prompt}${alreadyAskedBlock}${candidateQuestionDirective}`;
 
+    const userMessageWithPlan =
+      assignedCore
+        ? `${userMessage}${assignedCoreDirective(assignedCore.questionText, assignedCore.questionType)}`
+        : userMessage;
+
     const llmMessages = [
       { role: 'system' as const, content: systemPrompt },
-      { role: 'user' as const, content: userMessage },
+      { role: 'user' as const, content: userMessageWithPlan },
     ];
 
     type TurnOk = {
@@ -853,6 +940,16 @@ export async function POST(request: Request): Promise<NextResponse> {
         answerProbeNeeded,
         previousTurnWasAcknowledgment: followUpCtx.previous_turn_was_acknowledgment,
       });
+
+      const coreBinding = bindPlannedCoreQuestion({
+        turn: validated,
+        scriptType: interview.script_type,
+        lastQuestionType: interview.script_type === 'SCRIPT_M' ? interview.last_question_type : null,
+        plan: questionPlan,
+        alreadyAskedCore: askedCoreQuestions,
+        context: planContext,
+      });
+      validated = coreBinding.turn;
 
       // Authority may replace speech/display_question (canned CQ / self_intro)
       // and canonicalizes speech to optional-bridge + exact display_question.
@@ -931,6 +1028,18 @@ export async function POST(request: Request): Promise<NextResponse> {
           }
         }
         reusedExistingTurn = true;
+      }
+
+      if (!reusedExistingTurn) {
+        for (const event of coreBinding.events) {
+          logQuestionPlan(interviewId, event);
+        }
+        if (coreBinding.askedId || coreBinding.skippedIds.length > 0) {
+          await markQuestionPlanRows(serviceClient, [
+            ...(coreBinding.askedId ? [{ id: coreBinding.askedId, status: 'asked' as const }] : []),
+            ...coreBinding.skippedIds.map((id) => ({ id, status: 'skipped' as const })),
+          ]);
+        }
       }
 
       await recordPreviousAnswer();

@@ -7,6 +7,7 @@ import {
   scriptMFollowUpIsDuplicateOf,
   speechContainsQuestionMark,
 } from './follow-up-guards'
+import { findCoreDuplicate } from '@/lib/interview/question-plan/duplicate'
 import {
   cannedScriptMNextCoreTurn,
   nextScriptMCoreQuestionType,
@@ -471,13 +472,19 @@ export function cannedNextCoreQuestionTurn(opts: {
     const nextType = nextScriptMCoreQuestionType(
       opts.lastQuestionType ?? opts.parentQuestionType,
     )
-    return cannedScriptMNextCoreTurn(nextType, opts.alreadyAsked, opts.emotion)
+    return (
+      cannedScriptMNextCoreTurn(nextType, opts.alreadyAsked, opts.emotion) ??
+      cannedMoveOnTurn(opts.emotion)
+    )
   }
 
   const technical = opts.scriptType === 'SCRIPT_T'
   const display_question = technical
     ? 'Walk me through how you would approach this problem end to end, including the main trade-off you would make.'
     : 'Tell me about a time you faced a setback or disagreement at work or in a project. What did you do, and what was the outcome?'
+  if (findCoreDuplicate(display_question, opts.alreadyAsked).duplicate) {
+    return cannedMoveOnTurn(opts.emotion)
+  }
   return {
     speech: `Let's keep going. ${display_question}`,
     display_question,
@@ -702,7 +709,10 @@ function resolveTurnAuthorityOverrides(
       const nextType = nextScriptMCoreQuestionType(
         opts.lastQuestionType ?? opts.parentQuestionType,
       )
-      return cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion)
+      return (
+        cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion) ??
+        cannedMoveOnTurn(turn.interviewer_emotion)
+      )
     }
     return cannedMoveOnTurn(turn.interviewer_emotion)
   }
@@ -808,7 +818,10 @@ function resolveTurnAuthorityOverrides(
         const nextType = nextScriptMCoreQuestionType(
           opts.lastQuestionType ?? opts.parentQuestionType,
         )
-        return cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion)
+        return (
+          cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion) ??
+          cannedMoveOnTurn(turn.interviewer_emotion)
+        )
       }
 
       // Adaptive OFF core already returned above. Non-core: drop flag, keep speech.

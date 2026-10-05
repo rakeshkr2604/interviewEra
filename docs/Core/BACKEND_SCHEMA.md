@@ -1,8 +1,8 @@
 # Backend Schema
 
 > Status: CANONICAL
-> Last Verified: 2026-09-30
-> Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC
+> Last Verified: 2026-10-05
+> Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC + V2.1 question-plan columns on questions
 > Authority: Schema overview for agents (migrations remain legal SoT)
 
 ## Purpose
@@ -26,6 +26,7 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 |---|---|
 | `interviews` | `engine='v2.1'` + script columns; one-active partial unique index |
 | `script_turns` | turn_index, question/answer, follow-up flags, structure fields |
+| `questions` | Shared with V1. V2.1 core plans use nullable `question_type`, `difficulty`, `source`, `plan_status` (`planned`/`asked`/`skipped`), `grounding`. `plan_status` NULL means a legacy V1 row. Partial unique index on `(interview_id, order_index)` only where `plan_status` is set. Migration 113. |
 | `answer_evaluations` | per-answer scores |
 | `script_interview_reports` | completion reports |
 | `resume_interview_snapshots` | resume freeze at interview |
