@@ -1,8 +1,8 @@
 # Quality Gates
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Gate levels (design + current CI enforcement)
+> Last Verified: 2026-10-06
+> Verification Scope: Gate levels (design + current CI enforcement) + NFT PDF scoping gate
 > Authority: What must be green vs ritual vs warning
 
 **Status note: DESIGN origins.** Defines every gate, its enforcement level, and why. PR-blocking requires branch protection (GitHub Pro — see archive `BRANCH_PROTECTION_SETUP.md` / `ENGINEERING_PLATFORM.md`); until upgraded, "Blocking" means "socially blocking + red X on the PR."
@@ -15,6 +15,7 @@ Legend — **Blocking**: merge impossible/forbidden while red. **Warning**: surf
 | 2 | Typecheck (`tsc --noEmit`, strict) | **Blocking** | ci.yml quality | Strict TS is a load-bearing safety net given heavy AI codegen; non-negotiable |
 | 3 | Unit tests (vitest, incl. razorpay concurrency suite) | **Blocking** | ci.yml quality | 374-test suite is the core regression net; payments idempotency scenarios live here |
 | 4 | PDF extraction fixtures (`verify:pdf`) | **Blocking** | ci.yml pdf_extract | Funnel-critical; already CI-enforced today — keep |
+| 4b | PDF NFT scoping (`verify:nft-pdf` after build) | **Blocking** | ci.yml build (after `npm run build`) | Prevents reintroducing global `'/**'` PDF tracing that bloated Functions Storage |
 | 5 | E2E auth suite (Playwright) | **Blocking** | ci.yml e2e_auth | Auth is a High Risk System mid-migration; already enforced — keep. Both `NEXT_PUBLIC_AUTH_V2` states: currently single-state in CI (**which state is exercised: Unknown — not verified from repository**; make it explicit, run both on auth-path changes) |
 | 6 | Build + noindex/sitemap audit | **Blocking** | ci.yml build + Vercel build | The strongest existing gate (build-fail on SEO contradiction — AGENTS.md invariant #6); dual-enforced in CI and at deploy |
 | 7 | Secret scan (gitleaks) | **Blocking** | ci.yml (new) | Multiple AI tools generate code; a leaked key is unbounded-cost. Blocking from day one; false positives handled via allowlist file |

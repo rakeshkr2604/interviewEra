@@ -8,13 +8,32 @@ const withBundleAnalyzer = bundleAnalyzer({
 /** Vercel sets `preview` only for Preview deployments — never on Production (`production`). */
 const IS_VERCEL_PREVIEW = process.env.VERCEL_ENV === "preview";
 
+/**
+ * PDF asset tracing — ROUTE-SCOPED ONLY.
+ *
+ * Never attach these to `'/**'`. A global include forces ~45MB+ of pdfjs-dist /
+ * pdf-parse / canvas files into every serverless function (health, payments,
+ * auth, …), which multiplies Vercel Deployment + Functions storage across
+ * every deploy. NFT does not follow pdfjs runtime font/cmap paths, so these
+ * globs are required — but only on routes that execute PDF parsing.
+ *
+ * Required by runtime:
+ * - standard_fonts / cmaps → getDocument asset URLs in src/lib/pdf/parser.ts
+ * - legacy/build pdf(+worker).mjs → dynamic import + fake-worker resolve
+ * - @napi-rs/canvas → DOMMatrix/Path2D/ImageData globals for Node pdfjs
+ * - pdf-parse → fallback when canvas globals missing / pdfjs fails
+ */
 function pdfTraceGlobs(): string[] {
   return [
     "./node_modules/pdfjs-dist/standard_fonts/**",
     "./node_modules/pdfjs-dist/cmaps/**",
-    "./node_modules/pdfjs-dist/legacy/build/**",
+    "./node_modules/pdfjs-dist/legacy/build/pdf.mjs",
+    "./node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
     "./node_modules/@napi-rs/canvas/**",
-    "./node_modules/pdf-parse/**",
+    // index + lib only — do not ship pdf-parse/test fixtures (~5MB) into Lambdas
+    "./node_modules/pdf-parse/package.json",
+    "./node_modules/pdf-parse/index.js",
+    "./node_modules/pdf-parse/lib/**",
   ];
 }
 
@@ -22,6 +41,21 @@ function pdfTraceGlobs(): string[] {
 function scriptEngineTraceGlobs(): string[] {
   return ["./src/lib/ai/scripts/*.md"];
 }
+
+/** Routes that call extractText / page-count / ATS PDF layout inspect. */
+const PDF_TRACE_ROUTES = [
+  "/api/resume/upload",
+  "/api/job-description/extract",
+  "/tools/ats-checker",
+] as const;
+
+/** Routes that read SCRIPT_*.md via script-loader at runtime. */
+const SCRIPT_TRACE_ROUTES = [
+  "/api/interview/script/turn",
+  "/api/interview/script/auto-structure",
+  "/api/interview/script/start",
+] as const;
+
 const nextConfig: NextConfig = {
   devIndicators: {
     position: 'bottom-right',
@@ -53,17 +87,10 @@ const nextConfig: NextConfig = {
   },
   // Prevents Next.js from bundling packages that need Node.js internals at load time
   serverExternalPackages: ['pdfjs-dist', '@react-pdf/renderer', '@napi-rs/canvas', 'pdf-parse'],
-  // Force NFT to trace pdfjs-dist font + cmap assets into every Node server
-  // bundle that needs them. `'/**'` plus explicit route IDs reduces risk of Next
-  // picomatch drift per deployment (ATS server action vs API routes).
+  // Route-scoped NFT includes only. See pdfTraceGlobs() — never use '/**' for PDF.
   outputFileTracingIncludes: {
-    '/**': [...pdfTraceGlobs(), ...scriptEngineTraceGlobs()],
-    '/tools/ats-checker': pdfTraceGlobs(),
-    '/api/resume/upload': pdfTraceGlobs(),
-    '/api/job-description/extract': pdfTraceGlobs(),
-    '/api/interview/script/turn': scriptEngineTraceGlobs(),
-    '/api/interview/script/auto-structure': scriptEngineTraceGlobs(),
-    '/api/interview/script/start': scriptEngineTraceGlobs(),
+    ...Object.fromEntries(PDF_TRACE_ROUTES.map((route) => [route, pdfTraceGlobs()])),
+    ...Object.fromEntries(SCRIPT_TRACE_ROUTES.map((route) => [route, scriptEngineTraceGlobs()])),
   },
   // Performance
   compress: true,

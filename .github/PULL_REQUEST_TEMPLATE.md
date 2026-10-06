@@ -9,6 +9,7 @@ Check any that apply (see AGENTS.md "High Risk Systems" table) — each carries 
 - [ ] **Payments** (Razorpay) — ran `npx vitest run src/lib/razorpay/` AND manually traced both verify-first and webhook-first orderings (docs/Core/PAYMENTS.md)
 - [ ] **Speech/voice pipeline** — ran the unit suite AND `npm run verify:voice` AND a manual mobile smoke (Chrome Android / iOS Safari) (docs/Core/VOICE_PIPELINE.md)
 - [ ] **Resume/PDF parsing** — ran `npm run verify:pdf` against checked-in fixtures
+- [ ] **PDF serverless tracing** — if touching `next.config` / PDF extract: `npm run build && npm run verify:nft-pdf` (no global `'/**'` PDF includes)
 - [ ] **Auth (V2 migration)** — exercised both `NEXT_PUBLIC_AUTH_V2` states (on and off)
 - [ ] **Database/RLS** — new migration reviewed against AGENTS.md Critical Invariants #2/#3/#10 (credit RPCs, `guard_users_privileged_update`, service-role-only writes)
 - [ ] **SEO/indexing** — ran `npm run audit:noindex` (also covered by `npm run build`)

@@ -207,6 +207,10 @@ jobs:
         if: needs.changes.outputs.code == 'true'
         run: npm run build
 
+      - name: Verify PDF NFT scoping
+        if: needs.changes.outputs.code == 'true'
+        run: npm run verify:nft-pdf
+
       - name: Pack Next.js build
         if: needs.changes.outputs.code == 'true'
         run: tar -czf next-build.tar.gz --exclude='.next/cache' .next

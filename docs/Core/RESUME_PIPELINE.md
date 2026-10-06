@@ -1,8 +1,8 @@
 # Resume Pipeline
 
 > Status: CANONICAL
-> Last Verified: 2026-10-04
-> Verification Scope: Upload/extract/parse + content classification + storage privacy
+> Last Verified: 2026-10-06
+> Verification Scope: Upload/extract/parse + content classification + storage privacy + serverless PDF tracing scope
 > Authority: Resume text extraction and AI parse
 
 ## Purpose
@@ -58,19 +58,21 @@ Flags: `RESUME_OCR_ENABLED` (unset = **on**), `RESUME_PARSE_FORCE_AI`.
 
 ## Architecture / Rules
 
-- Serverless: `next.config.ts` must trace `pdfjs-dist` / `@napi-rs/canvas` assets
+- Serverless: `next.config.ts` must **route-scope** `outputFileTracingIncludes` for `pdfjs-dist` fonts/cmaps, canvas, and pdf-parse — **never** `'/**'` (global include caused multi-GB Vercel Functions Storage). Routes: `/api/resume/upload`, `/api/job-description/extract`, `/tools/ats-checker`. Detail: [PERFORMANCE](../Guidelines/PERFORMANCE.md).
+- Canonical extract engine: `pdfjs-dist` legacy; `@napi-rs/canvas` supplies Node DOM globals; `pdf-parse` remains a **fallback** only (not the primary path).
 - Typed errors: `PDFEncryptedError`, `PDFScannedNoTextError`, …
 - Upload rate limit: fail-closed (`upload:{userId}`, 5 / 300s)
 
 ## Dependencies
 
-pdfjs · pdf-parse · tesseract · OpenRouter · Supabase Storage · [AI_PIPELINES](AI_PIPELINES.md)
+pdfjs · pdf-parse (fallback) · tesseract · OpenRouter · Supabase Storage · [AI_PIPELINES](AI_PIPELINES.md) · [PERFORMANCE](../Guidelines/PERFORMANCE.md)
 
 ## Failure Modes
 
 | Failure | Mitigation |
 |---|---|
-| Bundling miss on Vercel | Tracing includes + `verify:pdf` |
+| Bundling miss on Vercel | Route-scoped tracing includes + `verify:pdf` |
+| Global PDF tracing reintroduced | `verify:nft-pdf` + `tracing-config.test.ts` |
 | Encrypted PDF | Typed error to user |
 | OCR cost spike | Bound + opt-out flag |
 | Low text | Regex `buildFallbackParsedResume` |
@@ -80,6 +82,8 @@ pdfjs · pdf-parse · tesseract · OpenRouter · Supabase Storage · [AI_PIPELIN
 ## Verification
 
 `npm run verify:pdf` against fixtures before any extract-chain change.  
+After production build: `npm run verify:nft-pdf` (unrelated NFTs must not contain PDF assets).  
+Config regression: `npx vitest run src/lib/pdf/tracing-config.test.ts`  
 Classifier / shared gate:  
 `npx vitest run src/lib/documents/document-classification.test.ts src/lib/documents/validate-resume-document-text.test.ts`  
 ATS ordering + semantic rejects:  
@@ -87,7 +91,7 @@ ATS ordering + semantic rejects:
 
 ## Change Triggers
 
-Parser · OCR bounds · `MIN_USEFUL_CHARS` · classifier thresholds · storage path semantics · bucket public flag · new upload route without tracing
+Parser · OCR bounds · `MIN_USEFUL_CHARS` · classifier thresholds · storage path semantics · bucket public flag · new upload route without tracing · any `outputFileTracingIncludes` change
 
 ## Related Documents
 

@@ -1,39 +1,100 @@
 # Performance
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: next.config + Redis caching posture
+> Last Verified: 2026-10-06
+> Verification Scope: next.config outputFileTracing + serverless PDF scoping
 > Authority: Perf / bundling guidance
 
 ## Purpose
 
-Avoid known prod-only failures and keep serverless packages correct.
+Avoid known prod-only failures and keep serverless packages correct — especially preventing heavyweight PDF infrastructure from bloating every Vercel function.
 
 ## Current State / Rules
 
 - `optimizePackageImports` for heavy UI libs
 - Images: AVIF/WebP; `minimumCacheTTL` for images
-- **PDF tracing:** `serverExternalPackages` + `outputFileTracingIncludes` for pdfjs/canvas — missing assets = silent prod break
 - Redis: rate limit + voice quota only (no general data cache layer)
 - Interview routes: respect `maxDuration`
 - Analyze locally: `npm run analyze`
 
+### Heavy server-side dependencies must be route-scoped
+
+**Rule:** Never put PDF / native / large asset globs on `'/**'` (or any catch-all) in `outputFileTracingIncludes`.
+
+**Why global tracing is dangerous:** Next.js NFT copies every matched file into **each** serverless function that matches the key. With `'/**': pdfTraceGlobs()`, ~45 MB of `pdfjs-dist` fonts/cmaps + `pdf-parse` + `@napi-rs/canvas` was forced into **~250** functions (health, payments, auth, …). Vercel Functions Storage is the **sum** of those per-function copies — so one mis-scoped include multiplies into multi-GB usage and ~480 MB build caches every deploy.
+
+**InterviewEra PDF architecture:**
+
+```
+Route (only these)
+  /api/resume/upload
+  /api/job-description/extract
+  /tools/ats-checker   (+ role/results pages matched by path)
+    → domain service (parser / page-count / ATS layout)
+      → pdfjs-dist (+ standard_fonts / cmaps)
+      → @napi-rs/canvas (Node DOMMatrix globals)
+      → pdf-parse (fallback when canvas/pdfjs fail)
+```
+
+Unrelated routes must **not** receive those assets.
+
+### Tracing rules (each must answer: why / which route / what breaks)
+
+| Glob | Why | Routes | Runtime reference | Approx size | If removed |
+|---|---|---|---|---|---|
+| `pdfjs-dist/standard_fonts/**` | NFT does not follow runtime font URLs | PDF routes above | `parser.ts` `standardFontDataUrl` | ~0.7 MB | Helvetica/Times resumes → CORRUPT on Vercel |
+| `pdfjs-dist/cmaps/**` | Same for CJK/encoding maps | PDF routes | `parser.ts` `cMapUrl` | ~1.1 MB | Encoded PDFs fail extract |
+| `pdfjs-dist/legacy/build/pdf.mjs` + `pdf.worker.mjs` | Entrypoint + fake-worker | PDF routes | dynamic `import('pdfjs-dist/legacy/...')` | ~few MB | Import / worker resolve fails |
+| `@napi-rs/canvas/**` | DOMMatrix/Path2D/ImageData on Node | PDF routes | `pdfjs-node-setup.ts` | wrapper + platform `.node` | pdfjs import crashes → fallback/OCR only |
+| `pdf-parse/{package.json,index.js,lib/**}` | Fallback engine (not `test/**`) | PDF routes | `extractWithPdfParse` | ~27 MB lib | No secondary engine if pdfjs/canvas fail |
+| `src/lib/ai/scripts/*.md` | Script prompts read from disk | script turn/start/auto-structure | `script-loader.ts` | small | ENOENT on turn route |
+
+`serverExternalPackages`: `pdfjs-dist`, `@napi-rs/canvas`, `pdf-parse`, `@react-pdf/renderer` (report export — separate from extract).
+
+### How to validate bundle size
+
+```bash
+npm run clean && npm run build
+npm run measure:nft          # writes validation-results/nft-baseline.json
+npm run verify:nft-pdf       # fails if unrelated NFTs regain PDF assets
+npm run verify:pdf           # extract fixtures still work
+```
+
+Key signals of regression:
+
+- `Routes with pdfjs` ≫ PDF route count (should be ~3–5, not ~250)
+- `/api/health` NFT containing `pdfjs-dist/standard_fonts` or `pdf-parse`
+- Unrelated NFT traced size jumping back toward ~50 MB
+
+### How to add a new heavy dependency safely
+
+1. Import it only from a domain module used by the routes that need it (no barrel imports into shared middleware/layout).
+2. Add **route-scoped** `outputFileTracingIncludes` entries for assets NFT cannot discover (fonts, WASM, native binaries).
+3. Never use `'/**'` / `'/*'` for those globs.
+4. Run `npm run verify:nft-pdf` after `build`.
+5. Update this doc + `RESUME_PIPELINE.md` if the PDF extract chain changes.
+
 ## Dependencies
 
-[RESUME_PIPELINE](../Core/RESUME_PIPELINE.md) · [SYSTEM_DESIGN](../Core/SYSTEM_DESIGN.md)
+[RESUME_PIPELINE](../Core/RESUME_PIPELINE.md) · [SYSTEM_DESIGN](../Core/SYSTEM_DESIGN.md) · `next.config.ts`
 
 ## Failure Modes
 
-New PDF-touching route without tracing globs · unbounded OCR · blocking on Redis for voice
+| Failure | Mitigation |
+|---|---|
+| New PDF-touching route without tracing globs | Prod CORRUPT / missing fonts — add route to `PDF_TRACE_ROUTES` |
+| Reintroduce `'/**'` PDF includes | Multi-GB Functions Storage — blocked by `tracing-config.test.ts` + `verify:nft-pdf` |
+| Unbounded OCR | Existing OCR bounds / flag |
+| Blocking on Redis for voice | Keep fail-open/closed as documented |
 
 ## Verification
 
-`npm run verify:pdf` · preview soak for middleware/voice · bundle analyze when shipping large client pages
+`npm run verify:pdf` · `npm run verify:nft-pdf` (after build) · `npx vitest run src/lib/pdf/tracing-config.test.ts` · preview soak for PDF upload/ATS/JD extract · bundle analyze when shipping large client pages
 
 ## Change Triggers
 
-New serverless native dep · new long route · cache layer introduction
+New serverless native dep · new PDF extract route · any edit to `outputFileTracingIncludes` · cache layer introduction
 
 ## Related Documents
 
-[QUALITY_GATES](../Operations/QUALITY_GATES.md)
+[QUALITY_GATES](../Operations/QUALITY_GATES.md) · [RESUME_PIPELINE](../Core/RESUME_PIPELINE.md)
