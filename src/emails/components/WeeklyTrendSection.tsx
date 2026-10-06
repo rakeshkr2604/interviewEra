@@ -76,10 +76,10 @@ export function WeeklyTrendSection({ previousWeekScore, currentWeekScore, style 
 
           {/* Current Week Score */}
           <td align="center" valign="middle">
-            <p style={{ fontSize: '11px', fontWeight: '700', color: '#7c3aed', textTransform: 'uppercase', margin: '0 0 6px 0' }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', color: '#5B21F4', textTransform: 'uppercase', margin: '0 0 6px 0' }}>
               Current Week
             </p>
-            <p style={{ fontSize: '36px', fontWeight: '800', color: '#7c3aed', margin: 0 }}>
+            <p style={{ fontSize: '36px', fontWeight: '800', color: '#5B21F4', margin: 0 }}>
               {currentWeekScore}
             </p>
           </td>

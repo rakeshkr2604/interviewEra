@@ -81,7 +81,7 @@ export default function ProductUpdateEmail(props: Partial<ProductUpdateEmailProp
               style={{
                 fontSize: '11px',
                 fontWeight: '700',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textTransform: 'uppercase',
                 letterSpacing: '0.08em',
                 margin: '0 0 8px 0',
@@ -218,7 +218,7 @@ export default function ProductUpdateEmail(props: Partial<ProductUpdateEmailProp
         After you try the latest experience,{' '}
         <a
           href={`mailto:founder@interviewera.com?subject=${encodeURIComponent('InterviewEra feedback')}`}
-          style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: '600' }}
+          style={{ color: '#5B21F4', textDecoration: 'none', fontWeight: '600' }}
         >
           reply to this email
         </a>

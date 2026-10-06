@@ -60,7 +60,7 @@ export const LIGHT_TOKENS: Record<string, string> = {
   '--v3-accbrd': 'rgba(79, 70, 229, 0.24)',
   '--v3-okdim': 'rgba(5, 150, 105, 0.08)',
   '--v3-ok-brd': 'rgba(5, 150, 105, 0.35)',
-  '--v3-pur': '#7c3aed',
+  '--v3-pur': '#5B21F4',
   '--v3-cta-bg': 'linear-gradient(160deg, #eef2ff 0%, #f8fafc 50%, #f1f5f9 100%)',
   '--v3-cta-brd': 'rgba(79, 70, 229, 0.2)',
 }

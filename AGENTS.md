@@ -99,6 +99,7 @@ Full meanings preserved — do not bypass. Detail in linked Core docs.
 | Mic / STT / TTS | `docs/Core/VOICE_PIPELINE.md` |
 | Resume upload/parse | `docs/Core/RESUME_PIPELINE.md` |
 | Razorpay / credits grant | `docs/Core/PAYMENTS.md` |
+| Brand / logos / favicon / OG mark | `docs/Core/BRAND_ASSETS.md` |
 | New migration | `docs/Guidelines/DATABASE_MIGRATIONS.md` + `.cursor/rules/supabase-migrations.mdc` |
 | Flags | `docs/Operations/FEATURE_FLAGS.md` |
 | Ship / CI | `docs/Operations/RELEASE.md`, `QUALITY_GATES.md` |
@@ -191,3 +192,13 @@ Detail: [`docs/Guidelines/ENGINEERING_WORKFLOW.md`](docs/Guidelines/ENGINEERING_
 - **Post-merge:** verify expected tip / CI / deploy as in scope; no unverified impact claims.
 
 Adapters: [`CLAUDE.md`](CLAUDE.md) · [`.cursorrules`](.cursorrules) · index [`docs/INDEX.md`](docs/INDEX.md)
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -59,11 +59,11 @@ export default function WelcomeEmail({
       />
 
       {/* Expected Time Card */}
-      <InfoCard style={{ borderLeft: '4px solid #7c3aed', backgroundColor: '#f5f3ff' }}>
+      <InfoCard style={{ borderLeft: '4px solid #5B21F4', backgroundColor: '#f5f3ff' }}>
         <p style={{
           fontSize: '14px',
           fontWeight: '600',
-          color: '#7c3aed',
+          color: '#5B21F4',
           margin: 0,
         }}>
           ⏱ Takes only 15 minutes
@@ -96,7 +96,7 @@ export default function WelcomeEmail({
                 height: '24px',
                 borderRadius: '12px',
                 backgroundColor: '#f5f3ff',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textAlign: 'center',
                 lineHeight: '24px',
                 fontSize: '12px',
@@ -122,7 +122,7 @@ export default function WelcomeEmail({
                 height: '24px',
                 borderRadius: '12px',
                 backgroundColor: '#f5f3ff',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textAlign: 'center',
                 lineHeight: '24px',
                 fontSize: '12px',
@@ -148,7 +148,7 @@ export default function WelcomeEmail({
                 height: '24px',
                 borderRadius: '12px',
                 backgroundColor: '#f5f3ff',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textAlign: 'center',
                 lineHeight: '24px',
                 fontSize: '12px',

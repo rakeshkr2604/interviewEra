@@ -13,13 +13,13 @@ export function CTAButton({ href, children, ariaLabel, style, reassurance }: CTA
     <div style={{ margin: '24px 0', textAlign: 'center' }}>
       <table border={0} cellPadding={0} cellSpacing={0} width="100%">
         <tr>
-          <td align="center" style={{ borderRadius: '12px', backgroundColor: '#7c3aed' }}>
+          <td align="center" style={{ borderRadius: '12px', backgroundColor: '#5B21F4' }}>
             <a
               href={href}
               aria-label={ariaLabel}
               style={{
                 display: 'block',
-                backgroundColor: '#7c3aed',
+                backgroundColor: '#5B21F4',
                 color: '#ffffff',
                 textDecoration: 'none',
                 padding: '16px 24px',
@@ -27,7 +27,7 @@ export function CTAButton({ href, children, ariaLabel, style, reassurance }: CTA
                 fontWeight: '600',
                 fontSize: '16px',
                 textAlign: 'center',
-                border: '1px solid #7c3aed',
+                border: '1px solid #5B21F4',
                 boxShadow: '0 4px 6px -1px rgba(124, 58, 237, 0.2)',
                 ...style,
               }}

@@ -21,7 +21,7 @@ export function WeeklyLeaderboardCard({ percentile, role, style }: WeeklyLeaderb
       className="info-card"
     >
       <p style={{ fontSize: '13px', fontWeight: '500', color: '#4b5563', margin: 0 }} className="text-secondary">
-        📊 You're ranked <strong style={{ color: '#7c3aed' }}>Top {percentile}%</strong> among {role} candidates.
+        📊 You're ranked <strong style={{ color: '#5B21F4' }}>Top {percentile}%</strong> among {role} candidates.
       </p>
     </div>
   );

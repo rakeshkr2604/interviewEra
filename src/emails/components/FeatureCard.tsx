@@ -15,7 +15,7 @@ function NewBadge() {
         display: 'inline-block',
         fontSize: '9px',
         fontWeight: '700',
-        color: '#7c3aed',
+        color: '#5B21F4',
         backgroundColor: '#ede9fe',
         borderRadius: '4px',
         padding: '2px 6px',

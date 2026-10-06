@@ -80,7 +80,7 @@ export default function InterviewRecoveryEmail({
         You can turn off interview reminders anytime in{' '}
         <a
           href={settingsUrl}
-          style={{ color: '#7c3aed', textDecoration: 'underline' }}
+          style={{ color: '#5B21F4', textDecoration: 'underline' }}
         >
           Settings
         </a>

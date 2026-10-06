@@ -66,7 +66,7 @@ export function generateScoreAccent(score: number): ScoreAccent {
     return {
       border: '1px solid #ddd6fe',
       backgroundColor: '#f5f3ff',
-      text: '#7c3aed',
+      text: '#5B21F4',
       className: 'score-accent-good',
     };
   }
@@ -221,7 +221,7 @@ export function calculateHiringReadiness(overallScore: number): ReadinessDetails
     return {
       label: 'Almost Ready',
       backgroundColor: '#f5f3ff',
-      textColor: '#7c3aed',
+      textColor: '#5B21F4',
       borderColor: '#ddd6fe',
     };
   }

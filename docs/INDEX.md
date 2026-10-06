@@ -1,8 +1,8 @@
 # Documentation Index
 
 > Status: CANONICAL
-> Last Verified: 2026-10-04
-> Verification Scope: Doc tree layout + agent entrypoints + security audit link
+> Last Verified: 2026-10-06
+> Verification Scope: Doc tree layout + agent entrypoints + security audit link + brand assets doc
 > Authority: Navigation map for humans and agents
 
 ## Purpose
@@ -31,6 +31,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [DECISIONS.md](Core/DECISIONS.md) | ADRs (incl. V1 removal) |
 | [ROUTING.md](Core/ROUTING.md) | Key app + API routes |
 | [SEO_AEO_GEO.md](Core/SEO_AEO_GEO.md) | Sitemap, noindex, analytics |
+| [BRAND_ASSETS.md](Core/BRAND_ASSETS.md) | Logo Package v1 paths, favicon/PWA/OG mapping |
 
 ## Guidelines
 

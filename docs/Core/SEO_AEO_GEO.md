@@ -1,8 +1,8 @@
 # SEO / AEO / GEO
 
 > Status: CANONICAL
-> Last Verified: 2026-10-03
-> Verification Scope: Sitemap, noindex audit, analytics SoT + interview milestones / admin Incomplete+COMPLETED
+> Last Verified: 2026-10-06
+> Verification Scope: Sitemap, noindex audit, analytics SoT + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths
 > Authority: Indexing + funnel analytics
 
 ## Purpose
@@ -19,6 +19,7 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 - **`scripts/noindex-audit.ts`** runs on `npm run build` — must not be bypassed (Invariant #6)
 - Soft-404 risk: catalog dynamics set `dynamicParams = false` where `generateStaticParams` is used
 - `BLOCK_SEARCH_INDEXING` or non-production `VERCEL_ENV` → site noindex
+- Default OG/Twitter image: `/og/default.png` (embeds Logo Package v1 UI square + brand colors). Organization JSON-LD logo: `BRAND_ICON_192_PATH` → `/favicon/android-chrome-192x192.png`. See [BRAND_ASSETS.md](./BRAND_ASSETS.md).
 
 ### Analytics
 

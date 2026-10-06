@@ -91,7 +91,7 @@ export function SummaryCard({ strengths, improvements, recommendation, style }: 
             <td valign="top">
               <table border={0} cellPadding={0} cellSpacing={0} width="100%">
                 <tr>
-                  <td valign="top" width="24" style={{ fontSize: '15px', color: '#7c3aed', fontWeight: 'bold', lineHeight: '20px' }}>
+                  <td valign="top" width="24" style={{ fontSize: '15px', color: '#5B21F4', fontWeight: 'bold', lineHeight: '20px' }}>
                     💡
                   </td>
                   <td valign="top">

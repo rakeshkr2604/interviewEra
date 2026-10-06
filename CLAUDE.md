@@ -38,6 +38,7 @@
 | Auth V2 / system | [`docs/Core/SYSTEM_DESIGN.md`](docs/Core/SYSTEM_DESIGN.md) |
 | DB / RLS | [`docs/Core/BACKEND_SCHEMA.md`](docs/Core/BACKEND_SCHEMA.md) |
 | SEO / analytics | [`docs/Core/SEO_AEO_GEO.md`](docs/Core/SEO_AEO_GEO.md) |
+| Brand / logos / favicon | [`docs/Core/BRAND_ASSETS.md`](docs/Core/BRAND_ASSETS.md) |
 
 Migrations: [`docs/Guidelines/DATABASE_MIGRATIONS.md`](docs/Guidelines/DATABASE_MIGRATIONS.md) + `.cursor/rules/supabase-migrations.mdc`.
 

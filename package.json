@@ -34,6 +34,7 @@
     "submit:indexnow": "tsx scripts/submit-indexnow.ts",
     "generate:pdf-fixtures": "tsx scripts/generate-pdf-fixtures.tsx",
     "generate:favicon-ico": "node scripts/generate-favicon-ico.mjs",
+    "prepare:logo-package": "node scripts/prepare-logo-package-v1.mjs",
     "verify:voice": "node scripts/voice-fix-verify.mjs",
     "email": "email dev --dir src/emails",
     "send-product-update": "tsx scripts/send-product-update.ts",

@@ -15,11 +15,12 @@ import {
   Bot,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
+import { BRAND_ICON_SQUARE_PATH } from '@/lib/brand/assets';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { performClientLogout } from '@/lib/supabase/client-logout';
 
-const BRAND_MARK = '/brand/logos/icon-only.svg';
+const BRAND_MARK = BRAND_ICON_SQUARE_PATH;
 
 const NAV_ITEMS = [
   { href: '/platform/growth', label: 'Growth', icon: TrendingUp, exact: false },
@@ -115,10 +116,7 @@ export function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
           src={BRAND_MARK}
           width={44}
           height={44}
-          className="size-11 shrink-0 rounded-2xl"
-          style={{
-            boxShadow: '0 6px 22px color-mix(in srgb, var(--accent-primary) 22%, transparent)',
-          }}
+          className="size-11 shrink-0 rounded-[22%] object-cover"
           alt=""
         />
         <p

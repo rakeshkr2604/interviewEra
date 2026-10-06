@@ -84,7 +84,7 @@ export default function ResetPasswordEmail({
         }} className="text-secondary">
           If the button above doesn't work, copy and paste this URL into your browser:
           <br />
-          <a href={resetUrl} style={{ color: '#7c3aed', textDecoration: 'none', wordBreak: 'break-all' }}>
+          <a href={resetUrl} style={{ color: '#5B21F4', textDecoration: 'none', wordBreak: 'break-all' }}>
             {resetUrl}
           </a>
         </p>

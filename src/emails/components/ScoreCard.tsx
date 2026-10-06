@@ -19,7 +19,7 @@ export function ScoreCard({ label, score, style }: ScoreCardProps) {
     if (s >= 80) {
       return {
         label: 'Good',
-        textColor: '#7c3aed',
+        textColor: '#5B21F4',
         bgColor: '#f5f3ff',
         borderColor: '#ddd6fe',
       };
@@ -76,7 +76,7 @@ export function ScoreCard({ label, score, style }: ScoreCardProps) {
         style={{
           fontSize: '28px',
           fontWeight: '800',
-          color: '#7c3aed',
+          color: '#5B21F4',
           margin: 0,
           lineHeight: '34px',
         }}

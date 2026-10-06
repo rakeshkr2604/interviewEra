@@ -1,0 +1,14 @@
+InterviewEra approved visual direction
+=======================================
+Primary deep navy/black: #09062D (approximate from approved artwork)
+Primary purple: #5B21F4 (approximate)
+Secondary violet: #9B6CFF (approximate)
+Background: #FFFFFF
+Neutral gray: #6B7280
+
+Tagline:
+PRACTICE • PREPARE • PROGRESS
+
+Note:
+Colors above are practical web approximations sampled from the approved rendered artwork.
+For exact brand-color locking, define final HEX values from the source vector artwork.

@@ -45,7 +45,7 @@ export function StreakCard({ streak, style }: StreakCardProps) {
       }}
       className="info-card"
     >
-      <p style={{ fontSize: '14px', fontWeight: '700', color: '#7c3aed', margin: 0 }}>
+      <p style={{ fontSize: '14px', fontWeight: '700', color: '#5B21F4', margin: 0 }}>
         🎯 Milestone Target
       </p>
       <p style={{ fontSize: '12px', fontWeight: '500', color: '#4b5563', margin: '4px 0 0 0' }} className="text-secondary">

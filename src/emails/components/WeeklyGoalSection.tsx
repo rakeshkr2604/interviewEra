@@ -42,7 +42,7 @@ export function WeeklyGoalSection({ goalText, targetCount, currentCount, style }
             <td style={{ fontSize: '14px', fontWeight: '700', color: '#18181b' }} className="text-primary">
               🎯 {goalText}
             </td>
-            <td align="right" style={{ fontSize: '14px', fontWeight: '700', color: '#7c3aed' }}>
+            <td align="right" style={{ fontSize: '14px', fontWeight: '700', color: '#5B21F4' }}>
               {currentCount} / {targetCount}
             </td>
           </tr>
@@ -62,7 +62,7 @@ export function WeeklyGoalSection({ goalText, targetCount, currentCount, style }
           style={{
             width: `${percentage}%`,
             height: '100%',
-            backgroundColor: '#7c3aed',
+            backgroundColor: '#5B21F4',
             borderRadius: '4px',
           }}
         />

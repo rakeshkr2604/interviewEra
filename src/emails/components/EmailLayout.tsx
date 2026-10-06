@@ -9,7 +9,7 @@ interface EmailLayoutProps {
 }
 
 export function EmailLayout({ children, previewText, unsubscribeUrl, footerTagline }: EmailLayoutProps) {
-  const brandPurple = '#7c3aed';
+  const brandPurple = '#5B21F4';
   const textDark = '#18181b';
 
   return (

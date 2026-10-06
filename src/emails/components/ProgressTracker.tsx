@@ -81,7 +81,7 @@ export function ProgressTracker({ currentStep, steps }: ProgressTrackerProps) {
             className = 'completed';
           } else if (step.active) {
             if (!step.icon) icon = '🟣';
-            color = '#7c3aed'; // brand purple
+            color = '#5B21F4'; // brand purple
             fontWeight = '600';
             className = 'active';
           }
@@ -94,7 +94,7 @@ export function ProgressTracker({ currentStep, steps }: ProgressTrackerProps) {
             subtextColor = '#10b981';
           } else if (step.active) {
             subtext = '⬤ Working On';
-            subtextColor = '#7c3aed';
+            subtextColor = '#5B21F4';
           }
 
           return (

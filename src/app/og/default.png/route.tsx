@@ -1,6 +1,20 @@
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { ImageResponse } from 'next/og'
+import { BRAND_COLORS } from '@/lib/brand/assets'
 
 export async function GET() {
+  const iconPath = path.join(
+    process.cwd(),
+    'public',
+    'brand',
+    'icons',
+    'ui',
+    'interviewera-icon-square.png',
+  )
+  const iconData = await readFile(iconPath)
+  const iconSrc = `data:image/png;base64,${iconData.toString('base64')}`
+
   return new ImageResponse(
     (
       <div
@@ -10,8 +24,7 @@ export async function GET() {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
-          background:
-            'linear-gradient(135deg, #faf5ff 0%, #f5f3ff 40%, #ede9fe 100%)',
+          background: `linear-gradient(135deg, #ffffff 0%, #f5f3ff 45%, #ede9fe 100%)`,
           padding: '72px 80px',
           fontFamily: 'system-ui, -apple-system, sans-serif',
           position: 'relative',
@@ -21,8 +34,7 @@ export async function GET() {
           style={{
             position: 'absolute',
             inset: 0,
-            background:
-              'radial-gradient(ellipse 50% 40% at 90% 10%, rgba(139, 92, 246, 0.18), transparent 60%), radial-gradient(ellipse 60% 50% at 10% 90%, rgba(99, 102, 241, 0.15), transparent 60%)',
+            background: `radial-gradient(ellipse 50% 40% at 90% 10%, ${BRAND_COLORS.secondaryViolet}2e, transparent 60%), radial-gradient(ellipse 60% 50% at 10% 90%, ${BRAND_COLORS.primaryPurple}26, transparent 60%)`,
             display: 'flex',
           }}
         />
@@ -30,30 +42,21 @@ export async function GET() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 14,
+            gap: 16,
           }}
         >
-          <div
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 12,
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: 24,
-              fontWeight: 800,
-            }}
-          >
-            IE
-          </div>
+          <img
+            src={iconSrc}
+            width={56}
+            height={56}
+            alt=""
+            style={{ width: 56, height: 56, borderRadius: 14 }}
+          />
           <div
             style={{
               fontSize: 30,
               fontWeight: 700,
-              color: '#4c1d95',
+              color: BRAND_COLORS.deepNavy,
               letterSpacing: '-0.01em',
             }}
           >
@@ -72,7 +75,7 @@ export async function GET() {
             style={{
               fontSize: 76,
               fontWeight: 800,
-              color: '#0f172a',
+              color: BRAND_COLORS.deepNavy,
               lineHeight: 1.05,
               letterSpacing: '-0.035em',
               display: 'flex',
@@ -83,7 +86,7 @@ export async function GET() {
             <span>before the company</span>
             <span
               style={{
-                background: 'linear-gradient(90deg, #6366f1, #8b5cf6, #d946ef)',
+                background: `linear-gradient(90deg, ${BRAND_COLORS.primaryPurple}, ${BRAND_COLORS.secondaryViolet})`,
                 backgroundClip: 'text',
                 color: 'transparent',
               }}
@@ -99,28 +102,28 @@ export async function GET() {
             alignItems: 'center',
             justifyContent: 'space-between',
             paddingTop: 32,
-            borderTop: '1px solid rgba(15, 23, 42, 0.08)',
+            borderTop: `1px solid ${BRAND_COLORS.deepNavy}14`,
           }}
         >
           <div
             style={{
               fontSize: 24,
-              color: '#475569',
+              color: BRAND_COLORS.neutralGray,
               display: 'flex',
               alignItems: 'center',
               gap: 16,
             }}
           >
             <span>Upload resume</span>
-            <span style={{ color: '#a78bfa' }}>→</span>
+            <span style={{ color: BRAND_COLORS.secondaryViolet }}>→</span>
             <span>Answer AI</span>
-            <span style={{ color: '#a78bfa' }}>→</span>
+            <span style={{ color: BRAND_COLORS.secondaryViolet }}>→</span>
             <span>Get scored</span>
           </div>
           <div
             style={{
               fontSize: 22,
-              color: '#7c3aed',
+              color: BRAND_COLORS.primaryPurple,
               fontWeight: 600,
             }}
           >
@@ -129,6 +132,6 @@ export async function GET() {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    { width: 1200, height: 630 },
   )
 }

@@ -34,6 +34,7 @@ import {
   Bot,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
+import { BRAND_ICON_SQUARE_PATH } from '@/lib/brand/assets'
 import { performClientLogout } from '@/lib/supabase/client-logout'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
@@ -42,7 +43,7 @@ import { COMMUNITY_HUB_PATH } from '@/lib/community/community'
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
 
-const BRAND_MARK = '/brand/logos/icon-only.svg'
+const BRAND_MARK = BRAND_ICON_SQUARE_PATH
 const SIDEBAR_EXPANDED_STORAGE_KEY = 'ie:sidebar-sections-expanded'
 const SIDEBAR_EXPANDED_EVENT = 'ie:sidebar-sections-expanded'
 
@@ -421,10 +422,7 @@ export function Sidebar({
           src={BRAND_MARK}
           width={44}
           height={44}
-          className="size-11 shrink-0 rounded-2xl"
-          style={{
-            boxShadow: '0 6px 22px color-mix(in srgb, var(--accent-primary) 22%, transparent)',
-          }}
+          className="size-11 shrink-0 rounded-[22%] object-cover"
           alt=""
         />
         <div>
@@ -596,7 +594,7 @@ export function Sidebar({
             src={BRAND_MARK}
             width={28}
             height={28}
-            className="size-7 shrink-0 rounded-lg"
+            className="size-7 shrink-0 rounded-[0.7rem] object-cover"
             alt=""
             aria-hidden
           />

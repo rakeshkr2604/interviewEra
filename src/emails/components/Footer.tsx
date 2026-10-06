@@ -6,7 +6,7 @@ interface FooterProps {
 }
 
 export function Footer({ unsubscribeUrl, tagline }: FooterProps) {
-  const brandPurple = '#7c3aed';
+  const brandPurple = '#5B21F4';
   const textMuted = '#71717a';
 
   return (

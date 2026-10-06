@@ -71,7 +71,7 @@ export default function VerificationEmail({
         }} className="text-secondary">
           If the button above doesn't work, copy and paste this URL into your browser:
           <br />
-          <a href={verificationUrl} style={{ color: '#7c3aed', textDecoration: 'none', wordBreak: 'break-all' }}>
+          <a href={verificationUrl} style={{ color: '#5B21F4', textDecoration: 'none', wordBreak: 'break-all' }}>
             {verificationUrl}
           </a>
         </p>

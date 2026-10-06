@@ -71,7 +71,7 @@ export function ComparisonSection({ scores, labels, role, style }: ComparisonSec
           
           let barColor = '#f59e0b';
           if (cat.score >= 90) barColor = '#10b981';
-          else if (cat.score >= 80) barColor = '#7c3aed';
+          else if (cat.score >= 80) barColor = '#5B21F4';
 
           return (
             <tr key={idx}>

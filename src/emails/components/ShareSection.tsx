@@ -50,7 +50,7 @@ export function ShareSection({ enabled = true, reportUrl, candidateName = 'there
               rel="noopener noreferrer"
               style={{
                 fontSize: '13px',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textDecoration: 'none',
                 fontWeight: '600',
               }}
@@ -64,7 +64,7 @@ export function ShareSection({ enabled = true, reportUrl, candidateName = 'there
               href={emailMentorUrl}
               style={{
                 fontSize: '13px',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textDecoration: 'none',
                 fontWeight: '600',
               }}
@@ -80,7 +80,7 @@ export function ShareSection({ enabled = true, reportUrl, candidateName = 'there
               rel="noopener noreferrer"
               style={{
                 fontSize: '13px',
-                color: '#7c3aed',
+                color: '#5B21F4',
                 textDecoration: 'none',
                 fontWeight: '600',
               }}

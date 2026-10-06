@@ -36,7 +36,7 @@ export function RecommendationCard({
         style={{
           fontSize: '11px',
           fontWeight: '700',
-          color: '#7c3aed',
+          color: '#5B21F4',
           textTransform: 'uppercase',
           letterSpacing: '0.05em',
           margin: '0 0 12px 0',

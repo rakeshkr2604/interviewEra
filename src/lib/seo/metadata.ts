@@ -4,8 +4,8 @@ import { canonicalUrl, getCanonicalSiteOrigin } from './site-url'
 const BASE_URL = getCanonicalSiteOrigin()
 const BRAND = 'InterviewEra'
 
-/** Launcher / JSON-LD — `public/favicon/android-chrome-192x192.png` */
-export const BRAND_ICON_192_PATH = '/favicon/android-chrome-192x192.png' as const
+/** Launcher / JSON-LD — Logo Package v1 (`public/favicon/android-chrome-192x192.png`). */
+export { BRAND_ICON_192_PATH } from '@/lib/brand/assets'
 
 export const siteConfig = {
   name: BRAND,

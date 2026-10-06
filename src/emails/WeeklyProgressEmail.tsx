@@ -214,7 +214,7 @@ export default function WeeklyProgressEmail(props: Partial<WeeklyProgressEmailPr
                   display: 'inline-block',
                   fontSize: '11px',
                   fontWeight: '700',
-                  color: '#7c3aed',
+                  color: '#5B21F4',
                   backgroundColor: '#f5f3ff',
                   border: '1px solid #ddd6fe',
                   padding: '4px 12px',
@@ -309,7 +309,7 @@ export default function WeeklyProgressEmail(props: Partial<WeeklyProgressEmailPr
             style={{
               fontSize: '12px',
               fontWeight: '700',
-              color: '#7c3aed',
+              color: '#5B21F4',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               margin: '0 0 10px 0',
@@ -381,7 +381,7 @@ export default function WeeklyProgressEmail(props: Partial<WeeklyProgressEmailPr
           href={reportUrl}
           style={{
             fontSize: '14px',
-            color: '#7c3aed',
+            color: '#5B21F4',
             textDecoration: 'underline',
             fontWeight: '600',
           }}

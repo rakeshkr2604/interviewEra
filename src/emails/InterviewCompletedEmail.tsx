@@ -396,7 +396,7 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
         <p style={{
           fontSize: '13px',
           fontWeight: '700',
-          color: '#7c3aed',
+          color: '#5B21F4',
           margin: '0 0 4px 0',
         }}>
           Score: {overallScore} / 100
@@ -470,7 +470,7 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
             style={{
               fontSize: '12px',
               fontWeight: '700',
-              color: '#7c3aed',
+              color: '#5B21F4',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
               margin: '0 0 10px 0',
@@ -521,7 +521,7 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
                       paddingBottom: '12px',
                       fontSize: '14px',
                       fontWeight: '700',
-                      color: '#7c3aed',
+                      color: '#5B21F4',
                       lineHeight: '20px',
                     }}
                   >
@@ -643,7 +643,7 @@ export default function InterviewCompletedEmail(props: Partial<InterviewComplete
           href="https://interviewera.com/dashboard"
           style={{
             fontSize: '14px',
-            color: '#7c3aed',
+            color: '#5B21F4',
             textDecoration: 'underline',
             fontWeight: '600',
           }}
