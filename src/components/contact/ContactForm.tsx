@@ -214,11 +214,25 @@ export function ContactForm() {
           </div>
         </div>
 
+        <p id="contact-privacy-notice" className={IE_HELPER_TEXT_CLASS}>
+          By sending this message you agree we may use your name, email, and message content to
+          respond, as described in our{' '}
+          <a
+            href="/privacy"
+            className="underline underline-offset-2"
+            style={{ color: 'var(--accent-primary)' }}
+          >
+            Privacy Policy
+          </a>
+          .
+        </p>
+
         <button
           type="submit"
           disabled={formState === 'submitting'}
           className={cn(IE_SUBMIT_BUTTON_CLASS, 'mt-auto shrink-0')}
           style={IE_SUBMIT_BUTTON_STYLE}
+          aria-describedby="contact-privacy-notice"
         >
           {formState === 'submitting' ? (
             <>

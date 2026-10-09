@@ -27,7 +27,7 @@ export const privacyDocument: LegalDocumentMeta = {
     'This policy explains what information InterviewEra.com collects, how we use it, who we share it with, and your rights as a Data Principal under India’s Digital Personal Data Protection Act, 2023 (DPDP Act) and, where applicable, other laws.',
   highlightsTitle: 'Privacy at a glance',
   highlights: [
-    { label: 'Data Fiduciary', value: 'InterviewEra (India)' },
+    { label: 'Data Fiduciary', value: 'InterviewEra' },
     { label: 'Primary storage region', value: 'Singapore (Supabase)' },
     { label: 'We sell your data?', value: 'No' },
     { label: 'Account deletion', value: 'Within 30 days' },
@@ -37,7 +37,7 @@ export const privacyDocument: LegalDocumentMeta = {
     {
       id: 'data-fiduciary',
       title: '1. Who We Are (Data Fiduciary)',
-      text: `InterviewEra operates InterviewEra.com and related apps (the “Service”). For personal data processed in connection with the Service for individuals in India, InterviewEra acts as a Data Fiduciary under the DPDP Act, 2023. Contact for general privacy queries: support@interviewera.com. Registered / operating address: ${COMPANY_ADDRESS}.`,
+      text: `InterviewEra operates InterviewEra.com and related apps (the “Service”). For personal data processed in connection with the Service for individuals in India, InterviewEra acts as a Data Fiduciary under the DPDP Act, 2023. Contact for general privacy queries: support@interviewera.com. Correspondence address: ${COMPANY_ADDRESS}. Legal entity name, registration number, and registered-office status are confirmed separately when available — this address is a contact / correspondence address, not a claim of company registration form.`,
       content: [
         {
           sub: 'Scope',

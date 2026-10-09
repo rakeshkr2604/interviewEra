@@ -9,6 +9,11 @@ const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
   // /pricing accessible copy is "InterviewEra plans" (sr-only <h2 id="pricing-plans">).
   { path: '/pricing', heading: /interviewera plans/i },
   { path: '/how-it-works', heading: /before the interview/i },
+  { path: '/privacy', heading: /privacy policy/i },
+  { path: '/terms', heading: /terms/i },
+  { path: '/refund', heading: /refund/i },
+  // Visible hero h1 is "Get in touch"; "Contact" is only an eyebrow pill (not a heading).
+  { path: '/contact', heading: /get in touch/i },
 ];
 
 async function applyTheme(page: import('@playwright/test').Page, theme: 'dark' | 'light') {

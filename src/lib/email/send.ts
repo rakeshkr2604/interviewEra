@@ -7,6 +7,8 @@ export interface SendEmailPayload {
   subject: string;
   html: string;
   text?: string;
+  /** Optional custom headers (e.g. List-Unsubscribe for marketing digests). */
+  headers?: Record<string, string>;
 }
 
 export interface SendEmailResult {
@@ -26,6 +28,7 @@ export async function sendEmail({
   subject,
   html,
   text,
+  headers,
 }: SendEmailPayload): Promise<SendEmailResult> {
   const recipient = Array.isArray(to) ? to.join(', ') : to;
   console.info(`[email] Attempting to send email. To: ${recipient}, Subject: "${subject}"`);
@@ -38,6 +41,7 @@ export async function sendEmail({
       subject,
       html,
       text,
+      ...(headers ? { headers } : {}),
     });
 
     if (response.error) {

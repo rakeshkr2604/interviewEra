@@ -1,8 +1,8 @@
 # Documentation Index
 
 > Status: CANONICAL
-> Last Verified: 2026-10-06
-> Verification Scope: Doc tree layout + agent entrypoints + security audit link + brand assets doc
+> Last Verified: 2026-10-09
+> Verification Scope: Doc tree layout + agent entrypoints + security audit link + brand assets + founder launch-readiness register
 > Authority: Navigation map for humans and agents
 
 ## Purpose
@@ -62,6 +62,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [SECURITY_AUDIT_2026-10-04.md](Operations/SECURITY_AUDIT_2026-10-04.md) | 2026-10-04 security audit, resume upload hardening, residual risks |
 | [API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md](Operations/API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md) | Point-in-time API route validation inventory (132 routes) |
 | [production-trust-hardening.md](audits/production-trust-hardening.md) | Privacy / legal / a11y / trust checklist audit + remediation evidence |
+| [founder-launch-readiness.md](audits/founder-launch-readiness.md) | GST/CA, entity, trust metrics, assets, DPAs, deletion retention, lawyer checklist |
 
 ## Root keepers
 

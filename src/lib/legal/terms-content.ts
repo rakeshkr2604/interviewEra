@@ -13,13 +13,13 @@ export const termsDocument: LegalDocumentMeta = {
     'Read the terms and conditions governing your use of InterviewEra.com — an AI-powered mock interview platform.',
   icon: FileText,
   effectiveDate: '1 May 2026',
-  lastUpdated: '22 July 2026',
+  lastUpdated: '9 October 2026',
   isDraftRevision: false,
   intro:
     'Please read these Terms carefully before using InterviewEra. By creating an account or using the Service you agree to be bound by them.',
   highlightsTitle: 'Key terms at a glance',
   highlights: [
-    { label: 'Governing law', value: 'India · Courts of Bengaluru, Karnataka' },
+    { label: 'Governing law', value: 'Laws of India' },
     { label: 'Minimum age', value: '18+' },
     { label: 'Paid plans', value: 'One-time · no auto-renewal' },
     { label: 'Liability cap', value: 'Fees paid in prior 3 months' },
@@ -61,7 +61,7 @@ export const termsDocument: LegalDocumentMeta = {
         },
         {
           sub: 'Paid Plans (One-Time)',
-          text: `Starter (₹${PAID_PLANS.starter.amountInr}) and Pro (₹${PAID_PLANS.pro.amountInr}) are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. Pricing is in Indian Rupees (INR) and includes applicable GST unless stated otherwise at checkout. Plans do not auto-renew — renew manually whenever you need continued access.`,
+          text: `Starter (₹${PAID_PLANS.starter.amountInr}) and Pro (₹${PAID_PLANS.pro.amountInr}) are one-time payments that grant 30 days of plan access and a fixed credit allowance for that period. Prices are displayed in Indian Rupees (INR). The total amount payable is shown before you complete checkout. Plans do not auto-renew — renew manually whenever you need continued access.`,
         },
         {
           sub: 'Payment Processing',
@@ -152,7 +152,7 @@ export const termsDocument: LegalDocumentMeta = {
     {
       id: 'governing-law',
       title: '12. Governing Law & Disputes',
-      text: 'These Terms are governed by and construed in accordance with the laws of India. Any disputes arising under these Terms shall be subject to the exclusive jurisdiction of the courts in Bengaluru, Karnataka. Before initiating formal proceedings, you agree to attempt resolution by contacting support@interviewera.com or using /contact.',
+      text: 'These Terms are governed by and construed in accordance with the laws of India. Before initiating formal proceedings, you agree to attempt resolution by contacting support@interviewera.com or using /contact. Exclusive court venue (if any) will be stated here once the legal entity and registered office are confirmed — until then, disputes are governed by applicable Indian law without a published exclusive venue claim.',
     },
     {
       id: 'changes',

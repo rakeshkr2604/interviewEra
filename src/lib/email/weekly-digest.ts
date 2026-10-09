@@ -5,6 +5,7 @@ import { getEmailAppUrl } from '@/lib/server/get-base-url';
 import type { WeeklyProgressEmailProps } from '@/emails/WeeklyProgressEmail';
 import type { WeeklyDimensionScores } from '@/emails/utils/weeklyHelpers';
 import { sendLifecycleTemplate } from '@/lib/email/lifecycle/send-template';
+import { buildListUnsubscribeHeaders } from '@/lib/email/list-unsubscribe';
 import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
 import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
@@ -391,6 +392,7 @@ async function sendDigest(data: DigestData): Promise<boolean> {
     idempotencyKey: data.idempotencyKey,
     props: data.templateProps as unknown as Record<string, unknown>,
     text: `Your weekly InterviewEra progress: ${data.lastWeekCount} interviews, avg score ${data.currentWeekScore}/100.`,
+    headers: buildListUnsubscribeHeaders(data.templateProps.unsubscribeUrl),
   });
 
   if (!result.sent && !result.skipped) {

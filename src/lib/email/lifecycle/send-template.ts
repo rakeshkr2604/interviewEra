@@ -17,6 +17,8 @@ export interface SendLifecycleTemplateInput {
   idempotencyKey?: string;
   replyTo?: string;
   text?: string;
+  /** Custom Resend headers (e.g. List-Unsubscribe on weekly digest). */
+  headers?: Record<string, string>;
 }
 
 export interface SendLifecycleTemplateResult {
@@ -37,7 +39,7 @@ export interface SendLifecycleTemplateResult {
 export async function sendLifecycleTemplate(
   input: SendLifecycleTemplateInput,
 ): Promise<SendLifecycleTemplateResult> {
-  const { template, to, props, userId, idempotencyKey, replyTo, text } = input;
+  const { template, to, props, userId, idempotencyKey, replyTo, text, headers } = input;
 
   let claimId: string | null = null;
 
@@ -96,6 +98,7 @@ export async function sendLifecycleTemplate(
     subject,
     html,
     text,
+    headers,
   });
 
   if (!result.success) {
