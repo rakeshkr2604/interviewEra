@@ -63,12 +63,23 @@ function interviewRecommendations(
 
   const focusLabel = REPORT_DIMENSION_LABELS[primaryWeak];
 
+  const start = getDefaultInterviewStartPath();
+  const qs = (params: Record<string, string>) => {
+    const sp = new URLSearchParams(params);
+    return `${start}?${sp.toString()}`;
+  };
+
   return [
     {
       id: 'mock-weak-dimension',
       title: `${role} mock — ${focusLabel} focus`,
       description: `Targeted session emphasizing ${focusLabel.toLowerCase()}.`,
-      href: `${getDefaultInterviewStartPath()}?role=${encodeURIComponent(role)}&focus=${primaryWeak}`,
+      href: qs({
+        role,
+        focus: primaryWeak,
+        difficulty,
+        mode: primaryWeak === 'technical_depth' ? 'technical' : 'mixed',
+      }),
       difficulty,
       reason: `Lowest dimension: ${focusLabel}`,
     },
@@ -76,7 +87,12 @@ function interviewRecommendations(
       id: 'mock-resume',
       title: 'Resume-deep-dive mock',
       description: 'Probe projects and skills from your uploaded resume.',
-      href: getDefaultInterviewStartPath(),
+      href: qs({
+        role,
+        difficulty: tier >= 2 ? 'medium' : 'easy',
+        mode: 'mixed',
+        focus: 'resume',
+      }),
       difficulty: tier >= 2 ? 'medium' : 'easy',
       reason: snapshot.latestResume ? 'Resume on file' : 'Upload resume first',
     },
@@ -84,7 +100,7 @@ function interviewRecommendations(
       id: 'mock-behavioral',
       title: 'HR / behavioral round',
       description: 'STAR-format answers for campus and early-career screens.',
-      href: `${getDefaultInterviewStartPath()}?mode=HR`,
+      href: qs({ role, mode: 'hr_behavioral', difficulty: 'easy' }),
       difficulty: 'easy',
       reason: 'Balances technical gaps with placement-ready soft skills',
     },

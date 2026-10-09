@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FakeDb } from '@/test-utils/supabase-fake'
 import { makeFakeServiceClient } from '@/test-utils/supabase-fake'
 
+vi.mock('server-only', () => ({}))
+
 const USER = { id: 'user-1', email: 'u@example.com' }
 const IV = '11111111-1111-4111-8111-111111111111'
 
@@ -27,8 +29,15 @@ vi.mock('@/lib/supabase/server', () => ({
 }))
 
 const trySendMock = vi.fn(async () => ({ attempted: true, sent: true }))
+const waitForScoredMock = vi.fn(async () => 1)
+const retentionMock = vi.fn(async () => null)
 vi.mock('@/lib/email/lifecycle/try-send-script-completion-email', () => ({
   trySendScriptCompletionEmail: (...args: unknown[]) => trySendMock(...args),
+  waitForScoredEvaluations: (...args: unknown[]) => waitForScoredMock(...args),
+}))
+
+vi.mock('@/lib/retention/process-interview-complete', () => ({
+  processInterviewRetentionSafely: (...args: unknown[]) => retentionMock(...args),
 }))
 
 vi.mock('@/lib/email/lifecycle/log', () => ({
@@ -53,7 +62,11 @@ function req(body: unknown): Request {
 beforeEach(() => {
   afterMock.mockClear()
   trySendMock.mockClear()
+  waitForScoredMock.mockClear()
+  retentionMock.mockClear()
   persistMilestoneEventOnce.mockClear()
+  waitForScoredMock.mockResolvedValue(1)
+  retentionMock.mockResolvedValue(null)
   db = {
     interviews: [
       {

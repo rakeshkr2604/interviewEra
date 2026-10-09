@@ -7,6 +7,7 @@ import type { WeeklyDimensionScores } from '@/emails/utils/weeklyHelpers';
 import { sendLifecycleTemplate } from '@/lib/email/lifecycle/send-template';
 import { buildListUnsubscribeHeaders } from '@/lib/email/list-unsubscribe';
 import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
+import { scriptDimsToV1Shape } from '@/lib/interview/script-dimension-bridge';
 import { getDefaultInterviewStartUrl } from '@/lib/interview/default-interview-start-path';
 
 // ─── Unsubscribe token helpers ────────────────────────────────────────────────
@@ -92,13 +93,7 @@ function emptyDimensionSums(): DimensionScores {
 function scriptDimsToWeeklyShape(
   dims: Record<DimensionKey, number>,
 ): DimensionScores {
-  return {
-    communication_clarity: dims.communication_clarity,
-    technical_depth: dims.content_accuracy,
-    answer_structure: dims.structure,
-    confidence: dims.specificity,
-    relevance: dims.relevance,
-  };
+  return scriptDimsToV1Shape(dims);
 }
 
 async function averageV1DimensionsForInterviews(

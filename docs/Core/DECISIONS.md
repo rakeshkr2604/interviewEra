@@ -1,8 +1,8 @@
 # Decisions (ADR)
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Documented engineering decisions for this governance cut
+> Last Verified: 2026-10-09
+> Verification Scope: Documented engineering decisions for this governance cut + Insights/retention v2.1 DEC
 > Authority: Architecture Decision Records
 
 ## Purpose
@@ -45,6 +45,13 @@ Short ADRs. New material decisions get a DEC entry here in the same change set.
 - **Related:** [AI_PIPELINES](AI_PIPELINES.md)
 
 ---
+
+## DEC-005 — Insights + retention consume v2.1 script reports (2026-10-09)
+
+- **Context:** Dashboard Insights (readiness / roadmap / analytics / notifications) and retention still assumed V1 `reports` / `questions`/`answers`/`evaluations` after DEC-002 removed the V1 engine path.
+- **Decision:** Candidate snapshot and analytics merge `script_interview_reports` (primary) with legacy V1 `reports` (fallback). Score-v1.2 dimensions map onto Insights `DimensionScores` via `script-dimension-bridge`. Retention aggregates scored `answer_evaluations` on V2.1 complete. Notifications remain **derived/ephemeral** (no durable notifications table); report-ready items use engine-correct hrefs and real `generated_at`.
+- **Consequences:** Missing dimension evidence must not be treated as scored zero; weakest-dimension lists stay empty until reports exist. Roadmap start links pass `role`/`mode`/`difficulty`/`focus` that `/interview/script/start` hydrates.
+- **Related:** [INTERVIEW_ENGINE](INTERVIEW_ENGINE.md) · [FLOWS](FLOWS.md)
 
 ## Template for new DECs
 

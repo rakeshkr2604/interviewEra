@@ -47,7 +47,9 @@ export function ReadinessPageContent({
             <h2 id={`cat-${cat.key}`} className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
               {cat.label}
             </h2>
-            <p className="mt-2 text-2xl font-bold tabular-nums">{cat.score}/100</p>
+            <p className="mt-2 text-2xl font-bold tabular-nums">
+              {cat.score == null ? '—' : `${cat.score}/100`}
+            </p>
             <p className="mt-2 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
               {cat.summary}
             </p>

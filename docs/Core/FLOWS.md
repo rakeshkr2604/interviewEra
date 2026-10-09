@@ -1,8 +1,8 @@
 # Flows
 
 > Status: CANONICAL
-> Last Verified: 2026-10-01
-> Verification Scope: Primary user journeys vs current routes
+> Last Verified: 2026-10-09
+> Verification Scope: Primary user journeys vs current routes + Insights/retention v2.1 wiring
 > Authority: End-to-end product flows
 
 ## Purpose
@@ -15,9 +15,10 @@ Short maps of the main journeys. Route inventory → [ROUTING.md](ROUTING.md).
 
 1. Signup / login → dashboard
 2. Upload resume → parse (degraded OK)
-3. **Start Interview** → `/interview/script/start` → `POST /api/interview/script/start`
+3. **Start Interview** → `/interview/script/start` (honors `role` / `mode` / `difficulty` / `focus` query params from roadmap & tools) → `POST /api/interview/script/start`
 4. Session `/interview/script/[id]`: turns ± TTS/STT → answer-score
-5. Complete → script report
+5. Complete → retention rollup (streak/XP/tier) + script report
+6. Insights (`/readiness`, `/roadmap`, `/analytics`, `/notifications`) read `script_interview_reports` (V1 `reports` only as legacy fallback)
 
 ### A2. Resume unfinished V2.1 (same interview row)
 

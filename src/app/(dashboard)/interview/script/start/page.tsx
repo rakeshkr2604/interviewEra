@@ -1,7 +1,12 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  modeFromFocusParam,
+  parseDifficultyParam,
+  parseInterviewModeParam,
+} from '@/lib/interview/script-start-query'
 import { StepIndicator } from '@/components/onboarding/StepIndicator'
 import { cn } from '@/lib/utils'
 import { Brain, ChevronRight, Sparkles, Mic2, Minus, Plus } from 'lucide-react'
@@ -87,8 +92,9 @@ const VOICE_PREVIEW_TEXT: Record<InterviewerId, string> = {
 }
 const AUTH_TRACE_ENABLED = process.env.NEXT_PUBLIC_IE_DIAGNOSTICS_AUTH_TRACE === '1'
 
-export default function ScriptInterviewStartPage() {
+function ScriptInterviewStartPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [step, setStep] = useState<1 | 2>(1)
 
@@ -132,6 +138,24 @@ export default function ScriptInterviewStartPage() {
   const [adaptiveFollowUp, setAdaptiveFollowUp] = useState<boolean>(true)
   const [cameraMode, setCameraMode] = useState<boolean>(() => readCameraInterviewModeEnabled())
 
+  // Hydrate role / mode / difficulty / focus from roadmap & tool deep-links.
+  useEffect(() => {
+    const roleParam = searchParams.get('role')?.trim()
+    if (roleParam) setRole(roleParam)
+
+    const modeParam = parseInterviewModeParam(searchParams.get('mode'))
+    if (modeParam) setInterviewMode(modeParam)
+
+    const difficultyParam = parseDifficultyParam(searchParams.get('difficulty'))
+    if (difficultyParam) setDifficulty(difficultyParam)
+
+    const focusParam = searchParams.get('focus')?.trim() ?? null
+    if (!modeParam) {
+      const inferred = modeFromFocusParam(focusParam)
+      if (inferred) setInterviewMode(inferred)
+    }
+  }, [searchParams])
+
   // Pull the user's latest resume id so the start route's FK is satisfied.
   useEffect(() => {
     let cancelled = false
@@ -144,19 +168,25 @@ export default function ScriptInterviewStartPage() {
         }
         const data = (await res.json()) as OnboardingStateResponse
         const id = data.hydration?.resume?.id
+        const hydrationStatus = data.hydration?.resume?.status
         if (cancelled) return
-        if (id) {
+        if (id && hydrationStatus === 'parsed') {
           setResumeId(id)
           setResumeStatus('ready')
           // Fetch parsed data for pills (fire-and-forget, non-blocking)
           const statusRes = await fetch(`/api/resume/status?id=${id}`, { credentials: 'include' })
           if (!cancelled && statusRes.ok) {
             const sd = (await statusRes.json()) as { status: string; parsed_data?: ParsedResume }
-            if (sd.parsed_data) {
+            if (sd.status === 'parsed' && sd.parsed_data) {
               setParsedResumeData(sd.parsed_data)
               if (sd.parsed_data.skills?.length) setParsedResumeSkills(sd.parsed_data.skills)
+            } else if (sd.status !== 'parsed') {
+              setResumeStatus('missing')
             }
           }
+        } else if (id && (hydrationStatus === 'parsing' || hydrationStatus === 'uploading')) {
+          setResumeId(id)
+          setResumeStatus('loading')
         } else {
           setResumeStatus('missing')
         }
@@ -1291,5 +1321,19 @@ export default function ScriptInterviewStartPage() {
         </>
       )}
     </div>
+  )
+}
+
+export default function ScriptInterviewStartPageWithSuspense() {
+  return (
+    <Suspense
+      fallback={
+        <div className="mx-auto max-w-3xl px-4 py-16 text-sm" style={{ color: 'var(--text-muted)' }}>
+          Loading interview setup…
+        </div>
+      }
+    >
+      <ScriptInterviewStartPage />
+    </Suspense>
   )
 }

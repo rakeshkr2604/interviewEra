@@ -31,11 +31,37 @@ function baseSnapshot(overrides: Partial<CandidateSnapshot> = {}): CandidateSnap
       relevance: null,
     },
     recentReportIds: [],
+    recentReports: [],
     collegeEnrollmentAccepted: false,
     collegeName: null,
     ...overrides,
   };
 }
+
+describe('buildCandidateNotifications — report ready', () => {
+  it('uses script report href and generatedAt timestamp', () => {
+    const notes = buildCandidateNotifications(
+      baseSnapshot({
+        recentReports: [
+          {
+            id: 'rep-1',
+            interviewId: 'iv-script',
+            engine: 'v2.1',
+            generatedAt: '2026-03-01T10:00:00.000Z',
+            href: '/report/script/iv-script',
+          },
+        ],
+        recentReportIds: ['rep-1'],
+      }),
+    );
+    const reportReady = notes.filter((n) => n.type === 'report_ready');
+    expect(reportReady).toHaveLength(1);
+    expect(reportReady[0]).toMatchObject({
+      href: '/report/script/iv-script',
+      createdAt: '2026-03-01T10:00:00.000Z',
+    });
+  });
+});
 
 describe('buildCandidateNotifications — interview recovery', () => {
   it('emits Continue notification for active in-progress session', () => {

@@ -4,12 +4,14 @@ import { privatePageMetadata } from '@/lib/seo/metadata'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
-import {
-  normalizeRadarRowToDimensionKey,
-  REPORT_DIMENSION_LABELS,
-} from '@/lib/utils/report-radar-dimensions'
+import { REPORT_DIMENSION_LABELS } from '@/lib/utils/report-radar-dimensions'
 import { buildRetentionDashboardSnapFromRow } from '@/lib/retention/build-retention-dashboard-snap'
 import type { UserProgressRow } from '@/lib/retention/types'
+import {
+  averageDimensions,
+  computeImprovementPercent,
+  mergeAnalyticsReports,
+} from '@/lib/candidate/analytics-reports'
 
 export const metadata = privatePageMetadata({
   title: 'Analytics',
@@ -36,50 +38,46 @@ export default async function AnalyticsPage() {
 
   const completedInterviewIds = (completedInterviews ?? []).map((item) => item.id as string)
 
-  const reports = completedInterviewIds.length > 0
-    ? (await supabase
-        .from('reports')
-        .select('overall_score, radar_data, generated_at, interview_id')
-        .in('interview_id', completedInterviewIds)
-        .order('generated_at', { ascending: false })
-        .limit(5)).data
-    : []
+  const [{ data: v1Reports }, { data: scriptReports }] =
+    completedInterviewIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from('reports')
+            .select('overall_score, radar_data, generated_at, interview_id')
+            .in('interview_id', completedInterviewIds)
+            .order('generated_at', { ascending: false })
+            .limit(20),
+          supabase
+            .from('script_interview_reports')
+            .select('overall, dimension_averages, generated_at, interview_id, status')
+            .in('interview_id', completedInterviewIds)
+            .in('status', ['ready', 'partial'])
+            .order('generated_at', { ascending: false })
+            .limit(20),
+        ])
+      : [{ data: [] }, { data: [] }]
 
-  const orderedReports = [...(reports ?? [])].reverse()
-  const baseline = orderedReports[0]?.overall_score ?? null
-  const latest = orderedReports[orderedReports.length - 1]?.overall_score ?? null
-  const improvement = baseline && latest && baseline > 0
-    ? Math.round(((latest - baseline) / baseline) * 100)
-    : 0
+  const orderedReports = mergeAnalyticsReports(
+    (v1Reports ?? []) as Parameters<typeof mergeAnalyticsReports>[0],
+    (scriptReports ?? []) as Parameters<typeof mergeAnalyticsReports>[1],
+    5,
+  )
 
-  type RadarPoint = { dimension: string; score: number }
-  const dimensionMap = new Map<string, number[]>()
-  for (const report of orderedReports) {
-    const radar = Array.isArray(report.radar_data) ? report.radar_data as RadarPoint[] : []
-    for (const point of radar) {
-      const dimKey = normalizeRadarRowToDimensionKey(String(point.dimension || ''))
-      if (dimKey == null) continue
-      const score = Number(point.score)
-      if (Number.isNaN(score)) continue
-      const bucket = dimensionMap.get(dimKey) ?? []
-      bucket.push(score)
-      dimensionMap.set(dimKey, bucket)
-    }
-  }
+  const baseline = orderedReports[0]?.overallScore ?? null
+  const latest = orderedReports[orderedReports.length - 1]?.overallScore ?? null
+  const improvement = computeImprovementPercent(baseline, latest)
 
-  const skills = Array.from(dimensionMap.entries())
-    .map(([name, scores]) => ({
-      name: REPORT_DIMENSION_LABELS[name as keyof typeof REPORT_DIMENSION_LABELS] ?? name,
-      pct: Math.round((scores.reduce((sum, score) => sum + score, 0) / scores.length) * 10),
-    }))
-    .sort((a, b) => b.pct - a.pct)
-    .slice(0, 5)
+  const skillRows = averageDimensions(orderedReports)
+  const skills = skillRows.slice(0, 5).map((row) => ({
+    name: REPORT_DIMENSION_LABELS[row.key],
+    pct: Math.round(row.avg * 10),
+  }))
 
   const trendPoints = orderedReports.map((report, idx) => ({
     label: `#${idx + 1}`,
-    score: Number(report.overall_score ?? 0),
-    dateLabel: report.generated_at
-      ? new Date(report.generated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+    score: report.overallScore,
+    dateLabel: report.generatedAt
+      ? new Date(report.generatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
       : '—',
   }))
 
@@ -131,12 +129,18 @@ export default async function AnalyticsPage() {
                 Last 5 completed interviews
               </p>
             </div>
-            <p
-              className="text-sm font-semibold"
-              style={{ color: 'var(--accent-primary)' }}
-            >
-              {improvement >= 0 ? `+${improvement}%` : `${improvement}%`} improvement
-            </p>
+            {hasTrend && improvement != null ? (
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--accent-primary)' }}
+              >
+                {improvement >= 0 ? `+${improvement}%` : `${improvement}%`} improvement
+              </p>
+            ) : (
+              <p className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+                {trendPoints.length === 1 ? 'Need 1 more mock for trend' : 'No trend yet'}
+              </p>
+            )}
           </div>
 
           {!hasTrend ? (
@@ -195,12 +199,12 @@ export default async function AnalyticsPage() {
             Skill breakdown
           </p>
           <p className="text-xs mb-5" style={{ color: 'var(--text-muted)' }}>
-            Averages across completed interviews
+            Averages across the last {orderedReports.length || 0} report
+            {orderedReports.length === 1 ? '' : 's'}
           </p>
 
           <div className="space-y-4">
             {skills.map((skill, i) => {
-              const hasData = skills.length > 0
               const colors = [
                 'var(--accent-primary)',
                 'var(--accent-success)',
@@ -221,7 +225,7 @@ export default async function AnalyticsPage() {
                       className="text-sm font-semibold"
                       style={{ color: colors[i] }}
                     >
-                      {hasData ? `${skill.pct}%` : '—'}
+                      {`${skill.pct}%`}
                     </p>
                   </div>
                   <div
@@ -231,7 +235,7 @@ export default async function AnalyticsPage() {
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{
-                        width: hasData ? `${skill.pct}%` : '0%',
+                        width: `${skill.pct}%`,
                         background: `linear-gradient(90deg, ${colors[i % colors.length]}, ${colors[(i + 1) % colors.length]})`,
                       }}
                     />

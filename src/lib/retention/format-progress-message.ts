@@ -96,7 +96,7 @@ export function formatProgressMessage(
     const gap = last5 === null ? target : Math.max(0, target - last5);
 
     if (sessionsNeeded > 0) {
-      return `Complete ${sessionsNeeded} more quality session${sessionsNeeded > 1 ? 's' : ''} (need ${TIER_3_UNLOCK.minSessions}+ logged sessions for the rolling window).`;
+      return `Complete ${sessionsNeeded} more session${sessionsNeeded > 1 ? 's' : ''} (need ${TIER_3_UNLOCK.minSessions}+ completed sessions for the rolling window).`;
     }
     if (gap > 0) {
       return `Raise your last-${TIER_3_UNLOCK.rollingWindow} average to ${target.toFixed(1)} (${gap.toFixed(1)} to go).`;
@@ -107,12 +107,12 @@ export function formatProgressMessage(
     const gap = overall === null ? target : Math.max(0, target - overall);
 
     if (sessionsNeeded > 0) {
-      return `Complete ${sessionsNeeded} more session${sessionsNeeded > 1 ? 's' : ''} (${TIER_4_UNLOCK.minSessions}+ quality sessions toward Mock Panel).`;
+      return `Complete ${sessionsNeeded} more session${sessionsNeeded > 1 ? 's' : ''} (${TIER_4_UNLOCK.minSessions}+ completed sessions toward Mock Panel).`;
     }
     if (overall === null || gap > 0) {
       return `Reach a ${target.toFixed(1)} overall lifetime average (${gap.toFixed(1)} points to go).`;
     }
   }
 
-  return 'Keep practicing — the next tier unlocks after documented quality thresholds.';
+  return 'Session and score thresholds look met — keep practicing quality mocks while unlock confirms.';
 }

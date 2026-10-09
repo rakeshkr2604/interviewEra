@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeReadinessScore } from './readiness-score';
+import { computeReadinessScore, weakestDimensions } from './readiness-score';
 import type { CandidateSnapshot } from './types';
 
 function baseSnapshot(overrides: Partial<CandidateSnapshot> = {}): CandidateSnapshot {
@@ -31,6 +31,7 @@ function baseSnapshot(overrides: Partial<CandidateSnapshot> = {}): CandidateSnap
       relevance: null,
     },
     recentReportIds: [],
+    recentReports: [],
     collegeEnrollmentAccepted: false,
     collegeName: null,
     ...overrides,
@@ -38,12 +39,39 @@ function baseSnapshot(overrides: Partial<CandidateSnapshot> = {}): CandidateSnap
 }
 
 describe('computeReadinessScore', () => {
-  it('returns early-stage score for empty snapshot', () => {
+  it('returns early-stage score for empty snapshot without inventing dimension scores', () => {
     const result = computeReadinessScore(baseSnapshot());
     expect(result.overall).toBeGreaterThanOrEqual(0);
     expect(result.overall).toBeLessThan(50);
     expect(result.level).toBe('early_stage');
     expect(result.categories).toHaveLength(5);
+    expect(result.categories.find((c) => c.key === 'communication')?.score).toBeNull();
+    expect(result.categories.find((c) => c.key === 'technical_depth')?.hasEvidence).toBe(false);
+  });
+
+  it('does not treat missing communication/technical as scored zero in the overall', () => {
+    const withResumeOnly = computeReadinessScore(
+      baseSnapshot({
+        resumeCompletionPct: 100,
+        latestResume: {
+          id: 'r1',
+          status: 'parsed',
+          createdAt: new Date().toISOString(),
+          fileUrl: null,
+          parsed: {
+            target_role: 'Software Engineer',
+            skills: ['TypeScript', 'React', 'Node'],
+            experience_estimate: '1 year',
+            parse_quality: 'full',
+          },
+          parseQuality: 'full',
+          parseWarning: null,
+        },
+      }),
+    );
+    // Resume-only should not be crushed by three synthetic zero categories.
+    expect(withResumeOnly.overall).toBeGreaterThan(40);
+    expect(withResumeOnly.categories.find((c) => c.key === 'communication')?.score).toBeNull();
   });
 
   it('weights interview performance and dimensions', () => {
@@ -102,5 +130,31 @@ describe('computeReadinessScore', () => {
     expect(result.overall).toBeGreaterThan(55);
     expect(result.level).not.toBe('early_stage');
     expect(result.improvementTrend).toBe('improving');
+  });
+});
+
+describe('weakestDimensions', () => {
+  it('returns empty when no dimension evidence exists', () => {
+    expect(
+      weakestDimensions({
+        communication_clarity: null,
+        technical_depth: null,
+        answer_structure: null,
+        confidence: null,
+        relevance: null,
+      }),
+    ).toEqual([]);
+  });
+
+  it('ranks only scored dimensions ascending', () => {
+    expect(
+      weakestDimensions({
+        communication_clarity: 8,
+        technical_depth: 4,
+        answer_structure: 6,
+        confidence: null,
+        relevance: 7,
+      }),
+    ).toEqual(['technical_depth', 'answer_structure', 'relevance']);
   });
 });

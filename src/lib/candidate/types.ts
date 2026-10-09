@@ -11,9 +11,12 @@ export type ReadinessCategoryKey =
 export interface ReadinessCategoryScore {
   key: ReadinessCategoryKey;
   label: string;
-  score: number;
+  /** Null when evidence is insufficient — not the same as a scored 0. */
+  score: number | null;
   maxScore: number;
   summary: string;
+  /** False when this category must not contribute to the weighted overall. */
+  hasEvidence: boolean;
 }
 
 export interface ReadinessScoreResult {
@@ -122,6 +125,17 @@ export interface ReportDimensionAverages {
   relevance: number | null;
 }
 
+/** Recent report refs for notifications — engine-aware href + real timestamp. */
+export interface RecentReportRef {
+  /** Report row id (V1 reports.id or script_interview_reports.id). */
+  id: string;
+  interviewId: string;
+  engine: 'v1' | 'v2.1';
+  generatedAt: string | null;
+  /** Canonical candidate report path for this engine. */
+  href: string;
+}
+
 export interface CandidateSnapshot {
   userId: string;
   targetRole: string;
@@ -143,7 +157,9 @@ export interface CandidateSnapshot {
   abandonedResumeInterviewRole: string | null;
   abandonedResumeInterviewEngine: string | null;
   dimensionAverages: ReportDimensionAverages;
+  /** @deprecated Prefer `recentReports` — ids alone cannot choose the correct report href. */
   recentReportIds: string[];
+  recentReports: RecentReportRef[];
   collegeEnrollmentAccepted: boolean;
   collegeName: string | null;
 }

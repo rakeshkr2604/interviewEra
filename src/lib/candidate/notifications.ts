@@ -4,10 +4,14 @@ import type { CandidateNotification, CandidateSnapshot } from './types';
 /**
  * Derived in-app notifications (not durable). Each unfinished interview uses a
  * stable `id` so repeated dashboard/notifications loads do not stack duplicates.
+ *
+ * Persistence of read/unread is intentionally not implemented here — the product
+ * derives the feed from live candidate state. Report-ready items use real
+ * `generatedAt` timestamps and engine-correct hrefs.
  */
 export function buildCandidateNotifications(snapshot: CandidateSnapshot): CandidateNotification[] {
   const items: CandidateNotification[] = [];
-  // Stable timestamp for derived items — avoids "just now" churn implying new events.
+  // Stable timestamp for derived items without their own event time.
   const derivedAt =
     snapshot.progress?.updated_at ??
     snapshot.latestResume?.createdAt ??
@@ -79,14 +83,25 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
     }
   }
 
-  for (const reportId of snapshot.recentReportIds.slice(0, 2)) {
+  const reportRefs =
+    snapshot.recentReports?.length > 0
+      ? snapshot.recentReports
+      : snapshot.recentReportIds.map((reportId) => ({
+          id: reportId,
+          interviewId: reportId,
+          engine: 'v1' as const,
+          generatedAt: null as string | null,
+          href: `/report/${reportId}`,
+        }));
+
+  for (const report of reportRefs.slice(0, 2)) {
     items.push({
-      id: `report-${reportId}`,
+      id: `report-${report.id}`,
       type: 'report_ready',
       title: 'Interview report ready',
       body: 'Review scores, strengths, and AI recommendations.',
-      href: `/report/${reportId}`,
-      createdAt: derivedAt,
+      href: report.href,
+      createdAt: report.generatedAt ?? derivedAt,
       read: false,
     });
   }
@@ -99,7 +114,7 @@ export function buildCandidateNotifications(snapshot: CandidateSnapshot): Candid
       body: snapshot.collegeName
         ? `You are enrolled at ${snapshot.collegeName}.`
         : 'Your campus admin can now track your placement progress.',
-      href: '/college/join',
+      href: '/college/dashboard',
       createdAt: derivedAt,
       read: true,
     });

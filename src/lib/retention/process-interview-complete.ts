@@ -25,8 +25,20 @@ import { buildCompletionReinforcement } from './completion-reinforcement';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { applyReferralBonus } from '@/lib/referral/apply-referral';
+import {
+  isScriptDimensionAverages,
+  scriptDimsToV1Shape,
+} from '@/lib/interview/script-dimension-bridge';
 
 const PG_UNIQUE_VIOLATION = '23505';
+
+type RetentionSessionAggregate = {
+  sessionScore: number;
+  avgDimensionScores: DimensionScores;
+  questionsAnswered: number;
+  totalQuestions: number;
+  avgAnswerDurationSec: number;
+};
 
 export interface InterviewRetentionClientPayload {
   currentTier: number;
@@ -46,7 +58,7 @@ export interface InterviewRetentionClientPayload {
   recoveryHint?: string | null;
 }
 
-async function aggregateEvaluationsFromInterview(
+async function aggregateV1EvaluationsFromInterview(
   interviewId: string,
 ): Promise<{
   sessionScore: number;
@@ -105,6 +117,103 @@ async function aggregateEvaluationsFromInterview(
   };
 
   return { sessionScore: roundToTwo(overall / n), avgDimensionScores: avg };
+}
+
+/**
+ * Aggregate scored v2.1 answer_evaluations into retention session scores.
+ * Uses score-v1.2 → V1 dimension bridge so session_quality_log stays on DimensionScores.
+ */
+async function aggregateScriptEvaluationsFromInterview(
+  interviewId: string,
+  startedAtIso: string | null,
+  questionCount: number,
+): Promise<RetentionSessionAggregate | null> {
+  const supabase = createServiceClient();
+  const totalQuestions = Math.max(1, questionCount);
+
+  const { data: evaluations, error: eErr } = await supabase
+    .from('answer_evaluations')
+    .select('overall, dimensions, status, created_at, turn_index')
+    .eq('interview_id', interviewId)
+    .eq('status', 'scored')
+    .order('turn_index', { ascending: true });
+
+  if (eErr || !evaluations?.length) return null;
+
+  const scored = evaluations.filter(
+    (ev) =>
+      typeof ev.overall === 'number' &&
+      Number.isFinite(ev.overall) &&
+      isScriptDimensionAverages(ev.dimensions),
+  );
+  if (scored.length === 0) return null;
+
+  const sums: DimensionScores = {
+    communication_clarity: 0,
+    technical_depth: 0,
+    answer_structure: 0,
+    confidence: 0,
+    relevance: 0,
+  };
+  let overall = 0;
+  for (const ev of scored) {
+    overall += Number(ev.overall);
+    const mapped = scriptDimsToV1Shape(
+      ev.dimensions as Parameters<typeof scriptDimsToV1Shape>[0],
+    );
+    sums.communication_clarity += mapped.communication_clarity;
+    sums.technical_depth += mapped.technical_depth;
+    sums.answer_structure += mapped.answer_structure;
+    sums.confidence += mapped.confidence;
+    sums.relevance += mapped.relevance;
+  }
+
+  const n = scored.length;
+  const avgDimensionScores: DimensionScores = {
+    communication_clarity: roundToTwo(sums.communication_clarity / n),
+    technical_depth: roundToTwo(sums.technical_depth / n),
+    answer_structure: roundToTwo(sums.answer_structure / n),
+    confidence: roundToTwo(sums.confidence / n),
+    relevance: roundToTwo(sums.relevance / n),
+  };
+
+  // Prefer candidate answer timestamps from script_turns when present.
+  const { data: turns } = await supabase
+    .from('script_turns')
+    .select('turn_index, created_at, structured_answer')
+    .eq('interview_id', interviewId)
+    .order('turn_index', { ascending: true });
+
+  const answerTimestamps: string[] = [];
+  for (const turn of turns ?? []) {
+    const structured = turn.structured_answer as { submitted_at?: string } | null;
+    const submitted =
+      structured && typeof structured.submitted_at === 'string'
+        ? structured.submitted_at
+        : typeof turn.created_at === 'string'
+          ? turn.created_at
+          : null;
+    if (submitted) answerTimestamps.push(submitted);
+  }
+  if (answerTimestamps.length === 0) {
+    for (const ev of scored) {
+      if (typeof ev.created_at === 'string') answerTimestamps.push(ev.created_at);
+    }
+  }
+
+  const questionsAnswered = Math.min(n, totalQuestions);
+  const avgAnswerDurationSec = computeAvgAnswerDurationSec({
+    startedAtIso,
+    rows: answerTimestamps.map((submitted_at) => ({ submitted_at })),
+  });
+
+  return {
+    sessionScore: roundToTwo(overall / n),
+    avgDimensionScores,
+    questionsAnswered,
+    totalQuestions,
+    avgAnswerDurationSec,
+  };
 }
 
 function computeAvgAnswerDurationSec(opts: {
@@ -394,7 +503,7 @@ export async function processInterviewRetention(
 
   const { data: interview, error: intErr } = await supabase
     .from('interviews')
-    .select('id, question_count, started_at, role')
+    .select('id, question_count, started_at, role, engine')
     .eq('id', interviewId)
     .eq('user_id', userId)
     .maybeSingle();
@@ -404,60 +513,90 @@ export async function processInterviewRetention(
     throw new Error(intErr?.message ?? 'interview not found');
   }
 
-  const totalQuestions = Math.max(1, Number(interview.question_count) || 1);
+  const engine = typeof interview.engine === 'string' ? interview.engine : null;
+  const startedAtIso = interview.started_at as string | null;
+  const questionCount = Math.max(1, Number(interview.question_count) || 1);
 
-  const { data: questionsOrdered, error: qErr } = await supabase
-    .from('questions')
-    .select('id, order_index')
-    .eq('interview_id', interviewId)
-    .order('order_index', { ascending: true });
+  let sessionAgg: RetentionSessionAggregate | null = null;
 
-  if (qErr || !questionsOrdered?.length) {
-    logger.error('retention_questions_load_failed', { interviewId, error: qErr?.message });
-    throw new Error(qErr?.message ?? 'no questions');
+  if (engine === 'v2.1') {
+    sessionAgg = await aggregateScriptEvaluationsFromInterview(
+      interviewId,
+      startedAtIso,
+      questionCount,
+    );
+  } else {
+    const { data: questionsOrdered, error: qErr } = await supabase
+      .from('questions')
+      .select('id, order_index')
+      .eq('interview_id', interviewId)
+      .order('order_index', { ascending: true });
+
+    if (qErr || !questionsOrdered?.length) {
+      logger.error('retention_questions_load_failed', { interviewId, error: qErr?.message });
+      throw new Error(qErr?.message ?? 'no questions');
+    }
+
+    const qIds = questionsOrdered.map((q) => q.id as string);
+    const { data: answers, error: aErr } = await supabase
+      .from('answers')
+      .select('id, question_id, submitted_at')
+      .in('question_id', qIds);
+
+    if (aErr) {
+      logger.error('retention_answers_load_failed', { interviewId, error: aErr.message });
+      throw new Error(aErr.message);
+    }
+
+    const answersSorted = [...(answers ?? [])].sort(
+      (a, b) =>
+        questionsOrdered.findIndex((q) => q.id === a.question_id) -
+        questionsOrdered.findIndex((q) => q.id === b.question_id),
+    );
+
+    // Count DISTINCT questions answered, not raw answer rows: a single question
+    // can have multiple answer rows now that the orchestrator asks in-place
+    // follow-ups. Capped at totalQuestions so it can never exceed it (the
+    // session_quality_log `answered_le_total` check constraint).
+    const distinctAnsweredQuestionIds = new Set(
+      (answers ?? []).map((a) => a.question_id as string),
+    );
+    const questionsAnswered = Math.min(
+      distinctAnsweredQuestionIds.size,
+      questionCount,
+    );
+    const avgAnswerDurationSec = computeAvgAnswerDurationSec({
+      startedAtIso,
+      rows: answersSorted.map((a) => ({ submitted_at: a.submitted_at as string })),
+    });
+
+    const agg = await aggregateV1EvaluationsFromInterview(interviewId);
+    if (agg) {
+      sessionAgg = {
+        sessionScore: agg.sessionScore,
+        avgDimensionScores: agg.avgDimensionScores,
+        questionsAnswered,
+        totalQuestions: questionCount,
+        avgAnswerDurationSec,
+      };
+    }
   }
 
-  const qIds = questionsOrdered.map((q) => q.id as string);
-  const { data: answers, error: aErr } = await supabase
-    .from('answers')
-    .select('id, question_id, submitted_at')
-    .in('question_id', qIds);
-
-  if (aErr) {
-    logger.error('retention_answers_load_failed', { interviewId, error: aErr.message });
-    throw new Error(aErr.message);
-  }
-
-  const answersSorted = [...(answers ?? [])].sort(
-    (a, b) =>
-      questionsOrdered.findIndex((q) => q.id === a.question_id) -
-      questionsOrdered.findIndex((q) => q.id === b.question_id),
-  );
-
-  // Count DISTINCT questions answered, not raw answer rows: a single question
-  // can have multiple answer rows now that the orchestrator asks in-place
-  // follow-ups. Capped at totalQuestions so it can never exceed it (the
-  // session_quality_log `answered_le_total` check constraint).
-  const distinctAnsweredQuestionIds = new Set(
-    (answers ?? []).map((a) => a.question_id as string),
-  );
-  const questionsAnswered = Math.min(
-    distinctAnsweredQuestionIds.size,
-    totalQuestions,
-  );
-  const questionsSkipped = Math.max(0, totalQuestions - questionsAnswered);
-  const avgAnswerDurationSec = computeAvgAnswerDurationSec({
-    startedAtIso: interview.started_at as string | null,
-    rows: answersSorted.map((a) => ({ submitted_at: a.submitted_at as string })),
-  });
-
-  const agg = await aggregateEvaluationsFromInterview(interviewId);
-  if (!agg) {
-    logger.error('retention_no_evaluations', { interviewId });
+  if (!sessionAgg) {
+    logger.error('retention_no_evaluations', { interviewId, engine });
     throw new Error('No evaluations for interview');
   }
 
-  const maxDim = maxDimensionScore(agg.avgDimensionScores);
+  const {
+    sessionScore,
+    avgDimensionScores,
+    questionsAnswered,
+    totalQuestions,
+    avgAnswerDurationSec,
+  } = sessionAgg;
+  const questionsSkipped = Math.max(0, totalQuestions - questionsAnswered);
+
+  const maxDim = maxDimensionScore(avgDimensionScores);
   if (maxDim === null) {
     throw new Error('Dimension scores incomplete');
   }
@@ -467,12 +606,12 @@ export async function processInterviewRetention(
     questionsAnswered,
     totalQuestions,
     avgAnswerDurationSec,
-    sessionScore: agg.sessionScore,
+    sessionScore,
   });
   const qualityMet = qualityVerdict.passed;
-  const qualityFeedback = buildSessionQualityFeedback(qualityVerdict, agg.sessionScore);
+  const qualityFeedback = buildSessionQualityFeedback(qualityVerdict, sessionScore);
 
-  const xpAdded = qualityMet ? Math.round(agg.sessionScore * 10) : 0;
+  const xpAdded = qualityMet ? Math.round(sessionScore * 10) : 0;
   const totalXpNext = Math.max(0, (progressRowBefore.total_xp ?? 0) + xpAdded);
 
   const placeholderContribution = {
@@ -489,9 +628,9 @@ export async function processInterviewRetention(
     total_questions: totalQuestions,
     questions_skipped: questionsSkipped,
     avg_answer_duration_sec: avgAnswerDurationSec,
-    session_score: agg.sessionScore,
+    session_score: sessionScore,
     quality_met: qualityMet,
-    dimension_scores: agg.avgDimensionScores,
+    dimension_scores: avgDimensionScores,
     max_dimension_score: roundToTwo(maxDim),
     unlock_contribution: placeholderContribution,
   };
@@ -530,7 +669,7 @@ export async function processInterviewRetention(
           reasonCode: 'reasonCode' in unlockResult ? unlockResult.reasonCode : undefined,
         }),
     qualityMet,
-    sessionScore: agg.sessionScore,
+    sessionScore,
   });
 
   if (unlockedOk) {
@@ -549,7 +688,7 @@ export async function processInterviewRetention(
     questionsAnswered,
     totalQuestions,
     avgAnswerDurationSec,
-    sessionScore: agg.sessionScore,
+    sessionScore,
   });
 
   if (!streakResult.ok) {
@@ -588,8 +727,8 @@ export async function processInterviewRetention(
       plan: typeof userRow?.plan_tier === 'string' ? userRow.plan_tier : undefined,
       source: 'interview_complete',
       qualityMet,
-      sessionScore: agg.sessionScore,
-      score: agg.sessionScore,
+      sessionScore,
+      score: sessionScore,
     },
     { ga4: false },
   );

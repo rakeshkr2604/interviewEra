@@ -7,6 +7,7 @@ import {
 } from './candidate-profile';
 import type {
   CandidateSnapshot,
+  RecentReportRef,
   ReportDimensionAverages,
   ResumeSnapshot,
 } from './types';
@@ -17,6 +18,7 @@ import {
 } from '@/lib/interview/fetch-primary-recovery-interview';
 import type { DimensionScores } from '@/types/app.types';
 import { normalizeRadarRowToDimensionKey } from '@/lib/utils/report-radar-dimensions';
+import { scriptReportDimsToV1Shape } from '@/lib/interview/script-dimension-bridge';
 
 export type CandidateSnapshotUserRow = {
   onboarding_draft?: unknown;
@@ -46,6 +48,8 @@ export type CandidateSnapshotPrefetch = {
   interviews?: CandidateSnapshotInterviewRow[] | null;
   /** Independent of the recent-list window; when set, skips recovery DB fetch. */
   recoveryTarget?: PrimaryRecoveryTarget | null;
+  /** Lifetime completed interview count (bypass recent-window undercount). */
+  completedSessionCount?: number | null;
 };
 
 /** Shared select for dashboard + snapshot interview hydration (20-row cap). */
@@ -118,16 +122,47 @@ export async function fetchDashboardUserRow(
   return userFull;
 }
 
-function aggregateDimensionAverages(
-  radarRows: { dimension: string; score: number }[][],
-): ReportDimensionAverages {
-  const buckets: Record<keyof DimensionScores, number[]> = {
+function emptyDimensionBuckets(): Record<keyof DimensionScores, number[]> {
+  return {
     communication_clarity: [],
     technical_depth: [],
     answer_structure: [],
     confidence: [],
     relevance: [],
   };
+}
+
+function averagesFromBuckets(
+  buckets: Record<keyof DimensionScores, number[]>,
+): ReportDimensionAverages {
+  const avg = (vals: number[]) =>
+    vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+
+  return {
+    communication_clarity: avg(buckets.communication_clarity),
+    technical_depth: avg(buckets.technical_depth),
+    answer_structure: avg(buckets.answer_structure),
+    confidence: avg(buckets.confidence),
+    relevance: avg(buckets.relevance),
+  };
+}
+
+function pushDimensionScores(
+  buckets: Record<keyof DimensionScores, number[]>,
+  dims: DimensionScores,
+): void {
+  for (const key of Object.keys(buckets) as (keyof DimensionScores)[]) {
+    const score = dims[key];
+    if (typeof score === 'number' && Number.isFinite(score)) {
+      buckets[key].push(score);
+    }
+  }
+}
+
+function aggregateDimensionAveragesFromRadar(
+  radarRows: { dimension: string; score: number }[][],
+): Record<keyof DimensionScores, number[]> {
+  const buckets = emptyDimensionBuckets();
 
   for (const radar of radarRows) {
     for (const point of radar) {
@@ -139,16 +174,7 @@ function aggregateDimensionAverages(
     }
   }
 
-  const avg = (vals: number[]) =>
-    vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-
-  return {
-    communication_clarity: avg(buckets.communication_clarity),
-    technical_depth: avg(buckets.technical_depth),
-    answer_structure: avg(buckets.answer_structure),
-    confidence: avg(buckets.confidence),
-    relevance: avg(buckets.relevance),
-  };
+  return buckets;
 }
 
 function resumeCompletionPct(resume: ResumeSnapshot | null): number {
@@ -177,6 +203,9 @@ export async function loadCandidateSnapshot(
   const hasPrefetchedProgress = Boolean(prefetch && 'progressSnap' in prefetch);
   const hasPrefetchedInterviews = Boolean(prefetch && 'interviews' in prefetch);
   const hasPrefetchedRecovery = Boolean(prefetch && 'recoveryTarget' in prefetch);
+  const hasPrefetchedCompletedCount = Boolean(
+    prefetch && 'completedSessionCount' in prefetch,
+  );
 
   const [
     { data: progressSnap },
@@ -184,6 +213,7 @@ export async function loadCandidateSnapshot(
     { data: resumes },
     { data: enrollment },
     recoveryTarget,
+    completedCountResult,
   ] = await Promise.all([
     hasPrefetchedProgress
       ? Promise.resolve({ data: prefetch!.progressSnap ?? null })
@@ -212,6 +242,13 @@ export async function loadCandidateSnapshot(
     hasPrefetchedRecovery
       ? Promise.resolve(prefetch!.recoveryTarget ?? null)
       : fetchPrimaryRecoveryInterview(supabase, userId),
+    hasPrefetchedCompletedCount
+      ? Promise.resolve({ count: prefetch!.completedSessionCount ?? null })
+      : supabase
+          .from('interviews')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('status', 'completed'),
   ]);
 
   const draft = parsePersistedDraft(userRow?.onboarding_draft ?? null);
@@ -267,28 +304,104 @@ export async function loadCandidateSnapshot(
     };
   }
 
-  const completedInterviews = (interviews ?? []).filter((i) => i.status === 'completed');
+  const interviewRows = interviews ?? [];
+  const completedInWindow = interviewRows.filter((i) => i.status === 'completed');
+  const lifetimeCompleted =
+    typeof completedCountResult.count === 'number'
+      ? completedCountResult.count
+      : completedInWindow.length;
+
   // Recovery fields come from fetchPrimaryRecoveryInterview (not the recent-20 window).
   const recovery = recoveryTarget;
-  const inProgress =
-    recovery?.mode === 'continue'
-      ? recovery
-      : null;
-  const abandonedResume =
-    recovery?.mode === 'resume'
-      ? recovery
-      : null;
+  const inProgress = recovery?.mode === 'continue' ? recovery : null;
+  const abandonedResume = recovery?.mode === 'resume' ? recovery : null;
 
-  const radarRows = completedInterviews.flatMap((interview) => {
-    const reports = (interview.reports ?? []) as { radar_data?: { dimension: string; score: number }[] }[];
-    return reports.map((r) => (Array.isArray(r.radar_data) ? r.radar_data : []));
+  const completedIds = completedInWindow.map((i) => i.id as string);
+  const { data: scriptReportsRaw } =
+    completedIds.length > 0
+      ? await supabase
+          .from('script_interview_reports')
+          .select('id, interview_id, overall, dimension_averages, generated_at, status')
+          .in('interview_id', completedIds)
+          .in('status', ['ready', 'partial'])
+      : { data: [] as {
+          id: string;
+          interview_id: string;
+          overall: number | null;
+          dimension_averages: unknown;
+          generated_at: string | null;
+          status: string;
+        }[] };
+
+  const scriptByInterview = new Map<
+    string,
+    {
+      id: string;
+      overall: number | null;
+      dimension_averages: unknown;
+      generated_at: string | null;
+      status: string;
+    }[]
+  >();
+  for (const r of scriptReportsRaw ?? []) {
+    const list = scriptByInterview.get(r.interview_id as string) ?? [];
+    list.push({
+      id: r.id as string,
+      overall: r.overall as number | null,
+      dimension_averages: r.dimension_averages,
+      generated_at: r.generated_at as string | null,
+      status: r.status as string,
+    });
+    scriptByInterview.set(r.interview_id as string, list);
+  }
+
+  const dimBuckets = emptyDimensionBuckets();
+  const recentReports: RecentReportRef[] = [];
+
+  for (const interview of completedInWindow) {
+    const engine = interview.engine === 'v2.1' ? 'v2.1' : 'v1';
+    if (engine === 'v2.1') {
+      const scriptReports = scriptByInterview.get(interview.id as string) ?? [];
+      for (const report of scriptReports) {
+        const mapped = scriptReportDimsToV1Shape(report.dimension_averages);
+        if (mapped) pushDimensionScores(dimBuckets, mapped);
+        recentReports.push({
+          id: report.id,
+          interviewId: interview.id as string,
+          engine: 'v2.1',
+          generatedAt: report.generated_at,
+          href: `/report/script/${interview.id}`,
+        });
+      }
+    } else {
+      const reports = (interview.reports ?? []) as {
+        id: string;
+        radar_data?: { dimension: string; score: number }[];
+        generated_at?: string | null;
+      }[];
+      for (const report of reports) {
+        const radar = Array.isArray(report.radar_data) ? report.radar_data : [];
+        const radarBuckets = aggregateDimensionAveragesFromRadar([radar]);
+        for (const key of Object.keys(radarBuckets) as (keyof DimensionScores)[]) {
+          dimBuckets[key].push(...radarBuckets[key]);
+        }
+        recentReports.push({
+          id: report.id,
+          interviewId: interview.id as string,
+          engine: 'v1',
+          generatedAt: report.generated_at ?? null,
+          href: `/report/${report.id}`,
+        });
+      }
+    }
+  }
+
+  recentReports.sort((a, b) => {
+    const aTs = a.generatedAt ?? '';
+    const bTs = b.generatedAt ?? '';
+    return bTs.localeCompare(aTs);
   });
-
-  const recentReportIds = completedInterviews
-    .flatMap((interview) =>
-      ((interview.reports ?? []) as { id: string }[]).map((r) => r.id),
-    )
-    .slice(0, 5);
+  const recentReportsTop = recentReports.slice(0, 5);
 
   const targetRole =
     profile.preferredRole ||
@@ -304,7 +417,7 @@ export async function loadCandidateSnapshot(
     hasActiveResume,
     resumeCompletionPct: resumeCompletionPct(latestResume),
     progress: (progressSnap as UserProgressRow | null) ?? null,
-    completedSessionCount: completedInterviews.length,
+    completedSessionCount: lifetimeCompleted,
     inProgressInterviewId: inProgress ? inProgress.id : null,
     inProgressInterviewRole: inProgress ? inProgress.role : null,
     inProgressInterviewEngine: inProgress ? (inProgress.engine ?? null) : null,
@@ -313,8 +426,9 @@ export async function loadCandidateSnapshot(
     abandonedResumeInterviewEngine: abandonedResume
       ? (abandonedResume.engine ?? null)
       : null,
-    dimensionAverages: aggregateDimensionAverages(radarRows),
-    recentReportIds,
+    dimensionAverages: averagesFromBuckets(dimBuckets),
+    recentReportIds: recentReportsTop.map((r) => r.id),
+    recentReports: recentReportsTop,
     collegeEnrollmentAccepted: enrollment?.enrollment_status === 'active',
     collegeName: collegeOrgName,
   };

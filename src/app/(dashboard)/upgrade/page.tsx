@@ -21,6 +21,7 @@ import {
   publicSnapshotToPromoQuotes,
 } from '@/lib/pricing/effective-price';
 import type { PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
+import { mergeAnalyticsReports } from '@/lib/candidate/analytics-reports';
 
 export default async function UpgradePage({
   searchParams,
@@ -68,19 +69,31 @@ export default async function UpgradePage({
     if (completedInterviews && completedInterviews.length > 0) {
       const interviewIds = completedInterviews.map((i) => i.id as string);
 
-      const { data: reports } = await supabase
-        .from('reports')
-        .select('overall_score, generated_at')
-        .in('interview_id', interviewIds)
-        .order('generated_at', { ascending: true })
-        .limit(5);
+      const [{ data: v1Reports }, { data: scriptReports }] = await Promise.all([
+        supabase
+          .from('reports')
+          .select('overall_score, radar_data, generated_at, interview_id')
+          .in('interview_id', interviewIds)
+          .order('generated_at', { ascending: false })
+          .limit(20),
+        supabase
+          .from('script_interview_reports')
+          .select('overall, dimension_averages, generated_at, interview_id, status')
+          .in('interview_id', interviewIds)
+          .in('status', ['ready', 'partial'])
+          .order('generated_at', { ascending: false })
+          .limit(20),
+      ]);
 
-      if (reports) {
-        trendData = reports.map((r, i) => ({
-          dimension: `Interview ${i + 1}`,
-          score: Math.round((r.overall_score as number) * 10) / 10,
-        }));
-      }
+      const merged = mergeAnalyticsReports(
+        (v1Reports ?? []) as Parameters<typeof mergeAnalyticsReports>[0],
+        (scriptReports ?? []) as Parameters<typeof mergeAnalyticsReports>[1],
+        5,
+      );
+      trendData = merged.map((r, i) => ({
+        dimension: `Interview ${i + 1}`,
+        score: Math.round(r.overallScore * 10) / 10,
+      }));
     }
   }
 

@@ -1,7 +1,9 @@
 /**
  * Pure dashboard projections for next-tier progress (server or client).
  * Criteria default from `tier_config` when present; fall back to Phase-1 constants.
- * Session counts for tier-gates match {@link evaluateUnlockCriteria} (total quality logs).
+ * Session counts for dashboard gates use `user_progress.total_sessions`
+ * (completed interviews). Unlock RPC may still evaluate last-N quality logs —
+ * copy labels say “sessions” / “overall avg” to match stored rollups shown here.
  */
 
 import { MAX_TIER, TIER_2_UNLOCK, TIER_3_UNLOCK, TIER_4_UNLOCK } from './constants';

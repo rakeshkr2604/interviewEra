@@ -18,8 +18,9 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-function scoreFromTenPointScale(value: number | null | undefined): number {
-  if (value == null || !Number.isFinite(value)) return 0;
+/** Convert 0–10 scale to 0–100; null stays null (missing ≠ zero). */
+function scoreFromTenPointScale(value: number | null | undefined): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
   return clampScore(value * 10);
 }
 
@@ -90,65 +91,104 @@ function trendLabel(trend: ReadinessScoreResult['improvementTrend']): string {
   }
 }
 
+function weightedOverall(categories: ReadinessCategoryScore[]): number {
+  const available = categories.filter((c) => c.hasEvidence && c.score != null);
+  if (available.length === 0) return 0;
+  const weightSum = available.reduce((sum, cat) => sum + CATEGORY_WEIGHTS[cat.key], 0);
+  if (weightSum <= 0) return 0;
+  const raw = available.reduce(
+    (sum, cat) => sum + (cat.score as number) * CATEGORY_WEIGHTS[cat.key],
+    0,
+  );
+  return clampScore(raw / weightSum);
+}
+
 export function computeReadinessScore(snapshot: CandidateSnapshot): ReadinessScoreResult {
+  const dimValues = Object.values(snapshot.dimensionAverages).filter(
+    (v): v is number => v != null && Number.isFinite(v),
+  );
   const interviewAvg =
     snapshot.progress?.overall_avg_score ??
-    (snapshot.completedSessionCount > 0
-      ? Object.values(snapshot.dimensionAverages).filter((v) => v != null).reduce((a, b) => a + (b ?? 0), 0) /
-        Math.max(1, Object.values(snapshot.dimensionAverages).filter((v) => v != null).length)
+    (snapshot.completedSessionCount > 0 && dimValues.length > 0
+      ? dimValues.reduce((a, b) => a + b, 0) / dimValues.length
       : null);
+
+  const interviewScore = scoreFromTenPointScale(interviewAvg);
+  const communicationScore = scoreFromTenPointScale(
+    snapshot.dimensionAverages.communication_clarity,
+  );
+  const technicalScore = scoreFromTenPointScale(snapshot.dimensionAverages.technical_depth);
+
+  const hasResumeEvidence =
+    Boolean(snapshot.latestResume?.parsed) || snapshot.resumeCompletionPct > 0;
+  const resumeScore = computeResumeQualityScore(
+    snapshot.latestResume?.parsed ?? null,
+    snapshot.resumeCompletionPct,
+  );
+
+  const hasConsistencyEvidence =
+    (snapshot.progress?.total_sessions ?? 0) > 0 ||
+    (snapshot.progress?.current_streak ?? 0) > 0 ||
+    snapshot.completedSessionCount > 0;
+  const consistencyScore = computeConsistencyScore(snapshot);
 
   const categories: ReadinessCategoryScore[] = [
     {
       key: 'resume_quality',
       label: 'Resume quality',
-      score: computeResumeQualityScore(snapshot.latestResume?.parsed ?? null, snapshot.resumeCompletionPct),
+      score: hasResumeEvidence ? resumeScore : null,
       maxScore: 100,
+      hasEvidence: hasResumeEvidence,
       summary: snapshot.latestResume?.parsed
         ? `Parsed resume with ${snapshot.latestResume.parsed.skills.length} skills identified.`
-        : 'Upload and parse a resume to unlock full scoring.',
+        : hasResumeEvidence
+          ? 'Resume upload in progress or incomplete — finish parsing for a full score.'
+          : 'Upload and parse a resume to unlock this dimension.',
     },
     {
       key: 'interview_performance',
       label: 'Interview performance',
-      score: scoreFromTenPointScale(interviewAvg),
+      score: interviewScore,
       maxScore: 100,
+      hasEvidence: interviewScore != null,
       summary:
-        snapshot.completedSessionCount > 0
+        interviewScore != null && snapshot.completedSessionCount > 0
           ? `Based on ${snapshot.completedSessionCount} completed mock${snapshot.completedSessionCount === 1 ? '' : 's'}.`
-          : 'No completed interviews yet.',
+          : 'No completed interviews with scores yet.',
     },
     {
       key: 'communication',
       label: 'Communication',
-      score: scoreFromTenPointScale(snapshot.dimensionAverages.communication_clarity),
+      score: communicationScore,
       maxScore: 100,
-      summary: snapshot.dimensionAverages.communication_clarity != null
-        ? `Avg clarity ${snapshot.dimensionAverages.communication_clarity.toFixed(1)}/10 across reports.`
-        : 'Communication scores appear after your first report.',
+      hasEvidence: communicationScore != null,
+      summary:
+        snapshot.dimensionAverages.communication_clarity != null
+          ? `Avg clarity ${snapshot.dimensionAverages.communication_clarity.toFixed(1)}/10 across reports.`
+          : 'Communication scores appear after your first report.',
     },
     {
       key: 'technical_depth',
       label: 'Technical depth',
-      score: scoreFromTenPointScale(snapshot.dimensionAverages.technical_depth),
+      score: technicalScore,
       maxScore: 100,
-      summary: snapshot.dimensionAverages.technical_depth != null
-        ? `Avg technical depth ${snapshot.dimensionAverages.technical_depth.toFixed(1)}/10.`
-        : 'Technical depth scores appear after your first report.',
+      hasEvidence: technicalScore != null,
+      summary:
+        snapshot.dimensionAverages.technical_depth != null
+          ? `Avg technical depth ${snapshot.dimensionAverages.technical_depth.toFixed(1)}/10.`
+          : 'Technical depth scores appear after your first report.',
     },
     {
       key: 'consistency',
       label: 'Consistency',
-      score: computeConsistencyScore(snapshot),
+      score: hasConsistencyEvidence ? consistencyScore : null,
       maxScore: 100,
-      summary: `${snapshot.progress?.current_streak ?? 0}-day streak · ${snapshot.progress?.total_sessions ?? 0} quality sessions.`,
+      hasEvidence: hasConsistencyEvidence,
+      summary: `${snapshot.progress?.current_streak ?? 0}-day streak · ${snapshot.progress?.total_sessions ?? 0} completed sessions.`,
     },
   ];
 
-  const overall = clampScore(
-    categories.reduce((sum, cat) => sum + cat.score * CATEGORY_WEIGHTS[cat.key], 0),
-  );
-
+  const overall = weightedOverall(categories);
   const trend = improvementTrend(snapshot);
 
   return {
@@ -161,12 +201,17 @@ export function computeReadinessScore(snapshot: CandidateSnapshot): ReadinessSco
   };
 }
 
+/**
+ * Weakest dimensions among those with real scores.
+ * Returns [] when no dimension evidence exists (do not invent “weak” areas).
+ */
 export function weakestDimensions(
   averages: CandidateSnapshot['dimensionAverages'],
   limit = 3,
 ): (keyof DimensionScores)[] {
   const entries = (Object.keys(REPORT_DIMENSION_LABELS) as (keyof DimensionScores)[])
-    .map((key) => ({ key, score: averages[key] ?? 10 }))
-    .sort((a, b) => (a.score ?? 10) - (b.score ?? 10));
+    .map((key) => ({ key, score: averages[key] }))
+    .filter((e): e is { key: keyof DimensionScores; score: number } => e.score != null)
+    .sort((a, b) => a.score - b.score);
   return entries.slice(0, limit).map((e) => e.key);
 }

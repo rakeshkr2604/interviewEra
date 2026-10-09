@@ -54,7 +54,7 @@ export function ReadinessOverviewCard({ readiness }: { readiness: ReadinessScore
               {cat.label}
             </p>
             <p className="mt-1 text-lg font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>
-              {cat.score}
+              {cat.score == null ? '—' : cat.score}
             </p>
           </div>
         ))}

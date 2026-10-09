@@ -4,6 +4,8 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
 import { trySendScriptCompletionEmail } from '@/lib/email/lifecycle/try-send-script-completion-email';
 import { wasLifecycleEmailSent } from '@/lib/email/lifecycle/log';
+import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete';
+import { waitForScoredEvaluations } from '@/lib/email/lifecycle/try-send-script-completion-email';
 
 /** Best-effort durable completion milestone — never throws into the request. */
 function emitScriptInterviewCompleted(userId: string, interviewId: string): void {
@@ -92,6 +94,13 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     // Also re-emit durable interview_completed (052 unique index = exactly once).
     if (ownership.status === 'completed') {
       emitScriptInterviewCompleted(user.id, interviewId);
+      // Repair: re-run retention if prior completion never logged quality (idempotent).
+      after(() => {
+        void (async () => {
+          await waitForScoredEvaluations(serviceClient, interviewId);
+          await processInterviewRetentionSafely(user.id, interviewId);
+        })();
+      });
       if (recipientEmail && !(await wasLifecycleEmailSent(idempotencyKey))) {
         after(() => {
           void trySendScriptCompletionEmail({
@@ -151,28 +160,31 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
     emitScriptInterviewCompleted(user.id, interviewId);
 
-    // Warm report + send email after scores land (wait inside trySend).
+    // Warm report + retention + email after scores land (wait inside trySend).
     // Survives via Next.js after() → platform waitUntil when available.
     after(() => {
-      void trySendScriptCompletionEmail({
-        serviceClient,
-        interviewId,
-        userId: user.id,
-        recipientEmail,
-        waitForScores: true,
-      })
-        .then((r) => {
+      void (async () => {
+        await waitForScoredEvaluations(serviceClient, interviewId);
+        await processInterviewRetentionSafely(user.id, interviewId);
+        try {
+          const r = await trySendScriptCompletionEmail({
+            serviceClient,
+            interviewId,
+            userId: user.id,
+            recipientEmail,
+            waitForScores: false,
+          });
           console.info(
             `[interview/script/complete] after() email result (interviewId=${interviewId}):`,
             JSON.stringify(r),
           );
-        })
-        .catch((err) => {
+        } catch (err) {
           console.error(
             `[interview/script/complete] after() report/email failed (interviewId=${interviewId}):`,
             err,
           );
-        });
+        }
+      })();
     });
 
     // Step 4 — done

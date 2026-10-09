@@ -72,7 +72,13 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
             style={{ color: 'var(--text-muted)' }}
           >
             <span>Progress to Tier {snap.tierProgress.targetTierNumber}</span>
-            <span className="tabular-nums">{snap.tierProgress.sessionsProgressLabel}</span>
+            <span className="tabular-nums text-right">
+              {snap.tierProgress.sessionsProgressLabel}
+              <span className="mx-1.5 opacity-40" aria-hidden>
+                ·
+              </span>
+              {snap.tierProgress.scoreProgressLabel}
+            </span>
           </div>
           <div
             className="h-2 w-full overflow-hidden rounded-full"

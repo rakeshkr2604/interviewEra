@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FakeDb } from '@/test-utils/supabase-fake'
 import { makeFakeServiceClient } from '@/test-utils/supabase-fake'
 
+vi.mock('server-only', () => ({}))
+
 const afterMock = vi.fn((cb: () => void) => {
   cb()
 })
@@ -9,6 +11,12 @@ const afterMock = vi.fn((cb: () => void) => {
 const trySendMock = vi.fn(async () => ({
   attempted: true,
   sent: true,
+}))
+
+const waitForScoredMock = vi.fn(async () => 1)
+const retentionMock = vi.fn(async () => ({
+  sessionLogged: true,
+  qualityMet: true,
 }))
 
 const persistMilestoneEventOnce = vi.fn()
@@ -19,6 +27,11 @@ vi.mock('next/server', () => ({
 
 vi.mock('@/lib/email/lifecycle/try-send-script-completion-email', () => ({
   trySendScriptCompletionEmail: (...args: unknown[]) => trySendMock(...args),
+  waitForScoredEvaluations: (...args: unknown[]) => waitForScoredMock(...args),
+}))
+
+vi.mock('@/lib/retention/process-interview-complete', () => ({
+  processInterviewRetentionSafely: (...args: unknown[]) => retentionMock(...args),
 }))
 
 vi.mock('@/lib/analytics/milestone-events-store', () => ({
@@ -35,8 +48,12 @@ describe('completeScriptInterviewFromTurn — race-safe completion', () => {
   beforeEach(() => {
     afterMock.mockClear()
     trySendMock.mockClear()
+    waitForScoredMock.mockClear()
+    retentionMock.mockClear()
     persistMilestoneEventOnce.mockClear()
     trySendMock.mockResolvedValue({ attempted: true, sent: true })
+    waitForScoredMock.mockResolvedValue(1)
+    retentionMock.mockResolvedValue({ sessionLogged: true, qualityMet: true })
     db = {
       interviews: [
         {
@@ -68,8 +85,13 @@ describe('completeScriptInterviewFromTurn — race-safe completion', () => {
       interview_id: IV,
       engine: 'v2.1',
     })
-    expect(afterMock).toHaveBeenCalledTimes(1)
-    expect(trySendMock).toHaveBeenCalledTimes(1)
+    // Retention after() + completion-email after()
+    expect(afterMock).toHaveBeenCalledTimes(2)
+    await vi.waitFor(() => {
+      expect(waitForScoredMock).toHaveBeenCalled()
+      expect(retentionMock).toHaveBeenCalledWith('user-1', IV)
+      expect(trySendMock).toHaveBeenCalledTimes(1)
+    })
   })
 
   it('abandoned interview: remains abandoned and does not emit interview_completed', async () => {
@@ -178,7 +200,7 @@ describe('completeScriptInterviewFromTurn — race-safe completion', () => {
 
     expect(result).toEqual({ ok: true, transitioned: true })
     expect(db.interviews[0].status).toBe('completed')
-    expect(afterMock).toHaveBeenCalledTimes(1)
+    expect(afterMock).toHaveBeenCalledTimes(2)
   })
 
   it('pending → completed also emits once', async () => {

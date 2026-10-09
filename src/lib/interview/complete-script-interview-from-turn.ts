@@ -14,7 +14,11 @@
 import { after } from 'next/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store'
-import { trySendScriptCompletionEmail } from '@/lib/email/lifecycle/try-send-script-completion-email'
+import {
+  trySendScriptCompletionEmail,
+  waitForScoredEvaluations,
+} from '@/lib/email/lifecycle/try-send-script-completion-email'
+import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete'
 
 const LOG_PREFIX = '[script-turn-complete]'
 
@@ -39,7 +43,7 @@ export type CompleteScriptInterviewFromTurnResult =
   | { ok: true; transitioned: boolean }
   | { ok: false; error: string }
 
-function queueCompletionEmail(args: {
+function voidCompletionEmail(args: {
   serviceClient: SupabaseClient
   interviewId: string
   userId: string
@@ -130,7 +134,23 @@ export async function completeScriptInterviewFromTurn(
 
   if (transitioned) {
     emitInterviewCompleted(userId, interviewId)
-    queueCompletionEmail({ serviceClient, interviewId, userId, recipientEmail })
+    // Retention must never fail the business completion (degrade-don't-fail).
+    // Wait for answer_evaluations the same way completion email does, so we do
+    // not permanently skip quality logging when the last score is still in flight.
+    after(() => {
+      void (async () => {
+        const scored = await waitForScoredEvaluations(serviceClient, interviewId)
+        console.info(`${LOG_PREFIX} retention scored-eval wait done`, {
+          interviewId,
+          scored,
+        })
+        const payload = await processInterviewRetentionSafely(userId, interviewId)
+        if (!payload) {
+          console.warn(`${LOG_PREFIX} retention returned null`, { interviewId })
+        }
+      })()
+    })
+    voidCompletionEmail({ serviceClient, interviewId, userId, recipientEmail })
     return { ok: true, transitioned: true }
   }
 

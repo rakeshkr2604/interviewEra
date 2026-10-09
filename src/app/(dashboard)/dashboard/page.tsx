@@ -177,6 +177,7 @@ export default async function DashboardPage() {
       : ((progressSnap as UserProgressRow | null) ?? null),
     interviews: (interviewsRaw ?? []) as InterviewWithReportsRow[],
     recoveryTarget,
+    completedSessionCount: completedCountTotal ?? 0,
   })
   const profileOnboarding = resolveProfileOnboarding({
     name: userData?.name,
