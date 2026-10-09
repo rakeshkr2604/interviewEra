@@ -14,11 +14,11 @@ import { StructuredData } from "@/components/seo/StructuredData";
 import { DeferredVercelMetrics } from "@/components/shared/DeferredVercelMetrics";
 import { DeferredWebManifest } from "@/components/shared/DeferredWebManifest";
 import { Clarity } from "@/components/Clarity";
+import { ConsentGatedAnalytics } from "@/components/consent/ConsentGatedAnalytics";
+import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import { AttributionCapture } from "@/components/analytics/AttributionCapture";
 import { CtaAuthCache } from "@/components/analytics/CtaAuthCache";
 import { FunnelQueryCapture } from "@/components/analytics/FunnelQueryCapture";
-import { GoogleAnalyticsPageView } from "@/components/analytics/GoogleAnalyticsPageView";
-import { GA_MEASUREMENT_ID } from "@/lib/analytics/gtag";
 import { siteConfig } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -173,37 +173,15 @@ export default function RootLayout({
           <Toaster position="top-right" richColors closeButton />
         </ThemeProvider>
         <DeferredWebManifest />
+        <CookieConsentBanner />
         <DeferredVercelMetrics />
+        <ConsentGatedAnalytics />
+        <Clarity />
         <Suspense fallback={null}>
           <AttributionCapture />
           <CtaAuthCache />
           <FunnelQueryCapture />
         </Suspense>
-        {process.env.NODE_ENV === "production" && GA_MEASUREMENT_ID ? (
-          <>
-            <Script
-              id="google-analytics-gtag"
-              strategy="lazyOnload"
-              src={`https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`}
-            />
-            <Script
-              id="google-analytics-init"
-              strategy="lazyOnload"
-              dangerouslySetInnerHTML={{
-                __html: `
-                  window.dataLayer = window.dataLayer || [];
-                  function gtag(){dataLayer.push(arguments);}
-                  gtag('js', new Date());
-                  gtag('config', '${GA_MEASUREMENT_ID}', { send_page_view: false });
-                `,
-              }}
-            />
-          </>
-        ) : null}
-        <Suspense fallback={null}>
-          <GoogleAnalyticsPageView />
-        </Suspense>
-        <Clarity />
       </body>
     </html>
   );

@@ -35,6 +35,8 @@ Server Components default; mutations via Route Handlers / Server Actions.
 3. Redis rate limits by path prefix
 4. Session refresh when needed → auth gate (unauthenticated document routes → `/login`)
 
+**Static bypass (required):** `config.matcher` and the early extension allowlist in `proxy` must include landing media (`mp4` / `webm` / common audio) as well as images/fonts. Missing `mp4` caused unauthenticated `/assets/*.mp4` to **307 → `/login`**, so homepage hero + Meet Interviewers videos never decoded (poster-only).
+
 ### Auth / tenancy
 
 - Clients: anon browser + cookie `createClient()` + service-role `createServiceClient()`

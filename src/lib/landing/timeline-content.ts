@@ -10,7 +10,7 @@ export const TIMELINE_INTRO = {
 export const TIMELINE_INTERVIEWER = {
   name: 'Meera',
   role: 'AI Interviewer',
-  videoSrc: '/assets/meera-intro.mp4',
+  videoSrc: '/avatars/female/meera-ai.mp4',
   posterSrc: '/assets/meera-intro-poster.webp',
   avatarSrc: '/avatars/female/meera-avatar.png',
 } as const;

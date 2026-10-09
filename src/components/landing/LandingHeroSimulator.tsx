@@ -11,8 +11,8 @@ import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimu
  * - Animation engine runs only in useEffect (post-hydration), with full teardown of
  *   every timeout / rAF / interval on unmount → no leaks, no orphan loops.
  * - prefers-reduced-motion → renders the final scored state once, no loop, no video.
- * - Video is preload="none" and only plays while in view (IntersectionObserver),
- *   so it never competes with hero LCP and pauses when scrolled away.
+ * - Video is preload="metadata" and only plays while in view (IntersectionObserver
+ *   on the tile), with abort-safe play retry so poster never sticks forever.
  * - Decorative: host carries an aria-label; inner DOM is aria-hidden and the fake
  *   controls are removed from the tab order.
  * - Loaded via next/dynamic from LandingHeroSimulatorIsland (poster shell first).
@@ -514,23 +514,56 @@ export default function LandingHeroSimulator() {
     const iw = window as IdleW;
     const usedIdle = typeof iw.requestIdleCallback === 'function';
 
+    // Play/pause races (IO flicker + Strict Mode remount) abort the first play()
+    // and leave the media stuck at readyState 0 — poster stays forever.
+    let wantPlay = false;
+    let playGen = 0;
+    const syncVideo = (shouldPlay: boolean) => {
+      if (!video || cancelled) return;
+      wantPlay = shouldPlay;
+      if (!shouldPlay) {
+        playGen++;
+        video.pause();
+        videoTile?.classList.remove('is-playing');
+        return;
+      }
+      video.muted = true;
+      const gen = ++playGen;
+      let tries = 0;
+      const attempt = () => {
+        if (cancelled || !wantPlay || gen !== playGen) return;
+        void video
+          .play()
+          .then(() => {
+            if (cancelled || !wantPlay || gen !== playGen) return;
+            videoTile?.classList.add('is-playing');
+          })
+          .catch(() => {
+            if (cancelled || !wantPlay || gen !== playGen || tries >= 2) return;
+            tries++;
+            const id = window.setTimeout(attempt, 150);
+            timeouts.add(id);
+          });
+      };
+      attempt();
+    };
+
     const beginActive = () => {
       if (cancelled) return;
       if (video) {
-        video.muted = true;
+        const observeTarget = videoTile ?? video;
         if ('IntersectionObserver' in window) {
           io = new IntersectionObserver(
             (entries) => {
-              entries.forEach((entry) => {
-                if (entry.isIntersecting) video.play().catch(() => {});
-                else video.pause();
-              });
+              const entry = entries[0];
+              if (!entry) return;
+              syncVideo(entry.isIntersecting);
             },
-            { threshold: 0.15 },
+            { root: null, rootMargin: '12% 0px', threshold: 0.1 },
           );
-          io.observe(video);
+          io.observe(observeTarget);
         } else {
-          video.play().catch(() => {});
+          syncVideo(true);
         }
       }
       runTurn();
@@ -623,9 +656,14 @@ export default function LandingHeroSimulator() {
           <div className="sim-left">
             <div className="sim-video-tile">
               <LandingHeroSimulatorPoster />
-              <video loop muted playsInline preload="none" tabIndex={-1}>
-                <source src="/assets/female-ai.mp4" type="video/mp4" />
-              </video>
+              <video
+                src="/avatars/female/meera-ai.mp4"
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                tabIndex={-1}
+              />
               <div className="sim-listen-overlay" />
               <div className="sim-tile-name">
                 <span className="name">Meera · HR round</span>

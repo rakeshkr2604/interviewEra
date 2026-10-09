@@ -50,7 +50,7 @@ export const MEET_INTERVIEWERS: MeetInterviewer[] = [
       'Situational Questions',
     ],
     badge: 'HR',
-    videoSrc: '/assets/meera-intro.mp4',
+    videoSrc: '/avatars/female/meera-ai.mp4',
     posterSrc: '/assets/meera-intro-poster.webp',
   },
 ];

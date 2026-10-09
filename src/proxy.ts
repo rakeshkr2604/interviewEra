@@ -32,6 +32,7 @@ const PUBLIC_ROUTES = new Set([
   '/privacy',
   '/terms',
   '/refund',
+  '/unsubscribe',
   '/auth/callback',
   '/auth/confirm',
   '/auth/error',
@@ -170,10 +171,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Static assets in /public (PWA icons, OG images, fonts, source maps, web app manifest).
-  // Without this, these files can fall through the auth gate and 307 to /login.
+  // Static assets in /public (PWA icons, OG images, fonts, landing videos, source maps, web app manifest).
+  // Without this, these files can fall through the auth gate and 307 to /login —
+  // that broke muted autoplay on the homepage hero + Meet Interviewers clips.
   if (
-    /\.(?:png|jpe?g|svg|gif|webp|ico|avif|woff2?|ttf|otf|eot|map|webmanifest)$/i.test(pathname)
+    /\.(?:png|jpe?g|svg|gif|webp|ico|avif|mp4|webm|mp3|ogg|m4a|wav|woff2?|ttf|otf|eot|map|webmanifest)$/i.test(
+      pathname,
+    )
   ) {
     return NextResponse.next();
   }
@@ -362,6 +366,6 @@ export const config = {
      * and the IndexNow key file (<key>.txt) so crawlers fetch them with zero proxy overhead.
      * HTML document routes (/, /about, /pricing, …) still match so www→apex runs for real browsers.
      */
-    '/((?!_next/static|_next/image|_next/data|_vercel/|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|css|js|mjs|map|txt|xml|woff2?|ttf|otf|eot)$).*)',
+    '/((?!_next/static|_next/image|_next/data|_vercel/|opengraph-image\\.png|twitter-image\\.png|.*\\.(?:svg|png|jpe?g|gif|webp|ico|avif|mp4|webm|mp3|ogg|m4a|wav|css|js|mjs|map|txt|xml|woff2?|ttf|otf|eot)$).*)',
   ],
 };

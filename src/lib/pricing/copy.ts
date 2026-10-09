@@ -12,6 +12,7 @@ export const PAYMENT_TRUST_BULLETS = [
   'One-time payment',
   'No auto-renewal',
   'Renew manually anytime',
+  'Listed prices include applicable GST unless stated otherwise at checkout',
   'UPI • Cards • Wallets • Net Banking',
   'Payments secured by Razorpay',
 ] as const;
@@ -28,7 +29,7 @@ export const PAYMENT_METHOD_KEYWORDS = [
 ] as const;
 
 export const UPGRADE_PAGE_FOOTER =
-  'Payments processed securely by Razorpay. No auto-renewal. Renew whenever you need.';
+  'Payments processed securely by Razorpay. Listed prices include applicable GST unless stated otherwise at checkout. No auto-renewal. Renew whenever you need.';
 
 export const BILLING_PAYMENT_METHODS_NOTE =
   'One-time payments via Razorpay. Available payment methods are shown at checkout. Credits deduct when an interview starts.';

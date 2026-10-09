@@ -30,8 +30,11 @@ export function CollegeSignupFields() {
   const [studentCount, setStudentCount] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const consentReady = ageConfirmed && acceptedLegal;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -65,6 +68,10 @@ export function CollegeSignupFields() {
         setError(passwordCheck.error.issues[0]?.message ?? 'Password does not meet requirements.');
         return;
       }
+      if (!consentReady) {
+        setError('Confirm you are 18+ and accept the Terms and Privacy Policy to create an account.');
+        return;
+      }
 
       const signupResponse = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -75,6 +82,9 @@ export function CollegeSignupFields() {
           name: officerName,
           next: CAMPUS_SETUP_PATH,
           metadata: { role: 'college_admin' },
+          ageConfirmed: true,
+          acceptedTerms: true,
+          acceptedPrivacy: true,
         }),
       });
 
@@ -153,9 +163,42 @@ export function CollegeSignupFields() {
           onToggleShow={() => setShowPassword((v) => !v)}
         />
 
+        <div className="space-y-3 rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--card-border)' }}>
+          <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <input
+              id="campus-signup-age-confirmed"
+              type="checkbox"
+              checked={ageConfirmed}
+              onChange={(e) => setAgeConfirmed(e.target.checked)}
+              className="mt-1 size-4 shrink-0"
+            />
+            <span>I confirm that I am 18 years of age or older.</span>
+          </label>
+          <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <input
+              id="campus-signup-legal-accepted"
+              type="checkbox"
+              checked={acceptedLegal}
+              onChange={(e) => setAcceptedLegal(e.target.checked)}
+              className="mt-1 size-4 shrink-0"
+            />
+            <span>
+              I agree to the{' '}
+              <Link href="/terms" className="font-semibold underline underline-offset-2" style={{ color: 'var(--accent-primary)' }}>
+                Terms &amp; Conditions
+              </Link>{' '}
+              and{' '}
+              <Link href="/privacy" className="font-semibold underline underline-offset-2" style={{ color: 'var(--accent-primary)' }}>
+                Privacy Policy
+              </Link>
+              .
+            </span>
+          </label>
+        </div>
+
         {error ? <AuthErrorBanner message={error} /> : null}
 
-        <AuthLoadingButton loading={loading} loadingLabel="Creating account…">
+        <AuthLoadingButton loading={loading} disabled={!consentReady} loadingLabel="Creating account…">
           Create account and verify email
         </AuthLoadingButton>
 

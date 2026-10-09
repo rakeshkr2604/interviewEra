@@ -1,3 +1,4 @@
+import { StarRatingDisplay } from '@/components/shared/StarRatingDisplay';
 import { CANDIDATE_RATING, TRUST_METRICS } from '@/lib/landing/trust-metrics';
 
 export function AuthTrustProof() {
@@ -47,9 +48,7 @@ export function AuthTrustProof() {
             {interviewMetric.suffix} AI mock interviews completed
           </p>
           <p className="mt-1 text-xs font-medium">
-            <span className="tracking-wide text-amber-500" aria-hidden>
-              ★★★★★
-            </span>{' '}
+            <StarRatingDisplay className="tracking-wide text-amber-500" />{' '}
             <span style={{ color: 'var(--text-secondary)' }}>
               {CANDIDATE_RATING.value}/{CANDIDATE_RATING.outOf} {CANDIDATE_RATING.label}
             </span>

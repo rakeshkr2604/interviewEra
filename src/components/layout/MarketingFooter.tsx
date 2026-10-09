@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
+import { CookieSettingsButton } from '@/components/consent/CookieSettingsButton';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import Image from 'next/image';
 import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
@@ -228,6 +229,20 @@ export function MarketingFooter() {
                   </Link>
                 </span>
               ))}
+              <span className="inline-flex items-center gap-x-2">
+                <span aria-hidden className="opacity-40">|</span>
+                <CookieSettingsButton className="font-medium transition-colors hover:text-[var(--accent-primary)]" />
+              </span>
+              <span className="inline-flex items-center gap-x-2">
+                <span aria-hidden className="opacity-40">|</span>
+                <Link
+                  href="/privacy#cookies"
+                  className="font-medium transition-colors hover:text-[var(--accent-primary)]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Cookie Policy
+                </Link>
+              </span>
             </div>
             <span className="hidden opacity-40 sm:inline" aria-hidden>|</span>
             <span>Ranchi, Jharkhand, India</span>

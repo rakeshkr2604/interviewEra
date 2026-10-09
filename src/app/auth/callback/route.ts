@@ -14,6 +14,11 @@ import {
   resolvePostAuthDestination,
 } from '@/lib/auth/resolve-destination';
 import { captureReferralFromCode } from '@/lib/referral/capture-referral';
+import { persistSignupConsent } from '@/lib/legal/persist-signup-consent';
+import {
+  SIGNUP_CONSENT_COOKIE,
+  parseSignupConsentCookie,
+} from '@/lib/legal/signup-consent';
 import { createServiceClient } from '@/lib/supabase/server';
 import { NextResponse, type NextRequest } from 'next/server';
 
@@ -113,6 +118,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
               },
             );
           }
+
+          const signupConsent = parseSignupConsentCookie(
+            cookieStore.get(SIGNUP_CONSENT_COOKIE)?.value,
+          );
+          if (signupConsent) {
+            void persistSignupConsent(createServiceClient(), userId, signupConsent).catch(
+              (err) => {
+                console.error('[auth/callback] signup consent persist failed:', err);
+              },
+            );
+          }
         }
       }
 
@@ -134,6 +150,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       applyCookiesToResponse(response, sessionCookieWrites);
       response.cookies.set('oauth_next', '', { path: '/', maxAge: 0 });
       response.cookies.set('auth_intent', '', { path: '/', maxAge: 0 });
+      response.cookies.set(SIGNUP_CONSENT_COOKIE, '', { path: '/', maxAge: 0 });
       return response;
     }
   }

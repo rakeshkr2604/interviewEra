@@ -1,9 +1,13 @@
 import { test, expect } from '@playwright/test';
+import { seedAnalyticsConsent } from '../helpers/analytics-consent';
 import { HOME_HERO_HEADING } from '../helpers/marketing-home';
 import { gotoMarketingPage } from '../helpers/marketing-nav';
 
 test.describe('page_view analytics', () => {
   test('homepage fires durable page_view once on load', async ({ page }) => {
+    // Durable page_view mounts only after analytics Accept (ConsentGatedAnalytics).
+    await seedAnalyticsConsent(page, 'accepted');
+
     await page.addInitScript(() => {
       try {
         sessionStorage.clear();

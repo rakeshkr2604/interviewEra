@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   applyCampaignToPlan,
   chooseCheckoutAmount,
+  getPublicPricingSnapshot,
   isPricingCampaignLive,
   publicSnapshotToPromoQuotes,
   selectLiveCampaignForPlan,
@@ -201,6 +202,41 @@ describe('coupon vs global campaign precedence', () => {
     });
     expect(decision.source).toBe('campaign');
     expect(decision.finalAmountPaise).toBe(23900);
+  });
+});
+
+describe('getPublicPricingSnapshot (placeholder E2E credentials)', () => {
+  const previousUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const previousKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  afterEach(() => {
+    if (previousUrl === undefined) delete process.env.NEXT_PUBLIC_SUPABASE_URL;
+    else process.env.NEXT_PUBLIC_SUPABASE_URL = previousUrl;
+    if (previousKey === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = previousKey;
+    vi.restoreAllMocks();
+  });
+
+  it('uses list prices and does not query campaigns when credentials are placeholders', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_URL = 'https://placeholder.supabase.co';
+    process.env.SUPABASE_SERVICE_ROLE_KEY =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU';
+
+    const from = vi.fn(() => {
+      throw new Error('pricing_campaigns must not be queried with placeholder credentials');
+    });
+    const svc = { from } as never;
+    const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => undefined);
+
+    const snapshot = await getPublicPricingSnapshot(svc, NOW);
+
+    expect(from).not.toHaveBeenCalled();
+    expect(snapshot.plans.starter.finalPrice).toBe(299);
+    expect(snapshot.plans.pro.finalPrice).toBe(799);
+    expect(snapshot.campaign.active).toBe(false);
+    expect(infoSpy).toHaveBeenCalledWith(
+      '[pricing-campaign] placeholder credentials; using list prices',
+    );
   });
 });
 

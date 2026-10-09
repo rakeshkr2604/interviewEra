@@ -34,7 +34,8 @@ for (const colorScheme of ['light', 'dark'] as const) {
     await page.addInitScript((theme) => localStorage.setItem('ie-theme', theme), colorScheme);
     await page.goto('/pricing');
     await expect(page.locator('html')).toHaveAttribute('data-theme', colorScheme);
-    await expect(page.getByText('One-time payment', { exact: true })).toBeVisible();
+    // Starter and Pro both list this benefit — assert at least one is visible.
+    await expect(page.getByText('One-time payment', { exact: true }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await page.goto('/login');

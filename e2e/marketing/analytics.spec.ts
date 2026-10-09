@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
+import { seedAnalyticsConsent } from '../helpers/analytics-consent';
 import {
   HOME_CTA_SAMPLE_REPORT,
   HOME_CTA_SAMPLE_REPORT_HREF,
@@ -56,6 +57,11 @@ async function clickTrackedCta(page: Page, locator: Locator) {
 }
 
 test.describe('Marketing CTA analytics', () => {
+  test.beforeEach(async ({ page }) => {
+    // Cookie banner covers mid-page cards and intercepts clicks when unset.
+    await seedAnalyticsConsent(page, 'rejected');
+  });
+
   test('homepage Start Free fires once', async ({ page }) => {
     await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
     await installCtaSpy(page);

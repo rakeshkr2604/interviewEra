@@ -64,6 +64,7 @@ Long routes: `maxDuration: 60` in `vercel.json` for upload/parse/extract/`script
 ## Failure Modes
 
 Stale docs listing V1 start as primary — treat as archived only.
+Unauthenticated `/assets/*.mp4` (or other media) **307 → `/login`** if `mp4`/`webm`/audio are missing from `src/proxy.ts` matcher + static bypass — landing videos show posters only.
 
 ## Verification
 

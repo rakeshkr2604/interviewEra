@@ -28,6 +28,12 @@ import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
+import {
+  SIGNUP_CONSENT_COOKIE,
+  SIGNUP_CONSENT_COOKIE_MAX_AGE_SECONDS,
+  buildSignupConsentPayload,
+  encodeSignupConsentCookie,
+} from '@/lib/legal/signup-consent';
 import { cn } from '@/lib/utils';
 
 const PASSWORD_RULES = [
@@ -58,11 +64,19 @@ export function SignupForm({
   const [email, setEmail] = useState(initialEmail ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [feedback, setFeedback] = useState<{ kind: 'error' | 'success'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const passwordChecks = PASSWORD_RULES.map((rule) => ({ ...rule, met: rule.test(password) }));
   const passwordValid = passwordChecks.every((check) => check.met);
+  const consentReady = ageConfirmed && acceptedLegal;
+
+  function writeOauthConsentCookie() {
+    const payload = buildSignupConsentPayload();
+    document.cookie = `${SIGNUP_CONSENT_COOKIE}=${encodeSignupConsentCookie(payload)}; path=/; max-age=${SIGNUP_CONSENT_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax`;
+  }
 
   useEffect(() => {
     trackAuthStarted({ flow: 'signup', intent, source_page: '/signup' });
@@ -74,7 +88,15 @@ export function SignupForm({
 
   async function handleGoogleSignup() {
     setFeedback(null);
+    if (!consentReady) {
+      setFeedback({
+        kind: 'error',
+        text: 'Confirm you are 18+ and accept the Terms and Privacy Policy before continuing with Google.',
+      });
+      return;
+    }
     try {
+      writeOauthConsentCookie();
       await signInWithGoogle();
     } catch {
       setFeedback({ kind: 'error', text: 'Google sign-up could not start. Check your connection and try again.' });
@@ -103,6 +125,13 @@ export function SignupForm({
         setFeedback({ kind: 'error', text: 'Your password does not meet all requirements yet.' });
         return;
       }
+      if (!consentReady) {
+        setFeedback({
+          kind: 'error',
+          text: 'Confirm you are 18+ and accept the Terms and Privacy Policy to create an account.',
+        });
+        return;
+      }
 
       const response = await fetch('/api/auth/signup', {
         method: 'POST',
@@ -112,6 +141,9 @@ export function SignupForm({
           password,
           name: nameCheck.data,
           next: next ?? '/dashboard',
+          ageConfirmed: true,
+          acceptedTerms: true,
+          acceptedPrivacy: true,
         }),
       });
       const body = (await response.json()) as {
@@ -186,7 +218,47 @@ export function SignupForm({
             </div>
           ) : null}
 
-          <OAuthButton loading={oauthLoading} disabled={loading} onClick={() => void handleGoogleSignup()} />
+          <div className="space-y-3 rounded-xl border px-3.5 py-3" style={{ borderColor: 'var(--card-border)' }}>
+            <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <input
+                id="signup-age-confirmed"
+                type="checkbox"
+                checked={ageConfirmed}
+                onChange={(event) => setAgeConfirmed(event.target.checked)}
+                className="mt-1 size-4 shrink-0"
+              />
+              <span>
+                I confirm that I am 18 years of age or older. InterviewEra does not knowingly
+                collect personal data from children under 18.
+              </span>
+            </label>
+            <label className="flex items-start gap-2.5 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              <input
+                id="signup-legal-accepted"
+                type="checkbox"
+                checked={acceptedLegal}
+                onChange={(event) => setAcceptedLegal(event.target.checked)}
+                className="mt-1 size-4 shrink-0"
+              />
+              <span>
+                I agree to the{' '}
+                <Link href="/terms" className="font-semibold underline underline-offset-2" style={{ color: 'var(--accent-primary)' }}>
+                  Terms &amp; Conditions
+                </Link>{' '}
+                and{' '}
+                <Link href="/privacy" className="font-semibold underline underline-offset-2" style={{ color: 'var(--accent-primary)' }}>
+                  Privacy Policy
+                </Link>
+                .
+              </span>
+            </label>
+          </div>
+
+          <OAuthButton
+            loading={oauthLoading}
+            disabled={loading || !consentReady}
+            onClick={() => void handleGoogleSignup()}
+          />
           <AuthDivider />
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -251,7 +323,7 @@ export function SignupForm({
                 : <FormSuccessBanner message={feedback.text} />
             ) : null}
 
-            <FormSubmitButton loading={loading} loadingLabel="Creating account…">
+            <FormSubmitButton loading={loading} disabled={!consentReady} loadingLabel="Creating account…">
               Create free account
             </FormSubmitButton>
           </form>

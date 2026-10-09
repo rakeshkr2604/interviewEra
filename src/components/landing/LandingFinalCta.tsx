@@ -5,6 +5,7 @@ import { StartFreeCtaLink } from '@/components/analytics/StartFreeCtaLink';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { T, Reveal } from '@/components/landing/landing-home-shared';
 import { LANDING_HOME_INNER } from '@/lib/landing/container';
+import { StarRatingDisplay } from '@/components/shared/StarRatingDisplay';
 import { CANDIDATE_RATING } from '@/lib/landing/trust-metrics';
 
 export default function LandingFinalCta({ isLoggedIn }: { isLoggedIn: boolean }) {
@@ -22,14 +23,10 @@ export default function LandingFinalCta({ isLoggedIn }: { isLoggedIn: boolean })
             className="mb-4 text-sm font-medium"
             style={{ color: T.text2 }}
           >
-            <span aria-hidden className="tracking-wide" style={{ color: T.warn }}>
-              ★★★★★
+            <span className="tracking-wide" style={{ color: T.warn }}>
+              <StarRatingDisplay />{' '}
+              {CANDIDATE_RATING.value} / {CANDIDATE_RATING.outOf} {CANDIDATE_RATING.label}
             </span>
-            <span className="sr-only">
-              {CANDIDATE_RATING.value} out of {CANDIDATE_RATING.outOf} stars —{' '}
-            </span>
-            {' '}
-            {CANDIDATE_RATING.value} / {CANDIDATE_RATING.outOf} {CANDIDATE_RATING.label}
           </p>
           <div className="mb-5 inline-block rounded-full px-4 py-1.5 text-xs font-semibold" style={{ background: T.accdim, border: `1px solid ${T.accbrd}`, color: T.acc2 }}>
             Free to start — no card required

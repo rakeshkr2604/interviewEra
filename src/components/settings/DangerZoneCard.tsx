@@ -113,8 +113,9 @@ export function DangerZoneCard() {
                 className="mt-1.5 max-w-prose text-sm leading-relaxed sm:text-[15px]"
                 style={{ color: 'var(--text-secondary)' }}
               >
-                Deleting data here cannot be undone. We remove personal data from active systems within a reasonable
-                period; limited billing records may be retained where the law requires (for example GST rules in India).
+                Deleting data here cannot be undone. Account deletion removes your profile, interviews, resumes, and
+                application payment history from InterviewEra. Razorpay may keep processor-side records under its own
+                policies. Download or request invoices from support before you delete if you need them.
               </p>
             </div>
 

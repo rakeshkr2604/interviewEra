@@ -1,8 +1,8 @@
 # SEO / AEO / GEO
 
 > Status: CANONICAL
-> Last Verified: 2026-10-06
-> Verification Scope: Sitemap, noindex audit, analytics SoT + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths
+> Last Verified: 2026-10-09
+> Verification Scope: Sitemap, noindex audit, analytics SoT + optional analytics cookie consent gating + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths
 > Authority: Indexing + funnel analytics
 
 ## Purpose
@@ -23,8 +23,9 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 
 ### Analytics
 
-- Client: GA4 + Clarity + Vercel Analytics
+- Client: GA4 + Clarity + Vercel Analytics / Speed Insights — **optional**, gated by analytics cookie consent (`ie_analytics_consent` in localStorage; banner in root layout). Essential Supabase Auth cookies are never gated.
 - **SoT for funnel/payments:** server `product_events` (service-role writes). GA4 is backup.
+- Consent UI: `CookieConsentBanner` + `ConsentGatedAnalytics` / consent-aware `Clarity` + `DeferredVercelMetrics`. Reject stops subsequent optional script init; does not erase prior vendor data.
 - Critical client events: `sendBeacon` → `/api/product-events` (204)
 - **Interview lifecycle milestones (durable; at most one row per interview when persistence succeeds — migration 052 unique index; delivery is not guaranteed if the background insert fails):**
   - `interview_started` — V2.1 script start

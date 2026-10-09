@@ -25,24 +25,35 @@ function prefersReducedMotion(): boolean {
 function InterviewRoundCard({
   round,
   videoRef,
+  onActivate,
+  onDeactivate,
 }: {
   round: MeetInterviewer;
   videoRef: (el: HTMLVideoElement | null) => void;
+  onActivate: () => void;
+  onDeactivate: () => void;
 }) {
   return (
-    <article className="ie-meet-card flex flex-col">
+    <article
+      className="ie-meet-card flex flex-col"
+      onPointerEnter={onActivate}
+      onPointerLeave={onDeactivate}
+      onFocusCapture={onActivate}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) onDeactivate();
+      }}
+    >
       <div className="ie-meet-media">
         <video
           ref={videoRef}
+          src={round.videoSrc}
+          poster={round.posterSrc}
           muted
           loop
           playsInline
-          preload="none"
-          poster={round.posterSrc}
+          preload="metadata"
           aria-hidden
-        >
-          <source src={round.videoSrc} type="video/mp4" />
-        </video>
+        />
         <div
           className="ie-meet-badge absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1"
           style={{
@@ -101,35 +112,51 @@ function InterviewRoundCard({
 export default function LandingMeetInterviewers() {
   const sectionRef = useRef<HTMLElement | null>(null);
   const videoRefs = useRef<(HTMLVideoElement | null)[]>([]);
+  const inViewRef = useRef(false);
+  const activeIndexRef = useRef<number | null>(null);
 
   useEffect(() => {
     const section = sectionRef.current;
     if (!section) return;
 
-    const syncPlayback = (shouldPlay: boolean) => {
-      if (prefersReducedMotion()) {
-        for (const v of videoRefs.current) v?.pause();
+    const pauseAll = () => {
+      for (const v of videoRefs.current) v?.pause();
+    };
+
+    const playActive = () => {
+      if (prefersReducedMotion() || !inViewRef.current) {
+        pauseAll();
         return;
       }
-      for (const v of videoRefs.current) {
-        if (!v) continue;
-        if (shouldPlay) void v.play().catch(() => {});
-        else v.pause();
-      }
+      const idx = activeIndexRef.current;
+      videoRefs.current.forEach((v, i) => {
+        if (!v) return;
+        if (i === idx) {
+          v.muted = true;
+          void v.play().catch(() => {});
+        } else {
+          v.pause();
+        }
+      });
+    };
+
+    const onVisibility = (visible: boolean) => {
+      inViewRef.current = visible;
+      section.classList.toggle('is-in-view', visible);
+      if (!visible) pauseAll();
+      else playActive();
     };
 
     if (!('IntersectionObserver' in window)) {
-      section.classList.add('is-in-view');
-      syncPlayback(true);
-      return () => syncPlayback(false);
+      onVisibility(true);
+      return () => pauseAll();
     }
 
     const io = new IntersectionObserver(
       (entries) => {
         const entry = entries[0];
         if (!entry) return;
-        section.classList.toggle('is-in-view', entry.isIntersecting);
-        syncPlayback(entry.isIntersecting);
+        onVisibility(entry.isIntersecting);
       },
       { root: null, rootMargin: '10% 0px', threshold: 0.15 },
     );
@@ -137,9 +164,29 @@ export default function LandingMeetInterviewers() {
 
     return () => {
       io.disconnect();
-      syncPlayback(false);
+      pauseAll();
     };
   }, []);
+
+  const activate = (index: number) => {
+    activeIndexRef.current = index;
+    if (prefersReducedMotion() || !inViewRef.current) return;
+    videoRefs.current.forEach((v, i) => {
+      if (!v) return;
+      if (i === index) {
+        v.muted = true;
+        void v.play().catch(() => {});
+      } else {
+        v.pause();
+      }
+    });
+  };
+
+  const deactivate = (index: number) => {
+    if (activeIndexRef.current !== index) return;
+    activeIndexRef.current = null;
+    videoRefs.current[index]?.pause();
+  };
 
   return (
     <section
@@ -168,6 +215,8 @@ export default function LandingMeetInterviewers() {
               videoRef={(el) => {
                 videoRefs.current[i] = el;
               }}
+              onActivate={() => activate(i)}
+              onDeactivate={() => deactivate(i)}
             />
           ))}
         </div>

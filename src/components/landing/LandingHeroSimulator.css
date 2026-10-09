@@ -145,6 +145,10 @@
 .sim-host .sim-video-tile.listening {
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-danger) 22%, transparent), 0 10px 28px -16px color-mix(in srgb, var(--accent-danger) 28%, transparent);
 }
+.sim-host .sim-video-tile .sim-poster {
+  position: absolute; inset: 0; z-index: 0;
+  transition: opacity 0.25s ease;
+}
 .sim-host .sim-video-tile video,
 .sim-host .sim-video-tile .sim-poster img {
   position: absolute; inset: 0;
@@ -152,6 +156,8 @@
 }
 .sim-host .sim-video-tile .sim-poster img { z-index: 0; }
 .sim-host .sim-video-tile video { z-index: 1; background: transparent; }
+/* Hide static poster only after playback actually starts (avoids blank tile). */
+.sim-host .sim-video-tile.is-playing .sim-poster { opacity: 0; pointer-events: none; }
 /* Component 1 — avatar live-state, shown as a waveform (Speaking / Listening / Analyzing) */
 .sim-host .sim-state {
   display: flex; align-items: center; gap: 12px;

@@ -21,7 +21,7 @@ export const privacyDocument: LegalDocumentMeta = {
     'Learn how InterviewEra collects, uses, and protects your personal data under applicable Indian data protection law.',
   icon: Shield,
   effectiveDate: '1 May 2026',
-  lastUpdated: '22 July 2026',
+  lastUpdated: '9 October 2026',
   isDraftRevision: false,
   intro:
     'This policy explains what information InterviewEra.com collects, how we use it, who we share it with, and your rights as a Data Principal under India’s Digital Personal Data Protection Act, 2023 (DPDP Act) and, where applicable, other laws.',
@@ -113,18 +113,27 @@ export const privacyDocument: LegalDocumentMeta = {
     {
       id: 'cookies',
       title: '5. Cookies & Local Storage',
+      text: 'We group browser storage into essential, preference, and optional analytics categories. Optional analytics (Google Analytics 4, Microsoft Clarity, and Vercel Analytics / Speed Insights) load only after you Accept in our cookie banner. Rejecting analytics is as easy as accepting. Changing or withdrawing consent stops subsequent optional tracking; it does not erase data already sent to a provider.',
       content: [
         {
-          sub: 'Session Cookies',
-          text: 'We use Supabase Auth session cookies to keep you signed in across page visits. These are strictly necessary for the Service to function.',
+          sub: 'Essential — Supabase Auth (sb-*)',
+          text: 'Session cookies set by Supabase Auth to keep you signed in and protect authenticated requests. Required for the Service. Lifetime follows the auth session.',
         },
         {
-          sub: 'Theme Preference',
-          text: 'Your light/dark mode choice may be stored in localStorage (for example under "ie-theme"). This preference stays in your browser.',
+          sub: 'Preferences — ie-theme (localStorage)',
+          text: 'Stores your light/dark theme choice in the browser. Not used for advertising.',
         },
         {
-          sub: 'Analytics',
-          text: 'Analytics providers may set first-party or similar identifiers to measure usage. We do not set third-party advertising cookies for ad retargeting.',
+          sub: 'Optional analytics — GA4 / Clarity / Vercel',
+          text: 'After Accept, Google Analytics 4, Microsoft Clarity (session insights), and Vercel Analytics / Speed Insights may set first-party or similar identifiers and process usage telemetry. Storage key ie_analytics_consent records your choice, version, and timestamp in localStorage. We do not use advertising retargeting cookies.',
+        },
+        {
+          sub: 'Attribution — ie_attribution (cookie)',
+          text: 'A first-party marketing attribution cookie may capture campaign/source parameters from landing URLs so we can measure acquisition. It is not required for sign-in.',
+        },
+        {
+          sub: 'Manage preferences',
+          text: 'Use the cookie banner (Accept / Reject / Manage) or the Cookie settings link in the site footer. See /privacy#cookies and our Privacy Policy for details.',
         },
       ],
     },
@@ -158,8 +167,20 @@ export const privacyDocument: LegalDocumentMeta = {
           text: 'Transactional email delivery. We share your email address and the content of the email being sent.',
         },
         {
-          sub: 'Analytics providers',
-          text: 'Vercel Analytics, Google Analytics 4, and Microsoft Clarity may process usage telemetry as described in their respective policies.',
+          sub: 'Analytics providers (optional)',
+          text: 'Vercel Analytics, Google Analytics 4, and Microsoft Clarity may process usage telemetry only when you have accepted optional analytics cookies, as described in their respective policies.',
+        },
+        {
+          sub: 'Deepgram (speech-to-text)',
+          text: 'When you use voice interview features, audio may be sent to Deepgram for transcription so we can capture your spoken answers. Provider policies apply to audio processed by their API.',
+        },
+        {
+          sub: 'ElevenLabs (text-to-speech)',
+          text: 'When interviewer speech is enabled, question text may be sent to ElevenLabs to synthesize audio. Provider policies apply.',
+        },
+        {
+          sub: 'Upstash (Redis)',
+          text: 'We use Upstash Redis for rate limiting, queues, and related infrastructure. Requests may include IP-derived keys and short-lived operational metadata for security and reliability.',
         },
         {
           sub: 'Legal Disclosures',
@@ -175,7 +196,7 @@ export const privacyDocument: LegalDocumentMeta = {
     {
       id: 'retention',
       title: '8. Data Retention',
-      text: 'We retain your account data, resumes, interview history, and rewards/redemption records for as long as your account remains active and as needed to operate the Service. If you delete your account, we permanently delete or irreversibly anonymise personal data within 30 days, except where retention is required by law (for example billing and tax records may be retained for up to 7 years as required under applicable Indian tax rules) or needed to resolve disputes, prevent fraud, or enforce our Terms.',
+      text: 'We retain your account data, resumes, interview history, and rewards/redemption records for as long as your account remains active and as needed to operate the Service. If you delete your account via Settings, we remove your InterviewEra profile, interviews, resumes, and related application payment rows from our application database (payment rows cascade with the user record). Razorpay and other processors may retain transaction records under their own policies. If you need invoices or tax receipts, download or request them from support before deleting your account. We aim to complete account deletion within 30 days. Limited operational logs or dispute/fraud records may be retained as required to enforce our Terms or comply with lawful requests. A future anonymised billing-retention mode (if adopted) will be described here before it ships.',
     },
     {
       id: 'rights',
@@ -225,7 +246,7 @@ export const privacyDocument: LegalDocumentMeta = {
         },
         {
           sub: 'Legal bases (summary)',
-          text: 'We typically rely on: (a) performance of a contract (providing the Service you request); (b) consent (where required, for example certain cookies or optional communications); and (c) legitimate interests (security, fraud prevention, product improvement) balanced against your rights.',
+          text: 'We typically rely on: (a) performance of a contract (providing the Service you request); (b) consent (optional analytics cookies via our banner, and optional communications where applicable); and (c) legitimate interests (security, fraud prevention, product improvement) balanced against your rights. Where GDPR cookie consent is required for non-essential tracking, optional analytics do not initialize until you Accept.',
         },
         {
           sub: 'International transfers',

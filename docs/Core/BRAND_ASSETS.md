@@ -1,8 +1,8 @@
 # Brand Assets
 
 > Status: CANONICAL
-> Last Verified: 2026-10-06
-> Verification Scope: Logo Package v1 wiring into `public/brand`, favicons, UI chrome, OG, JSON-LD, PWA manifest
+> Last Verified: 2026-10-09
+> Verification Scope: Logo Package v1 wiring into `public/brand`, favicons, UI chrome, OG, JSON-LD, PWA manifest; BrandTagline dark-theme contrast
 > Authority: Production brand asset architecture and context mapping
 
 ## Purpose
@@ -46,6 +46,8 @@ Legacy SVG marks under `public/brand/logos/` and `public/icons/` are **retained*
 ### Theme note
 
 Primary lockups are white-first (dark ink on white). Dark chrome uses a light plate for full lockups, or the purple square mark + CSS `BrandWordmarkSplit` for compact slots.
+
+`BrandTagline` (navbar “PRACTICE • PREPARE • PROGRESS”) uses `var(--text-primary)` for the words so dark theme keeps WCAG AA contrast. Do **not** hardcode `BRAND_COLORS.deepNavy` (`#09062D`) on dark surfaces — that token is for light plates / OG art only.
 
 ## Dependencies
 

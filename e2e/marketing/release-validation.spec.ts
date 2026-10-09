@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { seedAnalyticsConsent } from '../helpers/analytics-consent';
 import { HOME_HERO_HEADING } from '../helpers/marketing-home';
 import {
   NAV_PRICING_LINK,
@@ -104,6 +105,7 @@ test.describe('Release validation — homepage', () => {
 
   test('navigation, anchors, FAQ, and footer', async ({ page }, testInfo) => {
     const browser = testInfo.project.name;
+    await seedAnalyticsConsent(page, 'rejected');
     await page.setViewportSize({ width: 1440, height: 900 });
     await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
 
@@ -114,6 +116,7 @@ test.describe('Release validation — homepage', () => {
     await expect(nav.getByRole('link', { name: 'For Teams' })).toHaveCount(0);
 
     await page.getByRole('link', { name: /See Sample Interview Report/i }).first().click();
+    await page.locator('#interview-report').scrollIntoViewIfNeeded();
     await expect(page.locator('#interview-report')).toBeInViewport();
 
     await page.locator('#home-faq-heading').first().scrollIntoViewIfNeeded();

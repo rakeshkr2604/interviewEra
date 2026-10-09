@@ -63,7 +63,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
-  allowedDevOrigins: ['192.168.1.104'],
+  // Local Playwright / LAN preview hosts — without these, Next blocks /_next assets
+  // and client components never hydrate (cookie consent banner stays data-ready=0).
+  allowedDevOrigins: ['192.168.1.104', '127.0.0.1', 'localhost'],
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
     /** App Router + multipart uploads: default ~1 MB body — PDFs fail before the handler with HTML/plain errors. Keep ≤ Vercel ~4.5 MB. */

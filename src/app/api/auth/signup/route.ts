@@ -9,6 +9,11 @@ import { sanitizeNext } from '@/lib/auth/auth-params';
 import { captureReferralFromCode } from '@/lib/referral/capture-referral';
 import { getAttributionFromRequest } from '@/lib/analytics/attribution';
 import { persistUserAttributionOnce } from '@/lib/analytics/persist-user-attribution';
+import {
+  PRIVACY_ACCEPTANCE_VERSION,
+  TERMS_ACCEPTANCE_VERSION,
+} from '@/lib/legal/signup-consent';
+import { persistSignupConsent } from '@/lib/legal/persist-signup-consent';
 
 const GENERIC_SIGNUP_SUCCESS =
   'If this address can be registered, check your inbox for a verification email.';
@@ -19,6 +24,16 @@ const bodySchema = z.object({
   name: displayNameSchema,
   next: z.string().optional(),
   placementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  /** Explicit self-declaration — not a verified identity check. */
+  ageConfirmed: z.literal(true, {
+    error: 'You must confirm you are 18 or older to create an account.',
+  }),
+  acceptedTerms: z.literal(true, {
+    error: 'You must accept the Terms & Conditions to create an account.',
+  }),
+  acceptedPrivacy: z.literal(true, {
+    error: 'You must accept the Privacy Policy to create an account.',
+  }),
   /** Allowlisted only — never accept arbitrary user_metadata bags. */
   metadata: z
     .object({
@@ -91,7 +106,13 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     email: normalizedEmail,
     password,
     email_confirm: false,
-    user_metadata: { name, ...(metadata ?? {}) },
+    user_metadata: {
+      name,
+      ...(metadata ?? {}),
+      age_confirmed: true,
+      terms_accepted_version: TERMS_ACCEPTANCE_VERSION,
+      privacy_accepted_version: PRIVACY_ACCEPTANCE_VERSION,
+    },
   });
 
   if (createError) {
@@ -118,6 +139,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (placementDate) {
     await service.from('users').update({ placement_date: placementDate }).eq('id', userId);
   }
+
+  await persistSignupConsent(service, userId, {
+    ageConfirmed: true,
+    acceptedTerms: true,
+    acceptedPrivacy: true,
+    termsVersion: TERMS_ACCEPTANCE_VERSION,
+    privacyVersion: PRIVACY_ACCEPTANCE_VERSION,
+  });
 
   const attribution = getAttributionFromRequest(request);
   await persistUserAttributionOnce(service, userId, attribution).catch((err) => {

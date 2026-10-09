@@ -1,27 +1,29 @@
-import Script from "next/script";
+'use client';
+
+import Script from 'next/script';
+import { useAnalyticsConsent } from '@/hooks/use-analytics-consent';
 
 /**
- * Microsoft Clarity — session recording + heatmaps.
+ * Microsoft Clarity — session recording + heatmaps (optional analytics).
  *
- * Design constraints:
- * - Pure Server Component: no "use client", no hooks, no browser APIs.
- *   next/script with lazyOnload works from Server Components — Next.js
- *   serialises the Script marker into the RSC payload and the client runtime
- *   inserts the actual <script> tag after the window load event.
- * - process.env.NODE_ENV is a build-time constant evaluated server-side, so
- *   early-returning null in dev causes ZERO hydration mismatch (null on server
- *   = null on client; the Script element is simply never emitted).
- * - id="ms-clarity" lets Next.js Script deduplication discard any second render
- *   of this component (e.g. route transitions that re-render the root layout).
- * - strategy="lazyOnload" defers the tag until after load, keeping it out of
- *   the LCP / TBT critical path (accepted trade-off: slightly delayed early-
- *   session recording).
+ * Loads only after the visitor explicitly accepts analytics cookies.
+ * Essential auth/session cookies are unrelated and never gated here.
+ *
+ * - id="ms-clarity" lets Next.js Script deduplication discard duplicate mounts
+ * - strategy="lazyOnload" keeps Clarity off the LCP / TBT critical path
  */
 
 const CLARITY_ID = process.env.NEXT_PUBLIC_CLARITY_ID;
 
 export function Clarity() {
-  if (process.env.NODE_ENV !== "production" || !CLARITY_ID) {
+  const { ready, analyticsAllowed } = useAnalyticsConsent();
+
+  if (
+    !ready ||
+    !analyticsAllowed ||
+    process.env.NODE_ENV !== 'production' ||
+    !CLARITY_ID
+  ) {
     return null;
   }
 

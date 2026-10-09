@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { isSupabasePlaceholderCredential } from '@/lib/analytics/product-events-store';
 import {
   campaignAppliesToPlan,
   campaignWindowStatus,
@@ -287,11 +288,20 @@ export async function getPublicPricingSnapshot(
   now: Date = new Date(),
 ): Promise<PublicPricingSnapshot> {
   let campaigns: PricingCampaignRecord[] = [];
-  try {
-    campaigns = await loadLivePricingCampaigns(svc, now);
-  } catch (error) {
-    console.error('[pricing-campaign] snapshot load failed', error);
-    campaigns = [];
+
+  // E2E / CI uses supabase-demo placeholder JWTs. Campaigns are optional —
+  // skip the remote round-trip and keep canonical list prices (no invented discounts).
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  if (isSupabasePlaceholderCredential(supabaseUrl, serviceKey)) {
+    console.info('[pricing-campaign] placeholder credentials; using list prices');
+  } else {
+    try {
+      campaigns = await loadLivePricingCampaigns(svc, now);
+    } catch (error) {
+      console.error('[pricing-campaign] snapshot load failed', error);
+      campaigns = [];
+    }
   }
 
   const starter = applyCampaignToPlan(

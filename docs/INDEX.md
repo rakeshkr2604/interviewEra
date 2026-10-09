@@ -61,6 +61,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md](Operations/DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md) | Diagnostics 110/111 staging gates, apply sequence, E2E matrix |
 | [SECURITY_AUDIT_2026-10-04.md](Operations/SECURITY_AUDIT_2026-10-04.md) | 2026-10-04 security audit, resume upload hardening, residual risks |
 | [API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md](Operations/API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md) | Point-in-time API route validation inventory (132 routes) |
+| [production-trust-hardening.md](audits/production-trust-hardening.md) | Privacy / legal / a11y / trust checklist audit + remediation evidence |
 
 ## Root keepers
 

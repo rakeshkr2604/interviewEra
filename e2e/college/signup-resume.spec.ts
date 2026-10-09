@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { seedAnalyticsConsent } from '../helpers/analytics-consent';
 
 async function fillAndAssert(locator: ReturnType<Page['locator']>, value: string): Promise<void> {
   await locator.fill(value);
@@ -16,7 +17,7 @@ async function currentFieldValues(page: Page): Promise<Record<string, string>> {
   }));
 }
 
-async function submitCampusSignup(page: Page) {
+async function fillCampusSignupFields(page: Page) {
   const collegeName = page.locator('#college-name');
   const officerName = page.locator('#officer-name');
   const email = page.locator('#email');
@@ -28,7 +29,7 @@ async function submitCampusSignup(page: Page) {
     collegeName: 'Example Institute',
     officerName: 'Priya Sharma',
     email: 'admin@example.edu',
-    phone: '+91 9876543210',
+    phone: '9876543210',
     studentCount: '120',
     password: 'ValidPass1!',
   } as const;
@@ -61,8 +62,42 @@ async function submitCampusSignup(page: Page) {
   if (current.password !== expected.password) {
     await fillAndAssert(password, expected.password);
   }
+}
 
-  await page.getByRole('button', { name: /create account and verify email/i }).click();
+function ageCheckbox(page: Page) {
+  return page.locator('#campus-signup-age-confirmed');
+}
+
+function legalCheckbox(page: Page) {
+  return page.locator('#campus-signup-legal-accepted');
+}
+
+function submitButton(page: Page) {
+  return page.getByRole('button', { name: /create account and verify email/i });
+}
+
+/** Required age + Terms/Privacy only — optional marketing consent is not part of campus signup. */
+async function acceptRequiredSignupConsent(page: Page) {
+  await ageCheckbox(page).check();
+  await legalCheckbox(page).check();
+  await expect(ageCheckbox(page)).toBeChecked();
+  await expect(legalCheckbox(page)).toBeChecked();
+  await expect(submitButton(page)).toBeEnabled();
+}
+
+async function submitCampusSignup(page: Page) {
+  await fillCampusSignupFields(page);
+  await acceptRequiredSignupConsent(page);
+  await expect(submitButton(page)).toBeEnabled();
+  await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.url().includes('/api/auth/signup') &&
+        response.request().method() === 'POST' &&
+        response.ok(),
+    ),
+    submitButton(page).click(),
+  ]);
 }
 
 async function mockSignupAndRejectPrematureOrg(page: Page) {
@@ -93,15 +128,21 @@ async function mockSignupAndRejectPrematureOrg(page: Page) {
 }
 
 test.describe('campus signup verification continuation', () => {
+  test.beforeEach(async ({ page }) => {
+    // Banner would cover age/legal checkboxes near the submit control.
+    await seedAnalyticsConsent(page, 'rejected');
+  });
+
   test('Auth V2 campus signup waits for verification before create-org', async ({ page }) => {
     const createOrgCalls = await mockSignupAndRejectPrematureOrg(page);
 
     await page.goto('/signup?intent=college');
+    await expect(page.locator('#college-name')).toBeVisible();
     await submitCampusSignup(page);
 
     await expect(
       page.getByRole('heading', { name: /verify your email to continue campus setup/i }),
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 20_000 });
     expect(createOrgCalls()).toBe(0);
 
     const url = new URL(page.url());
@@ -120,5 +161,55 @@ test.describe('campus signup verification continuation', () => {
     await submitCampusSignup(page);
 
     expect(createOrgCalls()).toBe(0);
+  });
+
+  test('valid campus signup can be submitted when age and legal consent are checked', async ({
+    page,
+  }) => {
+    await mockSignupAndRejectPrematureOrg(page);
+    await page.goto('/signup?intent=college');
+    await expect(page.locator('#college-name')).toBeVisible();
+    await fillCampusSignupFields(page);
+    await expect(submitButton(page)).toBeDisabled();
+    await acceptRequiredSignupConsent(page);
+    await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.url().includes('/api/auth/signup') &&
+          response.request().method() === 'POST' &&
+          response.ok(),
+      ),
+      submitButton(page).click(),
+    ]);
+    await expect(
+      page.getByRole('heading', { name: /verify your email to continue campus setup/i }),
+    ).toBeVisible({ timeout: 20_000 });
+  });
+
+  test('missing age declaration keeps submit disabled', async ({ page }) => {
+    await page.goto('/signup?intent=college');
+    await fillCampusSignupFields(page);
+    await legalCheckbox(page).check();
+    await expect(ageCheckbox(page)).not.toBeChecked();
+    await expect(submitButton(page)).toBeDisabled();
+  });
+
+  test('missing Terms/Privacy acceptance keeps submit disabled', async ({ page }) => {
+    await page.goto('/signup?intent=college');
+    await fillCampusSignupFields(page);
+    await ageCheckbox(page).check();
+    await expect(legalCheckbox(page)).not.toBeChecked();
+    await expect(submitButton(page)).toBeDisabled();
+  });
+
+  test('optional marketing consent is not required for campus signup submit', async ({ page }) => {
+    await page.goto('/signup?intent=college');
+    await fillCampusSignupFields(page);
+    await acceptRequiredSignupConsent(page);
+    // No marketing opt-in control on campus signup — submit must not depend on one.
+    await expect(page.getByRole('checkbox', { name: /marketing|newsletter|updates/i })).toHaveCount(
+      0,
+    );
+    await expect(submitButton(page)).toBeEnabled();
   });
 });
