@@ -2,6 +2,7 @@
 
 > Status: CANONICAL
 > Last Verified: 2026-10-10
+> Verification Note: Partial-write reconcile + resume-duration ceiling (2026-10-10)
 > Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards + persisted V2.1 core-question plans (first-turn generation, duplicate-safe fallback)
 > Authority: Production interview path
 
@@ -83,7 +84,8 @@ Plan budgets: `users.plan_tier` → `getPlanLimits(...).max_llm_cost_per_month_u
 - Retention (`processInterviewRetentionSafely`) runs after a successful V2.1 complete:
   - **Turn path:** `after()` waits for scored evaluations, then aggregates (degrade-don't-fail).
   - **Repair `PATCH /api/interview/script/complete`:** waits for scores and runs retention **in-request**, returning `{ retention }` so the session UI can dispatch `ie-streak-updated` without relying on a browser refresh.
-  - Aggregation reads per-answer `{ score, note }` dimensions from `answer_evaluations` (via `scriptEvalDimsToV1Shape`), counts core parent answers from `script_turns`, and computes avg duration as `answered_at − created_at` (never interviewer/closing turn gaps). Missing `answered_at` → duration 0 (session cannot auto-qualify). Failures log + null and must not block completion. Idempotent via `session_quality_log UNIQUE(interview_id)`.
+  - Aggregation reads per-answer `{ score, note }` dimensions from `answer_evaluations` (via `scriptEvalDimsToV1Shape`), counts core parent answers from `script_turns`, and computes avg duration as `answered_at − created_at` (never interviewer/closing turn gaps). Resume idle gaps above the timer-based / 30m reliability ceiling are excluded (missing evidence → 0 if none remain). Missing `answered_at` → duration 0. Failures log + null and must not block completion.
+  - Idempotent via `session_quality_log UNIQUE(interview_id)`. Insert races (`23505`) and existing-log retries both run `reconcileExistingSessionLog` (rollups + streak + one-shot XP via `unlock_contribution.progress_applied`) so a quality log cannot strand streak/XP at 0.
 - Turn-path completion UPDATEs only `status IN ('pending','in_progress')` and emits only when a row actually transitioned — abandoned cannot become completed through that helper.
 - On abandon (`POST /api/interview/[id]/abandon`, exit-feedback abandon), attempt durable `interview_abandoned` via fire-and-forget `persistMilestoneEventOnce` (at-most-one durable row when persistence succeeds; delivery is not guaranteed). Abandoned rows must not emit `interview_completed`.
 - `completed_at` is a **terminal timestamp** (set on both successful complete and abandon). Do not treat `abandoned.completed_at` as “successful completion” in admin LAST INTERVIEW — prefer `started_at` (see `recent-user-interview-stats.ts`).

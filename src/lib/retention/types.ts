@@ -30,6 +30,12 @@ export interface UnlockContribution {
   streak_delta: number;
   badge_earned: BadgeKey | null;
   xp_gained: number;
+  /**
+   * Set `false` at quality-log insert; flipped to `true` only after streak + XP
+   * progress mutations land. Repair uses this to avoid double-awarding XP.
+   * Legacy rows may omit the field.
+   */
+  progress_applied?: boolean;
 }
 
 /** Mirrors public.user_progress (camelCase TS, snake_case in DB). */

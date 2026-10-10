@@ -5,10 +5,21 @@
  * candidate submits via /api/interview/script/turn). Duration is
  * answered_at − created_at (question presented). Interviewer / closing /
  * warmup / CQ turns never contribute.
+ *
+ * Resumed sessions: a question presented days earlier then answered on resume
+ * must NOT count idle calendar time. Samples above {@link MAX_RELIABLE_ANSWER_DURATION_SEC}
+ * (or timer-based ceiling) are treated as missing evidence, not as long answers.
  */
 
 /** Candidate answer markers that count as a real submission for retention. */
 const COUNTED_SUBMITTED_AS = new Set(['raw', 'structured', 'timeout', 'auto_submit']);
+
+/**
+ * Absolute ceiling for a single answer. Multi-day resume gaps (observed
+ * production: ~4.5e6 seconds) are excluded so idle time cannot inflate the mean
+ * past the 45s quality floor.
+ */
+export const MAX_RELIABLE_ANSWER_DURATION_SEC = 30 * 60;
 
 export type ScriptTurnDurationRow = {
   turn_index: number;
@@ -18,6 +29,7 @@ export type ScriptTurnDurationRow = {
   answer_text: string | null;
   created_at: string | null;
   answered_at: string | null;
+  timer_seconds?: number | null;
   llm_output: unknown;
   structured_answer?: unknown;
 };
@@ -41,10 +53,21 @@ export function selectCoreAnsweredTurns(
   });
 }
 
+/** Per-answer reliability ceiling: timer×3 (min 3m) when timer known, else global max. */
+export function maxReliableDurationForTurn(turn: {
+  timer_seconds?: number | null;
+}): number {
+  const timer = Number(turn.timer_seconds);
+  if (Number.isFinite(timer) && timer > 0) {
+    return Math.min(MAX_RELIABLE_ANSWER_DURATION_SEC, Math.max(180, Math.round(timer * 3)));
+  }
+  return MAX_RELIABLE_ANSWER_DURATION_SEC;
+}
+
 /**
  * Mean per-answer duration from question-presented → answer-submitted.
- * Missing/invalid answered_at values are skipped (never fabricated). Returns 0
- * when no reliable pair exists so the session cannot auto-qualify on duration.
+ * Missing/invalid/unreliable (resume-idle) pairs are skipped — never fabricated.
+ * Returns 0 when no reliable pair exists so the session cannot auto-qualify.
  */
 export function computeScriptAvgAnswerDurationSec(
   turns: readonly ScriptTurnDurationRow[],
@@ -64,7 +87,12 @@ export function computeScriptAvgAnswerDurationSec(
         : null;
     if (presentedAt === null || answeredAt < presentedAt) continue;
 
-    durations.push(Math.max(0, Math.round((answeredAt - presentedAt) / 1000)));
+    const durationSec = Math.max(0, Math.round((answeredAt - presentedAt) / 1000));
+    const ceiling = maxReliableDurationForTurn(turn);
+    // Resume / multi-visit idle gap — treat as missing timing evidence.
+    if (durationSec > ceiling) continue;
+
+    durations.push(durationSec);
   }
   if (durations.length === 0) return 0;
   return Math.round(durations.reduce((a, b) => a + b, 0) / durations.length);

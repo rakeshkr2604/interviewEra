@@ -332,6 +332,170 @@ describe('processInterviewRetention — streak retry self-repair', () => {
     expect(db.user_progress[0].current_streak).toBe(1);
     expect(db.user_progress[0].longest_streak).toBe(1);
     expect(db.user_progress[0].last_quality_session_date).toBe('2026-07-01');
+    // Legacy partial write (no progress_applied) with untouched XP also repairs XP once.
+    expect(db.user_progress[0].total_xp).toBe(70);
+    expect(db.session_quality_log[0].unlock_contribution).toMatchObject({
+      progress_applied: true,
+      xp_gained: 70,
+      streak_delta: 1,
+    });
+  });
+
+  it('unique-constraint conflict reconciles missing streak and XP instead of idle return', async () => {
+    const IV_NEW = '55555555-5555-4555-8555-555555555555';
+    db.interviews = [
+      {
+        id: IV_NEW,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 1,
+        started_at: '2026-10-10T06:00:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [
+      {
+        user_id: USER_UUID,
+        current_streak: 0,
+        longest_streak: 0,
+        last_quality_session_date: null,
+        badges_earned: [],
+        current_tier: 1,
+        total_xp: 0,
+        sessions_at_current_tier: 0,
+        total_sessions: 0,
+        overall_avg_score: null,
+        last_5_sessions_avg: null,
+        max_dimension_score: null,
+      },
+    ];
+    db.script_turns = [
+      {
+        interview_id: IV_NEW,
+        turn_index: 3,
+        phase: 'core',
+        is_question: true,
+        submitted_as: 'raw',
+        answer_text: 'Detailed answer with concrete examples.',
+        created_at: '2026-10-10T06:10:00.000Z',
+        answered_at: '2026-10-10T06:12:00.000Z',
+        timer_seconds: 90,
+        llm_output: { is_follow_up: false },
+      },
+    ];
+    db.answer_evaluations = [
+      {
+        interview_id: IV_NEW,
+        turn_index: 3,
+        status: 'scored',
+        overall: 7.76,
+        dimensions: {
+          relevance: { score: 8, note: 'ok' },
+          content_accuracy: { score: 8, note: 'ok' },
+          communication_clarity: { score: 7, note: 'ok' },
+          structure: { score: 7, note: 'ok' },
+          specificity: { score: 8, note: 'ok' },
+        },
+      },
+    ];
+
+    // Race: concurrent winner inserted between our existence check and insert.
+    onError = (table, mode) => {
+      if (table === 'session_quality_log' && mode === 'insert') {
+        db.session_quality_log = [
+          {
+            id: 'sql-winner',
+            interview_id: IV_NEW,
+            user_id: USER_UUID,
+            questions_answered: 1,
+            total_questions: 1,
+            avg_answer_duration_sec: 120,
+            session_score: 7.76,
+            quality_met: true,
+            completed_at: '2026-10-10T06:59:11.000Z',
+            unlock_contribution: {
+              streak_delta: 0,
+              xp_gained: 78,
+              progress_applied: false,
+              badge_earned: null,
+              tier_unlocked: null,
+            },
+          },
+        ];
+        return { message: 'duplicate key value violates unique constraint', code: '23505' };
+      }
+      return null;
+    };
+
+    const result = await processInterviewRetention(USER_UUID, IV_NEW);
+
+    expect(result.sessionLogged).toBe(false);
+    expect(db.session_quality_log).toHaveLength(1);
+    expect(db.user_progress[0].current_streak).toBe(1);
+    expect(db.user_progress[0].total_xp).toBe(78);
+    expect(db.session_quality_log[0].unlock_contribution).toMatchObject({
+      progress_applied: true,
+      streak_delta: 1,
+    });
+  });
+
+  it('retry after unique-conflict reconcile is idempotent (no double XP)', async () => {
+    const IV_NEW = '55555555-5555-4555-8555-555555555555';
+    db.interviews = [
+      {
+        id: IV_NEW,
+        user_id: USER_UUID,
+        status: 'completed',
+        question_count: 1,
+        started_at: '2026-10-10T06:00:00.000Z',
+        role: 'Backend Engineer',
+      },
+    ];
+    db.session_quality_log = [
+      {
+        id: 'sql-partial',
+        interview_id: IV_NEW,
+        user_id: USER_UUID,
+        questions_answered: 1,
+        total_questions: 1,
+        avg_answer_duration_sec: 120,
+        session_score: 7.76,
+        quality_met: true,
+        completed_at: '2026-10-10T06:59:11.000Z',
+        unlock_contribution: {
+          streak_delta: 0,
+          xp_gained: 78,
+          progress_applied: false,
+          badge_earned: null,
+          tier_unlocked: null,
+        },
+      },
+    ];
+    db.user_progress = [
+      {
+        user_id: USER_UUID,
+        current_streak: 0,
+        longest_streak: 0,
+        last_quality_session_date: null,
+        badges_earned: [],
+        current_tier: 1,
+        total_xp: 0,
+        sessions_at_current_tier: 0,
+        total_sessions: 1,
+        overall_avg_score: 7.76,
+        last_5_sessions_avg: 7.76,
+        max_dimension_score: 8,
+      },
+    ];
+
+    await processInterviewRetention(USER_UUID, IV_NEW);
+    expect(db.user_progress[0].total_xp).toBe(78);
+    expect(db.user_progress[0].current_streak).toBe(1);
+
+    await processInterviewRetention(USER_UUID, IV_NEW);
+    expect(db.user_progress[0].total_xp).toBe(78);
+    expect(db.user_progress[0].current_streak).toBe(1);
   });
 });
 

@@ -189,7 +189,7 @@ async function aggregateScriptEvaluationsFromInterview(
   const { data: turns } = await supabase
     .from('script_turns')
     .select(
-      'turn_index, phase, is_question, submitted_as, answer_text, created_at, answered_at, llm_output, structured_answer',
+      'turn_index, phase, is_question, submitted_as, answer_text, created_at, answered_at, timer_seconds, llm_output, structured_answer',
     )
     .eq('interview_id', interviewId)
     .order('turn_index', { ascending: true });
@@ -369,26 +369,39 @@ async function recomputeProgressRollupsFromLogs(
 }
 
 /**
- * Self-repair streak when session_quality_log was inserted but updateStreak never
- * ran (same partial-write class as rollup repair — root-cause F3). Idempotent:
- * a fully-processed session is a same-day no-op or no change.
+ * Self-repair when session_quality_log exists but streak / XP / rollups never
+ * finished (partial write or unique-conflict loser). Idempotent:
+ * - streak: updateStreak same-day no-op
+ * - XP: only when unlock_contribution.progress_applied !== true (new rows start
+ *   false; legacy rows without the flag repair only when progress is clearly
+ *   untouched — streak 0 + null last_quality_session_date + total_xp 0)
  */
-async function repairStreakFromExistingLog(
+async function reconcileExistingSessionLog(
   supabase: ReturnType<typeof createServiceClient>,
   userId: string,
   interviewId: string,
 ): Promise<void> {
+  await recomputeProgressRollupsFromLogs(supabase, userId);
+  // Best-effort tier unlock — same degrade path as first-time completion.
+  await checkAndUnlockTier({ userId }).catch((err) => {
+    logger.error('retention_reconcile_unlock_failed', {
+      userId,
+      interviewId,
+      error: err instanceof Error ? err.message : 'unknown',
+    });
+  });
+
   const { data: logRow, error: logErr } = await supabase
     .from('session_quality_log')
     .select(
-      'questions_answered, total_questions, avg_answer_duration_sec, session_score, unlock_contribution, completed_at',
+      'user_id, quality_met, questions_answered, total_questions, avg_answer_duration_sec, session_score, unlock_contribution, completed_at',
     )
     .eq('interview_id', interviewId)
     .maybeSingle();
 
   if (logErr || !logRow) {
     if (logErr) {
-      logger.error('retention_streak_repair_log_read_failed', {
+      logger.error('retention_reconcile_log_read_failed', {
         userId,
         interviewId,
         error: logErr.message,
@@ -396,6 +409,48 @@ async function repairStreakFromExistingLog(
     }
     return;
   }
+
+  if (typeof logRow.user_id === 'string' && logRow.user_id !== userId) {
+    logger.error('retention_reconcile_user_mismatch', { userId, interviewId });
+    return;
+  }
+
+  const contribution =
+    logRow.unlock_contribution && typeof logRow.unlock_contribution === 'object'
+      ? ({ ...(logRow.unlock_contribution as Record<string, unknown>) } as Record<
+          string,
+          unknown
+        >)
+      : {};
+
+  // Snapshot progress BEFORE streak mutation — legacy XP eligibility depends on
+  // pre-repair counters (post-streak last_quality_session_date would hide XP debt).
+  const { data: progressBefore } = await supabase
+    .from('user_progress')
+    .select('total_xp, current_streak, last_quality_session_date')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const qualityMet = logRow.quality_met === true;
+  const intendedXp =
+    typeof contribution.xp_gained === 'number' && Number.isFinite(contribution.xp_gained)
+      ? Math.max(0, Math.round(contribution.xp_gained))
+      : qualityMet
+        ? Math.round((Number(logRow.session_score) || 0) * 10)
+        : 0;
+
+  const progressApplied = contribution.progress_applied === true;
+  const explicitlyPending = contribution.progress_applied === false;
+  const legacyUntouchedProgress =
+    contribution.progress_applied == null &&
+    qualityMet &&
+    intendedXp > 0 &&
+    Number(progressBefore?.total_xp ?? 0) === 0 &&
+    Number(progressBefore?.current_streak ?? 0) === 0 &&
+    progressBefore?.last_quality_session_date == null;
+
+  const shouldApplyXp =
+    qualityMet && intendedXp > 0 && !progressApplied && (explicitlyPending || legacyUntouchedProgress);
 
   const sessionCompletedAt =
     typeof logRow.completed_at === 'string' && Number.isFinite(Date.parse(logRow.completed_at))
@@ -424,25 +479,59 @@ async function repairStreakFromExistingLog(
     return;
   }
 
-  const contribution =
-    logRow.unlock_contribution && typeof logRow.unlock_contribution === 'object'
-      ? (logRow.unlock_contribution as Record<string, unknown>)
-      : {};
   const streakDelta = streakResult.newStreak - streakResult.previousStreak;
   const priorDelta =
     typeof contribution.streak_delta === 'number' ? contribution.streak_delta : 0;
-
   if (priorDelta === 0 && streakDelta !== 0) {
-    const { error: patchErr } = await supabase
+    contribution.streak_delta = streakDelta;
+  }
+
+  if (shouldApplyXp) {
+    // Claim before mutating XP so a concurrent reconciler cannot double-award.
+    contribution.progress_applied = true;
+    contribution.xp_gained = intendedXp;
+    const { error: claimErr } = await supabase
       .from('session_quality_log')
-      .update({
-        unlock_contribution: {
-          ...contribution,
-          streak_delta: streakDelta,
-        },
-      })
+      .update({ unlock_contribution: contribution })
       .eq('interview_id', interviewId);
 
+    if (claimErr) {
+      logger.error('retention_xp_repair_claim_failed', {
+        userId,
+        interviewId,
+        error: claimErr.message,
+      });
+      return;
+    }
+
+    const nextXp = Math.max(0, Number(progressBefore?.total_xp ?? 0) + intendedXp);
+    const { error: xpErr } = await supabase
+      .from('user_progress')
+      .update({ total_xp: nextXp })
+      .eq('user_id', userId);
+
+    if (xpErr) {
+      // Roll claim back so a later retry can re-attempt XP.
+      contribution.progress_applied = false;
+      await supabase
+        .from('session_quality_log')
+        .update({ unlock_contribution: contribution })
+        .eq('interview_id', interviewId);
+      logger.error('retention_xp_repair_failed', {
+        userId,
+        interviewId,
+        error: xpErr.message,
+      });
+      return;
+    }
+
+    logger.info('retention_xp_repaired', { userId, interviewId, xpAdded: intendedXp, nextXp });
+  } else if (priorDelta === 0 && streakDelta !== 0) {
+    // Streak repaired without XP claim — persist streak_delta only.
+    const { error: patchErr } = await supabase
+      .from('session_quality_log')
+      .update({ unlock_contribution: contribution })
+      .eq('interview_id', interviewId);
     if (patchErr) {
       logger.error('retention_streak_repair_contribution_failed', {
         userId,
@@ -466,10 +555,8 @@ export async function processInterviewRetention(
     .maybeSingle();
 
   if (existingLog) {
-    // Self-repair partial writes (log inserted, roll-up never landed) so stale
-    // user_progress counters converge on retry instead of staying wrong forever.
-    await recomputeProgressRollupsFromLogs(supabase, userId);
-    await repairStreakFromExistingLog(supabase, userId, interviewId);
+    // Self-repair partial writes (log inserted, streak/XP/roll-up never landed).
+    await reconcileExistingSessionLog(supabase, userId, interviewId);
     return idlePayload(userId, interviewId, 'session_quality_log exists');
   }
 
@@ -611,6 +698,8 @@ export async function processInterviewRetention(
     streak_delta: 0,
     badge_earned: null as BadgeKey | null,
     xp_gained: xpAdded,
+    /** Flipped true only after streak + XP progress mutations succeed. */
+    progress_applied: false,
   };
 
   const insertRow = {
@@ -630,6 +719,10 @@ export async function processInterviewRetention(
   const { error: insErr } = await supabase.from('session_quality_log').insert(insertRow);
 
   if (insErr?.code === PG_UNIQUE_VIOLATION) {
+    // Concurrent winner already inserted — reconcile missing streak/XP instead of
+    // returning idle and permanently stranding a partial write (prod 3195be3e).
+    logger.info('retention_unique_conflict_reconcile', { userId, interviewId });
+    await reconcileExistingSessionLog(supabase, userId, interviewId);
     return idlePayload(userId, interviewId, 'unique interview_id conflict');
   }
   if (insErr) {
@@ -765,18 +858,6 @@ export async function processInterviewRetention(
   const completedCountFinal = await getCompletedInterviewCount(supabase, userId);
   const totalSessionsFinal = completedCountFinal ?? rollupRows.length;
 
-  await supabase
-    .from('session_quality_log')
-    .update({
-      unlock_contribution: {
-        tier_unlocked: unlockTierNew ?? null,
-        streak_delta: streakDelta,
-        badge_earned: newBadges[0] ?? null,
-        xp_gained: xpAdded,
-      },
-    })
-    .eq('interview_id', interviewId);
-
   const { error: upErr } = await supabase
     .from('user_progress')
     .update({
@@ -792,6 +873,30 @@ export async function processInterviewRetention(
   if (upErr) {
     logger.error('user_progress_update_failed', { userId, error: upErr.message });
     throw new Error(upErr.message);
+  }
+
+  // Mark progress applied only after user_progress XP/rollup write succeeds so a
+  // crash between insert and here remains repairable without double XP.
+  const { error: contribErr } = await supabase
+    .from('session_quality_log')
+    .update({
+      unlock_contribution: {
+        tier_unlocked: unlockTierNew ?? null,
+        streak_delta: streakDelta,
+        badge_earned: newBadges[0] ?? null,
+        xp_gained: xpAdded,
+        progress_applied: true,
+      },
+    })
+    .eq('interview_id', interviewId);
+
+  if (contribErr) {
+    logger.error('retention_contribution_finalize_failed', {
+      userId,
+      interviewId,
+      error: contribErr.message,
+    });
+    // Progress already written — do not throw (would look like total failure).
   }
 
   const reinforcement = buildCompletionReinforcement({

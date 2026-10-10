@@ -43,7 +43,10 @@ class QueryBuilder implements PromiseLike<QueryResult> {
   constructor(
     private readonly db: FakeDb,
     private readonly table: string,
-    private readonly onError?: (table: string, mode: string) => { message: string } | null,
+    private readonly onError?: (
+      table: string,
+      mode: string,
+    ) => { message: string; code?: string } | null,
   ) {}
 
   select(_cols?: string, opts?: SelectOpts): this {
@@ -187,7 +190,7 @@ class QueryBuilder implements PromiseLike<QueryResult> {
  */
 export function makeFakeServiceClient(
   db: FakeDb,
-  onError?: (table: string, mode: string) => { message: string } | null,
+  onError?: (table: string, mode: string) => { message: string; code?: string } | null,
 ) {
   return {
     from(table: string) {

@@ -149,4 +149,54 @@ describe('computeScriptAvgAnswerDurationSec', () => {
     ];
     expect(computeScriptAvgAnswerDurationSec(turns)).toBe(0);
   });
+
+  it('excludes multi-day resume idle gaps from the average (prod 3195be3e class)', () => {
+    const turns = [
+      {
+        turn_index: 5,
+        ...baseTurn,
+        timer_seconds: 150,
+        // Presented in August, answered on October resume — must not dominate mean.
+        created_at: '2026-08-18T19:24:42.000Z',
+        answered_at: '2026-10-10T06:48:09.000Z',
+      },
+      {
+        turn_index: 8,
+        ...baseTurn,
+        timer_seconds: 90,
+        created_at: '2026-10-10T06:52:26.000Z',
+        answered_at: '2026-10-10T06:54:38.000Z', // 132s
+      },
+      {
+        turn_index: 9,
+        ...baseTurn,
+        timer_seconds: 90,
+        created_at: '2026-10-10T06:54:38.000Z',
+        answered_at: '2026-10-10T06:56:42.000Z', // 124s
+      },
+      {
+        turn_index: 10,
+        ...baseTurn,
+        timer_seconds: 90,
+        created_at: '2026-10-10T06:56:42.000Z',
+        answered_at: '2026-10-10T06:58:30.000Z', // 108s
+      },
+    ];
+
+    // Idle gap excluded → mean of 132, 124, 108.
+    expect(computeScriptAvgAnswerDurationSec(turns)).toBe(121);
+  });
+
+  it('returns 0 when every sample is an unreliable resume gap', () => {
+    const turns = [
+      {
+        turn_index: 5,
+        ...baseTurn,
+        timer_seconds: 150,
+        created_at: '2026-08-18T19:24:42.000Z',
+        answered_at: '2026-10-10T06:48:09.000Z',
+      },
+    ];
+    expect(computeScriptAvgAnswerDurationSec(turns)).toBe(0);
+  });
 });
