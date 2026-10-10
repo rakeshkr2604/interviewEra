@@ -32,6 +32,15 @@ const completeSchema = z.object({
   performanceBucket: z.enum(['strong', 'average', 'low']).optional(),
 });
 
+async function runRetentionAfterScores(
+  serviceClient: ReturnType<typeof createServiceClient>,
+  userId: string,
+  interviewId: string,
+) {
+  await waitForScoredEvaluations(serviceClient, interviewId);
+  return processInterviewRetentionSafely(userId, interviewId);
+}
+
 export async function PATCH(request: Request): Promise<NextResponse> {
   let interviewIdForLog = 'unknown';
   try {
@@ -92,15 +101,11 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
     // Already completed — repair path: re-fire email if never sent (parity with v1).
     // Also re-emit durable interview_completed (052 unique index = exactly once).
+    // Retention runs in-request so the client can refresh streak from the response
+    // (turn-path after() may have raced or failed silently).
     if (ownership.status === 'completed') {
       emitScriptInterviewCompleted(user.id, interviewId);
-      // Repair: re-run retention if prior completion never logged quality (idempotent).
-      after(() => {
-        void (async () => {
-          await waitForScoredEvaluations(serviceClient, interviewId);
-          await processInterviewRetentionSafely(user.id, interviewId);
-        })();
-      });
+      const retention = await runRetentionAfterScores(serviceClient, user.id, interviewId);
       if (recipientEmail && !(await wasLifecycleEmailSent(idempotencyKey))) {
         after(() => {
           void trySendScriptCompletionEmail({
@@ -124,13 +129,18 @@ export async function PATCH(request: Request): Promise<NextResponse> {
             });
         });
         return NextResponse.json(
-          { success: true, alreadyCompleted: true, emailRepairQueued: true },
+          {
+            success: true,
+            alreadyCompleted: true,
+            emailRepairQueued: true,
+            retention,
+          },
           { status: 200 },
         );
       }
       // Turn-route completion is source of truth; client repair PATCH is not an error.
       return NextResponse.json(
-        { success: true, alreadyCompleted: true },
+        { success: true, alreadyCompleted: true, retention },
         { status: 200 },
       );
     }
@@ -160,12 +170,12 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
     emitScriptInterviewCompleted(user.id, interviewId);
 
-    // Warm report + retention + email after scores land (wait inside trySend).
-    // Survives via Next.js after() → platform waitUntil when available.
+    // Retention in-request (authoritative for client streak refresh). Email stays
+    // in after() so a slow Resend call cannot block the completion response.
+    const retention = await runRetentionAfterScores(serviceClient, user.id, interviewId);
+
     after(() => {
       void (async () => {
-        await waitForScoredEvaluations(serviceClient, interviewId);
-        await processInterviewRetentionSafely(user.id, interviewId);
         try {
           const r = await trySendScriptCompletionEmail({
             serviceClient,
@@ -188,7 +198,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     });
 
     // Step 4 — done
-    return NextResponse.json({ success: true }, { status: 200 });
+    return NextResponse.json({ success: true, retention }, { status: 200 });
   } catch (err) {
     console.error(`[interview/script/complete] Unexpected error (interviewId=${interviewIdForLog}):`, err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

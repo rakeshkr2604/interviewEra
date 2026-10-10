@@ -25,10 +25,12 @@ import { buildCompletionReinforcement } from './completion-reinforcement';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { applyReferralBonus } from '@/lib/referral/apply-referral';
+import { scriptEvalDimsToV1Shape } from '@/lib/interview/script-dimension-bridge';
 import {
-  isScriptDimensionAverages,
-  scriptDimsToV1Shape,
-} from '@/lib/interview/script-dimension-bridge';
+  computeScriptAvgAnswerDurationSec,
+  selectCoreAnsweredTurns,
+  type ScriptTurnDurationRow,
+} from '@/lib/retention/script-answer-duration';
 
 const PG_UNIQUE_VIOLATION = '23505';
 
@@ -122,10 +124,14 @@ async function aggregateV1EvaluationsFromInterview(
 /**
  * Aggregate scored v2.1 answer_evaluations into retention session scores.
  * Uses score-v1.2 → V1 dimension bridge so session_quality_log stays on DimensionScores.
+ *
+ * Per-answer audit rows store dimensions as `{ score, note }` objects — not flat
+ * averages. Duration uses script_turns.answered_at (submit moment), never
+ * interviewer / closing turn created_at gaps.
  */
 async function aggregateScriptEvaluationsFromInterview(
   interviewId: string,
-  startedAtIso: string | null,
+  _startedAtIso: string | null,
   questionCount: number,
 ): Promise<RetentionSessionAggregate | null> {
   const supabase = createServiceClient();
@@ -140,12 +146,18 @@ async function aggregateScriptEvaluationsFromInterview(
 
   if (eErr || !evaluations?.length) return null;
 
-  const scored = evaluations.filter(
-    (ev) =>
-      typeof ev.overall === 'number' &&
-      Number.isFinite(ev.overall) &&
-      isScriptDimensionAverages(ev.dimensions),
-  );
+  const scored: { overall: number; dims: DimensionScores; turn_index: number }[] = [];
+  for (const ev of evaluations) {
+    const overall = Number(ev.overall);
+    if (!Number.isFinite(overall)) continue;
+    const mapped = scriptEvalDimsToV1Shape(ev.dimensions);
+    if (!mapped) continue;
+    scored.push({
+      overall,
+      dims: mapped,
+      turn_index: Number(ev.turn_index) || 0,
+    });
+  }
   if (scored.length === 0) return null;
 
   const sums: DimensionScores = {
@@ -155,17 +167,14 @@ async function aggregateScriptEvaluationsFromInterview(
     confidence: 0,
     relevance: 0,
   };
-  let overall = 0;
+  let overallSum = 0;
   for (const ev of scored) {
-    overall += Number(ev.overall);
-    const mapped = scriptDimsToV1Shape(
-      ev.dimensions as Parameters<typeof scriptDimsToV1Shape>[0],
-    );
-    sums.communication_clarity += mapped.communication_clarity;
-    sums.technical_depth += mapped.technical_depth;
-    sums.answer_structure += mapped.answer_structure;
-    sums.confidence += mapped.confidence;
-    sums.relevance += mapped.relevance;
+    overallSum += ev.overall;
+    sums.communication_clarity += ev.dims.communication_clarity;
+    sums.technical_depth += ev.dims.technical_depth;
+    sums.answer_structure += ev.dims.answer_structure;
+    sums.confidence += ev.dims.confidence;
+    sums.relevance += ev.dims.relevance;
   }
 
   const n = scored.length;
@@ -177,38 +186,21 @@ async function aggregateScriptEvaluationsFromInterview(
     relevance: roundToTwo(sums.relevance / n),
   };
 
-  // Prefer candidate answer timestamps from script_turns when present.
   const { data: turns } = await supabase
     .from('script_turns')
-    .select('turn_index, created_at, structured_answer')
+    .select(
+      'turn_index, phase, is_question, submitted_as, answer_text, created_at, answered_at, llm_output, structured_answer',
+    )
     .eq('interview_id', interviewId)
     .order('turn_index', { ascending: true });
 
-  const answerTimestamps: string[] = [];
-  for (const turn of turns ?? []) {
-    const structured = turn.structured_answer as { submitted_at?: string } | null;
-    const submitted =
-      structured && typeof structured.submitted_at === 'string'
-        ? structured.submitted_at
-        : typeof turn.created_at === 'string'
-          ? turn.created_at
-          : null;
-    if (submitted) answerTimestamps.push(submitted);
-  }
-  if (answerTimestamps.length === 0) {
-    for (const ev of scored) {
-      if (typeof ev.created_at === 'string') answerTimestamps.push(ev.created_at);
-    }
-  }
-
-  const questionsAnswered = Math.min(n, totalQuestions);
-  const avgAnswerDurationSec = computeAvgAnswerDurationSec({
-    startedAtIso,
-    rows: answerTimestamps.map((submitted_at) => ({ submitted_at })),
-  });
+  const turnRows = (turns ?? []) as ScriptTurnDurationRow[];
+  const coreAnswered = selectCoreAnsweredTurns(turnRows);
+  const questionsAnswered = Math.min(coreAnswered.length, totalQuestions);
+  const avgAnswerDurationSec = computeScriptAvgAnswerDurationSec(turnRows);
 
   return {
-    sessionScore: roundToTwo(overall / n),
+    sessionScore: roundToTwo(overallSum / n),
     avgDimensionScores,
     questionsAnswered,
     totalQuestions,

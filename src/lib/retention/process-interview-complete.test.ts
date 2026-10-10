@@ -31,7 +31,10 @@ vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: () => makeFakeServiceClient(db, (table, mode) => onError?.(table, mode) ?? null),
 }));
 
-import { processInterviewRetention } from '@/lib/retention/process-interview-complete';
+import {
+  processInterviewRetention,
+  processInterviewRetentionSafely,
+} from '@/lib/retention/process-interview-complete';
 
 const USER = 'user-1';
 const IV = 'iv-1';
@@ -39,6 +42,7 @@ const IV = 'iv-1';
 // the existingLog short-circuit tests above never reach that validation, but
 // the full first-time-path tests below do, so they need real UUID shapes.
 const USER_UUID = '11111111-1111-4111-8111-111111111111';
+const IV_V21 = '66666666-6666-4666-8666-666666666666';
 
 const dims = (v: number) => ({
   communication_clarity: v,
@@ -47,6 +51,52 @@ const dims = (v: number) => ({
   confidence: v,
   relevance: v,
 });
+
+/** Production answer_evaluations shape — `{ score, note }` per dimension. */
+const scriptEvalDims = (v: number) => ({
+  relevance: { score: v, note: 'ok' },
+  content_accuracy: { score: v, note: 'ok' },
+  communication_clarity: { score: v, note: 'ok' },
+  structure: { score: v, note: 'ok' },
+  specificity: { score: v, note: 'ok' },
+});
+
+function coreAnswerTurn(
+  turnIndex: number,
+  presentedIso: string,
+  answeredIso: string | null,
+  answer = 'Detailed answer with concrete examples and trade-offs.',
+) {
+  return {
+    interview_id: IV_V21,
+    turn_index: turnIndex,
+    phase: 'core',
+    is_question: true,
+    submitted_as: 'raw',
+    answer_text: answer,
+    created_at: presentedIso,
+    answered_at: answeredIso,
+    llm_output: { is_follow_up: false },
+    structured_answer: null,
+  };
+}
+
+function baseV21Progress() {
+  return {
+    user_id: USER_UUID,
+    current_tier: 1,
+    current_streak: 0,
+    longest_streak: 0,
+    last_quality_session_date: null,
+    badges_earned: [],
+    total_xp: 0,
+    sessions_at_current_tier: 0,
+    total_sessions: 0,
+    overall_avg_score: null,
+    last_5_sessions_avg: null,
+    max_dimension_score: null,
+  };
+}
 
 beforeEach(() => {
   db = {
@@ -337,5 +387,288 @@ describe('processInterviewRetention — total_sessions source', () => {
     const prog = db.user_progress[0];
     expect(db.session_quality_log.length).toBe(2);
     expect(prog.total_sessions).toBe(4);
+  });
+});
+
+describe('processInterviewRetention — v2.1 script engine', () => {
+  it('qualifying 8.2/10 session with valid answered_at durations increments streak', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 4,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      {
+        interview_id: IV_V21,
+        turn_index: 2,
+        phase: 'core',
+        is_question: false,
+        submitted_as: null,
+        answer_text: null,
+        created_at: '2026-10-09T13:15:10.000Z',
+        answered_at: null,
+        llm_output: {},
+        structured_answer: null,
+      },
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:17:51.000Z'),
+      coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', '2026-10-09T13:20:14.000Z'),
+      coreAnswerTurn(5, '2026-10-09T13:21:17.000Z', '2026-10-09T13:23:17.000Z'),
+      coreAnswerTurn(6, '2026-10-09T13:23:57.000Z', '2026-10-09T13:25:57.000Z'),
+      {
+        interview_id: IV_V21,
+        turn_index: 9,
+        phase: 'closing',
+        is_question: false,
+        submitted_as: null,
+        answer_text: null,
+        created_at: '2026-10-09T13:26:00.000Z',
+        answered_at: null,
+        llm_output: {},
+        structured_answer: null,
+      },
+    ];
+    // Mean overall = (7.9 + 8.5 + 8.2 + 8.2) / 4 = 8.2
+    db.answer_evaluations = [
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 7.9, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 8.5, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 5, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 6, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_V21);
+
+    expect(result.sessionLogged).toBe(true);
+    expect(result.qualityMet).toBe(true);
+    expect(result.streak).toBe(1);
+    expect(db.user_progress[0].current_streak).toBe(1);
+    expect(db.user_progress[0].total_xp).toBe(82);
+    const log = db.session_quality_log.find((r) => r.interview_id === IV_V21);
+    expect(log).toMatchObject({
+      session_score: 8.2,
+      questions_answered: 4,
+      total_questions: 4,
+      avg_answer_duration_sec: 120,
+      quality_met: true,
+    });
+  });
+
+  it('8.2/10 session that fails duration does not increment streak', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 4,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    // 20s average — below 45s threshold
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:16:11.000Z'),
+      coreAnswerTurn(4, '2026-10-09T13:16:20.000Z', '2026-10-09T13:16:40.000Z'),
+      coreAnswerTurn(5, '2026-10-09T13:16:50.000Z', '2026-10-09T13:17:10.000Z'),
+      coreAnswerTurn(6, '2026-10-09T13:17:20.000Z', '2026-10-09T13:17:40.000Z'),
+    ];
+    db.answer_evaluations = [
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 5, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 6, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_V21);
+
+    expect(result.sessionLogged).toBe(true);
+    expect(result.qualityMet).toBe(false);
+    expect(result.streak).toBe(0);
+    expect(db.user_progress[0].current_streak).toBe(0);
+    expect(db.user_progress[0].total_xp).toBe(0);
+    expect(db.session_quality_log[0]).toMatchObject({
+      session_score: 8.2,
+      avg_answer_duration_sec: 20,
+      quality_met: false,
+    });
+  });
+
+  it('score below 6.0 does not qualify even with valid duration', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 2,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:17:51.000Z'),
+      coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', '2026-10-09T13:20:14.000Z'),
+    ];
+    db.answer_evaluations = [
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 5.0, dimensions: scriptEvalDims(5) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 5.0, dimensions: scriptEvalDims(5) },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_V21);
+    expect(result.qualityMet).toBe(false);
+    expect(result.streak).toBe(0);
+    expect(db.session_quality_log[0].quality_met).toBe(false);
+  });
+
+  it('missing answered_at cannot fabricate a passing duration', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 2,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', null),
+      coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', null),
+      {
+        interview_id: IV_V21,
+        turn_index: 9,
+        phase: 'closing',
+        is_question: false,
+        submitted_as: null,
+        answer_text: null,
+        created_at: '2026-10-09T14:00:00.000Z',
+        answered_at: null,
+        llm_output: {},
+        structured_answer: null,
+      },
+    ];
+    db.answer_evaluations = [
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 8.2, dimensions: scriptEvalDims(8) },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_V21);
+    expect(result.qualityMet).toBe(false);
+    expect(db.session_quality_log[0].avg_answer_duration_sec).toBe(0);
+    expect(db.user_progress[0].current_streak).toBe(0);
+  });
+
+  it('missing evaluation set is an observable recoverable failure', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 2,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:17:51.000Z'),
+      coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', '2026-10-09T13:20:14.000Z'),
+    ];
+    db.answer_evaluations = [];
+
+    await expect(processInterviewRetention(USER_UUID, IV_V21)).rejects.toThrow(
+      'No evaluations for interview',
+    );
+    expect(await processInterviewRetentionSafely(USER_UUID, IV_V21)).toBeNull();
+    expect(db.session_quality_log).toHaveLength(0);
+  });
+
+  it('duplicate completion does not double-award XP', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 2,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:17:51.000Z'),
+      coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', '2026-10-09T13:20:14.000Z'),
+    ];
+    db.answer_evaluations = [
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 8.0, dimensions: scriptEvalDims(8) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 8.0, dimensions: scriptEvalDims(8) },
+    ];
+
+    const first = await processInterviewRetention(USER_UUID, IV_V21);
+    expect(first.sessionLogged).toBe(true);
+    expect(first.qualityMet).toBe(true);
+    expect(db.user_progress[0].total_xp).toBe(80);
+    expect(db.user_progress[0].current_streak).toBe(1);
+
+    const second = await processInterviewRetention(USER_UUID, IV_V21);
+    expect(second.sessionLogged).toBe(false);
+    expect(db.user_progress[0].total_xp).toBe(80);
+    expect(db.user_progress[0].current_streak).toBe(1);
+    expect(db.session_quality_log.filter((r) => r.interview_id === IV_V21)).toHaveLength(1);
+  });
+
+  it('bridges {score,note} eval dimensions onto V1 retention slots', async () => {
+    db.interviews = [
+      {
+        id: IV_V21,
+        user_id: USER_UUID,
+        status: 'completed',
+        engine: 'v2.1',
+        question_count: 1,
+        started_at: '2026-10-09T13:15:00.000Z',
+        role: 'Full Stack Developer',
+      },
+    ];
+    db.user_progress = [baseV21Progress()];
+    db.script_turns = [
+      coreAnswerTurn(3, '2026-10-09T13:15:51.000Z', '2026-10-09T13:17:51.000Z'),
+    ];
+    db.answer_evaluations = [
+      {
+        interview_id: IV_V21,
+        turn_index: 3,
+        status: 'scored',
+        overall: 8.0,
+        dimensions: {
+          relevance: { score: 7, note: 'r' },
+          content_accuracy: { score: 10, note: 'c' },
+          communication_clarity: { score: 6, note: 'cc' },
+          structure: { score: 5, note: 's' },
+          specificity: { score: 4, note: 'sp' },
+        },
+      },
+    ];
+
+    const result = await processInterviewRetention(USER_UUID, IV_V21);
+    expect(result.sessionLogged).toBe(true);
+    expect(db.session_quality_log[0].dimension_scores).toEqual({
+      communication_clarity: 6,
+      technical_depth: 10,
+      answer_structure: 5,
+      confidence: 4,
+      relevance: 7,
+    });
   });
 });

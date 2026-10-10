@@ -982,7 +982,7 @@ export default function ScriptInterviewPage() {
 
   const completeInterview = useCallback(async () => {
     try {
-      await fetch('/api/interview/script/complete', {
+      const res = await fetch('/api/interview/script/complete', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -990,6 +990,17 @@ export default function ScriptInterviewPage() {
         // interview lands in a terminal state. Real scoring arrives later.
         body: JSON.stringify({ interviewId, performanceBucket: 'average' }),
       })
+      if (!res.ok) return
+      const data = (await res.json()) as {
+        retention?: { streak?: number } | null
+      }
+      if (data.retention && typeof data.retention.streak === 'number') {
+        window.dispatchEvent(
+          new CustomEvent('ie-streak-updated', {
+            detail: { streak: data.retention.streak },
+          }),
+        )
+      }
     } catch {
       /* completion is best-effort for the UI — never block the closing screen */
     }

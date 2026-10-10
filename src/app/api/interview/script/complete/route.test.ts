@@ -82,6 +82,11 @@ beforeEach(() => {
 
 describe('PATCH /api/interview/script/complete', () => {
   it('marks completed and emits durable interview_completed', async () => {
+    retentionMock.mockResolvedValueOnce({
+      sessionLogged: true,
+      qualityMet: true,
+      streak: 1,
+    })
     const res = await PATCH(
       req({ interviewId: IV, performanceBucket: 'average' }),
     )
@@ -94,6 +99,10 @@ describe('PATCH /api/interview/script/complete', () => {
       interview_id: IV,
       engine: 'v2.1',
     })
+    expect(waitForScoredMock).toHaveBeenCalled()
+    expect(retentionMock).toHaveBeenCalledWith(USER.id, IV)
+    const json = await res.json()
+    expect(json.retention).toMatchObject({ streak: 1, qualityMet: true })
   })
 
   it('ignores client-supplied performanceBucket (integrity)', async () => {
@@ -103,14 +112,21 @@ describe('PATCH /api/interview/script/complete', () => {
     expect(db.interviews[0].performance_bucket).toBe('average')
   })
 
-  it('already-completed repair emits interview_completed (052 dedupe)', async () => {
+  it('already-completed repair emits interview_completed and returns retention', async () => {
     db.interviews[0].status = 'completed'
+    retentionMock.mockResolvedValueOnce({
+      sessionLogged: false,
+      qualityMet: true,
+      streak: 2,
+    })
     const res = await PATCH(
       req({ interviewId: IV, performanceBucket: 'strong' }),
     )
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.alreadyCompleted).toBe(true)
+    expect(json.retention).toMatchObject({ streak: 2 })
+    expect(retentionMock).toHaveBeenCalledWith(USER.id, IV)
     expect(persistMilestoneEventOnce).toHaveBeenCalledWith('interview_completed', {
       user_id: USER.id,
       interview_id: IV,

@@ -1017,35 +1017,38 @@ export default function CoachClient() {
   const [error, setError] = useState<string | null>(null)
   const loadGenRef = useRef(0)
 
-  async function loadEntitlement(opts?: { soft?: boolean }) {
-    const gen = ++loadGenRef.current
-    if (!opts?.soft) setLoading(true)
-    try {
-      const res = await fetch('/api/coach/entitlement', { cache: 'no-store' })
-      if (res.status === 401) {
-        router.replace(`/login?next=${encodeURIComponent('/coach')}`)
-        return
+  const loadEntitlement = useCallback(
+    async (opts?: { soft?: boolean }) => {
+      const gen = ++loadGenRef.current
+      if (!opts?.soft) setLoading(true)
+      try {
+        const res = await fetch('/api/coach/entitlement', { cache: 'no-store' })
+        if (res.status === 401) {
+          router.replace(`/login?next=${encodeURIComponent('/coach')}`)
+          return
+        }
+        const data = (await res.json()) as CoachEntitlementResponse & { error?: string }
+        if (gen !== loadGenRef.current) return
+        if (!res.ok) {
+          throw new Error(data.error ?? `Entitlement failed (${res.status})`)
+        }
+        setEntitlement(data)
+        const nextDuration = data.allowedDurations.includes(data.defaultDurationMinutes)
+          ? data.defaultDurationMinutes
+          : data.allowedDurations[0] ?? 3
+        setDurationMinutes((current) =>
+          data.allowedDurations.includes(current) ? current : nextDuration,
+        )
+        setError(null)
+      } catch (err) {
+        if (gen !== loadGenRef.current) return
+        setError(err instanceof Error ? err.message : 'Failed to load Coach access')
+      } finally {
+        if (gen === loadGenRef.current && !opts?.soft) setLoading(false)
       }
-      const data = (await res.json()) as CoachEntitlementResponse & { error?: string }
-      if (gen !== loadGenRef.current) return
-      if (!res.ok) {
-        throw new Error(data.error ?? `Entitlement failed (${res.status})`)
-      }
-      setEntitlement(data)
-      const nextDuration = data.allowedDurations.includes(data.defaultDurationMinutes)
-        ? data.defaultDurationMinutes
-        : data.allowedDurations[0] ?? 3
-      setDurationMinutes((current) =>
-        data.allowedDurations.includes(current) ? current : nextDuration
-      )
-      setError(null)
-    } catch (err) {
-      if (gen !== loadGenRef.current) return
-      setError(err instanceof Error ? err.message : 'Failed to load Coach access')
-    } finally {
-      if (gen === loadGenRef.current && !opts?.soft) setLoading(false)
-    }
-  }
+    },
+    [router],
+  )
 
   async function mintSession(isReset = false) {
     const gen = ++loadGenRef.current
@@ -1096,7 +1099,7 @@ export default function CoachClient() {
 
   useEffect(() => {
     void loadEntitlement()
-  }, [])
+  }, [loadEntitlement])
 
   if (loading && !entitlement) {
     return (

@@ -240,6 +240,8 @@ export async function POST(request: Request): Promise<NextResponse> {
       const updatePayload: Record<string, unknown> = {
         submitted_as: submittedAs ?? 'raw',
         answer_text: lastAnswer,
+        // Authoritative submit moment for retention duration (answered_at − created_at).
+        answered_at: new Date().toISOString(),
       };
 
       const isSpecial =

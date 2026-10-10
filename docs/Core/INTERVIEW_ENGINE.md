@@ -1,7 +1,7 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-10-05
+> Last Verified: 2026-10-10
 > Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards + persisted V2.1 core-question plans (first-turn generation, duplicate-safe fallback)
 > Authority: Production interview path
 
@@ -80,7 +80,10 @@ Plan budgets: `users.plan_tier` → `getPlanLimits(...).max_llm_cost_per_month_u
 
 - **Authoritative completion** = `interviews.status = 'completed'` (transactional DB state). Admin COMPLETED counts this — **not** `product_events`.
 - On successful V2.1 completion (`completeScriptInterviewFromTurn` and `PATCH .../script/complete`), attempt durable `product_events.interview_completed` via `persistMilestoneEventOnce`. Migration 052 unique index keeps **at most one** durable row per interview when persistence succeeds; a persistence failure can still yield zero rows. Analytics failure must not fail completion.
-- Retention (`processInterviewRetentionSafely`) also runs after a successful V2.1 complete (turn path + repair PATCH), aggregating scored `answer_evaluations` into `session_quality_log` / `user_progress`. The after() path waits for scored evaluations (same poll as completion email) before aggregating so a last-answer race does not permanently skip quality logging. Failures are degrade-don't-fail (log + null) and must not block completion. Idempotent via `session_quality_log UNIQUE(interview_id)`.
+- Retention (`processInterviewRetentionSafely`) runs after a successful V2.1 complete:
+  - **Turn path:** `after()` waits for scored evaluations, then aggregates (degrade-don't-fail).
+  - **Repair `PATCH /api/interview/script/complete`:** waits for scores and runs retention **in-request**, returning `{ retention }` so the session UI can dispatch `ie-streak-updated` without relying on a browser refresh.
+  - Aggregation reads per-answer `{ score, note }` dimensions from `answer_evaluations` (via `scriptEvalDimsToV1Shape`), counts core parent answers from `script_turns`, and computes avg duration as `answered_at − created_at` (never interviewer/closing turn gaps). Missing `answered_at` → duration 0 (session cannot auto-qualify). Failures log + null and must not block completion. Idempotent via `session_quality_log UNIQUE(interview_id)`.
 - Turn-path completion UPDATEs only `status IN ('pending','in_progress')` and emits only when a row actually transitioned — abandoned cannot become completed through that helper.
 - On abandon (`POST /api/interview/[id]/abandon`, exit-feedback abandon), attempt durable `interview_abandoned` via fire-and-forget `persistMilestoneEventOnce` (at-most-one durable row when persistence succeeds; delivery is not guaranteed). Abandoned rows must not emit `interview_completed`.
 - `completed_at` is a **terminal timestamp** (set on both successful complete and abandon). Do not treat `abandoned.completed_at` as “successful completion” in admin LAST INTERVIEW — prefer `started_at` (see `recent-user-interview-stats.ts`).

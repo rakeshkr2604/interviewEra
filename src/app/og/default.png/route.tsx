@@ -45,6 +45,8 @@ export async function GET() {
             gap: 16,
           }}
         >
+          {/* ImageResponse/Satori only supports native <img>, not next/image */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={iconSrc}
             width={56}
