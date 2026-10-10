@@ -156,10 +156,71 @@ async function extractAppIconMark(inputBuf, outputPath) {
   }
 
   for (let p = 0; p < w * h; p++) {
+    const i = p * 4
     if (!keep[p]) {
-      const i = p * 4
       data[i + 3] = 0
+      continue
     }
+    // Near-white→alpha punch clears white IE letter fills (RGB stays). Restore
+    // opaque white inside the tile so dark chrome does not show through holes.
+    if (data[i + 3] < 32) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      if (r >= 200 && g >= 200 && b >= 200) {
+        data[i + 3] = 255
+      }
+    }
+  }
+
+  // Close tiny interior holes (antialias gaps inside IE strokes).
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = (y * w + x) * 4
+      if (data[i + 3] >= 16) continue
+      if (data[i] < 200 || data[i + 1] < 200 || data[i + 2] < 200) continue
+      let opaque = 0
+      for (const [dx, dy] of [
+        [-1, 0],
+        [1, 0],
+        [0, -1],
+        [0, 1],
+        [-1, -1],
+        [1, 1],
+        [-1, 1],
+        [1, -1],
+      ]) {
+        if (data[((y + dy) * w + (x + dx)) * 4 + 3] >= 200) opaque++
+      }
+      if (opaque >= 5) data[i + 3] = 255
+    }
+  }
+
+  // Strip only the outer light rim (package glow). Build a tight purple core mask
+  // and drop light pixels that sit outside a small dilate of that core.
+  const coreDilate = 3
+  const nearPurple = new Uint8Array(w * h)
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!purple[y * w + x]) continue
+      for (let dy = -coreDilate; dy <= coreDilate; dy++) {
+        for (let dx = -coreDilate; dx <= coreDilate; dx++) {
+          if (dx * dx + dy * dy > coreDilate * coreDilate) continue
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue
+          nearPurple[ny * w + nx] = 1
+        }
+      }
+    }
+  }
+  for (let p = 0; p < w * h; p++) {
+    const i = p * 4
+    if (data[i + 3] < 8 || nearPurple[p]) continue
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    if (r >= 190 && g >= 190 && b >= 190) data[i + 3] = 0
   }
 
   ensureDir(path.dirname(outputPath))
@@ -324,16 +385,6 @@ async function prepareUiIcon(sourceRelative, outBaseName) {
     .png()
     .toBuffer()
 
-  const punchedPath = path.join(
-    root,
-    'public',
-    'brand',
-    'icons',
-    'ui',
-    `_tmp-${outBaseName}-punched.png`,
-  )
-  await punchNearWhiteToAlpha(croppedBuf, punchedPath, { threshold: 248 })
-
   const markPath = path.join(
     root,
     'public',
@@ -342,8 +393,9 @@ async function prepareUiIcon(sourceRelative, outBaseName) {
     'ui',
     `_tmp-${outBaseName}-mark.png`,
   )
-  const punchedBuf = await sharp(punchedPath).png().toBuffer()
-  await extractAppIconMark(punchedBuf, markPath)
+  // Do not punch near-white before extract — that zeros white IE letter fills and
+  // leaves transparent holes on dark chrome. extractAppIconMark drops the plate.
+  await extractAppIconMark(croppedBuf, markPath)
 
   const trimmed = await sharp(markPath).trim({ threshold: 8 }).png().toBuffer()
   const trimmedMeta = await sharp(trimmed).metadata()
@@ -372,7 +424,6 @@ async function prepareUiIcon(sourceRelative, outBaseName) {
     .toFile(outPng)
 
   await sharp(outPng).webp({ quality: 92 }).toFile(outWebp)
-  fs.unlinkSync(punchedPath)
   fs.unlinkSync(markPath)
   console.log('wrote', path.relative(root, outPng))
   console.log('wrote', path.relative(root, outWebp))
@@ -469,6 +520,109 @@ function copyBrandTree() {
   copyFile(path.join(pkg, 'BRAND_COLORS.txt'), path.join(root, 'public', 'brand', 'BRAND_COLORS.txt'))
 }
 
+/**
+ * Transparent purple IE monogram for dark chrome (no purple squircle plate).
+ * Source: 05-monochrome/interviewera-purple-icon — crop board label, punch plate.
+ */
+async function preparePurpleMark() {
+  const source = path.join(pkg, '05-monochrome', 'interviewera-purple-icon.png')
+  const meta = await sharp(source).metadata()
+  const w = meta.width ?? 1000
+  const h = meta.height ?? 1000
+  const cropH = Math.min(h, Math.round(h * 0.82))
+  const { data, info } = await sharp(source)
+    .extract({ left: 0, top: 0, width: w, height: cropH })
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true })
+
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i]
+    const g = data[i + 1]
+    const b = data[i + 2]
+    if (r >= 230 && g >= 230 && b >= 230) data[i + 3] = 0
+  }
+
+  // Despill white/pink plate antialias (reads as a halo on dark chrome).
+  const { width: pw, height: ph } = info
+  for (let pass = 0; pass < 5; pass++) {
+    let removed = 0
+    const next = Buffer.from(data)
+    for (let y = 0; y < ph; y++) {
+      for (let x = 0; x < pw; x++) {
+        const i = (y * pw + x) * 4
+        if (data[i + 3] < 8) continue
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        const max = Math.max(r, g, b)
+        const min = Math.min(r, g, b)
+        const chroma = max - min
+        const isPurple = chroma > 35 && b > 90 && b >= g - 15
+        if (isPurple) continue
+        const lum = (r + g + b) / 3
+        // Near-white or low-chroma bright fringe from the white board plate.
+        if (lum < 150 && chroma > 25) continue
+        let clear = false
+        for (const [dx, dy] of [
+          [-1, 0],
+          [1, 0],
+          [0, -1],
+          [0, 1],
+        ]) {
+          const nx = x + dx
+          const ny = y + dy
+          if (nx < 0 || ny < 0 || nx >= pw || ny >= ph || data[(ny * pw + nx) * 4 + 3] < 20) {
+            clear = true
+            break
+          }
+        }
+        if (clear) {
+          next[i + 3] = 0
+          removed++
+        }
+      }
+    }
+    next.copy(data)
+    if (removed === 0) break
+  }
+
+  const punched = await sharp(data, {
+    raw: { width: info.width, height: info.height, channels: 4 },
+  })
+    .png()
+    .toBuffer()
+  const trimmed = await sharp(punched).trim({ threshold: 12 }).png().toBuffer()
+  const tmeta = await sharp(trimmed).metadata()
+  const side = Math.max(tmeta.width ?? 512, tmeta.height ?? 512)
+  const pad = 20
+  const outDir = path.join(root, 'public', 'brand', 'monochrome', 'ui')
+  ensureDir(outDir)
+  const outPng = path.join(outDir, 'interviewera-purple-mark.png')
+  const outWebp = path.join(outDir, 'interviewera-purple-mark.webp')
+  const fitted = await sharp(trimmed)
+    .resize(side, side, {
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .png()
+    .toBuffer()
+  await sharp({
+    create: {
+      width: side + pad * 2,
+      height: side + pad * 2,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    },
+  })
+    .composite([{ input: fitted, left: pad, top: pad }])
+    .png()
+    .toFile(outPng)
+  await sharp(outPng).webp({ quality: 95 }).toFile(outWebp)
+  console.log('wrote', path.relative(root, outPng), '(purple mark)')
+  console.log('wrote', path.relative(root, outWebp), '(purple mark)')
+}
+
 async function main() {
   if (!fs.existsSync(pkg)) {
     throw new Error(`Logo package not found: ${pkg}`)
@@ -485,6 +639,7 @@ async function main() {
     path.join('02-icons', 'interviewera-icon-circle-white.png'),
     'interviewera-icon-circle',
   )
+  await preparePurpleMark()
   const uiSquarePng = path.join(
     root,
     'public',

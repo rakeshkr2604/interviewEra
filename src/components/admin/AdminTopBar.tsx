@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
+import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup'
 import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 export function AdminTopBar() {
@@ -11,12 +11,14 @@ export function AdminTopBar() {
       style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
     >
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:gap-6">
-        <span className="inline-flex shrink-0 items-baseline gap-1.5">
-          <BrandWordmarkSplit />
-          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Campus
-          </span>
-        </span>
+        <BrandChromeLockup
+          href="/college/dashboard"
+          suffix={
+            <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Campus
+            </span>
+          }
+        />
         <nav className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
           <Link
             href="/college/dashboard"

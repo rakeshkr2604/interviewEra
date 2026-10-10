@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Menu } from 'lucide-react';
+import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { PlatformSidebar } from '@/components/layout/PlatformSidebar';
 
@@ -101,9 +102,12 @@ export function PlatformChrome({ children }: { children: React.ReactNode }) {
           >
             <Menu className="size-5" />
           </button>
-          <span className="min-w-0 flex-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-            <BrandWordmarkSplit />
-          </span>
+          <BrandChromeLockup
+            href="/platform/growth"
+            className="min-w-0 flex-1"
+            markClassName="size-8"
+            markSize={32}
+          />
         </header>
 
         <main

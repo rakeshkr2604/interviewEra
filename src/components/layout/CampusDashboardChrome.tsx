@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
+import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { CampusSidebar } from './CampusSidebar'
 
@@ -140,9 +141,12 @@ export function CampusDashboardChrome({
           >
             <Menu className="size-5" />
           </button>
-          <span className="min-w-0 flex-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-            <BrandWordmarkSplit />
-          </span>
+          <BrandChromeLockup
+            href="/college/dashboard"
+            className="min-w-0 flex-1"
+            markClassName="size-8"
+            markSize={32}
+          />
           <span
             className="text-xs font-semibold rounded-full px-2 py-0.5"
             style={{

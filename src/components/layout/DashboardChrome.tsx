@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Menu } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { StreakCounter } from '@/components/layout/StreakCounter'
@@ -182,9 +183,12 @@ export function DashboardChrome({
           >
             <Menu className="size-5" />
           </button>
-          <span className="min-w-0 flex-1" style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}>
-            <BrandWordmarkSplit />
-          </span>
+          <BrandChromeLockup
+            href="/dashboard"
+            className="min-w-0 flex-1"
+            markClassName="size-8"
+            markSize={32}
+          />
           <StreakCounter key={initialStreak} initialStreak={initialStreak} />
         </header>
 

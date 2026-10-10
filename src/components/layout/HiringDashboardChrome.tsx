@@ -1,8 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { LogOut } from 'lucide-react';
-import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
+import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { performClientLogout } from '@/lib/supabase/client-logout';
@@ -34,9 +33,10 @@ export function HiringDashboardChrome({
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <Link href="/hiring/dashboard" className="inline-flex items-center gap-2">
-                <BrandWordmarkSplit className="text-sm font-bold sm:text-base" />
-              </Link>
+              <BrandChromeLockup
+                href="/hiring/dashboard"
+                wordmarkClassName="text-sm font-bold sm:text-base"
+              />
               <p className="mt-0.5 truncate text-xs sm:text-sm" style={{ color: 'var(--text-secondary)' }}>
                 HR Dashboard · {orgName}
               </p>

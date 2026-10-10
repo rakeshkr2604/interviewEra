@@ -9,6 +9,7 @@ import {
   BRAND_LOGO_VERTICAL_PATH,
   BRAND_MARK_PATH,
   BRAND_MONOGRAM_NAV_PATH,
+  BRAND_PURPLE_MARK_PATH,
   BRAND_TAGLINE,
   BRAND_WORDMARK_NAV_PATH,
 } from './assets'
@@ -36,6 +37,7 @@ describe('brand assets (Logo Package v1)', () => {
   it('ships required production files under public/', () => {
     const required = [
       BRAND_ICON_SQUARE_PATH,
+      BRAND_PURPLE_MARK_PATH,
       BRAND_LOGO_HORIZONTAL_PATH,
       BRAND_MONOGRAM_NAV_PATH,
       BRAND_WORDMARK_NAV_PATH,

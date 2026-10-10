@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono, Instrument_Serif } from "next/font/google";
-import Script from "next/script";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
@@ -153,15 +152,14 @@ export default function RootLayout({
     >
       <head>
         <StructuredData />
-      </head>
-      <body className="min-h-full flex flex-col">
-        <Script
-          id="theme-init"
-          strategy="beforeInteractive"
+        {/* Inline (not next/script): FOUC-safe theme boot; avoids React 19 “script in component” overlay. */}
+        <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var s=localStorage.getItem('ie-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s==='light'?'light':s==='dark'?'dark':(d?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',t);if(t==='dark')r.classList.add('dark');else r.classList.remove('dark');}catch(e){}})();`,
           }}
         />
+      </head>
+      <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <NavbarSlot />
           <AuthStateWatcher />

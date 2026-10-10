@@ -2,9 +2,8 @@ import Link from 'next/link';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CookieSettingsButton } from '@/components/consent/CookieSettingsButton';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
-import Image from 'next/image';
 import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
-import { BRAND_MARK_PATH } from '@/lib/brand/assets';
+import { BrandMarkIcon } from '@/components/brand/BrandMarkIcon';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
 import { siteConfig } from '@/lib/seo/metadata';
@@ -202,14 +201,7 @@ export function MarketingFooter() {
           style={{ color: 'var(--text-muted)' }}
         >
           <p className="flex min-w-0 items-center gap-2 text-xs">
-            <Image
-              src={BRAND_MARK_PATH}
-              width={20}
-              height={20}
-              className="h-5 w-5 shrink-0 opacity-90"
-              alt=""
-              aria-hidden
-            />
+            <BrandMarkIcon size={20} className="h-5 w-5 opacity-90" />
             <span className="min-w-0">© 2026 InterviewEra. All rights reserved.</span>
           </p>
           <nav

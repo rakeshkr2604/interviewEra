@@ -76,6 +76,8 @@ const nextConfig: NextConfig = {
   webpack: (config) => config,
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Brand vertical lockup uses quality={95}; default allowlist is [75] only.
+    qualities: [75, 95],
     remotePatterns: [
       {
         protocol: 'https',

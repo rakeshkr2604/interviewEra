@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
@@ -15,12 +14,10 @@ import {
   Bot,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
-import { BRAND_ICON_SQUARE_PATH } from '@/lib/brand/assets';
+import { BrandMarkIcon } from '@/components/brand/BrandMarkIcon';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher';
 import { performClientLogout } from '@/lib/supabase/client-logout';
-
-const BRAND_MARK = BRAND_ICON_SQUARE_PATH;
 
 const NAV_ITEMS = [
   { href: '/platform/growth', label: 'Growth', icon: TrendingUp, exact: false },
@@ -112,13 +109,7 @@ export function PlatformSidebar({ onNavigate }: { onNavigate?: () => void }) {
         className="flex items-center gap-3 border-b px-4 py-5"
         style={{ borderColor: 'var(--card-border)' }}
       >
-        <Image
-          src={BRAND_MARK}
-          width={44}
-          height={44}
-          className="size-11 shrink-0 rounded-[22%] object-cover"
-          alt=""
-        />
+        <BrandMarkIcon size={44} className="size-11" />
         <p
           className="text-[15px] leading-tight"
           style={{ fontFamily: 'Bricolage Grotesque, sans-serif' }}

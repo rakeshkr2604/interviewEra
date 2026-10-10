@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import {
   useCallback,
@@ -32,9 +31,10 @@ import {
   FilePenLine,
   Users,
   Bot,
+  LogOut,
 } from 'lucide-react'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
-import { BRAND_ICON_SQUARE_PATH } from '@/lib/brand/assets'
+import { BrandMarkIcon } from '@/components/brand/BrandMarkIcon'
 import { performClientLogout } from '@/lib/supabase/client-logout'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
@@ -43,7 +43,6 @@ import { COMMUNITY_HUB_PATH } from '@/lib/community/community'
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
 
-const BRAND_MARK = BRAND_ICON_SQUARE_PATH
 const SIDEBAR_EXPANDED_STORAGE_KEY = 'ie:sidebar-sections-expanded'
 const SIDEBAR_EXPANDED_EVENT = 'ie:sidebar-sections-expanded'
 
@@ -418,13 +417,7 @@ export function Sidebar({
         className="flex items-center gap-3 border-b px-4 py-5"
         style={{ borderColor: 'var(--card-border)' }}
       >
-        <Image
-          src={BRAND_MARK}
-          width={44}
-          height={44}
-          className="size-11 shrink-0 rounded-[22%] object-cover"
-          alt=""
-        />
+        <BrandMarkIcon size={44} className="size-11" />
         <div>
           <p
             className="text-[15px] leading-tight"
@@ -590,14 +583,7 @@ export function Sidebar({
             e.currentTarget.style.color = 'var(--text-secondary)'
           }}
         >
-          <Image
-            src={BRAND_MARK}
-            width={28}
-            height={28}
-            className="size-7 shrink-0 rounded-[0.7rem] object-cover"
-            alt=""
-            aria-hidden
-          />
+          <LogOut size={16} strokeWidth={2} aria-hidden />
           {loggingOut ? 'Logging out…' : 'Log out'}
         </button>
       </div>

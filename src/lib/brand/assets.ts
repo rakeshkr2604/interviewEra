@@ -19,9 +19,13 @@ export const BRAND_COLORS = {
 export const BRAND_TAGLINE = 'PRACTICE • PREPARE • PROGRESS' as const
 export const BRAND_TAGLINE_PARTS = ['PRACTICE', 'PREPARE', 'PROGRESS'] as const
 
-/** Cropped UI square mark (board chrome removed; transparent plate). */
+/** Cropped UI square mark (board chrome removed; opaque white IE on purple tile). Favicon/OG. */
+/** No cache-bust query — Next/Image rejects unconfigured localPatterns search params. */
 export const BRAND_ICON_SQUARE_PATH = '/brand/icons/ui/interviewera-icon-square.webp' as const
 export const BRAND_ICON_SQUARE_PNG_PATH = '/brand/icons/ui/interviewera-icon-square.png' as const
+
+/** Transparent purple IE monogram for UI chrome (no squircle plate — dark-safe). */
+export const BRAND_PURPLE_MARK_PATH = '/brand/monochrome/ui/interviewera-purple-mark.webp' as const
 
 /** Circular mark — only where a circular presentation is intended. */
 export const BRAND_ICON_CIRCLE_PATH = '/brand/icons/ui/interviewera-icon-circle.webp' as const
@@ -29,9 +33,8 @@ export const BRAND_ICON_CIRCLE_PATH = '/brand/icons/ui/interviewera-icon-circle.
 /** Full lockups — UI crops (board captions removed); white-first on a light plate in dark chrome. */
 export const BRAND_LOGO_HORIZONTAL_PATH = '/brand/primary/ui/interviewera-horizontal.webp' as const
 /** Navbar monogram (full IE from vertical board — horizontal extract clips the I). */
-/** Navbar IE mark — bump query when regenerate `prepare-logo-package-v1`. */
-export const BRAND_MONOGRAM_NAV_PATH = '/brand/primary/ui/interviewera-monogram-nav.png?v=5' as const
-/** Navbar wordmark-only (InterviewEra). */
+export const BRAND_MONOGRAM_NAV_PATH = '/brand/primary/ui/interviewera-monogram-nav.png' as const
+/** Navbar wordmark-only (InterviewEra) — dark ink; light chrome only (dark uses CSS wordmark). */
 export const BRAND_WORDMARK_NAV_PATH = '/brand/primary/ui/interviewera-wordmark-nav.png' as const
 export const BRAND_LOGO_VERTICAL_PATH = '/brand/primary/ui/interviewera-primary-vertical.webp' as const
 export const BRAND_LOGO_STACKED_PATH = '/brand/primary/ui/interviewera-stacked.webp' as const
