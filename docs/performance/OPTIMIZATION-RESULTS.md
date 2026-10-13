@@ -173,7 +173,7 @@ Loop 1–5 results remain in the working tree. Loop 6 release gate:
 | Analyze (`ANALYZE=true` + 8 GB heap, `npx next build --webpack`) | PASS — client/nodejs/edge HTML reports. `npm run analyze` still fails on Windows cmd because the script prefixes `ANALYZE=true` |
 | Playwright staging vs `next start` | **6/6 PASS** (nav + history 4 including mobile tabs + production-lab). `/dashboard` lab TTFB median **296** / LCP **492** / CLS **0**; Recharts start 1413 ms. Smoke 3 **not re-run**. Local Playwright config **not run** (`.env.local` is production) |
 | Authenticated Lighthouse | **not re-run** this loop — Loop 5 n=1 table still stands. Mobile Slow-4G `/dashboard` LCP **7,924 ms** remains a lab risk |
-| Production migrations 116/117 | **not applied** |
+| Production migrations 116/117 | **applied Loop 7** — see [RELEASE-READINESS](RELEASE-READINESS.md) |
 
 ### Staging apply (116)
 
@@ -188,25 +188,21 @@ Verified:
 - After 117, staging Performance Advisor (loop 5 recheck): `auth_rls_initplan` = 0, `unindexed_foreign_keys` = 0. Residual: unused_index **120** and multiple_permissive_policies 45. Do not drop unused indexes.
 - Dummy-UUID EXPLAIN still seq-scans the 10-row table.
 
-### Production rollout
+### Production rollout (Loop 7 — done)
 
-1. Review migration 116. Do **not** drop unused indexes.
-2. Staging already has 116 — re-query production ledger on `plfuvgkycmxcyshrgpgv`.
-3. Production apply only with explicit founder authorization.
-4. Staging Playwright this loop: **6/6** (nav + history including mobile tabs + production-lab). Smoke 3 not re-run. Authenticated Lighthouse n=1 captured. Field p75 still fails until deploy.
-5. Production ledger reconfirmed empty for 116/117 names (loop 5). 116 indexes absent; 116 policies still bare `auth.*()`. `interview_turns` already InitPlan — apply 117 for ledger anyway. Operator packet: [RELEASE-READINESS](RELEASE-READINESS.md).
+1. App squash-merged to `main` as `9c28886` via PR #166; production deploy `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u` READY on `interviewera.com`.
+2. Production 116 then 117 applied on `plfuvgkycmxcyshrgpgv` (ledger `20261013093634` / `20261013094210`). Advisor InitPlan + unindexed-FK findings cleared. Unused indexes **not** dropped.
+3. `PERF_DASHBOARD_TRACE` and `ANALYZE` confirmed unset in Production env list.
+4. Authenticated smoke **BLOCKED** pending owner test account. Unauthenticated auth gate **PASS**.
+5. New-SHA Speed Insights window starting `2026-10-13T09:35:28Z` currently **n=0**. Old-SHA baseline (TTFB 2721 / LCP 5624 / CLS 0.16) remains separate. Operator packet: [RELEASE-READINESS](RELEASE-READINESS.md).
 
 ### Remaining blockers
 
-- Field `/dashboard` LCP **5624 ms** and desktop LCP **7748 ms** vs 2.5s. TTFB **2721 ms** is the production floor until loop 1–5 is **deployed**.
-- Field CLS **0.16** (n=46, desktop). Lab CLS 0 / Lighthouse desktop `/dashboard` CLS 0.015 after gutter/skeleton; field will not move until deploy + a new observation window.
-- Mobile Lighthouse `/dashboard` LCP **7,924 ms** (Slow 4G, n=1, ungzipped `next start`) vs field mobile LCP 128 ms (likely soft navigations). Do not average them. Loop 6 defers further mobile work until a production-equivalent trace.
-- Public PSI / CrUX — previously HTTP 429; not retried.
+- New-SHA field p75 **PENDING** until post-deploy n ≥ baseline (TTFB ≥78, LCP ≥137, CLS ≥46). Do not attribute old-SHA 2721/5624 to this release.
+- Authenticated production smoke needs owner test account.
+- Mobile Lighthouse `/dashboard` LCP **7,924 ms** (Slow 4G, n=1) remains unresolved lab risk — production-equivalent trace before more code.
 - Function-level TTFB: Observability Plus **not** purchased.
-- Production apply of 116/117 after founder authorization.
 - Multiple permissive policies on `interviews` SELECT (authorization-preserving).
-- `markQuestionPlanRows` CAS loop — keep sequential.
-- After-idle Next.js prefetch of marketing tool chunks on `/dashboard` (not initial JS).
 - `PERF_DASHBOARD_TRACE` must stay off in production.
 
 ## Architecture / Rules

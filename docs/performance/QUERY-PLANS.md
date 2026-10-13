@@ -111,18 +111,18 @@ Loop 5 also prints `describeDashboardRequestPlan()`: layout units are TTFB-block
 
 ### Production rollout checklist (116 then 117)
 
-Do **not** apply without explicit founder authorization.
+**Loop 7 (2026-10-13) — applied on production** `plfuvgkycmxcyshrgpgv` in order 116 then 117.
 
-1. **Precheck production** `plfuvgkycmxcyshrgpgv` (reconfirmed 2026-10-13 loop 5): ledger still has **no** rows named `dashboard_perf_indexes_and_rls_initplan` / `interview_turns_rls_initplan`. Highest names remain `114_signup_consent_records` and `script_turns_answered_at`. Live schema: 116 indexes **absent**; feedback/diagnostic policies still **bare** `auth.uid()` / `auth.role()`. Advisor still **5** `auth_rls_initplan` + **11** unindexed FKs + **75** unused + **49** multiple_permissive. `interview_turns` SELECT already uses `(SELECT auth.uid())` — 117 still needed for ledger, not for a missing wrap. Do not apply in this loop.
-2. **Precheck staging** `iiowrzfwemaxytbykjrg` (reconfirmed loop 5): ledger rows exist by **name** under timestamp versions `20261013061140` / `20261013061647`. Advisor: `auth_rls_initplan=0`, `unindexed_foreign_keys=0`, unused_index **120**, multiple_permissive **45**. Do not drop unused indexes.
-3. **Apply order:** `116_dashboard_perf_indexes_and_rls_initplan.sql`, then `117_interview_turns_rls_initplan.sql`. 117's SQL matches the current production policy text; applying it is an authorization-preserving `ALTER POLICY` plus a ledger row.
-4. **Locking:** `CREATE INDEX IF NOT EXISTS` takes SHARE (not CONCURRENTLY — migrations are transactional). Tables are small relative to `interviews`.
-5. **Postcheck:** ledger rows by **name**; `pg_indexes` for the 116 names; advisor `auth_rls_initplan=0` and `unindexed_foreign_keys=0`; EXPLAIN the recovery LIMIT 1 and completed-count queries on a real user. Do not drop unused indexes.
-6. **Rollback:** restore the five policies to bare `auth.*()` (not recommended) and `DROP INDEX IF EXISTS` for each added `idx_*`. Do not rewrite 116/117; add a follow-on serial file.
+1. **Precheck (fresh Loop 7):** ledger lacked both names; latest was `script_turns_answered_at`. Feedback/diagnostic policies bare `auth.*()`; `interview_turns` already InitPlan.
+2. **116 applied:** ledger `20261013093634` / `dashboard_perf_indexes_and_rls_initplan`; 12 expected indexes present; five policies InitPlan-wrapped.
+3. **117 applied after 116 verify:** ledger `20261013094210` / `interview_turns_rls_initplan`; SELECT policy remains InitPlan.
+4. **Postcheck advisor:** `auth_rls_initplan` and `unindexed_foreign_keys` gone; unused_index + multiple_permissive remain. **Do not drop unused indexes.**
+5. **Staging** still has earlier ledger rows `20261013061140` / `20261013061647` by name.
+6. **Rollback:** follow-on serial only — never rewrite 116/117. Full evidence: [RELEASE-READINESS](RELEASE-READINESS.md).
 
 ## Dependencies
 
-Migration 116 applied on staging. Production apply still unauthorized.
+Migrations 116 and 117 applied on staging and production (Loop 7).
 
 ## Failure Modes
 
