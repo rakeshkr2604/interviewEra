@@ -2,6 +2,7 @@
  * Platform-admin authorization helpers.
  */
 
+import { cache } from 'react';
 import { NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 
@@ -44,6 +45,14 @@ async function isPlatformRoleAdmin(userId: string): Promise<boolean> {
   }
 }
 
+/** Request-scoped verified user (auth.getUser). Never caches across requests. */
+export const getVerifiedPlatformUser = cache(async () => {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return null;
+  return user;
+});
+
 /** True when user is in ADMIN_EMAILS / builtin founder list or has platform_role = admin. */
 export async function isPlatformAdminUser(
   userId: string,
@@ -53,11 +62,15 @@ export async function isPlatformAdminUser(
   return isPlatformRoleAdmin(userId);
 }
 
+/**
+ * Admin gate for API routes and RSC. Uses request-scoped getVerifiedPlatformUser
+ * so layout + nested reads share one auth.getUser. Authorization still runs on
+ * every protected API call — a layout check alone is never enough.
+ */
 export async function requirePlatformAdmin(): Promise<AdminResult> {
-  const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const user = await getVerifiedPlatformUser();
 
-  if (authError || !user || !user.email) {
+  if (!user || !user.email) {
     return { admin: null, error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
   }
 

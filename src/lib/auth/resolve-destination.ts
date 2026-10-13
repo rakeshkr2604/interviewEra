@@ -36,25 +36,23 @@ export async function resolvePostAuthDestination(
   }
 
   const service = createServiceClient();
-  const { data: profile } = await service
-    .from('users')
-    .select('plan_tier')
-    .eq('id', userId)
-    .single();
+  const [profileResult, hiringResult] = await Promise.all([
+    service.from('users').select('plan_tier').eq('id', userId).single(),
+    service
+      .from('hiring_organizations')
+      .select('id')
+      .eq('admin_user_id', userId)
+      .maybeSingle(),
+  ]);
 
-  if (profile?.plan_tier === 'campus_admin') {
+  const planTier = profileResult.data?.plan_tier;
+  if (planTier === 'campus_admin') {
     return '/college/dashboard';
   }
 
-  const { data: hiringOrg } = await service
-    .from('hiring_organizations')
-    .select('id')
-    .eq('admin_user_id', userId)
-    .maybeSingle();
-
-  if (hiringOrg) {
+  if (hiringResult.data) {
     return '/hiring/dashboard';
   }
 
-  return resolveDestinationFromTier(profile?.plan_tier, params);
+  return resolveDestinationFromTier(planTier, params);
 }

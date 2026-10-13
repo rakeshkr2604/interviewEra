@@ -23,6 +23,7 @@ vi.mock('@/lib/supabase/server', () => ({
 }));
 
 vi.mock('@/lib/admin/auth', () => ({
+  getVerifiedPlatformUser: vi.fn(async () => mockUser),
   isPlatformAdminUser: vi.fn(async () => mockIsAdmin),
 }));
 

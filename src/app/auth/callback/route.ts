@@ -5,6 +5,7 @@ import {
   parseAttributionFromSearchParams,
 } from '@/lib/analytics/attribution';
 import { persistUserAttributionOnce } from '@/lib/analytics/persist-user-attribution';
+import { scheduleServerlessBackgroundWork } from '@/lib/analytics/schedule-serverless-background-work';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { sendWelcomeEmailIfNeeded } from '@/lib/email/lifecycle/send-welcome';
 import { isAuthV2Enabled } from '@/lib/auth/flags';
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           ...parseAttributionFromSearchParams(searchParams),
         };
 
+        // Funnel beacon is best-effort; do not block the redirect response.
         trackFunnelEvent(
           'signup_completed',
           { userId, source: 'oauth', method: 'oauth' },
@@ -100,35 +102,33 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         );
 
         if (userId) {
-          await persistUserAttributionOnce(createServiceClient(), userId, attribution).catch(
-            (err) => {
-              console.error('[auth/callback] attribution persistence failed:', err);
-            },
-          );
-
-          void sendWelcomeEmailIfNeeded(userId).catch((err) => {
-            console.error('[auth/callback] welcome email failed:', err);
-          });
-
           const referralCode = cookieStore.get('referral_code')?.value;
-          if (referralCode) {
-            void captureReferralFromCode(createServiceClient(), userId, referralCode).catch(
-              (err) => {
-                console.warn('[auth/callback] referral capture failed:', err);
-              },
-            );
-          }
-
           const signupConsent = parseSignupConsentCookie(
             cookieStore.get(SIGNUP_CONSENT_COOKIE)?.value,
           );
-          if (signupConsent) {
-            void persistSignupConsent(createServiceClient(), userId, signupConsent).catch(
-              (err) => {
+
+          // Attribution / welcome / referral / consent are enrichment — schedule
+          // via after()/waitUntil so the redirect is not delayed and work survives
+          // the serverless response (unlike bare fire-and-forget promises).
+          scheduleServerlessBackgroundWork(async () => {
+            const service = createServiceClient();
+            await persistUserAttributionOnce(service, userId, attribution).catch((err) => {
+              console.error('[auth/callback] attribution persistence failed:', err);
+            });
+            await sendWelcomeEmailIfNeeded(userId).catch((err) => {
+              console.error('[auth/callback] welcome email failed:', err);
+            });
+            if (referralCode) {
+              await captureReferralFromCode(service, userId, referralCode).catch((err) => {
+                console.warn('[auth/callback] referral capture failed:', err);
+              });
+            }
+            if (signupConsent) {
+              await persistSignupConsent(service, userId, signupConsent).catch((err) => {
                 console.error('[auth/callback] signup consent persist failed:', err);
-              },
-            );
-          }
+              });
+            }
+          });
         }
       }
 

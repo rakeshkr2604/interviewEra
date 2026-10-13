@@ -2,7 +2,7 @@
 
 > Status: CANONICAL
 > Last Verified: 2026-10-13
-> Verification Scope: next.config outputFileTracing + serverless PDF scoping + dashboard request folding + client nav isolation + gated TTFB spans
+> Verification Scope: next.config outputFileTracing + serverless PDF scoping + dashboard request folding + client nav isolation + gated TTFB spans + Loop 9 sign-in/admin funnel
 > Authority: Perf / bundling guidance
 
 ## Purpose
@@ -24,6 +24,10 @@ Avoid known prod-only failures and keep serverless packages correct — especial
 - Dashboard chrome must keep `scrollbar-gutter: stable` (classic desktop scrollbars). Do not restore the short centered spinner in `(dashboard)/loading.tsx`.
 - Document TTFB on `/dashboard` is layout (`auth.getUser` then chrome queries), not the two-wave page loader, when the header/body `Suspense` streams. Staging-only `PERF_DASHBOARD_TRACE=1` logs `[perf:dashboard]` spans with no user ids — never enable in production.
 - Release/rollout: [`docs/performance/RELEASE-READINESS.md`](../performance/RELEASE-READINESS.md)
+- Password login: plan_tier + hiring-org lookups run concurrently when both are required; hiring-org is skipped for explicit non-dashboard `next` ([`resolve-password-login-destination.ts`](../../src/lib/auth/resolve-password-login-destination.ts)).
+- OAuth callback: session exchange + destination stay on the critical path; attribution / welcome / referral / consent use `scheduleServerlessBackgroundWork` (`after()` / waitUntil) — never bare fire-and-forget.
+- Platform admin: request-scoped `getVerifiedPlatformUser` dedupes `auth.getUser`; every `/api/admin/*` still calls `requirePlatformAdmin`.
+- Admin funnel/growth: one cohort fetch, chunked `.in()` (100), set-based D7 return-visit / retention; cache-aside + single-flight via `getOrComputeCached` (TTL 120s, `fresh=1` bypass). Lab scripts: `scripts/perf/measure-admin-funnel.ts`, `measure-funnel-before-after.ts`.
 
 ### Heavy server-side dependencies must be route-scoped
 

@@ -48,9 +48,11 @@ describe('resolvePostAuthDestination', () => {
 
   it('routes campus_admin to college dashboard', async () => {
     mockSingle.mockResolvedValue({ data: { plan_tier: 'campus_admin' } });
+    mockMaybeSingle.mockResolvedValue({ data: null });
     const dest = await resolvePostAuthDestination('admin-1', {});
     expect(dest).toBe('/college/dashboard');
-    expect(mockFrom).not.toHaveBeenCalledWith('hiring_organizations');
+    // Plan + hiring lookups run concurrently; campus_admin still wins.
+    expect(mockFrom).toHaveBeenCalledWith('users');
   });
 
   it('defaults free users to dashboard', async () => {

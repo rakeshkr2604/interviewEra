@@ -2,7 +2,7 @@
 
 > Status: CANONICAL
 > Last Verified: 2026-10-13
-> Verification Scope: Loop 6 release gate + Loop 5 staging TTFB traces on `perf/fullstack-performance-audit`
+> Verification Scope: Loop 6–8 dashboard release evidence + Loop 9 sign-in/admin funnel lab benchmarks
 > Authority: Claimed improvements must match evidence below
 
 ## Purpose
@@ -196,6 +196,28 @@ Verified:
 4. Authenticated smoke **BLOCKED** pending owner test account. Unauthenticated auth gate **PASS**.
 5. New-SHA Speed Insights window starting `2026-10-13T09:35:28Z` currently **n=0**. Old-SHA baseline (TTFB 2721 / LCP 5624 / CLS 0.16) remains separate. Operator packet: [RELEASE-READINESS](RELEASE-READINESS.md).
 
+### Loop 9 — sign-in + admin funnel (lab)
+
+| Change | Why |
+|---|---|
+| Parallel plan_tier + hiring-org on password login; skip hiring when `next` is explicit non-dashboard | Removes a serial RTT on the common hiring path; preserves routing rules |
+| OAuth enrichment via `scheduleServerlessBackgroundWork` | Redirect no longer waits on attribution; work survives serverless response |
+| `getVerifiedPlatformUser` request-scoped cache | Layout shares one `auth.getUser` without cross-request auth caching |
+| Funnel cohort reuse + set-based D7 + chunked `.in(100)` | Removes return-visit N+1 and repeated cohort scans |
+| Growth retention set-based activity + batched interviews | Removes D1/D7/D30 per-user loops |
+| `getOrComputeCached` single-flight | Cold cache stampede coalescing; `fresh=1` still recomputes |
+
+**Staging lab** (`.env.staging.local`, ref `iiowrzfwemaxytbykjrg`, **not** field CWV):
+
+| Metric | Before | After | n | Notes |
+|---|---:|---:|---:|---|
+| Return-visit 90d (queries) | 17 | 1 | 5 | Same returned count = 1 |
+| Return-visit 90d median ms | **7455** | **424** | 5 | `measure-funnel-before-after.ts` |
+| Full `computeFunnelMetrics` 30d median ms | (legacy not re-timed end-to-end) | **405** | 5 | Post-fix only |
+| Full `computeGrowthMetrics` 30d median ms | (legacy not re-timed end-to-end) | **234** | 5 | Post-fix only |
+
+Password sign-in end-to-end lab: **SKIPPED** (`PERF_SIGNIN_USER_ID` unset). Production authenticated smoke: **BLOCKED** (owner test account). No Loop 9 migration — existing indexes sufficient.
+
 ### Remaining blockers
 
 - New-SHA field p75 **PENDING** until post-deploy n ≥ baseline (TTFB ≥78, LCP ≥137, CLS ≥46). Do not attribute old-SHA 2721/5624 to this release.
@@ -204,6 +226,7 @@ Verified:
 - Function-level TTFB: Observability Plus **not** purchased.
 - Multiple permissive policies on `interviews` SELECT (authorization-preserving).
 - `PERF_DASHBOARD_TRACE` must stay off in production.
+- Loop 9 production field improvement for `/platform/growth` and `/login` **PENDING** until app SHA deploys and Speed Insights / API timings are sampled.
 
 ## Architecture / Rules
 

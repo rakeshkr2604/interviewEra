@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server';
 import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { computeFunnelMetrics } from '@/lib/admin/funnel-metrics';
-import { getCached, setCached } from '@/lib/admin/cache';
+import { getOrComputeCached } from '@/lib/admin/cache';
 import { parseAdminDateBounds, resolveGrowthPreset } from '@/lib/admin/date-range';
 
 const CACHE_KEY = 'admin:funnel';
@@ -26,17 +26,18 @@ export async function GET(request: Request) {
   const fresh = url.searchParams.get('fresh') === '1';
   const cacheKey = `${CACHE_KEY}:${bounds.preset}:${bounds.fromIso}:${bounds.toIso}`;
 
-  if (!fresh) {
-    const cached = getCached<Awaited<ReturnType<typeof computeFunnelMetrics>>>(cacheKey);
-    if (cached) return NextResponse.json(cached);
-  }
-
   try {
-    const svc = createServiceClient();
-    const metrics = await computeFunnelMetrics(svc, rangeDays, {
-      sinceIso: bounds.fromIso ?? undefined,
-    });
-    setCached(cacheKey, metrics, CACHE_TTL);
+    const { data: metrics } = await getOrComputeCached(
+      cacheKey,
+      CACHE_TTL,
+      async () => {
+        const svc = createServiceClient();
+        return computeFunnelMetrics(svc, rangeDays, {
+          sinceIso: bounds.fromIso ?? undefined,
+        });
+      },
+      { fresh },
+    );
     return NextResponse.json(metrics);
   } catch (err) {
     console.error('[admin/funnel] Error:', err);

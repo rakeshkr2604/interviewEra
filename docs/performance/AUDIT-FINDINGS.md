@@ -2,7 +2,7 @@
 
 > Status: CANONICAL
 > Last Verified: 2026-10-13
-> Verification Scope: Dashboard, history, analytics, settings, campus deadlines, production advisor, field LCP/CLS attribution, loop 5 staging TTFB traces
+> Verification Scope: Dashboard, history, analytics, settings, campus deadlines, production advisor, field LCP/CLS attribution, loop 5 staging TTFB traces, Loop 9 sign-in + admin funnel
 > Authority: Confirmed bottlenecks with file paths
 
 ## Purpose
@@ -28,6 +28,20 @@ Correlate production SQL, advisor output, and application call sites. Not every 
 | D11 | Desktop CLS = scrollbar + short spinner | Field CLS p75 0.16 (n=46). Attribution: chrome `footer` (22) and decorative blob (12). Desktop 0.16 / mobile 0.09. Classic scrollbar + `loading.tsx` spinner left the footer in the first viewport | High — field CLS |
 | D12 | LCP element is chrome/subtitle | Field LCP attribution: `<main>` 64, header subtitle `<p>` 41. Loop 4 streams that subtitle without the snapshot. Recharts is **after** lab LCP | High — field LCP |
 | D13 | Community card hydrates in | [`DashboardCommunityCard.tsx`](../../src/components/community/DashboardCommunityCard.tsx) server snapshot was `false` | Med — in-flow insert |
+
+### Loop 9 — sign-in + admin funnel (confirmed)
+
+| ID | Finding | Evidence | Impact |
+|---|---|---|---|
+| A1 | Password login serial `users.plan_tier` then `hiring_organizations` | `src/app/(auth)/login/LoginForm.tsx` | Med — adds one RTT after auth when hiring lookup is required |
+| A2 | OAuth callback awaited `persistUserAttributionOnce` before redirect | [`auth/callback/route.ts`](../../src/app/auth/callback/route.ts) | High — attribution latency on every Google sign-in |
+| A3 | Funnel D7 return-visit N+1 on `user_activity` | [`funnel-metrics.ts`](../../src/lib/admin/funnel-metrics.ts) `countCohortReturnVisit` | High — staging 90d: **17 queries / median 7455 ms** → **1 query / median 424 ms** (n=5, parity returned=1) |
+| A4 | Funnel helpers re-fetched the signup cohort repeatedly | Same file | Med — redundant PostgREST round-trips |
+| A5 | Growth D1/D7/D30 retention N+1 activity (+ interview fallback) | [`growth-metrics.ts`](../../src/lib/admin/growth-metrics.ts) | High — up to ~2N queries per window on `/platform/growth` |
+| A6 | Report-viewed did exact count then re-downloaded rows | `countCohortReportViewed` | Med — double read for distinct users |
+| A7 | Admin in-memory cache had no single-flight | [`cache.ts`](../../src/lib/admin/cache.ts) | Med — cold stampede when Growth fires 4 APIs |
+
+Production read-only (ref `plfuvgkycmxcyshrgpgv`): cohort 90d = **146** users; set-based D7 return-visit EXPLAIN execution **~6.6 ms**; aggregate returned **9**. No new index justified at current cardinality (`users.created_at` still seq-scan on 221 rows).
 
 ### Confirmed non-dashboard SQL (do not “fix” as dashboard)
 

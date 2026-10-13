@@ -7,6 +7,7 @@ import {
   computeConversionFunnelMetrics,
   type ConversionFunnelMetrics,
 } from '@/lib/admin/conversion-funnel-metrics';
+import { chunkIds } from '@/lib/dashboard/id-chunks';
 
 export interface RetentionCohort {
   label: string;
@@ -55,12 +56,18 @@ async function countActiveSince(svc: SupabaseClient, sinceIso: string): Promise<
   return count ?? 0;
 }
 
-async function computeRetention(
+/**
+ * D{n} retention: users who signed up in [now-(n+7)d, now-n d) and returned
+ * within n days via user_activity.last_seen_at or an interview started_at.
+ * Set-based: one activity fetch + one interviews fetch (chunked), not N+1.
+ */
+export async function computeRetention(
   svc: SupabaseClient,
   days: number,
 ): Promise<RetentionCohort> {
-  const cohortStart = new Date(Date.now() - (days + 7) * 24 * 60 * 60 * 1000);
-  const cohortEnd = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+  const msDay = 24 * 60 * 60 * 1000;
+  const cohortStart = new Date(Date.now() - (days + 7) * msDay);
+  const cohortEnd = new Date(Date.now() - days * msDay);
 
   const { data: cohort } = await svc
     .from('users')
@@ -68,40 +75,66 @@ async function computeRetention(
     .gte('created_at', cohortStart.toISOString())
     .lt('created_at', cohortEnd.toISOString());
 
-  const users = cohort ?? [];
+  const users = (cohort ?? []).map((u) => ({
+    id: u.id as string,
+    created_at: u.created_at as string,
+  }));
   if (users.length === 0) {
     return { label: `D${days}`, rate_pct: 0, cohort_size: 0, retained: 0 };
   }
 
-  let retained = 0;
-  for (const u of users) {
-    const created = new Date(u.created_at as string).getTime();
-    const windowEnd = created + days * 24 * 60 * 60 * 1000;
-
+  const lastSeenByUser = new Map<string, number>();
+  for (const chunk of chunkIds(users.map((u) => u.id))) {
     const { data: activity } = await svc
       .from('user_activity')
-      .select('last_seen_at')
-      .eq('user_id', u.id as string)
-      .maybeSingle();
-
-    if (activity?.last_seen_at) {
-      const lastSeen = new Date(activity.last_seen_at as string).getTime();
-      if (lastSeen <= windowEnd && lastSeen > created) {
-        retained += 1;
-        continue;
-      }
+      .select('user_id, last_seen_at')
+      .in('user_id', chunk);
+    for (const row of activity ?? []) {
+      if (!row.last_seen_at) continue;
+      lastSeenByUser.set(row.user_id as string, new Date(row.last_seen_at as string).getTime());
     }
-
-    const { count } = await svc
-      .from('interviews')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', u.id as string)
-      .gte('started_at', new Date(created).toISOString())
-      .lte('started_at', new Date(windowEnd).toISOString());
-
-    if ((count ?? 0) > 0) retained += 1;
   }
 
+  const retainedByActivity = new Set<string>();
+  const needInterviewCheck: { id: string; created: number; windowEnd: number }[] = [];
+  for (const u of users) {
+    const created = new Date(u.created_at).getTime();
+    const windowEnd = created + days * msDay;
+    const lastSeen = lastSeenByUser.get(u.id);
+    if (lastSeen != null && lastSeen <= windowEnd && lastSeen > created) {
+      retainedByActivity.add(u.id);
+    } else {
+      needInterviewCheck.push({ id: u.id, created, windowEnd });
+    }
+  }
+
+  const retainedByInterview = new Set<string>();
+  if (needInterviewCheck.length > 0) {
+    const minCreated = Math.min(...needInterviewCheck.map((u) => u.created));
+    const maxWindowEnd = Math.max(...needInterviewCheck.map((u) => u.windowEnd));
+    const windows = new Map(needInterviewCheck.map((u) => [u.id, u]));
+
+    for (const chunk of chunkIds(needInterviewCheck.map((u) => u.id))) {
+      const { data: interviews } = await svc
+        .from('interviews')
+        .select('user_id, started_at')
+        .in('user_id', chunk)
+        .gte('started_at', new Date(minCreated).toISOString())
+        .lte('started_at', new Date(maxWindowEnd).toISOString());
+      for (const row of interviews ?? []) {
+        const uid = row.user_id as string;
+        if (retainedByInterview.has(uid)) continue;
+        const window = windows.get(uid);
+        if (!window || !row.started_at) continue;
+        const started = new Date(row.started_at as string).getTime();
+        if (started >= window.created && started <= window.windowEnd) {
+          retainedByInterview.add(uid);
+        }
+      }
+    }
+  }
+
+  const retained = retainedByActivity.size + retainedByInterview.size;
   return {
     label: `D${days}`,
     rate_pct: pct(retained, users.length) ?? 0,

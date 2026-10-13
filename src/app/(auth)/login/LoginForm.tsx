@@ -16,11 +16,11 @@ import { SessionBanner } from '@/components/auth/SessionBanner';
 import { AuthInterstitial } from '@/components/auth/AuthInterstitial';
 import { mapAuthErrorMessage } from '@/lib/auth/auth-errors';
 import { isAuthV2Enabled } from '@/lib/auth/flags';
-import {
-  extractInviteTokenFromNext,
-  resolveDestinationFromTier,
-} from '@/lib/auth/resolve-destination-core';
 import type { SessionRedirectReason } from '@/lib/auth/auth-params';
+import {
+  resolvePasswordLoginDestination,
+  shouldLookupHiringOrganization,
+} from '@/lib/auth/resolve-password-login-destination';
 import { useOAuthSignIn } from '@/hooks/use-oauth-sign-in';
 import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
 import { IE_FIELD_GROUP_CLASS, IE_FIELD_SURFACE_STYLE, IE_INPUT_CLASS, IE_LABEL_CLASS } from '@/lib/theme/component-classes';
@@ -70,34 +70,34 @@ export function LoginForm({ next, email: initialEmail, reason }: LoginFormProps)
         return;
       }
 
-      router.refresh();
+      // Refresh session cookies into the RSC tree without awaiting — destination
+      // lookups below are independent and must not wait on a full layout refetch.
+      void router.refresh();
 
       const loggedInUser = signInData.user;
       let destination = '/dashboard';
 
       if (loggedInUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('plan_tier')
-          .eq('id', loggedInUser.id)
-          .single();
+        const needsHiringLookup = shouldLookupHiringOrganization(next);
+        const [profileResult, hiringResult] = await Promise.all([
+          supabase
+            .from('users')
+            .select('plan_tier')
+            .eq('id', loggedInUser.id)
+            .single(),
+          needsHiringLookup
+            ? supabase
+                .from('hiring_organizations')
+                .select('id')
+                .eq('admin_user_id', loggedInUser.id)
+                .maybeSingle()
+            : Promise.resolve({ data: null as { id: string } | null }),
+        ]);
 
-        const inviteToken = extractInviteTokenFromNext(next);
-        destination = resolveDestinationFromTier(profile?.plan_tier, {
-          next,
-          inviteToken,
+        destination = resolvePasswordLoginDestination(next, {
+          planTier: profileResult.data?.plan_tier,
+          hiringOrgId: hiringResult.data?.id ?? null,
         });
-
-        if (!next || next === '/dashboard') {
-          const { data: hiringOrg } = await supabase
-            .from('hiring_organizations')
-            .select('id')
-            .eq('admin_user_id', loggedInUser.id)
-            .maybeSingle();
-          if (hiringOrg) {
-            destination = '/hiring/dashboard';
-          }
-        }
       }
 
       trackLoginCompleted({

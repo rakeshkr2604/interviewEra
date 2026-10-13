@@ -1,8 +1,14 @@
 /**
  * Founder funnel metrics — computed from transactional tables + product_events.
+ *
+ * Performance contract:
+ * - Fetch the signup cohort once and reuse it across step helpers.
+ * - Prefer bounded chunked `.in()` reads over per-user round-trips.
+ * - Do not download full event histories when a distinct user_id set suffices.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { chunkIds } from '@/lib/dashboard/id-chunks';
 
 export type FunnelStepKey =
   | 'landing'
@@ -32,6 +38,11 @@ export interface FunnelMetricsResult {
   steps: FunnelStepMetric[];
   generated_at: string;
 }
+
+export type FunnelCohortUser = {
+  id: string;
+  created_at: string;
+};
 
 const STEP_META: Record<
   FunnelStepKey,
@@ -93,145 +104,25 @@ const STEP_META: Record<
   },
 };
 
+const MS_DAY = 24 * 60 * 60 * 1000;
+
 function pct(numerator: number, denominator: number): number | null {
   if (denominator <= 0) return null;
   return Math.round((numerator / denominator) * 1000) / 10;
 }
 
-async function countUsersCreatedSince(
+export async function fetchFunnelCohort(
   svc: SupabaseClient,
   sinceIso: string,
-): Promise<number> {
-  const { count } = await svc
-    .from('users')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', sinceIso);
-  return count ?? 0;
-}
-
-async function countCohortWithResume(
-  svc: SupabaseClient,
-  sinceIso: string,
-): Promise<number> {
-  const { data: cohort } = await svc
-    .from('users')
-    .select('id')
-    .gte('created_at', sinceIso);
-  const ids = (cohort ?? []).map((r) => r.id as string);
-  if (ids.length === 0) return 0;
-
-  const { data: resumes } = await svc
-    .from('resumes')
-    .select('user_id')
-    .in('user_id', ids);
-  return new Set((resumes ?? []).map((r) => r.user_id as string)).size;
-}
-
-/**
- * "Started" excludes 'pending' — a row stuck in 'pending' means question
- * generation never resolved (or the user left before it did), so the
- * candidate never actually began answering. Counting it as "started" both
- * inflates the started count and understates true started→completed
- * conversion (a denominator padded with sessions nobody could have finished).
- */
-export async function countCohortFirstInterview(
-  svc: SupabaseClient,
-  sinceIso: string,
-  completed: boolean,
-): Promise<number> {
-  const { data: cohort } = await svc
-    .from('users')
-    .select('id')
-    .gte('created_at', sinceIso);
-  const ids = (cohort ?? []).map((r) => r.id as string);
-  if (ids.length === 0) return 0;
-
-  let query = svc.from('interviews').select('user_id').in('user_id', ids);
-  query = completed ? query.eq('status', 'completed') : query.neq('status', 'pending');
-  const { data: rows } = await query;
-  return new Set((rows ?? []).map((r) => r.user_id as string)).size;
-}
-
-async function countCohortReportViewed(svc: SupabaseClient, sinceIso: string): Promise<number> {
-  const { data: cohort } = await svc
-    .from('users')
-    .select('id')
-    .gte('created_at', sinceIso);
-  const ids = (cohort ?? []).map((r) => r.id as string);
-  if (ids.length === 0) return 0;
-
-  const { count } = await svc
-    .from('product_events')
-    .select('user_id', { count: 'exact', head: true })
-    .in('user_id', ids)
-    .in('event_name', ['report_viewed', 'report_opened']);
-  if (count && count > 0) {
-    const { data: events } = await svc
-      .from('product_events')
-      .select('user_id')
-      .in('user_id', ids)
-      .in('event_name', ['report_viewed', 'report_opened']);
-    return new Set((events ?? []).map((r) => r.user_id as string)).size;
-  }
-
-  const { data: interviews } = await svc
-    .from('interviews')
-    .select('id, user_id')
-    .in('user_id', ids)
-    .eq('status', 'completed');
-  const interviewIds = (interviews ?? []).map((r) => r.id as string);
-  if (interviewIds.length === 0) return 0;
-
-  const { data: reports } = await svc
-    .from('reports')
-    .select('interview_id')
-    .in('interview_id', interviewIds);
-  const reportInterviewIds = new Set((reports ?? []).map((r) => r.interview_id as string));
-  return new Set(
-    (interviews ?? [])
-      .filter((i) => reportInterviewIds.has(i.id as string))
-      .map((i) => i.user_id as string),
-  ).size;
-}
-
-async function countCohortReturnVisit(svc: SupabaseClient, sinceIso: string): Promise<number> {
-  const { data: cohort } = await svc
+): Promise<FunnelCohortUser[]> {
+  const { data } = await svc
     .from('users')
     .select('id, created_at')
     .gte('created_at', sinceIso);
-  if (!cohort?.length) return 0;
-
-  let returned = 0;
-  for (const row of cohort) {
-    const userId = row.id as string;
-    const created = new Date(row.created_at as string).getTime();
-    const d7 = created + 7 * 24 * 60 * 60 * 1000;
-    const { data: activity } = await svc
-      .from('user_activity')
-      .select('last_seen_at')
-      .eq('user_id', userId)
-      .maybeSingle();
-    if (!activity?.last_seen_at) continue;
-    const lastSeen = new Date(activity.last_seen_at as string).getTime();
-    if (lastSeen >= d7) returned += 1;
-  }
-  return returned;
-}
-
-async function countCohortPaid(svc: SupabaseClient, sinceIso: string): Promise<number> {
-  const { data: cohort } = await svc
-    .from('users')
-    .select('id')
-    .gte('created_at', sinceIso);
-  const ids = (cohort ?? []).map((r) => r.id as string);
-  if (ids.length === 0) return 0;
-
-  const { data: payments } = await svc
-    .from('payments')
-    .select('user_id')
-    .in('user_id', ids)
-    .eq('status', 'paid');
-  return new Set((payments ?? []).map((r) => r.user_id as string)).size;
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    created_at: r.created_at as string,
+  }));
 }
 
 async function countProductEventsSince(
@@ -247,15 +138,182 @@ async function countProductEventsSince(
   return count ?? 0;
 }
 
-async function countVerificationCompleted(svc: SupabaseClient, sinceIso: string): Promise<number> {
+async function countCohortWithResume(
+  svc: SupabaseClient,
+  userIds: string[],
+): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const distinct = new Set<string>();
+  for (const chunk of chunkIds(userIds)) {
+    const { data } = await svc.from('resumes').select('user_id').in('user_id', chunk);
+    for (const row of data ?? []) distinct.add(row.user_id as string);
+  }
+  return distinct.size;
+}
+
+/**
+ * "Started" excludes 'pending' — a row stuck in 'pending' means question
+ * generation never resolved (or the user left before it did), so the
+ * candidate never actually began answering. Counting it as "started" both
+ * inflates the started count and understates true started→completed
+ * conversion (a denominator padded with sessions nobody could have finished).
+ */
+export async function countCohortFirstInterview(
+  svc: SupabaseClient,
+  sinceIso: string,
+  completed: boolean,
+  cohortIds?: string[],
+): Promise<number> {
+  const ids =
+    cohortIds ??
+    (await fetchFunnelCohort(svc, sinceIso)).map((u) => u.id);
+  if (ids.length === 0) return 0;
+
+  const distinct = new Set<string>();
+  for (const chunk of chunkIds(ids)) {
+    let query = svc.from('interviews').select('user_id').in('user_id', chunk);
+    query = completed ? query.eq('status', 'completed') : query.neq('status', 'pending');
+    const { data } = await query;
+    for (const row of data ?? []) distinct.add(row.user_id as string);
+  }
+  return distinct.size;
+}
+
+async function loadCohortInterviewUserStatuses(
+  svc: SupabaseClient,
+  userIds: string[],
+): Promise<{ started: Set<string>; completed: Set<string> }> {
+  const started = new Set<string>();
+  const completed = new Set<string>();
+  if (userIds.length === 0) {
+    return { started, completed };
+  }
+
+  for (const chunk of chunkIds(userIds)) {
+    const { data } = await svc
+      .from('interviews')
+      .select('user_id, status')
+      .in('user_id', chunk);
+    for (const row of data ?? []) {
+      const uid = row.user_id as string;
+      const status = row.status as string;
+      if (status !== 'pending') started.add(uid);
+      if (status === 'completed') completed.add(uid);
+    }
+  }
+  return { started, completed };
+}
+
+export async function countCohortReportViewed(
+  svc: SupabaseClient,
+  sinceIso: string,
+  cohortIds?: string[],
+): Promise<number> {
+  const ids =
+    cohortIds ??
+    (await fetchFunnelCohort(svc, sinceIso)).map((u) => u.id);
+  if (ids.length === 0) return 0;
+
+  const eventUsers = new Set<string>();
+  for (const chunk of chunkIds(ids)) {
+    const { data: events } = await svc
+      .from('product_events')
+      .select('user_id')
+      .in('user_id', chunk)
+      .in('event_name', ['report_viewed', 'report_opened']);
+    for (const row of events ?? []) {
+      if (row.user_id) eventUsers.add(row.user_id as string);
+    }
+  }
+  if (eventUsers.size > 0) return eventUsers.size;
+
+  const completedInterviewIds: string[] = [];
+  const interviewUserById = new Map<string, string>();
+  for (const chunk of chunkIds(ids)) {
+    const { data: interviews } = await svc
+      .from('interviews')
+      .select('id, user_id')
+      .in('user_id', chunk)
+      .eq('status', 'completed');
+    for (const row of interviews ?? []) {
+      const iid = row.id as string;
+      completedInterviewIds.push(iid);
+      interviewUserById.set(iid, row.user_id as string);
+    }
+  }
+  if (completedInterviewIds.length === 0) return 0;
+
+  const reportInterviewIds = new Set<string>();
+  for (const chunk of chunkIds(completedInterviewIds)) {
+    const { data: reports } = await svc
+      .from('reports')
+      .select('interview_id')
+      .in('interview_id', chunk);
+    for (const row of reports ?? []) {
+      reportInterviewIds.add(row.interview_id as string);
+    }
+  }
+
+  const users = new Set<string>();
+  for (const interviewId of reportInterviewIds) {
+    const uid = interviewUserById.get(interviewId);
+    if (uid) users.add(uid);
+  }
+  return users.size;
+}
+
+export async function countCohortReturnVisit(
+  svc: SupabaseClient,
+  sinceIso: string,
+  cohort?: FunnelCohortUser[],
+): Promise<number> {
+  const rows = cohort ?? (await fetchFunnelCohort(svc, sinceIso));
+  if (rows.length === 0) return 0;
+
+  const lastSeenByUser = new Map<string, number>();
+  for (const chunk of chunkIds(rows.map((r) => r.id))) {
+    const { data: activity } = await svc
+      .from('user_activity')
+      .select('user_id, last_seen_at')
+      .in('user_id', chunk);
+    for (const row of activity ?? []) {
+      if (!row.last_seen_at) continue;
+      lastSeenByUser.set(row.user_id as string, new Date(row.last_seen_at as string).getTime());
+    }
+  }
+
+  let returned = 0;
+  for (const row of rows) {
+    const lastSeen = lastSeenByUser.get(row.id);
+    if (lastSeen == null) continue;
+    const d7 = new Date(row.created_at).getTime() + 7 * MS_DAY;
+    if (lastSeen >= d7) returned += 1;
+  }
+  return returned;
+}
+
+async function countCohortPaid(svc: SupabaseClient, userIds: string[]): Promise<number> {
+  if (userIds.length === 0) return 0;
+  const distinct = new Set<string>();
+  for (const chunk of chunkIds(userIds)) {
+    const { data } = await svc
+      .from('payments')
+      .select('user_id')
+      .in('user_id', chunk)
+      .eq('status', 'paid');
+    for (const row of data ?? []) distinct.add(row.user_id as string);
+  }
+  return distinct.size;
+}
+
+async function countVerificationCompleted(
+  svc: SupabaseClient,
+  sinceIso: string,
+  cohortSize: number,
+): Promise<number> {
   const eventCount = await countProductEventsSince(svc, ['verification_completed'], sinceIso);
   if (eventCount > 0) return eventCount;
-
-  const { data: cohort } = await svc
-    .from('users')
-    .select('id')
-    .gte('created_at', sinceIso);
-  return cohort?.length ?? 0;
+  return cohortSize;
 }
 
 export async function computeFunnelMetrics(
@@ -266,28 +324,28 @@ export async function computeFunnelMetrics(
   const since =
     options?.sinceIso ?? new Date(Date.now() - rangeDays * 24 * 60 * 60 * 1000).toISOString();
 
+  const cohort = await fetchFunnelCohort(svc, since);
+  const cohortIds = cohort.map((u) => u.id);
+  const cohortSignups = cohort.length;
+
   const [
-    cohortSignups,
     pageViews,
     landingCta,
     resumeUsers,
-    startedUsers,
-    completedUsers,
+    interviewStatuses,
     reportUsers,
     returnUsers,
     paidUsers,
     verifiedUsers,
   ] = await Promise.all([
-    countUsersCreatedSince(svc, since),
     countProductEventsSince(svc, ['page_view'], since),
     countProductEventsSince(svc, ['landing_cta_clicked'], since),
-    countCohortWithResume(svc, since),
-    countCohortFirstInterview(svc, since, false),
-    countCohortFirstInterview(svc, since, true),
-    countCohortReportViewed(svc, since),
-    countCohortReturnVisit(svc, since),
-    countCohortPaid(svc, since),
-    countVerificationCompleted(svc, since),
+    countCohortWithResume(svc, cohortIds),
+    loadCohortInterviewUserStatuses(svc, cohortIds),
+    countCohortReportViewed(svc, since, cohortIds),
+    countCohortReturnVisit(svc, since, cohort),
+    countCohortPaid(svc, cohortIds),
+    countVerificationCompleted(svc, since, cohortSignups),
   ]);
 
   const landingCount = Math.max(pageViews, landingCta, cohortSignups);
@@ -296,8 +354,8 @@ export async function computeFunnelMetrics(
     signup: cohortSignups,
     verification: Math.min(verifiedUsers, cohortSignups),
     resume: resumeUsers,
-    interview_started: startedUsers,
-    interview_completed: completedUsers,
+    interview_started: interviewStatuses.started.size,
+    interview_completed: interviewStatuses.completed.size,
     report_viewed: reportUsers,
     return_visit: returnUsers,
     paid: paidUsers,
