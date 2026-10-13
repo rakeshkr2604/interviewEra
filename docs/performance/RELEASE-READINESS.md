@@ -2,30 +2,26 @@
 
 > Status: CANONICAL
 > Last Verified: 2026-10-13
-> Verification Scope: Loop 7 complete execution — merge, production 116→117, production deploy READY; authenticated smoke + new-SHA field metrics PENDING
-> Authority: Operator release packet with Loop 7 evidence
+> Verification Scope: Loop 8 production verification — release state + migrations reconfirmed; authenticated smoke still BLOCKED; dashboard field samples still PENDING
+> Authority: Operator release packet with Loop 7–8 evidence
 
 ## Purpose
 
 Separate application ship, database migrations, production verification, and rollback. Production field TTFB/LCP/CLS from the **old SHA** must never be attributed to this release until a comparable **post-deploy** field window exists.
 
-## Current State (post Loop 7)
+## Current State (Loop 8 reconfirm — `2026-10-13T10:04:57Z`)
 
 | Item | Value |
 |---|---|
-| Release branch | `perf/fullstack-performance-audit` @ `f854191418a878483e87ffaedb85eabfdb5630f2` |
-| Pre-release `main` | `1de95c19b6732afb2cf8b6d133f7622624ae726a` |
-| PR | https://github.com/rakesh2604/InterviewEra/pull/166 — **MERGED** (squash) |
-| Merge commit / production SHA | `9c28886a8c704d92095e7417836ed4856590bc0a` |
-| Merge time (UTC) | `2026-10-13T09:35:28Z` |
-| Production deploy | **READY** `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u` — aliases `interviewera.com`, `www.interviewera.com` |
-| Deploy created (UTC) | `2026-10-13T09:35:31.374Z` |
-| Staging DB | 116 + 117 (earlier loops) |
-| Production DB | **116 then 117 applied** (ledger verified) |
-| `PERF_DASHBOARD_TRACE` | **unset** in Vercel Production env list (not present) |
-| `ANALYZE` | **unset** in Vercel Production env list (not present) |
+| App release SHA | `9c28886a8c704d92095e7417836ed4856590bc0a` (PR [#166](https://github.com/rakesh2604/InterviewEra/pull/166), merge `2026-10-13T09:35:28Z`) |
+| App release deploy | `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u` READY @ `2026-10-13T09:35:31.374Z` |
+| Current production tip | `6bb5b97bcfba8299793154a1216f9a7fdfdd9248` — **docs-only** (#168) on top of `9c28886`; no `src/` delta |
+| Current production deploy | `dpl_6Bz4JFHufNnPaHnEbKYVHhYxDRJG` READY @ `2026-10-13T09:58:25.737Z` — aliases `interviewera.com`, `www.interviewera.com` |
+| Production DB | Ledger **116 then 117**: `20261013093634` / `dashboard_perf_indexes_and_rls_initplan` → `20261013094210` / `interview_turns_rls_initplan` |
+| `PERF_DASHBOARD_TRACE` | **unset** (absent from Production env list — Loop 8 recheck) |
+| `ANALYZE` | **unset** (absent from Production env list — Loop 8 recheck) |
 | Old field baseline | TTFB 2721 ms (n=78), LCP 5624 ms (n=137), CLS 0.16 (n=46), INP 168 ms — **old SHA only** |
-| New-SHA field window | **PENDING** — post-deploy query returned empty (n=0) |
+| New-SHA `/dashboard` field | **PENDING** — `/dashboard` rows still **n = 0** in post-release window |
 
 `PERF_DASHBOARD_TRACE` defaults to **off** (`=== '1'` only). Do not enable it on Vercel Production.
 
@@ -47,15 +43,17 @@ Two-wave `loadDashboardPageData`, snapshot prefetch, history pagination, digest/
 
 | Route / check | Status | Evidence |
 |---|---|---|
-| Unauthenticated `/dashboard` | **PASS** | Redirects to `/login?next=%2Fdashboard` (browser + `curl -L`) |
-| Login page live | **PASS** | `https://interviewera.com/login` title “InterviewEra \| Login”, Google + email sign-in present |
-| Signed-in `/dashboard` | **BLOCKED** | No authorized production test credentials in this session; must not use `.env.local` |
+| Unauthenticated `/dashboard` | **PASS** | Loop 8: browser + `curl` → `/login?next=%2Fdashboard` (307) |
+| Login page live | **PASS** | `https://interviewera.com/login` renders sign-in |
+| Signed-in `/dashboard` | **BLOCKED** | No owner-authorized production test account in this session; must not use `.env.local` |
 | Signed-in `/history` pagination / overshoot | **BLOCKED** | Same credential blocker |
 | Signed-in `/analytics`, `/settings` | **BLOCKED** | Same credential blocker |
-| Runtime logs: no `[perf:dashboard]` | **PENDING** | Requires owner log access after authenticated traffic; TRACE confirmed unset so logs should stay absent |
-| Unauthorized remains unauthorized | **PASS** | Auth gate observed for `/dashboard` |
+| Runtime logs: no `[perf:dashboard]` | **PASS*** | See Loop 8 log check below |
+| Unauthorized remains unauthorized | **PASS** | Auth gate reconfirmed Loop 8 |
 
-**Owner action to complete smoke:** sign in with a dedicated authorized test account on `https://interviewera.com`, walk `/dashboard` → `/history` (incl. `?page=` overshoot) → `/analytics` → `/settings`, confirm chart slot + counts, and confirm no `[perf:dashboard]` in production logs.
+\*Log check used Vercel CLI request logs (not a full Observability function-stdout dump). MCP `get_runtime_logs` returned **403**. Supporting: `PERF_DASHBOARD_TRACE` unset.
+
+**Owner action to complete smoke:** sign in with a dedicated authorized test account on `https://interviewera.com`, walk `/dashboard` → `/history` (incl. `?page=` overshoot) → `/analytics` → `/settings`, confirm chart slot + counts.
 
 ## B. Database migrations (production `plfuvgkycmxcyshrgpgv`)
 
@@ -91,32 +89,43 @@ Window: ~28d ending 2026-10-13, **old deployed code** (pre-`9c28886`):
 | `/dashboard` CLS | 46 | 0.16 | old deployed code |
 | `/dashboard` INP | (prior report) | 168 ms | old deployed code |
 
-### New-SHA window (Loop 7)
+### New-SHA window (Loop 7 + Loop 8)
 
 | Item | Value |
 |---|---|
-| Deploy SHA | `9c28886a8c704d92095e7417836ed4856590bc0a` |
-| Window start (UTC) | `2026-10-13T09:35:28Z` (merge) / deploy `09:35:31Z` |
-| Query | `vercel metrics vercel.speed_insights.ttfb_ms` / `lcp_ms` `-a p75 -a count --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z` |
-| Result | **empty** (`summary: []`, `data: []`) — **n = 0** |
-| Status | **PENDING** — wait until TTFB n≥78, LCP n≥137, CLS n≥46 in a **post-deploy-only** window |
-| Follow-up | Re-run metrics daily; compare post-deploy slice vs equal-length pre-deploy slice. Rolling 28d still mixes old SHA. |
-
-Correct CLI metric ids (verified 2026-10-13): `vercel.speed_insights.ttfb_ms`, `lcp_ms`, `cls`, `inp_ms` (not bare `ttfb` / `lcp`).
+| Window start (UTC) | `2026-10-13T09:35:28Z` (release merge) |
+| Query time (Loop 8) | ~`2026-10-13T10:05Z`–`10:09Z` |
+| CLI note | Pass **`-a p75` and `-a count` as separate invocations** — combining both returns only `count` on CLI 63.1.2 |
+| `/dashboard` TTFB / LCP / CLS / INP | **no rows** — n = **0** for all four |
+| Non-dashboard samples in window (not release proof) | `/login` desktop TTFB p75 **197** (n=1), LCP p75 **440** (n=1); `/tools/question-generator` desktop TTFB p75 **5** (n=1), LCP p75 **5644** (n=1), CLS p75 **0.054** (n=1), INP p75 **8** (n=1) |
+| Thresholds | TTFB n≥78, LCP n≥137, CLS n≥46 — **not met** for `/dashboard` |
+| Comparison | **PENDING** — do not declare success/regression vs old-SHA 2721 / 5624 / 0.16. Rolling 28d still mixes SHAs. Tip deploy `6bb5b97` is docs-only; field still attributed to post-`9c28886` app code |
 
 ```bash
-vercel metrics vercel.speed_insights.ttfb_ms -a p75 -a count --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z --project interview-era
-vercel metrics vercel.speed_insights.lcp_ms -a p75 -a count --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z --project interview-era
-vercel metrics vercel.speed_insights.cls -a p75 -a count --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z --project interview-era
+vercel metrics vercel.speed_insights.ttfb_ms -a p75 --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z --project interview-era
+vercel metrics vercel.speed_insights.ttfb_ms -a count --prod --group-by route --group-by deviceType --since 2026-10-13T09:35:28Z --project interview-era
+# likewise lcp_ms / cls / inp_ms
 ```
 
 **Do not** claim field improvement yet. **Do not** compare staging lab TTFB or Lighthouse mobile LCP 7,924 ms to production p75.
+
+### Loop 8 verification evidence
+
+| Check | Status | Evidence |
+|---|---|---|
+| Release / aliases | **PASS** | Current prod `dpl_6Bz4JFHufNnPaHnEbKYVHhYxDRJG` aliases `interviewera.com` + `www`; app code = `9c28886` + docs-only `6bb5b97` |
+| Migrations 116→117 | **PASS** | Ledger order reconfirmed on `plfuvgkycmxcyshrgpgv` |
+| TRACE / ANALYZE unset | **PASS** | Absent from `vercel env ls --project interview-era` Production keys |
+| Auth smoke (signed-in) | **BLOCKED** | No authorized production test credentials provided to agent |
+| `[perf:dashboard]` logs | **PASS** (sampled) | Source: `vercel logs --project interview-era --environment production --since 2h --limit 100 --json` grepped for `perf:dashboard` / `[perf:dashboard]` → **0 hits** (100 lines). MCP runtime logs API **403**. Interval ~`2026-10-13T08:09Z`–`10:09Z` relative lookback |
+| Field `/dashboard` samples | **PENDING** | n=0 vs thresholds |
+| Mobile LCP waterfall | **NOT WARRANTED** | No production-equivalent mobile waterfall available; lab 7,924 ms remains unresolved risk only |
 
 ## D. Rollback
 
 | Layer | Action |
 |---|---|
-| Application | Vercel instant rollback from `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u` to prior production deployment, or `git revert` of squash `9c28886`. |
+| Application | Vercel instant rollback from current prod (`dpl_6Bz4JFHufNnPaHnEbKYVHhYxDRJG` / prior `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u`) to the pre-release production deployment, or `git revert` of squash `9c28886` (and docs tip if needed). |
 | 116 indexes | Follow-on serial `DROP INDEX IF EXISTS` for each added `idx_*`. Do not rewrite 116. |
 | 116/117 policies | Follow-on serial only if a policy error appears. InitPlan is authorization-preserving. |
 | Field | Record revert time so the next p75 window is not mixed silently. |
@@ -150,14 +159,15 @@ vercel metrics vercel.speed_insights.cls -a p75 -a count --prod --group-by route
 | Production migration 117 | **PASS** | Ledger `20261013094210` after 116 verified |
 | Production app deploy | **PASS** | `dpl_DpA4pFK5VF8yXdPL15tZTEeGVJ4u` READY; domains aliased; GitHub Production deployment `7035092414` SUCCESS for `9c28886` |
 | Authenticated smoke | **BLOCKED** | Auth gate PASS; signed-in routes need owner test account |
-| Post-release field metrics | **PENDING** | Post-deploy n=0; old-SHA baseline retained separately |
+| Post-release field metrics | **PENDING** | Loop 8: `/dashboard` still n=0; non-dashboard n=1 samples only |
 
 ## Remaining blockers / owner actions
 
 1. Complete authenticated production smoke with a dedicated test account (do not use agent access to `.env.local`).
-2. Collect post-deploy Speed Insights until comparable n; then compare to old-SHA baseline without mixing windows.
+2. Re-run Speed Insights daily from `2026-10-13T09:35:28Z` until `/dashboard` TTFB n≥78, LCP n≥137, CLS n≥46; then compare equal-length pre/post windows (not rolling 28d alone).
 3. Keep `PERF_DASHBOARD_TRACE` and `ANALYZE` unset in Production.
-4. Mobile Lighthouse LCP 7,924 ms — investigate with production-equivalent trace only; no speculative refactor.
+4. Mobile Lighthouse LCP 7,924 ms — investigate only with a production-equivalent mobile waterfall; no speculative refactor.
+5. Optional: grant Observability/runtime-log API access so function stdout can be searched beyond request logs.
 
 ## Related Documents
 
