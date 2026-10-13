@@ -1,10 +1,23 @@
-export default function DashboardLoading() {
+export default function DashboardGroupLoading() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="dashboard-page-shell min-h-[80dvh] min-w-0" data-testid="dashboard-group-skeleton">
       <div
-        className="h-8 w-8 animate-spin rounded-full border-2 border-t-transparent"
-        style={{ borderColor: 'var(--accent-primary)', borderTopColor: 'transparent' }}
+        className="mb-6 h-16 w-64 max-w-full animate-pulse motion-reduce:animate-none rounded-xl"
+        style={{ background: 'var(--bg-tertiary)' }}
+        aria-hidden
       />
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2">
+        <div
+          className="min-h-[12rem] animate-pulse motion-reduce:animate-none rounded-xl"
+          style={{ background: 'var(--bg-tertiary)' }}
+          aria-hidden
+        />
+        <div
+          className="min-h-[12rem] animate-pulse motion-reduce:animate-none rounded-xl"
+          style={{ background: 'var(--bg-tertiary)' }}
+          aria-hidden
+        />
+      </div>
     </div>
   )
 }

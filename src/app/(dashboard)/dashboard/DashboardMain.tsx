@@ -1,27 +1,12 @@
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { RecentInterviews } from '@/components/dashboard/RecentInterviews'
+import { ScoreTrendChartSlot } from '@/components/dashboard/ScoreTrendChartSlot'
+import { SCORE_TREND_CHART_HEIGHT_PX } from '@/components/dashboard/score-trend-chart-height'
 import {
   countHiddenInterviews,
   pickRecentInterviews,
 } from '@/lib/dashboard/dashboard-view'
 import type { InterviewWithReportsRow, UserRow } from './dashboard-types'
-
-const ScoreTrendChart = dynamic(
-  () =>
-    import('@/components/dashboard/ScoreTrendChart').then((m) => ({
-      default: m.ScoreTrendChart,
-    })),
-  {
-    loading: () => (
-      <div
-        className="h-28 w-full animate-pulse motion-reduce:animate-none rounded-lg"
-        style={{ background: 'var(--bg-tertiary)' }}
-        aria-hidden
-      />
-    ),
-  },
-)
 
 export function DashboardMain({
   rows,
@@ -120,8 +105,12 @@ export function DashboardMain({
               </div>
             ) : null}
           </div>
-          <div className="h-28 rounded-xl px-2 py-1" style={{ background: 'var(--bg-secondary)' }}>
-            <ScoreTrendChart data={trendData} />
+          <div
+            className="rounded-xl px-2 py-1"
+            style={{ height: SCORE_TREND_CHART_HEIGHT_PX, background: 'var(--bg-secondary)' }}
+            data-testid="score-trend-slot"
+          >
+            <ScoreTrendChartSlot data={trendData} />
           </div>
         </div>
       ) : null}

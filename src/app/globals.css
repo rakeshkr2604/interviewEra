@@ -172,6 +172,10 @@ html {
   /* Native wheel/touch scroll — never force smooth globally (causes jank on long pages). */
   scroll-behavior: auto;
   scroll-padding-top: 88px;
+  /* Desktop classic scrollbars steal ~15px when overflow appears; overlay mobile
+     scrollbars do not. Field /dashboard CLS p75 is desktop-only (0.16 vs mobile 0.09)
+     and attributes to the chrome footer + decorative layer. */
+  scrollbar-gutter: stable;
 }
 
 @media (prefers-reduced-motion: reduce) {

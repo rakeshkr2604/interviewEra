@@ -1,5 +1,18 @@
 import { createServiceClient } from '@/lib/supabase/server';
+import { chunkIds } from '@/lib/dashboard/id-chunks';
 import type { AnalyticsPayload } from './types';
+
+async function selectByUserChunks<T>(
+  queryFactory: (ids: string[]) => PromiseLike<{ data: T[] | null }>,
+  userIds: string[],
+): Promise<T[]> {
+  const rows: T[] = [];
+  for (const ids of chunkIds(userIds)) {
+    const { data } = await queryFactory(ids);
+    if (data?.length) rows.push(...data);
+  }
+  return rows;
+}
 
 export async function computeCampusAnalytics(
   collegeId: string,
@@ -31,27 +44,68 @@ export async function computeCampusAnalytics(
     enrollments.map((e) => [e.user_id, e.branch ?? 'Unassigned'])
   );
 
-  const [{ data: progressRecords }, { data: interviews }] = await Promise.all([
-    serviceClient
-      .from('user_progress')
-      .select('user_id, current_tier, overall_avg_score')
-      .in('user_id', studentIds),
-    serviceClient
-      .from('interviews')
-      .select('id, user_id, completed_at, status')
-      .in('user_id', studentIds),
+  let days = 30;
+  if (range === '7') days = 7;
+  if (range === '90') days = 90;
+  if (range === 'all') days = 365;
+  const fetchDays = Math.max(days, 90);
+  const fetchSince = new Date();
+  fetchSince.setDate(fetchSince.getDate() - fetchDays);
+  const fetchSinceIso = fetchSince.toISOString();
+
+  const [progressRecords, allInterviewCount, completedCount, interviews] = await Promise.all([
+    selectByUserChunks(
+      (ids) =>
+        serviceClient
+          .from('user_progress')
+          .select('user_id, current_tier, overall_avg_score')
+          .in('user_id', ids),
+      studentIds,
+    ),
+    selectByUserChunks(
+      async (ids) => {
+        const { count } = await serviceClient
+          .from('interviews')
+          .select('id', { count: 'exact', head: true })
+          .in('user_id', ids);
+        return { data: [{ n: count ?? 0 }] };
+      },
+      studentIds,
+    ).then((rows) => rows.reduce((sum, row) => sum + row.n, 0)),
+    selectByUserChunks(
+      async (ids) => {
+        const { count } = await serviceClient
+          .from('interviews')
+          .select('id', { count: 'exact', head: true })
+          .in('user_id', ids)
+          .eq('status', 'completed');
+        return { data: [{ n: count ?? 0 }] };
+      },
+      studentIds,
+    ).then((rows) => rows.reduce((sum, row) => sum + row.n, 0)),
+    selectByUserChunks(
+      (ids) =>
+        serviceClient
+          .from('interviews')
+          .select('id, user_id, completed_at, status')
+          .in('user_id', ids)
+          .eq('status', 'completed')
+          .gte('completed_at', fetchSinceIso),
+      studentIds,
+    ),
   ]);
 
-  const completedInterviews = (interviews ?? []).filter((i) => i.status === 'completed');
+  const completedInterviews = interviews;
   const completedIds = completedInterviews.map((i) => i.id);
 
-  const { data: reports } =
-    completedIds.length > 0
-      ? await serviceClient
-          .from('reports')
-          .select('interview_id, overall_score, generated_at')
-          .in('interview_id', completedIds)
-      : { data: [] };
+  const reports = [];
+  for (const ids of chunkIds(completedIds)) {
+    const { data } = await serviceClient
+      .from('reports')
+      .select('interview_id, overall_score, generated_at')
+      .in('interview_id', ids);
+    if (data?.length) reports.push(...data);
+  }
 
   const tierDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0 };
   const placementReady = { ready: 0, almostReady: 0, needsWork: 0 };
@@ -80,11 +134,6 @@ export async function computeCampusAnalytics(
       if (tier >= 3) stats.ready += 1;
     }
   });
-
-  let days = 30;
-  if (range === '7') days = 7;
-  if (range === '90') days = 90;
-  if (range === 'all') days = 365;
 
   const lastNDays = new Date();
   lastNDays.setDate(lastNDays.getDate() - days);
@@ -130,10 +179,9 @@ export async function computeCampusAnalytics(
     sessionActivity.push({ date: dateStr, count: sessionsByDate[dateStr] || 0 });
   }
 
-  const allInterviewCount = (interviews ?? []).length;
   const completionRate =
     allInterviewCount > 0
-      ? Math.round((completedInterviews.length / allInterviewCount) * 100)
+      ? Math.round((completedCount / allInterviewCount) * 100)
       : 0;
 
   const branchBreakdown = Array.from(branchStats.entries())

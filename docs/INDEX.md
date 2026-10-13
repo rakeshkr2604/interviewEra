@@ -1,8 +1,8 @@
 # Documentation Index
 
 > Status: CANONICAL
-> Last Verified: 2026-10-09
-> Verification Scope: Doc tree layout + agent entrypoints + security audit link + brand assets + founder launch-readiness register
+> Last Verified: 2026-10-13
+> Verification Scope: Doc tree layout + agent entrypoints + security audit link + brand assets + founder launch-readiness register + performance audit folder + release-readiness checklist
 > Authority: Navigation map for humans and agents
 
 ## Purpose
@@ -63,6 +63,16 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md](Operations/API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md) | Point-in-time API route validation inventory (132 routes) |
 | [production-trust-hardening.md](audits/production-trust-hardening.md) | Privacy / legal / a11y / trust checklist audit + remediation evidence |
 | [founder-launch-readiness.md](audits/founder-launch-readiness.md) | GST/CA, entity, trust metrics, assets, DPAs, deletion retention, lawyer checklist |
+
+## Performance
+
+| Doc | When to read |
+|---|---|
+| [BASELINE.md](performance/BASELINE.md) | Pre-change git/test/query/CWV snapshot |
+| [AUDIT-FINDINGS.md](performance/AUDIT-FINDINGS.md) | Dashboard waterfall, N+1, indexes, RLS |
+| [QUERY-PLANS.md](performance/QUERY-PLANS.md) | Captured EXPLAIN + query-count plans |
+| [OPTIMIZATION-RESULTS.md](performance/OPTIMIZATION-RESULTS.md) | What changed, evidence, rollout, blockers |
+| [RELEASE-READINESS.md](performance/RELEASE-READINESS.md) | App vs DB vs verify vs rollback; post-release field window |
 
 ## Root keepers
 

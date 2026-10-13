@@ -19,7 +19,7 @@ import {
 } from '@/lib/interview/recovery-email-cadence';
 import { isAbandonedContinueEligible } from '@/lib/interview/interview-status';
 import { sendInterviewRecoveryEmailIfEligible } from '@/lib/email/lifecycle/send-interview-recovery';
-import { wasLifecycleEmailSent } from '@/lib/email/lifecycle/log';
+import { prefetchSentLifecycleKeys } from '@/lib/email/lifecycle/log';
 
 export type RecoveryReminderRunStats = {
   enabled: boolean;
@@ -114,9 +114,14 @@ export async function processInterviewRecoveryReminders(
     }),
   );
 
-  let sendAttempts = 0;
+  type InWindowRow = {
+    row: (typeof candidates)[number];
+    stage: RecoveryEmailStage;
+    idempotencyKey: string;
+  };
+  const inWindow: InWindowRow[] = [];
 
-  stageLoop: for (const stageCfg of RECOVERY_EMAIL_STAGES) {
+  for (const stageCfg of RECOVERY_EMAIL_STAGES) {
     const stage = stageCfg.stage;
     for (const row of candidates) {
       const abandonedAtMs = Date.parse(row.completed_at ?? '');
@@ -133,43 +138,56 @@ export async function processInterviewRecoveryReminders(
         continue;
       }
 
-      const idempotencyKey = recoveryEmailIdempotencyKey(
-        row.id as string,
+      inWindow.push({
+        row,
         stage,
-      );
-      // Skip already-claimed without consuming send budget (anti-starvation).
-      if (await wasLifecycleEmailSent(idempotencyKey)) {
-        stats.skipped += 1;
-        stats.byStage[stage].skipped += 1;
-        bumpReason(stats, 'already_sent_or_claimed');
-        continue;
-      }
-
-      if (sendAttempts >= sendBudget) {
-        bumpReason(stats, 'batch_budget_exhausted');
-        break stageLoop;
-      }
-
-      sendAttempts += 1;
-      stats.eligibleAttempted += 1;
-      const result = await sendInterviewRecoveryEmailIfEligible({
-        interviewId: row.id as string,
-        stage,
-        nowMs,
+        idempotencyKey: recoveryEmailIdempotencyKey(row.id as string, stage),
       });
+    }
+  }
 
-      if (result.sent) {
-        stats.sent += 1;
-        stats.byStage[stage].sent += 1;
-      } else if (result.skipped) {
-        stats.skipped += 1;
-        stats.byStage[stage].skipped += 1;
-        bumpReason(stats, result.reason ?? 'skipped');
-      } else {
-        stats.failed += 1;
-        stats.byStage[stage].failed += 1;
-        bumpReason(stats, `fail:${result.error ?? 'failed'}`);
-      }
+  if (inWindow.length === 0) {
+    return stats;
+  }
+
+  const alreadySent = await prefetchSentLifecycleKeys(
+    inWindow.map((item) => item.idempotencyKey),
+    svc,
+  );
+
+  let sendAttempts = 0;
+  for (const item of inWindow) {
+    if (alreadySent.has(item.idempotencyKey)) {
+      stats.skipped += 1;
+      stats.byStage[item.stage].skipped += 1;
+      bumpReason(stats, 'already_sent_or_claimed');
+      continue;
+    }
+
+    if (sendAttempts >= sendBudget) {
+      bumpReason(stats, 'batch_budget_exhausted');
+      break;
+    }
+
+    sendAttempts += 1;
+    stats.eligibleAttempted += 1;
+    const result = await sendInterviewRecoveryEmailIfEligible({
+      interviewId: item.row.id as string,
+      stage: item.stage,
+      nowMs,
+    });
+
+    if (result.sent) {
+      stats.sent += 1;
+      stats.byStage[item.stage].sent += 1;
+    } else if (result.skipped) {
+      stats.skipped += 1;
+      stats.byStage[item.stage].skipped += 1;
+      bumpReason(stats, result.reason ?? 'skipped');
+    } else {
+      stats.failed += 1;
+      stats.byStage[item.stage].failed += 1;
+      bumpReason(stats, `fail:${result.error ?? 'failed'}`);
     }
   }
 

@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { privatePageMetadata } from '@/lib/seo/metadata'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
+import { getCachedAuthUser } from '@/lib/dashboard/request-cache'
+import { historyListHref } from '@/lib/dashboard/list-pagination'
+import { loadHistoryPageData } from '@/lib/dashboard/load-history-page-data'
 import { HistoryListClient } from './HistoryListClient'
 
 export const metadata = privatePageMetadata({
@@ -10,95 +12,24 @@ export const metadata = privatePageMetadata({
   path: '/history',
 })
 
-export default async function HistoryPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default async function HistoryPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string; pageSize?: string; tab?: string }>
+}) {
+  const user = await getCachedAuthUser()
   if (!user) redirect('/login')
 
-  const { data: interviews } = await supabase
-    .from('interviews')
-    .select('id, role, difficulty, status, started_at, completed_at, question_count, engine, credit_deducted, abandoned_resume_used')
-    .eq('user_id', user.id)
-    .order('started_at', { ascending: false })
-
-  const interviewIds = (interviews || []).map((i) => i.id as string)
-
-  let v1Reports: { id: string; interview_id: string; overall_score: number | null }[] = []
-  let v21Reports: {
-    id: string
-    interview_id: string
-    overall: number | null
-    status: string
-  }[] = []
-
-  if (interviewIds.length > 0) {
-    const [v1Res, v21Res] = await Promise.all([
-      supabase.from('reports').select('id, interview_id, overall_score').in('interview_id', interviewIds),
-      supabase
-        .from('script_interview_reports')
-        .select('id, interview_id, overall, status')
-        .in('interview_id', interviewIds),
-    ])
-    v1Reports = v1Res.data ?? []
-    v21Reports = v21Res.data ?? []
+  const params = await searchParams
+  const data = await loadHistoryPageData(user.id, params)
+  const requestedPage = Number.parseInt(String(params.page ?? '1'), 10)
+  if (
+    Number.isFinite(requestedPage) &&
+    requestedPage > 1 &&
+    data.pagination.page !== requestedPage
+  ) {
+    redirect(historyListHref(data.tab, data.pagination.page, data.pagination.pageSize))
   }
-
-  const reportByInterviewId = new Map(v1Reports.map((r) => [r.interview_id, r]))
-  const scriptReportByInterviewId = new Map(v21Reports.map((r) => [r.interview_id, r]))
-
-  const sortedInterviews = [...(interviews || [])].sort((a, b) => {
-    const aIso = (a.started_at as string | null) ?? (a.completed_at as string | null) ?? ''
-    const bIso = (b.started_at as string | null) ?? (b.completed_at as string | null) ?? ''
-    return bIso.localeCompare(aIso)
-  })
-
-  const items = sortedInterviews.map((interview) => {
-    const engine = (interview.engine as string | null) ?? null
-    const isScript = engine === 'v2.1'
-    const v1 = reportByInterviewId.get(interview.id as string)
-    const v21 = scriptReportByInterviewId.get(interview.id as string)
-    const scriptReady =
-      Boolean(v21) &&
-      (v21!.status === 'ready' || v21!.status === 'partial') &&
-      v21!.overall != null
-
-    const score = isScript
-      ? scriptReady
-        ? Number(v21!.overall)
-        : null
-      : (v1?.overall_score ?? null)
-
-    const reportHref =
-      interview.status === 'completed'
-        ? isScript
-          ? `/report/script/${interview.id}`
-          : v1?.id
-            ? `/report/${v1.id}`
-            : null
-        : null
-
-    // V1 session UI retired — non-script in-progress rows continue via dashboard.
-    const continueHref = isScript
-      ? `/interview/script/${interview.id}`
-      : '/dashboard'
-
-    return {
-      id: interview.id as string,
-      role: interview.role as string,
-      difficulty: interview.difficulty as string,
-      status: interview.status as string,
-      startedAt: (interview.started_at as string | null) ?? null,
-      completedAt: (interview.completed_at as string | null) ?? null,
-      engine: isScript ? ('v2.1' as const) : ('v1' as const),
-      reportHref,
-      continueHref,
-      score,
-      abandonedResumeUsed: Boolean(interview.abandoned_resume_used),
-      creditDeducted: interview.credit_deducted === true,
-    }
-  })
 
   return (
     <>
@@ -107,7 +38,14 @@ export default async function HistoryPage() {
         title="Interview history"
         subtitle="Past mocks, scores, and quick links to reports."
       />
-      <HistoryListClient items={items} />
+      <HistoryListClient
+        items={data.items}
+        tab={data.tab}
+        tabCounts={data.tabCounts}
+        page={data.pagination.page}
+        pageSize={data.pagination.pageSize}
+        totalForTab={data.totalForTab}
+      />
     </>
   )
 }

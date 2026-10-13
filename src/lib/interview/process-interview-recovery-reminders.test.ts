@@ -15,11 +15,15 @@ vi.mock('@/lib/email/lifecycle/send-interview-recovery', () => ({
 
 vi.mock('@/lib/email/lifecycle/log', () => ({
   wasLifecycleEmailSent: vi.fn(),
+  prefetchSentLifecycleKeys: vi.fn(async () => new Set<string>()),
 }));
 
 import { processInterviewRecoveryReminders } from './process-interview-recovery-reminders';
 import { sendInterviewRecoveryEmailIfEligible } from '@/lib/email/lifecycle/send-interview-recovery';
-import { wasLifecycleEmailSent } from '@/lib/email/lifecycle/log';
+import {
+  prefetchSentLifecycleKeys,
+  wasLifecycleEmailSent,
+} from '@/lib/email/lifecycle/log';
 import { isInterviewRecoveryEmailEnabled } from '@/lib/interview/recovery-email-cadence';
 
 function mockSvc(rows: unknown[]) {
@@ -55,6 +59,8 @@ describe('processInterviewRecoveryReminders', () => {
     vi.mocked(sendInterviewRecoveryEmailIfEligible).mockReset();
     vi.mocked(wasLifecycleEmailSent).mockReset();
     vi.mocked(wasLifecycleEmailSent).mockResolvedValue(false);
+    vi.mocked(prefetchSentLifecycleKeys).mockReset();
+    vi.mocked(prefetchSentLifecycleKeys).mockResolvedValue(new Set());
   });
 
   it('flag off + normal: no query and no send', async () => {
@@ -89,6 +95,7 @@ describe('processInterviewRecoveryReminders', () => {
     expect(stats.considered).toBeGreaterThan(0);
     expect(sendInterviewRecoveryEmailIfEligible).not.toHaveBeenCalled();
     expect(wasLifecycleEmailSent).not.toHaveBeenCalled();
+    expect(prefetchSentLifecycleKeys).not.toHaveBeenCalled();
     expect(stats.suppressReasons.dry_run).toBeGreaterThan(0);
   });
 
@@ -106,6 +113,7 @@ describe('processInterviewRecoveryReminders', () => {
     expect(stats.sendsAllowed).toBe(false);
     expect(sendInterviewRecoveryEmailIfEligible).not.toHaveBeenCalled();
     expect(wasLifecycleEmailSent).not.toHaveBeenCalled();
+    expect(prefetchSentLifecycleKeys).not.toHaveBeenCalled();
   });
 
   it('flag on + normal: attempts send for due candidates', async () => {
@@ -124,6 +132,7 @@ describe('processInterviewRecoveryReminders', () => {
     });
 
     expect(stats.sendsAllowed).toBe(true);
+    expect(prefetchSentLifecycleKeys).toHaveBeenCalledTimes(1);
     expect(sendInterviewRecoveryEmailIfEligible).toHaveBeenCalled();
     expect(stats.sent).toBeGreaterThanOrEqual(1);
   });
@@ -141,9 +150,9 @@ describe('processInterviewRecoveryReminders', () => {
       abandonedRow('new-1', new Date(nowMs - 26 * 3600_000).toISOString()),
     );
 
-    vi.mocked(wasLifecycleEmailSent).mockImplementation(async (key: string) =>
-      key.includes('new-1') ? false : true,
-    );
+    vi.mocked(prefetchSentLifecycleKeys).mockImplementation(async (keys) => {
+      return new Set([...keys].filter((key) => !key.includes('new-1')));
+    });
     vi.mocked(sendInterviewRecoveryEmailIfEligible).mockResolvedValue({
       sent: true,
       skipped: false,

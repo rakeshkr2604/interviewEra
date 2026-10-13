@@ -42,6 +42,29 @@ export type CandidateSnapshotInterviewRow = {
     | null;
 };
 
+export type CandidateSnapshotResumeRow = {
+  id: string;
+  status: string;
+  created_at: string;
+  storage_path: string | null;
+  parsed_data: unknown;
+  is_primary: boolean | null;
+};
+
+export type CandidateSnapshotEnrollmentRow = {
+  enrollment_status: string;
+  college_id: string | null;
+};
+
+export type CandidateSnapshotScriptReportRow = {
+  id: string;
+  interview_id: string;
+  overall: number | null;
+  dimension_averages: unknown;
+  generated_at: string | null;
+  status: string;
+};
+
 export type CandidateSnapshotPrefetch = {
   userRow?: CandidateSnapshotUserRow | null;
   progressSnap?: UserProgressRow | null;
@@ -50,7 +73,23 @@ export type CandidateSnapshotPrefetch = {
   recoveryTarget?: PrimaryRecoveryTarget | null;
   /** Lifetime completed interview count (bypass recent-window undercount). */
   completedSessionCount?: number | null;
+  resumes?: CandidateSnapshotResumeRow[] | null;
+  enrollment?: CandidateSnapshotEnrollmentRow | null;
+  scriptReports?: CandidateSnapshotScriptReportRow[] | null;
+  /** When the key is present, skip `campus_organizations` even if the value is null. */
+  collegeOrgName?: string | null;
+  /** Shared request client — avoids a second `createClient()` when the caller already has one. */
+  client?: Awaited<ReturnType<typeof createClient>>;
 };
+
+export const CANDIDATE_SNAPSHOT_RESUMES_SELECT =
+  'id, status, created_at, storage_path, parsed_data, is_primary' as const;
+
+export const CANDIDATE_SNAPSHOT_ENROLLMENT_SELECT =
+  'enrollment_status, college_id' as const;
+
+export const CANDIDATE_SNAPSHOT_SCRIPT_REPORTS_SELECT =
+  'id, interview_id, overall, dimension_averages, generated_at, status' as const;
 
 /** Shared select for dashboard + snapshot interview hydration (20-row cap). */
 export const CANDIDATE_DASHBOARD_INTERVIEWS_SELECT = `
@@ -193,12 +232,16 @@ export async function loadCandidateSnapshot(
   userId: string,
   prefetch?: CandidateSnapshotPrefetch,
 ): Promise<CandidateSnapshot> {
-  const supabase = await createClient();
+  let supabase: Awaited<ReturnType<typeof createClient>> | null = prefetch?.client ?? null;
+  const db = async () => {
+    if (!supabase) supabase = await createClient();
+    return supabase;
+  };
 
   const userRow =
     prefetch && 'userRow' in prefetch
       ? (prefetch.userRow ?? null)
-      : await fetchCandidateSnapshotUserRow(supabase, userId);
+      : await fetchCandidateSnapshotUserRow(await db(), userId);
 
   const hasPrefetchedProgress = Boolean(prefetch && 'progressSnap' in prefetch);
   const hasPrefetchedInterviews = Boolean(prefetch && 'interviews' in prefetch);
@@ -206,6 +249,8 @@ export async function loadCandidateSnapshot(
   const hasPrefetchedCompletedCount = Boolean(
     prefetch && 'completedSessionCount' in prefetch,
   );
+  const hasPrefetchedResumes = Boolean(prefetch && 'resumes' in prefetch);
+  const hasPrefetchedEnrollment = Boolean(prefetch && 'enrollment' in prefetch);
 
   const [
     { data: progressSnap },
@@ -217,34 +262,38 @@ export async function loadCandidateSnapshot(
   ] = await Promise.all([
     hasPrefetchedProgress
       ? Promise.resolve({ data: prefetch!.progressSnap ?? null })
-      : supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+      : (await db()).from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
     hasPrefetchedInterviews
       ? Promise.resolve({ data: prefetch!.interviews ?? null })
-      : supabase
+      : (await db())
           .from('interviews')
           .select('id, role, status, engine, reports(id, radar_data, generated_at)')
           .eq('user_id', userId)
           .order('started_at', { ascending: false })
           .limit(20),
-    supabase
-      .from('resumes')
-      .select('id, status, created_at, storage_path, parsed_data, is_primary')
-      .eq('user_id', userId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .limit(5),
-    supabase
-      .from('college_enrollments')
-      .select('enrollment_status, college_id')
-      .eq('user_id', userId)
-      .eq('enrollment_status', 'active')
-      .maybeSingle(),
+    hasPrefetchedResumes
+      ? Promise.resolve({ data: prefetch!.resumes ?? null })
+      : (await db())
+          .from('resumes')
+          .select(CANDIDATE_SNAPSHOT_RESUMES_SELECT)
+          .eq('user_id', userId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: false })
+          .limit(5),
+    hasPrefetchedEnrollment
+      ? Promise.resolve({ data: prefetch!.enrollment ?? null })
+      : (await db())
+          .from('college_enrollments')
+          .select(CANDIDATE_SNAPSHOT_ENROLLMENT_SELECT)
+          .eq('user_id', userId)
+          .eq('enrollment_status', 'active')
+          .maybeSingle(),
     hasPrefetchedRecovery
       ? Promise.resolve(prefetch!.recoveryTarget ?? null)
-      : fetchPrimaryRecoveryInterview(supabase, userId),
+      : fetchPrimaryRecoveryInterview(await db(), userId),
     hasPrefetchedCompletedCount
       ? Promise.resolve({ count: prefetch!.completedSessionCount ?? null })
-      : supabase
+      : (await db())
           .from('interviews')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', userId)
@@ -259,8 +308,10 @@ export async function loadCandidateSnapshot(
     (userRow?.campus_org_id as string | undefined) ??
     null;
   let collegeOrgName: string | null = null;
-  if (orgId) {
-    const { data: org } = await supabase
+  if (prefetch && 'collegeOrgName' in prefetch) {
+    collegeOrgName = prefetch.collegeOrgName ?? null;
+  } else if (orgId) {
+    const { data: org } = await (await db())
       .from('campus_organizations')
       .select('name')
       .eq('id', orgId)
@@ -317,21 +368,26 @@ export async function loadCandidateSnapshot(
   const abandonedResume = recovery?.mode === 'resume' ? recovery : null;
 
   const completedIds = completedInWindow.map((i) => i.id as string);
+  const prefetchedScriptReports =
+    prefetch && 'scriptReports' in prefetch
+      ? (prefetch.scriptReports ?? [])
+      : null;
   const { data: scriptReportsRaw } =
-    completedIds.length > 0
-      ? await supabase
-          .from('script_interview_reports')
-          .select('id, interview_id, overall, dimension_averages, generated_at, status')
-          .in('interview_id', completedIds)
-          .in('status', ['ready', 'partial'])
-      : { data: [] as {
-          id: string;
-          interview_id: string;
-          overall: number | null;
-          dimension_averages: unknown;
-          generated_at: string | null;
-          status: string;
-        }[] };
+    prefetchedScriptReports
+      ? {
+          data: prefetchedScriptReports.filter(
+            (report) =>
+              completedIds.includes(report.interview_id) &&
+              (report.status === 'ready' || report.status === 'partial'),
+          ),
+        }
+      : completedIds.length > 0
+        ? await (await db())
+            .from('script_interview_reports')
+            .select(CANDIDATE_SNAPSHOT_SCRIPT_REPORTS_SELECT)
+            .in('interview_id', completedIds)
+            .in('status', ['ready', 'partial'])
+        : { data: [] as CandidateSnapshotScriptReportRow[] };
 
   const scriptByInterview = new Map<
     string,

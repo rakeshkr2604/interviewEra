@@ -1,8 +1,8 @@
 # Feature Flags
 
 > Status: CANONICAL
-> Last Verified: 2026-10-04
-> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired; recovery email kill switch
+> Last Verified: 2026-10-13
+> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired; recovery email kill switch; PERF_DASHBOARD_TRACE
 > Authority: Flag registry
 
 ## Purpose
@@ -33,6 +33,7 @@ Every temporary/permanent env toggle. **New flags without an entry here = review
 | `ELEVENLABS_OPTIMIZE_LATENCY` | unset → `'3'` | TTS optimize level |
 | `INTERVIEW_RECOVERY_EMAIL_ENABLED` | unset → **off** | Phase 2 unfinished-interview recovery emails (`'1'` on). Cron registered; dry-run inventory works with flag off; real sends only when enabled and non-dry-run. |
 | Staging contract (`APP_ENV`, `EXPECTED_SUPABASE_PROJECT_REF`, …) | fail closed | Staging safety |
+| `PERF_DASHBOARD_TRACE` | unset → off | Staging-only `[perf:dashboard]` span logs (no user ids). Never leave on in production. |
 
 Client `localStorage.VOICE_DEBUG='1'` — prod verbose voice logs.
 

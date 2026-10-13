@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
 import { SettingsPageClient } from '@/components/settings/SettingsPageClient'
-import { createClient } from '@/lib/supabase/server'
 import { creditsMonthStartIsoIst } from '@/lib/settings/ist-month'
 import {
   parseNotificationPreferencesJson,
 } from '@/lib/settings/notification-preferences'
+import { getCachedAuthUser, getCachedSupabase } from '@/lib/dashboard/request-cache'
 import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
 import { privatePageMetadata } from '@/lib/seo/metadata'
 import type { PlanTier } from '@/types/app.types'
@@ -17,11 +17,9 @@ export const metadata = privatePageMetadata({
 })
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getCachedAuthUser()
   if (!user) redirect('/login')
+  const supabase = await getCachedSupabase()
 
   const profileSelectFull =
     'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path, referral_code' as const
@@ -87,22 +85,31 @@ export default async function SettingsPage() {
   }
 
   const monthStart = creditsMonthStartIsoIst()
-  const { data: debitRows } = await supabase
-    .from('credit_transactions')
-    .select('amount')
-    .eq('user_id', user.id)
-    .eq('type', 'debit')
-    .gte('created_at', monthStart)
+  const [{ data: debitRows }, { data: paymentRows }, { data: txRows }, candidateSnapshot] =
+    await Promise.all([
+      supabase
+        .from('credit_transactions')
+        .select('amount')
+        .eq('user_id', user.id)
+        .eq('type', 'debit')
+        .gte('created_at', monthStart),
+      supabase
+        .from('payments')
+        .select('id, order_id, payment_id, amount, currency, status, plan, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('credit_transactions')
+        .select('id, type, amount, reason, created_at')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(50),
+      loadCandidateSnapshot(user.id, { client: supabase }),
+    ])
 
   const creditsUsedThisMonth =
     debitRows?.reduce((sum, row) => sum + (Number(row.amount) || 0), 0) ?? 0
-
-  const { data: paymentRows } = await supabase
-    .from('payments')
-    .select('id, order_id, payment_id, amount, currency, status, plan, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(20)
 
   const recentPayments: BillingPayment[] =
     paymentRows?.map((p) => ({
@@ -115,13 +122,6 @@ export default async function SettingsPage() {
       plan: p.plan as string,
       created_at: p.created_at as string,
     })) ?? []
-
-  const { data: txRows } = await supabase
-    .from('credit_transactions')
-    .select('id, type, amount, reason, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50)
 
   const recentTransactions: BillingTx[] =
     txRows?.map((t) => ({
@@ -139,8 +139,6 @@ export default async function SettingsPage() {
   const profileName = profile.name ?? (user.user_metadata?.name as string | undefined) ?? null
   const profileAvatarPath =
     typeof profile.avatar_path === 'string' ? profile.avatar_path : null
-
-  const candidateSnapshot = await loadCandidateSnapshot(user.id)
 
   return (
     <SettingsPageClient

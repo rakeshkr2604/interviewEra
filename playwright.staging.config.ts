@@ -32,9 +32,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: process.env.CI ? 'npm run start' : 'npm run dev',
+    command:
+      process.env.CI || process.env.E2E_WEB_SERVER === 'start'
+        ? 'npx tsx scripts/perf/with-staging-env.ts npm run start'
+        : 'npm run dev',
     url: baseURL,
-    reuseExistingServer: false,
+    reuseExistingServer: process.env.E2E_REUSE_SERVER === '1',
     timeout: 120_000,
   },
 });

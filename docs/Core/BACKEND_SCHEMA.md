@@ -1,8 +1,8 @@
 # Backend Schema
 
 > Status: CANONICAL
-> Last Verified: 2026-10-10
-> Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC + V2.1 question-plan columns on questions
+> Last Verified: 2026-10-13
+> Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC + V2.1 question-plan columns on questions + dashboard perf indexes / RLS init-plan (116)
 > Authority: Schema overview for agents (migrations remain legal SoT)
 
 ## Purpose
@@ -24,7 +24,7 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 
 | Table | Notes |
 |---|---|
-| `interviews` | `engine='v2.1'` + script columns; one-active partial unique index |
+| `interviews` | `engine='v2.1'` + script columns; one-active partial unique index; recovery composite `idx_interviews_user_engine_status_started` (migration 116, apply staging-first) |
 | `script_turns` | turn_index, question/answer, follow-up flags, structure fields; `answered_at` (migration 115) = candidate submit moment for retention duration |
 | `questions` | Shared with V1. V2.1 core plans use nullable `question_type`, `difficulty`, `source`, `plan_status` (`planned`/`asked`/`skipped`), `grounding`. `plan_status` NULL means a legacy V1 row. Partial unique index on `(interview_id, order_index)` only where `plan_status` is set. Migration 113. |
 | `answer_evaluations` | per-answer scores |
@@ -54,6 +54,7 @@ V1 dual-agent tables (`conversation_states`, `answer_analyses`, …) may remain 
 
 - RLS on every new table + matching GRANTs
 - Prefer additive migrations; no DROPs without founder sign-off + row counts
+- Auth helpers in policies should use `(SELECT auth.uid())` / `(SELECT auth.role())` so Postgres builds an InitPlan (migration 067 + 116 + 117). Do not weaken USING/WITH CHECK to improve advisor scores.
 
 ## Dependencies
 

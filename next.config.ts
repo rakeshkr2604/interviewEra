@@ -3,6 +3,8 @@ import bundleAnalyzer from "@next/bundle-analyzer";
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
+  // Opening the HTML report in a browser doubles webpack memory on Windows.
+  openAnalyzer: process.env.ANALYZE_OPEN === "true",
 });
 
 /** Vercel sets `preview` only for Preview deployments — never on Production (`production`). */

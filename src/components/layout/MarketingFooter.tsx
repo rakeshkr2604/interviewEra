@@ -5,7 +5,7 @@ import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { BrandHomeLink } from '@/components/brand/BrandHomeLink';
 import { BrandMarkIcon } from '@/components/brand/BrandMarkIcon';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
-import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
+import { NAV_TOOLS_LINKS } from '@/lib/seo/content/nav-links';
 import { siteConfig } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 

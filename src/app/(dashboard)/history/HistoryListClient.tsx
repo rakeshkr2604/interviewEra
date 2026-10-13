@@ -7,6 +7,8 @@ import { formatInterviewDateTimeEnIn } from '@/lib/datetime/ist'
 import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { getInterviewRecoveryPresentation } from '@/lib/interview/interview-recovery-ui'
 import { CommunityCTA } from '@/components/community/CommunityCTA'
+import { historyListHref, totalPages, type HistoryListTab } from '@/lib/dashboard/list-pagination'
+import type { HistoryListItem, HistoryTabCounts } from '@/lib/dashboard/load-history-page-data'
 import {
   Dialog,
   DialogContent,
@@ -21,72 +23,75 @@ import { requestInterviewResume } from '@/lib/interview/request-interview-resume
 
 type FilterTab = 'All' | 'Completed' | 'In-progress'
 
-interface HistoryItem {
-  id: string
-  role: string
-  difficulty: string
-  status: string
-  startedAt: string | null
-  completedAt: string | null
-  engine: 'v1' | 'v2.1'
-  reportHref: string | null
-  continueHref: string
-  score: number | null
-  abandonedResumeUsed: boolean
-  creditDeducted: boolean
-}
+type HistoryItem = HistoryListItem
 
 interface HistoryListClientProps {
   items: HistoryItem[]
+  tab: HistoryListTab
+  tabCounts: HistoryTabCounts
+  page: number
+  pageSize: number
+  totalForTab: number
 }
 
-const TABS: FilterTab[] = ['All', 'Completed', 'In-progress']
+const TABS: { label: FilterTab; value: HistoryListTab }[] = [
+  { label: 'All', value: 'all' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'In-progress', value: 'in-progress' },
+]
 
-export function HistoryListClient({ items }: HistoryListClientProps) {
+export function HistoryListClient({
+  items,
+  tab,
+  tabCounts,
+  page,
+  pageSize,
+  totalForTab,
+}: HistoryListClientProps) {
   const router = useRouter()
-  const [activeTab, setActiveTab] = useState<FilterTab>('All')
+  const activeTab: FilterTab =
+    tab === 'completed' ? 'Completed' : tab === 'in-progress' ? 'In-progress' : 'All'
   const [continueTarget, setContinueTarget] = useState<HistoryItem | null>(null)
   const [continueBusy, setContinueBusy] = useState(false)
   const [continueError, setContinueError] = useState<string | null>(null)
 
-  const filteredItems = useMemo(() => {
-    if (activeTab === 'All') return items
-    if (activeTab === 'Completed') return items.filter((item) => item.status === 'completed')
-    return items.filter((item) => item.status !== 'completed')
-  }, [activeTab, items])
-
-  const tabCounts = useMemo<Record<FilterTab, number>>(
+  const filteredItems = items
+  const pages = totalPages(totalForTab, pageSize)
+  const displayCounts = useMemo<Record<FilterTab, number>>(
     () => ({
-      All: items.length,
-      Completed: items.filter((item) => item.status === 'completed').length,
-      'In-progress': items.filter((item) => item.status !== 'completed').length,
+      All: tabCounts.all,
+      Completed: tabCounts.completed,
+      'In-progress': tabCounts['in-progress'],
     }),
-    [items],
+    [tabCounts],
   )
 
   return (
     <>
       <div className="mb-6 flex flex-wrap gap-2">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
+        {TABS.map((entry) => (
+          <Link
+            key={entry.value}
+            href={historyListHref(entry.value, 1, pageSize)}
+            data-testid={`history-tab-${entry.value}`}
             className="rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-150"
             style={{
-              background: tab === activeTab ? 'var(--accent-primary)' : 'var(--bg-secondary)',
-              color: tab === activeTab ? 'white' : 'var(--text-secondary)',
+              background: entry.label === activeTab ? 'var(--accent-primary)' : 'var(--bg-secondary)',
+              color: entry.label === activeTab ? 'white' : 'var(--text-secondary)',
               border: '1px solid var(--card-border)',
             }}
           >
-            {tab} ({tabCounts[tab]})
-          </button>
+            {entry.label} ({displayCounts[entry.label]})
+          </Link>
         ))}
       </div>
 
       <div className="space-y-3">
         {filteredItems.length === 0 ? (
-          <div className="dashboard-premium-card p-12 text-center sm:p-14">
+          <div
+            data-testid="history-empty"
+            className="dashboard-premium-card p-12 text-center sm:p-14"
+          >
             <p className="mb-2 text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               No {activeTab === 'All' ? '' : activeTab.toLowerCase()} interviews yet
             </p>
@@ -127,6 +132,8 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
             return (
               <div
                 key={interview.id}
+                data-testid="history-item"
+                data-interview-id={interview.id}
                 className="dashboard-premium-card flex flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-5 lg:px-7"
               >
                 <div className="min-w-0 flex-1">
@@ -228,6 +235,43 @@ export function HistoryListClient({ items }: HistoryListClientProps) {
           })
         )}
       </div>
+
+      {totalForTab > pageSize ? (
+        <nav
+          className="mt-6 flex flex-wrap items-center justify-between gap-3 text-sm"
+          aria-label="History pagination"
+        >
+          <p style={{ color: 'var(--text-muted)' }}>
+            Page {page} of {pages}
+          </p>
+          <div className="flex gap-2">
+            {page > 1 ? (
+              <Link
+                href={historyListHref(tab, page - 1, pageSize)}
+                className="rounded-xl border px-3 py-2 text-xs font-medium"
+                style={{
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Previous
+              </Link>
+            ) : null}
+            {page < pages ? (
+              <Link
+                href={historyListHref(tab, page + 1, pageSize)}
+                className="rounded-xl border px-3 py-2 text-xs font-medium"
+                style={{
+                  borderColor: 'var(--card-border)',
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Next
+              </Link>
+            ) : null}
+          </div>
+        </nav>
+      ) : null}
 
       <Dialog
         open={continueTarget !== null}

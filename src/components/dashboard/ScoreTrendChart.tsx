@@ -10,6 +10,8 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
+import { SCORE_TREND_CHART_HEIGHT_PX } from '@/components/dashboard/score-trend-chart-height'
+
 interface ScoreTrendPoint {
   label: string
   score: number
@@ -21,7 +23,7 @@ interface ScoreTrendChartProps {
 
 export function ScoreTrendChart({ data }: ScoreTrendChartProps) {
   return (
-    <ResponsiveContainer width="100%" height={128}>
+    <ResponsiveContainer width="100%" height={SCORE_TREND_CHART_HEIGHT_PX}>
       <LineChart data={data} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.1} />
         <XAxis dataKey="label" tick={{ fontSize: 11 }} />

@@ -50,7 +50,7 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
-import { NAV_TOOLS_ITEMS, NAV_TOOLS_LINKS } from '@/lib/seo/content/nav';
+import { NAV_TOOLS_ITEMS, NAV_TOOLS_LINKS } from '@/lib/seo/content/nav-links';
 import { cn } from '@/lib/utils';
 import { isAnyNavPathActive, isNavPathActive } from '@/lib/navigation/nav-active';
 import { IE_FOCUS_VISIBLE } from '@/lib/theme/component-classes';

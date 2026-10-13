@@ -211,7 +211,7 @@ export function DashboardChrome({
           style={{
             background: 'var(--page-gradient)',
             color: 'var(--text-primary)',
-            scrollbarGutter: isImmersiveViewport ? 'stable' : undefined,
+            scrollbarGutter: 'stable',
           }}
         >
           <div

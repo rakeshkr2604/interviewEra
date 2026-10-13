@@ -4,6 +4,7 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 import { CreateDeadlineModal } from './CreateDeadlineModal';
 import { Calendar, AlertCircle } from 'lucide-react';
+import { computeDeadlineProgress } from '@/lib/college/deadline-progress';
 
 export const metadata = privatePageMetadata({
   title: 'Deadlines',
@@ -46,50 +47,20 @@ async function getDeadlineData(collegeId: string) {
     .eq('enrollment_status', 'active');
 
   const totalStudents = enrollments?.length ?? 0;
+  const studentIds = enrollments?.map((enrollment) => enrollment.user_id) ?? [];
 
-  const deadlinesWithProgress: DeadlineWithProgress[] = await Promise.all(
-    deadlines.map(async (deadline) => {
-      let completedStudents = 0;
-
-      if (totalStudents > 0) {
-        const { data: progress } = await serviceClient
+  const { data: progress } =
+    totalStudents > 0
+      ? await serviceClient
           .from('user_progress')
           .select('total_sessions, current_tier, overall_avg_score')
-          .in(
-            'user_id',
-            enrollments?.map((e) => e.user_id) ?? []
-          );
+          .in('user_id', studentIds)
+      : { data: [] };
 
-        completedStudents = (progress ?? []).filter((p) => {
-          switch (deadline.deadline_type) {
-            case 'sessions':
-              return p.total_sessions >= deadline.target_value;
-            case 'tier':
-              return p.current_tier >= deadline.target_value;
-            case 'score':
-              return p.overall_avg_score !== null && p.overall_avg_score >= deadline.target_value;
-            default:
-              return false;
-          }
-        }).length;
-      }
-
-      const now = new Date();
-      const dueDate = new Date(deadline.due_date);
-      const daysRemaining = Math.ceil(
-        (dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      const isOverdue = daysRemaining < 0;
-
-      return {
-        ...deadline,
-        totalStudents,
-        completedStudents,
-        completionPercentage: totalStudents > 0 ? Math.round((completedStudents / totalStudents) * 100) : 0,
-        daysRemaining: Math.abs(daysRemaining),
-        isOverdue,
-      };
-    })
+  const deadlinesWithProgress: DeadlineWithProgress[] = computeDeadlineProgress(
+    deadlines,
+    progress ?? [],
+    totalStudents,
   );
 
   return { deadlines: deadlinesWithProgress };

@@ -1,7 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-import { Navbar } from '@/components/layout/Navbar';
+
+const Navbar = dynamic(
+  () => import('@/components/layout/Navbar').then((mod) => mod.Navbar),
+  { ssr: true },
+);
 
 /**
  * Thin wrapper that renders <Navbar /> only on marketing-side routes.

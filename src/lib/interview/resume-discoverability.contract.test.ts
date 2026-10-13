@@ -20,12 +20,16 @@ describe('Phase 1 resume discoverability contracts', () => {
 
   it('dashboard hero uses fetchPrimaryRecoveryInterview (not recent-list window)', () => {
     const page = read('src/app/(dashboard)/dashboard/page.tsx');
+    const body = read('src/app/(dashboard)/dashboard/DashboardPageBody.tsx');
+    const loader = read('src/lib/dashboard/load-dashboard-page-data.ts');
     const card = read('src/components/dashboard/UserSummaryCard.tsx');
     const cta = read('src/components/dashboard/DashboardRecoveryCta.tsx');
     const fetchSrc = read('src/lib/interview/fetch-primary-recovery-interview.ts');
-    expect(page).toContain('fetchPrimaryRecoveryInterview');
-    expect(page).not.toContain('selectPrimaryRecoveryInterview');
-    expect(page).toContain('recoveryInterview');
+    expect(loader).toContain('fetchPrimaryRecoveryInterview');
+    expect(body).toContain('loadDashboardPageData');
+    expect(page).toContain('DashboardPageBody');
+    expect(body).not.toContain('selectPrimaryRecoveryInterview');
+    expect(body).toContain('recoveryInterview');
     expect(card).toContain('DashboardRecoveryCta');
     expect(cta).toContain('requestInterviewResume');
     expect(cta).toContain('Continue interview');

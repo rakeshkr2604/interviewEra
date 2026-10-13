@@ -4,6 +4,11 @@ import { DashboardChrome } from '@/components/layout/DashboardChrome'
 import { isPlatformAdminUser } from '@/lib/admin/auth'
 import { assertCoachAccess } from '@/lib/coach/access'
 import {
+  dashboardPerfMark,
+  dashboardPerfNow,
+  timedDashboardSpan,
+} from '@/lib/dashboard/perf-trace'
+import {
   getCachedAuthUser,
   getCachedDashboardUserRow,
   getCachedUserProgressRow,
@@ -16,6 +21,7 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
+  const layoutStarted = dashboardPerfNow()
   const user = await getCachedAuthUser()
 
   let initialStreak = 0
@@ -24,12 +30,16 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   let canAccessCoach = false
 
   if (user) {
+    const chromeStarted = dashboardPerfNow()
     const [{ data: profile }, { data: progress }, platformAdmin, coachAccess] = await Promise.all([
-      getCachedDashboardUserRow(user.id),
-      getCachedUserProgressRow(user.id),
-      isPlatformAdminUser(user.id, user.email),
-      assertCoachAccess(user),
+      timedDashboardSpan('layout.userRow', () => getCachedDashboardUserRow(user.id)),
+      timedDashboardSpan('layout.progress', () => getCachedUserProgressRow(user.id)),
+      timedDashboardSpan('layout.platformAdmin', () =>
+        isPlatformAdminUser(user.id, user.email),
+      ),
+      timedDashboardSpan('layout.coachAccess', () => assertCoachAccess(user)),
     ])
+    dashboardPerfMark('layout.chrome', chromeStarted, { queryCount: 4 })
 
     isPlatformAdmin = platformAdmin
     canAccessAdmin =
@@ -38,6 +48,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     const streak = Number(progress?.current_streak ?? 0)
     initialStreak = Number.isFinite(streak) ? streak : 0
   }
+
+  dashboardPerfMark('layout.total', layoutStarted)
 
   return (
     <DashboardChrome

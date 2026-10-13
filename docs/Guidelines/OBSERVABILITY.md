@@ -1,8 +1,8 @@
 # Observability
 
 > Status: CANONICAL
-> Last Verified: 2026-10-03
-> Verification Scope: Live logging + interview diagnostic events (Phase 2.2 staging readiness)
+> Last Verified: 2026-10-13
+> Verification Scope: Live logging + interview diagnostic events + gated dashboard TTFB spans
 > Authority: Current logging/telemetry — not the historical RFC backlog
 
 ## Purpose
@@ -12,7 +12,7 @@ Describe **live** observability. Design RFCs / execution plans are archived unde
 ## Current State
 
 - **No unified APM** (no Sentry/Datadog/OTel in package.json) — Vercel log stream + DB tables
-- Prefixed console families: `[payment:*]`, interview telemetry, `[VOICE_PIPELINE]`, `[ai-completion]`, …
+- Prefixed console families: `[payment:*]`, interview telemetry, `[VOICE_PIPELINE]`, `[ai-completion]`, `[perf:dashboard]` (opt-in `PERF_DASHBOARD_TRACE=1`, no user ids), …
 - Durable: `ai_call_logs`, `voice_usage_logs`, `provider_health_logs`, rollups, `product_events`
 - **Interview diagnostics (failure-biased):** `interview_diagnostic_events` via `POST /api/interview/diagnostics` (authenticated + ownership). Schema v1 catalog in `src/lib/diagnostics/event-contract.ts`. Not funnel SoT.
 - Request IDs: sparse (exemplary on resume upload); business IDs (`interviewId`, `paymentId`) + client `runId` / `correlation_id` are the spine

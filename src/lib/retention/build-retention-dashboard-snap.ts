@@ -69,25 +69,25 @@ export async function buildRetentionDashboardSnapFromRow(
         overall_avg_score: null,
       };
 
-  const nextCfg =
-    current_tier < MAX_TIER ? await getTierConfig(current_tier + 1) : null;
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const [nextCfg, lastSessionQualityFeedback, weeklyCountResult] = await Promise.all([
+    current_tier < MAX_TIER ? getTierConfig(current_tier + 1) : Promise.resolve(null),
+    userId && total_sessions > 0
+      ? loadLatestFailedSessionQualityFeedback(userId)
+      : Promise.resolve(null),
+    userId
+      ? createClient().then((supabase) =>
+          supabase
+            .from('session_quality_log')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('completed_at', weekAgo),
+        )
+      : Promise.resolve({ count: undefined as number | undefined }),
+  ]);
   const tierProgress =
     current_tier < MAX_TIER ? computeRetentionTierProgressView(progPick, nextCfg) : null;
-
-  const lastSessionQualityFeedback =
-    userId && total_sessions > 0 ? await loadLatestFailedSessionQualityFeedback(userId) : null;
-
-  let weeklySessions: number | undefined;
-  if (userId) {
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const supabase = await createClient();
-    const { count } = await supabase
-      .from('session_quality_log')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .gte('completed_at', weekAgo);
-    weeklySessions = count ?? 0;
-  }
+  const weeklySessions = userId ? (weeklyCountResult.count ?? 0) : undefined;
 
   const last5 = row?.last_5_sessions_avg ?? null;
   const overall = row?.overall_avg_score ?? null;

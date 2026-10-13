@@ -2,10 +2,12 @@ import { redirect } from 'next/navigation';
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker';
 import { ReadinessPageContent } from '@/components/candidate/ReadinessPageContent';
-import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot';
 import { computeReadinessScore } from '@/lib/candidate/readiness-score';
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap';
-import { createClient } from '@/lib/supabase/server';
+import {
+  getCachedAuthUser,
+  getCachedCandidateSnapshot,
+} from '@/lib/dashboard/request-cache';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 
 export const metadata = privatePageMetadata({
@@ -17,13 +19,10 @@ export const metadata = privatePageMetadata({
 export const dynamic = 'force-dynamic';
 
 export default async function ReadinessPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedAuthUser();
   if (!user) redirect('/login');
 
-  const snapshot = await loadCandidateSnapshot(user.id);
+  const snapshot = await getCachedCandidateSnapshot(user.id);
   const readiness = computeReadinessScore(snapshot);
   const roadmap = generatePersonalizedRoadmap(snapshot);
 

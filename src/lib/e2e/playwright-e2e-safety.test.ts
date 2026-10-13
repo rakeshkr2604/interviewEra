@@ -32,4 +32,13 @@ describe('Playwright E2E production-safety contract', () => {
     expect(setup).toContain('resolvePlaywrightBaseUrl');
     expect(staging).toContain('resolvePlaywrightBaseUrl');
   });
+
+  it('starts the staging production server through the staging-env wrapper', () => {
+    const staging = readFileSync(
+      join(process.cwd(), 'playwright.staging.config.ts'),
+      'utf8',
+    );
+    expect(staging).toContain('scripts/perf/with-staging-env.ts');
+    expect(staging).toContain("E2E_WEB_SERVER === 'start'");
+  });
 });

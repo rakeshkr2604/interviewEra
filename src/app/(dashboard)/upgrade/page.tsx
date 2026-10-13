@@ -21,7 +21,11 @@ import {
   publicSnapshotToPromoQuotes,
 } from '@/lib/pricing/effective-price';
 import type { PromoPlanQuote } from '@/components/pricing/PricingTierGrid';
-import { mergeAnalyticsReports } from '@/lib/candidate/analytics-reports';
+import { mergeAnalyticsReports } from '@/lib/candidate/analytics-reports'
+import {
+  fetchCompletedInterviewCount,
+  fetchRecentCompletedInterviewIds,
+} from '@/lib/candidate/completed-interviews';
 
 export default async function UpgradePage({
   searchParams,
@@ -58,16 +62,14 @@ export default async function UpgradePage({
   let totalInterviewsCompleted = 0;
 
   if (creditsRemaining === 0) {
-    const { data: completedInterviews } = await supabase
-      .from('interviews')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('status', 'completed');
+    const [lifetimeCompleted, interviewIds] = await Promise.all([
+      fetchCompletedInterviewCount(supabase, user.id),
+      fetchRecentCompletedInterviewIds(supabase, user.id),
+    ]);
 
-    totalInterviewsCompleted = completedInterviews?.length ?? 0;
+    totalInterviewsCompleted = lifetimeCompleted;
 
-    if (completedInterviews && completedInterviews.length > 0) {
-      const interviewIds = completedInterviews.map((i) => i.id as string);
+    if (interviewIds.length > 0) {
 
       const [{ data: v1Reports }, { data: scriptReports }] = await Promise.all([
         supabase

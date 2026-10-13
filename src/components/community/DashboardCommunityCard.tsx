@@ -10,15 +10,25 @@ import {
 import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 
+/** SSR/hydration snapshot: show the card. Hiding until localStorage hydrates was shifting the footer. */
+export const DASHBOARD_COMMUNITY_CARD_SERVER_VISIBLE = true
+
 export function DashboardCommunityCard() {
-  const storageShow = useCommunityStorageSnapshot(shouldShowDashboardCard, () => false);
+  const storageShow = useCommunityStorageSnapshot(
+    shouldShowDashboardCard,
+    () => DASHBOARD_COMMUNITY_CARD_SERVER_VISIBLE,
+  );
   const [dismissedLocally, setDismissedLocally] = useState(false);
   const show = storageShow && !dismissedLocally;
 
   if (!show) return null;
 
   return (
-    <section className="dashboard-section relative" aria-labelledby="dashboard-community-heading">
+    <section
+      className="dashboard-section relative"
+      aria-labelledby="dashboard-community-heading"
+      data-testid="dashboard-community-card"
+    >
       <button
         type="button"
         onClick={() => {

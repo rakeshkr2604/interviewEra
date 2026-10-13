@@ -3,8 +3,10 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker';
 import { NotificationsFeed } from '@/components/candidate/NotificationsFeed';
 import { buildCandidateNotifications } from '@/lib/candidate/notifications';
-import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot';
-import { createClient } from '@/lib/supabase/server';
+import {
+  getCachedAuthUser,
+  getCachedCandidateSnapshot,
+} from '@/lib/dashboard/request-cache';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 
 export const metadata = privatePageMetadata({
@@ -16,13 +18,10 @@ export const metadata = privatePageMetadata({
 export const dynamic = 'force-dynamic';
 
 export default async function NotificationsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCachedAuthUser();
   if (!user) redirect('/login');
 
-  const snapshot = await loadCandidateSnapshot(user.id);
+  const snapshot = await getCachedCandidateSnapshot(user.id);
   const notifications = buildCandidateNotifications(snapshot);
 
   return (

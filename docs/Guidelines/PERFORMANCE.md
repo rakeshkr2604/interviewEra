@@ -1,8 +1,8 @@
 # Performance
 
 > Status: CANONICAL
-> Last Verified: 2026-10-06
-> Verification Scope: next.config outputFileTracing + serverless PDF scoping
+> Last Verified: 2026-10-13
+> Verification Scope: next.config outputFileTracing + serverless PDF scoping + dashboard request folding + client nav isolation + gated TTFB spans
 > Authority: Perf / bundling guidance
 
 ## Purpose
@@ -15,7 +15,15 @@ Avoid known prod-only failures and keep serverless packages correct — especial
 - Images: AVIF/WebP; `minimumCacheTTL` for images
 - Redis: rate limit + voice quota only (no general data cache layer)
 - Interview routes: respect `maxDuration`
-- Analyze locally: `npm run analyze`
+- Analyze locally: `ANALYZE=true ANALYZE_OPEN=false` (Windows: also `NODE_OPTIONS=--max-old-space-size=8192`, then `npx next build --webpack` — `npm run analyze` fails in cmd because the script prefixes `ANALYZE=true`). Opening the HTML report OOMs webpack at ~2 GB.
+- Client chrome must not import `@/lib/seo/content/registry` / `programmatic/questions`. Static hrefs live in [`nav-links.ts`](../../src/lib/seo/content/nav-links.ts).
+- Recharts on `/dashboard` must load from a Client Component (`ScoreTrendChartSlot`). `ssr: false` is illegal in Server Component `DashboardMain`. Keep the reserved slot height equal to `SCORE_TREND_CHART_HEIGHT_PX` (do not import the Recharts module from the slot file).
+- Authenticated dashboard loaders: fold independent reads, prefetch into `loadCandidateSnapshot`, never cache user data across requests — [`docs/performance/`](../performance/OPTIMIZATION-RESULTS.md)
+- User-facing lists default to page size 20; lifetime counts stay `count: exact`, not `page.length`
+- `/dashboard` header (title + subtitle) must stream without waiting for the interview snapshot. Keep the welcome redirect inside the data `Suspense` child.
+- Dashboard chrome must keep `scrollbar-gutter: stable` (classic desktop scrollbars). Do not restore the short centered spinner in `(dashboard)/loading.tsx`.
+- Document TTFB on `/dashboard` is layout (`auth.getUser` then chrome queries), not the two-wave page loader, when the header/body `Suspense` streams. Staging-only `PERF_DASHBOARD_TRACE=1` logs `[perf:dashboard]` spans with no user ids — never enable in production.
+- Release/rollout: [`docs/performance/RELEASE-READINESS.md`](../performance/RELEASE-READINESS.md)
 
 ### Heavy server-side dependencies must be route-scoped
 

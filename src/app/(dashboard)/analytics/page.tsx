@@ -1,6 +1,11 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { privatePageMetadata } from '@/lib/seo/metadata'
+import {
+  getCachedAuthUser,
+  getCachedSupabase,
+  getCachedUserProgressRow,
+} from '@/lib/dashboard/request-cache'
+import { fetchRecentCompletedInterviewIds } from '@/lib/candidate/completed-interviews'
 import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { RetentionProgressRefreshListener } from '@/components/dashboard/RetentionProgressRefreshListener'
@@ -22,21 +27,15 @@ export const metadata = privatePageMetadata({
 export const dynamic = 'force-dynamic'
 
 export default async function AnalyticsPage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getCachedAuthUser()
   if (!user) redirect('/login')
+  const supabase = await getCachedSupabase()
 
-  const [{ data: completedInterviews }, { data: progressSnap, error: progressErr }] =
+  const [{ data: progressSnap, error: progressErr }, completedInterviewIds] =
     await Promise.all([
-      supabase
-        .from('interviews')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('status', 'completed'),
-      supabase.from('user_progress').select('*').eq('user_id', user.id).maybeSingle(),
+      getCachedUserProgressRow(user.id),
+      fetchRecentCompletedInterviewIds(supabase, user.id),
     ])
-
-  const completedInterviewIds = (completedInterviews ?? []).map((item) => item.id as string)
 
   const [{ data: v1Reports }, { data: scriptReports }] =
     completedInterviewIds.length > 0

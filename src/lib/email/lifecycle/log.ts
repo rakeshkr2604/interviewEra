@@ -42,6 +42,35 @@ export async function wasLifecycleEmailSent(idempotencyKey: string): Promise<boo
   return Boolean(data);
 }
 
+const LIFECYCLE_KEY_CHUNK = 100;
+
+/**
+ * One (chunked) lookup for already-sent / in-flight claim keys.
+ * Failed rows are excluded because they are not status=sent.
+ */
+export async function prefetchSentLifecycleKeys(
+  keys: readonly string[],
+  supabase: { from: ReturnType<typeof createServiceClient>['from'] } = createServiceClient(),
+): Promise<Set<string>> {
+  const sent = new Set<string>();
+  const unique = [...new Set(keys.filter((key) => key.length > 0))];
+  for (let i = 0; i < unique.length; i += LIFECYCLE_KEY_CHUNK) {
+    const chunk = unique.slice(i, i + LIFECYCLE_KEY_CHUNK);
+    const { data, error } = await supabase
+      .from('lifecycle_email_log')
+      .select('idempotency_key')
+      .in('idempotency_key', chunk)
+      .eq('status', 'sent');
+    if (error) {
+      throw new Error(error.message);
+    }
+    for (const row of data ?? []) {
+      if (typeof row.idempotency_key === 'string') sent.add(row.idempotency_key);
+    }
+  }
+  return sent;
+}
+
 /**
  * Reserve the idempotency slot BEFORE calling Resend.
  * Inserts status='sent' (occupies idx_lifecycle_email_sent_idempotency).
