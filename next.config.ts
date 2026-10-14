@@ -168,8 +168,10 @@ const nextConfig: NextConfig = {
     // - wss://*.supabase.co covers Supabase Realtime subscriptions.
     // - siteTwin: allow assets when page is on www but chunks target apex (or vice versa).
     // - Razorpay Web Checkout: nested iframes (api); static host serves chunks/fonts for hosted checkout.
-    // - framing: Production uses `frame-ancestors 'none'` + X-Frame-Options: DENY.
+    // - framing: Production HTML uses `frame-ancestors 'none'` + X-Frame-Options: DENY.
     //   Preview (VERCEL_ENV=preview): frame-ancestors https://vercel.com https://vercel.live only — no `'self'`, no wildcards.
+    //   Speaking-practice PDFs under /resources/guides are the exception: same-origin
+    //   pages may embed them. Those files use a separate headers() entry.
     const razorpayScript =
       'https://checkout.razorpay.com https://cdn.razorpay.com https://api.razorpay.com https://lumberjack.razorpay.com https://checkout-static-next.razorpay.com';
     const razorpayConnect =
@@ -242,13 +244,33 @@ const nextConfig: NextConfig = {
     const nonIndexAssetHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] as const;
     /** App shell — allow crawl so Google sees noindex (avoids GSC "indexed though blocked"). */
     const privateAppHeaders = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] as const;
+    const speakingPdfHeaders = securityHeaders.flatMap((header) => {
+      if (header.key === "X-Frame-Options") {
+        return [{ key: header.key, value: "SAMEORIGIN" }];
+      }
+      if (header.key === "Content-Security-Policy") {
+        return [{
+          key: header.key,
+          value: header.value
+            .replaceAll("frame-ancestors 'none'", "frame-ancestors 'self'")
+            .replaceAll(FRAME_ANCESTORS_PREVIEW, "frame-ancestors 'self'"),
+        }];
+      }
+      return [header];
+    });
+    if (!speakingPdfHeaders.some((header) => header.key === "X-Frame-Options")) {
+      speakingPdfHeaders.push({ key: "X-Frame-Options", value: "SAMEORIGIN" });
+    }
 
     return [
       { source: "/site.webmanifest", headers: [...nonIndexAssetHeaders] },
       { source: "/manifest.json", headers: [...nonIndexAssetHeaders] },
       { source: "/_next/static/media/:path*", headers: [...nonIndexAssetHeaders] },
       { source: "/dashboard", headers: [...privateAppHeaders] },
-      { source: "/(.*)", headers: securityHeaders },
+      // HTML stays unframeable. Practice PDFs are excluded here and allowed
+      // below so /prepare can embed them on the same origin.
+      { source: "/((?!resources/guides/).*)", headers: securityHeaders },
+      { source: "/resources/guides/:path*", headers: speakingPdfHeaders },
     ];
   },
 };
