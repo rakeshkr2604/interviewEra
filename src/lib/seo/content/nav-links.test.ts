@@ -5,7 +5,9 @@ import { NAV_TOOLS_ITEMS, NAV_TOOLS_LINKS } from './nav-links';
 describe('nav-links isolation', () => {
   it('exports the static tool hrefs the marketing chrome needs', () => {
     expect(NAV_TOOLS_LINKS.map((item) => item.href)).toContain('/tools/ats-checker');
-    expect(NAV_TOOLS_ITEMS).toHaveLength(3);
+    expect(NAV_TOOLS_LINKS.map((item) => item.href)).toContain('/tools/prompt-builder');
+    expect(NAV_TOOLS_ITEMS).toHaveLength(4);
+    expect(NAV_TOOLS_ITEMS.map((item) => item.href)).toContain('/tools/prompt-builder');
   });
 
   it('does not import the programmatic question bank', () => {

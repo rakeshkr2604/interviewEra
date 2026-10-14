@@ -1,8 +1,8 @@
 # Routing
 
 > Status: CANONICAL
-> Last Verified: 2026-10-03
-> Verification Scope: Key App Router + API paths for current product + admin interview review
+> Last Verified: 2026-10-14
+> Verification Scope: Key App Router + API paths for current product + admin interview review + public preparation guides
 > Authority: Route map (code wins if drift)
 
 ## Purpose
@@ -21,7 +21,12 @@ Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
 | `/onboarding`, `/interview/new` | **Redirect** → `/interview/script/start` |
 | `/interview/session/[id]` | **Retired notice** only (not a live V1 engine) |
 | `/dashboard`, `/resume`, `/settings`, … | Candidate shell |
-| `/pricing`, `/blog`, `/interview-questions/**` | Marketing / SEO |
+| `/prepare` | Logged-in Interview Prep workspace (sidebar). Noindex. Public articles stay on `/resources` |
+| `/pricing`, `/blog`, `/resources`, `/interview-questions/**` | Marketing / SEO |
+| `/tools/prompt-builder` | Local ChatGPT prompt builder. Public, no account. Usage counts record the goal only. |
+| `/resources/chatgpt-interview-preparation` | Local ChatGPT prompt builder + guide. No resume upload. |
+| `/resources/hr-interview-answer-framework` | HR question frameworks. Links the existing STAR guide. |
+| `/resources/online-assessment-preparation` | Assessment and video-interview preparation. Formats vary by drive. |
 | `/college/**`, `/platform/**`, `/admin/**` | Org / platform |
 | `/platform/feedback` | Platform-admin feedback inbox |
 | `/platform/feedback/interview/[id]` | Platform-admin **read-only** Interview Investigation Center (durable evidence join; not a live session; no credit mutations) |

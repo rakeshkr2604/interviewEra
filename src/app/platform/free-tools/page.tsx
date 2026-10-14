@@ -7,6 +7,7 @@ import {
   ListChecks,
   RefreshCw,
   ShieldAlert,
+  Sparkles,
   Star,
 } from 'lucide-react';
 import type {
@@ -22,20 +23,23 @@ const TOOL_LABELS: Record<FreeToolKey, string> = {
   ats: 'ATS Resume Checker',
   question_generator: 'Question Generator',
   star: 'STAR Answer Builder',
+  prompt_builder: 'Prompt Builder',
 };
 
-const TOOL_ORDER: FreeToolKey[] = ['ats', 'question_generator', 'star'];
+const TOOL_ORDER: FreeToolKey[] = ['ats', 'question_generator', 'star', 'prompt_builder'];
 
 const TOOL_ICONS: Record<FreeToolKey, React.ReactNode> = {
   ats: <FileSearch className="h-4 w-4" />,
   question_generator: <ListChecks className="h-4 w-4" />,
   star: <Star className="h-4 w-4" />,
+  prompt_builder: <Sparkles className="h-4 w-4" />,
 };
 
 const TOOL_ACCENTS: Record<FreeToolKey, string> = {
   ats: 'var(--accent-primary)',
   question_generator: 'var(--accent-success)',
   star: 'var(--accent-warning)',
+  prompt_builder: 'var(--accent-primary)',
 };
 
 const WINDOW_OPTIONS: { key: WindowKey; label: string }[] = [
@@ -50,6 +54,13 @@ const QG_MODE_LABELS: Record<string, string> = {
   jd: 'Job description',
   topic: 'Topic',
   company: 'Company-style',
+};
+
+const PROMPT_GOAL_LABELS: Record<string, string> = {
+  hr: 'HR answers',
+  project: 'Project explanation',
+  technical: 'Technical interviews',
+  comprehensive: 'Comprehensive preparation',
 };
 
 const cardStyle: React.CSSProperties = {
@@ -395,6 +406,69 @@ function QgModePanel({
   );
 }
 
+function PromptGoalPanel({
+  data,
+  window,
+  loading,
+}: {
+  data: FreeToolMetricsResult | null;
+  window: WindowKey;
+  loading: boolean;
+}) {
+  const breakdown = data?.prompt_goal_breakdown[window] ?? {};
+  const entries = Object.entries(PROMPT_GOAL_LABELS).map(([mode, label]) => ({
+    mode,
+    label,
+    count: breakdown[mode] ?? 0,
+  }));
+  const max = Math.max(1, ...entries.map((entry) => entry.count));
+  const total = entries.reduce((sum, entry) => sum + entry.count, 0);
+
+  return (
+    <div style={cardStyle} className="p-5">
+      <h2 className="mb-1 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+        Prompt Builder — goal breakdown
+      </h2>
+      <p className="mb-4 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+        Local prompt generations. Counts only the selected goal, never resume or prompt text.
+      </p>
+      {loading || !data ? (
+        <div className="space-y-2">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-8 animate-pulse rounded-lg" style={{ background: 'var(--card-border)' }} />
+          ))}
+        </div>
+      ) : total === 0 ? (
+        <p className="py-6 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+          No prompts generated in this window yet.
+        </p>
+      ) : (
+        <div className="space-y-2.5">
+          {entries.map(({ mode, label, count }) => (
+            <div key={mode} className="flex items-center gap-3">
+              <span className="w-40 shrink-0 text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                {label}
+              </span>
+              <div className="h-2.5 flex-1 overflow-hidden rounded-full" style={{ background: 'var(--bg-secondary)' }}>
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${Math.round((count / max) * 100)}%`,
+                    background: 'var(--accent-primary)',
+                  }}
+                />
+              </div>
+              <span className="w-12 shrink-0 text-right text-xs font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                {fmt(count)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FreeToolsPage() {
@@ -423,7 +497,7 @@ export default function FreeToolsPage() {
           </h1>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
             {lastUpdated
-              ? `Last updated ${relTime(lastUpdated.toISOString())} · ATS · Question Generator · STAR Builder`
+              ? `Last updated ${relTime(lastUpdated.toISOString())} · ATS · Question Generator · STAR Builder · Prompt Builder`
               : 'Loading…'}
           </p>
         </div>
@@ -465,7 +539,7 @@ export default function FreeToolsPage() {
       {/* Per-tool summary cards */}
       <div>
         <SectionLabel>Usage &amp; Cost — {WINDOW_OPTIONS.find((w) => w.key === window)?.label}</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {TOOL_ORDER.map((tool) => (
             <ToolSummaryCard
               key={tool}
@@ -482,12 +556,13 @@ export default function FreeToolsPage() {
       <div className="grid gap-5 lg:grid-cols-2">
         <SignedInSplitPanel data={data} window={window} loading={loading && !data} />
         <QgModePanel data={data} window={window} loading={loading && !data} />
+        <PromptGoalPanel data={data} window={window} loading={loading && !data} />
       </div>
 
       {/* Conversion signal — signup CTA CTR from durable product_events */}
       <div>
         <SectionLabel>Conversion Signal — {WINDOW_OPTIONS.find((w) => w.key === window)?.label}</SectionLabel>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {TOOL_ORDER.map((tool) => {
             const stats = data?.cta_conversion?.[tool]?.[window];
             const accent = TOOL_ACCENTS[tool];

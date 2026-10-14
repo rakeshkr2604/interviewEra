@@ -18,13 +18,15 @@ const boundaries = {
 };
 
 const emptyAllTime: AllTimeCounts = {
-  events: {
-    ats: {},
-    question_generator: {},
-    star: {},
-  },
-  signedIn: { ats: 0, question_generator: 0, star: 0 },
+    events: {
+      ats: {},
+      question_generator: {},
+      star: {},
+      prompt_builder: {},
+    },
+  signedIn: { ats: 0, question_generator: 0, star: 0, prompt_builder: 0 },
   qgModes: {},
+  promptGoals: {},
 };
 
 function event(overrides: Partial<UsageEventRow>): UsageEventRow {
@@ -118,9 +120,11 @@ describe('aggregateFreeToolMetrics', () => {
         ats: { run: 100, cache_hit: 20, rate_limited: 5, error: 2 },
         question_generator: { run: 50 },
         star: {},
+        prompt_builder: {},
       },
-      signedIn: { ats: 30, question_generator: 10, star: 0 },
+      signedIn: { ats: 30, question_generator: 10, star: 0, prompt_builder: 0 },
       qgModes: { role: 40, topic: 10 },
+      promptGoals: { technical: 4 },
     };
     const result = aggregateFreeToolMetrics({
       events30d: [],
@@ -137,6 +141,35 @@ describe('aggregateFreeToolMetrics', () => {
     expect(atsAll.anonymous).toBe(90); // 100 + 20 - 30
     expect(atsAll.cache_hit_rate_pct).toBe(16.7);
     expect(result.qg_mode_breakdown.all).toEqual({ role: 40, topic: 10 });
+    expect(result.prompt_goal_breakdown.all).toEqual({ technical: 4 });
+    expect(result.tools.prompt_builder.all.runs).toBe(0);
+    expect(result.tools.prompt_builder.today.cache_hit_rate_pct).toBeNull();
+    expect(result.tools.prompt_builder.today.cost_usd).toBe(0);
+  });
+
+  it('counts prompt-builder runs by goal and ignores other events', () => {
+    const rows: UsageEventRow[] = [
+      event({ tool: 'prompt_builder', mode: 'hr' }),
+      event({ tool: 'prompt_builder', mode: 'project' }),
+      event({ tool: 'prompt_builder', mode: 'technical' }),
+      event({ tool: 'prompt_builder', mode: 'comprehensive' }),
+      event({ tool: 'prompt_builder', mode: 'technical', event: 'rate_limited' }),
+      event({ tool: 'prompt_builder', mode: 'not-a-goal' }),
+    ];
+    const { tools, prompt_goal_breakdown } = aggregateFreeToolMetrics({
+      events30d: rows,
+      costRows: [],
+      allTime: emptyAllTime,
+      boundaries,
+    });
+    expect(tools.prompt_builder.today.runs).toBe(5);
+    expect(tools.prompt_builder.today.rate_limited).toBe(1);
+    expect(prompt_goal_breakdown.today).toEqual({
+      hr: 1,
+      project: 1,
+      technical: 1,
+      comprehensive: 1,
+    });
   });
 
   it('tracks QG mode breakdown for set runs only', () => {
@@ -202,6 +235,7 @@ describe('aggregateToolCtaConversion', () => {
         ats: { page_views: 10, cta_clicks: 2 },
         question_generator: { page_views: 0, cta_clicks: 0 },
         star: { page_views: 0, cta_clicks: 0 },
+        prompt_builder: { page_views: 0, cta_clicks: 0 },
       },
       boundaries,
     });
@@ -218,6 +252,7 @@ describe('aggregateToolCtaConversion', () => {
       'question_generator',
     );
     expect(resolveFreeToolFromPagePath('/tools/star-builder')).toBe('star');
+    expect(resolveFreeToolFromPagePath('/tools/prompt-builder')).toBe('prompt_builder');
     expect(resolveFreeToolFromPagePath('/dashboard')).toBeNull();
   });
 });

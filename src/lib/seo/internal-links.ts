@@ -14,6 +14,7 @@ export const HOME_MONEY_PAGE_LINKS: SeoTextLink[] = [
   { href: '/tools/question-generator', label: 'Interview Question Generator' },
   { href: '/tools/ats-checker', label: 'ATS resume checker' },
   { href: '/tools/star-builder', label: 'STAR answer builder' },
+  { href: '/tools/prompt-builder', label: 'ChatGPT prompt builder' },
   { href: '/blog', label: 'Interview prep blog' },
 ];
 
@@ -31,5 +32,6 @@ export const BLOG_TOOL_LINKS: SeoTextLink[] = [
   { href: '/tools/question-generator', label: 'Interview question generator' },
   { href: '/tools/ats-checker', label: 'ATS resume checker' },
   { href: '/tools/star-builder', label: 'STAR answer builder' },
+  { href: '/tools/prompt-builder', label: 'ChatGPT prompt builder' },
   { href: '/pricing', label: 'Plans & credits' },
 ];

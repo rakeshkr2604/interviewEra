@@ -21,7 +21,8 @@ export type FreeToolId =
   | 'ats-checker'
   | 'question-generator'
   | 'question-generator-answer'
-  | 'star-builder';
+  | 'star-builder'
+  | 'prompt-builder';
 
 export type FreeToolRateLimitOptions = {
   /**
@@ -61,6 +62,11 @@ export const FREE_TOOL_RATE_LIMITS: Record<
     limit: 5,
     windowMs: 60 * 60 * 1000,
     userMessage: 'Rate limit reached. You can use the STAR builder up to 5 times per hour.',
+  },
+  'prompt-builder': {
+    limit: 40,
+    windowMs: 60 * 60 * 1000,
+    userMessage: 'Rate limit reached. You can generate up to 40 prompts per hour.',
   },
 };
 

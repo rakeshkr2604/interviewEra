@@ -22,6 +22,7 @@ export type ContentCluster =
 
 export type ContentType =
   | 'blog'
+  | 'prep-guide'
   | 'role-hub'
   | 'company-role-hub'
   | 'company-hub'

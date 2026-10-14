@@ -212,6 +212,7 @@ export async function proxy(request: NextRequest) {
 
   const isPublic =
     PUBLIC_ROUTES.has(pathname) ||
+    pathname.startsWith('/resources/') ||
     pathname.startsWith('/tools/') ||
     pathname.startsWith('/blog') ||
     pathname.startsWith('/interview-questions') ||

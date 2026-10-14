@@ -25,6 +25,8 @@ import {
   Map,
   Bell,
   ChevronDown,
+  BookMarked,
+  Sparkles,
   ListChecks,
   ScanSearch,
   Star,
@@ -75,6 +77,7 @@ type NavSection = {
 
 /** Defaults: keep daily workflow open; tuck infrequent sections. */
 const DEFAULT_SECTION_EXPANDED: Record<string, boolean> = {
+  prepare: true,
   practice: true,
   tools: true,
   insights: false,
@@ -103,6 +106,11 @@ function buildNavSections(canAccessCoach = false): NavSection[] {
 
   return [
     {
+      id: 'prepare',
+      label: 'Prepare',
+      items: [{ href: '/prepare', label: 'Interview Prep', icon: BookMarked }],
+    },
+    {
       id: 'practice',
       label: 'Practice',
       items: practiceItems,
@@ -118,6 +126,7 @@ function buildNavSections(canAccessCoach = false): NavSection[] {
         },
         { href: '/tools/ats-checker', label: 'ATS Resume Checker', icon: ScanSearch },
         { href: '/tools/star-builder', label: 'STAR Answer Builder', icon: Star },
+        { href: '/tools/prompt-builder', label: 'Prompt Builder', icon: Sparkles },
         {
           kind: 'comingSoon',
           id: 'resume-builder',

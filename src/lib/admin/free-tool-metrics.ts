@@ -10,11 +10,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { USD_TO_INR } from '@/lib/cost/cost-engine';
 import { istDayStartUtcIso } from '@/lib/datetime/ist';
+import { PREP_GOALS } from '@/lib/prep/prompt-builder';
 
-export type FreeToolKey = 'ats' | 'question_generator' | 'star';
+export type FreeToolKey = 'ats' | 'question_generator' | 'star' | 'prompt_builder';
 export type WindowKey = 'today' | 'd7' | 'd30' | 'all';
 
-export const FREE_TOOL_KEYS: readonly FreeToolKey[] = ['ats', 'question_generator', 'star'];
+export const FREE_TOOL_KEYS: readonly FreeToolKey[] = ['ats', 'question_generator', 'star', 'prompt_builder'];
 export const WINDOW_KEYS: readonly WindowKey[] = ['today', 'd7', 'd30', 'all'];
 
 /** Tools with a Redis result cache — cache-hit rate is meaningless for the rest. */
@@ -25,6 +26,7 @@ const TOOL_COST_OPERATIONS: Record<FreeToolKey, readonly string[]> = {
   ats: ['ats_field_extraction', 'ats_jd_extraction', 'ats_embedding'],
   question_generator: ['qg_set_generation', 'qg_answer_generation'],
   star: ['star_builder'],
+  prompt_builder: [],
 };
 
 const QG_SET_MODES = ['role', 'jd', 'topic', 'company'] as const;
@@ -57,6 +59,8 @@ export interface FreeToolMetricsResult {
   qg_mode_breakdown: Record<WindowKey, Record<string, number>>;
   /** Per-tool signup CTA CTR from durable product_events. */
   cta_conversion: Record<FreeToolKey, Record<WindowKey, ToolCtaWindowStats>>;
+  /** Prompt-builder runs by preparation goal. No resume or prompt text. */
+  prompt_goal_breakdown: Record<WindowKey, Record<string, number>>;
   usd_to_inr: number;
   generated_at: string;
 }
@@ -83,6 +87,8 @@ export interface AllTimeCounts {
   signedIn: Record<FreeToolKey, number>;
   /** [mode] → all-time QG run count */
   qgModes: Record<string, number>;
+  /** [goal] → all-time prompt-builder run count */
+  promptGoals: Record<string, number>;
 }
 
 interface WindowBoundaries {
@@ -96,6 +102,7 @@ export const FREE_TOOL_PAGE_PREFIXES: Record<FreeToolKey, string> = {
   ats: '/tools/ats-checker',
   question_generator: '/tools/question-generator',
   star: '/tools/star-builder',
+  prompt_builder: '/tools/prompt-builder',
 };
 
 export interface ProductEventRow {
@@ -225,7 +232,7 @@ export function aggregateFreeToolMetrics(input: {
   costRows: CostLogRow[];
   allTime: AllTimeCounts;
   boundaries: WindowBoundaries;
-}): Pick<FreeToolMetricsResult, 'tools' | 'qg_mode_breakdown'> {
+}): Pick<FreeToolMetricsResult, 'tools' | 'qg_mode_breakdown' | 'prompt_goal_breakdown'> {
   const { events30d, costRows, allTime, boundaries } = input;
 
   const tools = {} as Record<FreeToolKey, Record<WindowKey, ToolWindowStats>>;
@@ -243,6 +250,12 @@ export function aggregateFreeToolMetrics(input: {
     d7: {},
     d30: {},
     all: { ...allTime.qgModes },
+  };
+  const promptGoalBreakdown: Record<WindowKey, Record<string, number>> = {
+    today: {},
+    d7: {},
+    d30: {},
+    all: { ...allTime.promptGoals },
   };
 
   // Rolling windows (today / 7d / 30d) from the row fetch.
@@ -271,6 +284,14 @@ export function aggregateFreeToolMetrics(input: {
         (QG_SET_MODES as readonly string[]).includes(row.mode)
       ) {
         qgModeBreakdown[window][row.mode] = (qgModeBreakdown[window][row.mode] ?? 0) + 1;
+      }
+      if (
+        row.tool === 'prompt_builder' &&
+        row.event === 'run' &&
+        row.mode &&
+        (PREP_GOALS as readonly string[]).includes(row.mode)
+      ) {
+        promptGoalBreakdown[window][row.mode] = (promptGoalBreakdown[window][row.mode] ?? 0) + 1;
       }
     }
   }
@@ -323,7 +344,7 @@ export function aggregateFreeToolMetrics(input: {
     }
   }
 
-  return { tools, qg_mode_breakdown: qgModeBreakdown };
+  return { tools, qg_mode_breakdown: qgModeBreakdown, prompt_goal_breakdown: promptGoalBreakdown };
 }
 
 /** PostgREST caps selects at 1000 rows — page through with .range(). */
@@ -374,6 +395,7 @@ async function fetchAllTimeCounts(svc: SupabaseClient): Promise<AllTimeCounts> {
   const events = {} as AllTimeCounts['events'];
   const signedIn = {} as AllTimeCounts['signedIn'];
   const qgModes: Record<string, number> = {};
+  const promptGoals: Record<string, number> = {};
 
   const eventNames = ['run', 'cache_hit', 'rate_limited', 'error'] as const;
 
@@ -420,8 +442,22 @@ async function fetchAllTimeCounts(svc: SupabaseClient): Promise<AllTimeCounts> {
     );
   }
 
+  for (const mode of PREP_GOALS) {
+    countQueries.push(
+      svc
+        .from('tool_usage_events')
+        .select('id', { count: 'exact', head: true })
+        .eq('tool', 'prompt_builder')
+        .eq('event', 'run')
+        .eq('mode', mode)
+        .then(({ count }) => {
+          promptGoals[mode] = count ?? 0;
+        }),
+    );
+  }
+
   await Promise.all(countQueries);
-  return { events, signedIn, qgModes };
+  return { events, signedIn, qgModes, promptGoals };
 }
 
 async function fetchProductEventsForToolsSince(

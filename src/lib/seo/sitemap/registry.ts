@@ -87,7 +87,25 @@ export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
   },
   { path: '/help-center', changeFrequency: 'monthly', priority: 0.62 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.55 },
-  { path: '/resources', changeFrequency: 'weekly', priority: 0.82, lastModified: '2026-06-06' },
+  { path: '/resources', changeFrequency: 'weekly', priority: 0.82, lastModified: '2026-10-14' },
+  {
+    path: '/resources/chatgpt-interview-preparation',
+    changeFrequency: 'monthly',
+    priority: 0.8,
+    lastModified: '2026-10-14',
+  },
+  {
+    path: '/resources/hr-interview-answer-framework',
+    changeFrequency: 'monthly',
+    priority: 0.8,
+    lastModified: '2026-10-14',
+  },
+  {
+    path: '/resources/online-assessment-preparation',
+    changeFrequency: 'monthly',
+    priority: 0.8,
+    lastModified: '2026-10-14',
+  },
   { path: '/privacy', changeFrequency: 'yearly', priority: 0.35 },
   { path: '/terms', changeFrequency: 'yearly', priority: 0.35 },
   { path: '/refund', changeFrequency: 'yearly', priority: 0.3 },
@@ -98,6 +116,7 @@ export const TOOL_LANDING_ROUTES: SitemapSourceEntry[] = [
   { path: '/tools/question-generator', changeFrequency: 'monthly', priority: 0.9 },
   { path: '/tools/ats-checker', changeFrequency: 'monthly', priority: 0.9 },
   { path: '/tools/star-builder', changeFrequency: 'monthly', priority: 0.9 },
+  { path: '/tools/prompt-builder', changeFrequency: 'monthly', priority: 0.9 },
 ];
 
 /**

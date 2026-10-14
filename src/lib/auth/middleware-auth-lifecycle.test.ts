@@ -215,4 +215,33 @@ describe('Middleware Auth Lifecycle & Cookie Propagation', () => {
     expect(response.status).toBe(307)
     expect(response.headers.get('location')).toContain('/login')
   })
+
+  it('redirects an unauthenticated /prepare visit to login', async () => {
+    const dummyResponse = NextResponse.next()
+    mockUpdateSession.mockResolvedValueOnce({
+      response: dummyResponse,
+      user: null,
+    })
+
+    const { proxy } = await import('../../proxy')
+    const response = await proxy(new NextRequest('http://localhost:3000/prepare'))
+    expect(response.status).toBe(307)
+    const location = response.headers.get('location') ?? ''
+    expect(location).toContain('/login')
+    expect(location).toContain('next=%2Fprepare')
+  })
+
+  it('serves the resources hub and nested preparation guides without a session', async () => {
+    const { proxy } = await import('../../proxy')
+    for (const path of [
+      '/resources',
+      '/resources/chatgpt-interview-preparation',
+      '/resources/hr-interview-answer-framework',
+      '/resources/online-assessment-preparation',
+    ]) {
+      const response = await proxy(new NextRequest(`http://localhost:3000${path}`))
+      expect(response.status).not.toBe(307)
+      expect(response.headers.get('location')).toBeNull()
+    }
+  })
 })

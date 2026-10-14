@@ -11,12 +11,12 @@
 
 import { createServiceClient } from '@/lib/supabase/server';
 
-export type ToolUsageTool = 'ats' | 'question_generator' | 'star';
+export type ToolUsageTool = 'ats' | 'question_generator' | 'star' | 'prompt_builder';
 export type ToolUsageEvent = 'run' | 'cache_hit' | 'rate_limited' | 'error';
 
 export interface ToolUsageEntry {
   tool: ToolUsageTool;
-  /** QG generation mode ('role' | 'jd' | 'topic' | 'company' | 'answer'); omit for other tools. */
+  /** QG mode or prompt-builder goal. Omit when the tool has no mode. */
   mode?: string;
   event: ToolUsageEvent;
   /** Pass when known at the call site; ai_call_logs remains the cost source of truth. */

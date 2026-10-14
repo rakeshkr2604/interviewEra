@@ -103,7 +103,13 @@ export type ProductEventName =
   | 'onboarding_started'
   | 'onboarding_step_completed'
   | 'onboarding_completed'
-  | 'profile_completion_updated';
+  | 'profile_completion_updated'
+  | 'resource_hub_viewed'
+  | 'prep_prompt_generated'
+  | 'prep_prompt_copied'
+  | 'readiness_checklist_completed'
+  | 'prep_guide_opened'
+  | 'prep_to_mock_cta_clicked';
 
 export type ProductEventPayload = {
   /** @deprecated Legacy field — use event_name at emit boundary. */

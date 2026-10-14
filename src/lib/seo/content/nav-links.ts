@@ -34,6 +34,7 @@ export const NAV_TOOLS_LINKS: readonly SeoTextLink[] = [
   { href: '/tools/question-generator', label: 'Interview Question Generator' },
   { href: '/tools/ats-checker', label: 'ATS Resume Checker' },
   { href: '/tools/star-builder', label: 'STAR Answer Builder' },
+  { href: '/tools/prompt-builder', label: 'Prompt Builder' },
 ] as const;
 
 export const NAV_TOOLS_ITEMS: readonly NavResourceItem[] = [
@@ -51,6 +52,11 @@ export const NAV_TOOLS_ITEMS: readonly NavResourceItem[] = [
     label: 'STAR Answer Builder',
     href: '/tools/star-builder',
     desc: 'Structure behavioral answers clearly',
+  },
+  {
+    label: 'Prompt Builder',
+    href: '/tools/prompt-builder',
+    desc: 'Build a ChatGPT interview prompt on this device',
   },
 ] as const;
 
