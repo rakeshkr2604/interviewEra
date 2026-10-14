@@ -1,22 +1,20 @@
 import Link from 'next/link';
-import { faqPageJsonLd } from '@/lib/seo/schema/jsonld';
 import { COMMUNITY_HUB_PATH } from '@/lib/community/community';
-import { LANDING_FAQ_CATEGORY_VIEWS, LANDING_FAQS } from '@/lib/landing/faq-content';
+import { LANDING_FAQ_CATEGORY_VIEWS } from '@/lib/landing/faq-content';
 import { LandingFaqCategorized } from '@/components/landing/faq/LandingFaqCategorized';
 import { LANDING_HOME_SECTION, LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { cn } from '@/lib/utils';
 import '@/components/landing/faq/LandingFaq.css';
 
 /**
- * Homepage FAQ — categorized accordion (TUF-inspired) + FAQPage JSON-LD.
- * Copy lives in `faq-content.ts`; interactive shell is a client island.
+ * Homepage FAQ UI — categorized accordion (TUF-inspired).
+ * JSON-LD lives in `LandingFaqJsonLd` so the interactive (and CSS-heavy) shell
+ * can be viewport-deferred without dropping structured data from the document.
  */
-export function LandingFaq() {
-  const faqLd = faqPageJsonLd(LANDING_FAQS.map((f) => ({ question: f.q, answer: f.a })));
-
+export default function LandingFaq() {
   return (
     <section
-      className={cn(LANDING_HOME_SECTION, 'ie-lh-section-faq border-t')}
+      className={cn(LANDING_HOME_SECTION, 'landing-faq-section ie-lh-section-faq border-t')}
       aria-labelledby="home-faq-heading"
     >
       <div className={cn(LANDING_PAGE_CONTAINER, 'max-w-6xl')}>
@@ -60,8 +58,6 @@ export function LandingFaq() {
           .
         </div>
       </div>
-
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
     </section>
   );
 }

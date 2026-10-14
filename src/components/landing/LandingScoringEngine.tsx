@@ -9,6 +9,8 @@ import {
 } from '@/components/landing/LandingScoringEngine.data';
 import { LANDING_DEMO_DISCLOSURE } from '@/lib/landing/demo-disclosure';
 import { cn } from '@/lib/utils';
+/** Co-located with this dynamically imported island — keeps ~14KB off the marketing critical CSS (Loop 18). */
+import './LandingScoringEngine.css';
 
 const blockLabelStyle: CSSProperties = {
   fontSize: '12px',

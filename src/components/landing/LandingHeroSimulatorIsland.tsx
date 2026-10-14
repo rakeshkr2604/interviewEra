@@ -1,17 +1,12 @@
-'use client';
-
-import dynamic from 'next/dynamic';
+import { LandingHeroSimulatorGestureLoader } from '@/components/landing/LandingHeroSimulatorGestureLoader';
 import { LandingHeroSimulatorShell } from '@/components/landing/LandingHeroSimulatorShell';
 
 /**
- * Client island: code-splits the turn-engine + video while SSR/first paint
- * can still show the static poster shell (no spinner, reserved layout).
+ * Server island: static poster shell is in the RSC payload; only the gesture
+ * loader hydrates. Keeps the turn-engine + video off the mobile LCP graph.
  */
-const LandingHeroSimulator = dynamic(
-  () => import('@/components/landing/LandingHeroSimulator'),
-  { loading: () => <LandingHeroSimulatorShell /> },
-);
-
 export default function LandingHeroSimulatorIsland() {
-  return <LandingHeroSimulator />;
+  return (
+    <LandingHeroSimulatorGestureLoader fallback={<LandingHeroSimulatorShell />} />
+  );
 }

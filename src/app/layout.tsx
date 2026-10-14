@@ -34,13 +34,14 @@ const bricolage = Bricolage_Grotesque({
   adjustFontFallback: true,
 });
 
-/** Body font — 700 for `font-bold` on non-heading copy; avoid loading 800/900 here (use heading font for display nums). */
+/** Body font — 700 for `font-bold` on non-heading copy; avoid loading 800/900 here (use heading font for display nums).
+ *  Do not preload alongside Bricolage — competing font preloads delay LCP text on `/`. */
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
   subsets: ["latin"],
   display: "swap",
   weight: ["400", "500", "600", "700"],
-  preload: true,
+  preload: false,
   adjustFontFallback: true,
 });
 

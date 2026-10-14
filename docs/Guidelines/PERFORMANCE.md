@@ -1,8 +1,8 @@
 # Performance
 
 > Status: CANONICAL
-> Last Verified: 2026-10-13
-> Verification Scope: next.config outputFileTracing + serverless PDF scoping + dashboard request folding + client nav isolation + gated TTFB spans + Loop 9 sign-in/admin funnel
+> Last Verified: 2026-10-14
+> Verification Scope: next.config outputFileTracing + serverless PDF scoping + dashboard request folding + client nav isolation + gated TTFB spans + Loop 9 sign-in/admin funnel + homepage `/` LCP lab-vs-field consolidation
 > Authority: Perf / bundling guidance
 
 ## Purpose
@@ -28,6 +28,7 @@ Avoid known prod-only failures and keep serverless packages correct — especial
 - OAuth callback: session exchange + destination stay on the critical path; attribution / welcome / referral / consent use `scheduleServerlessBackgroundWork` (`after()` / waitUntil) — never bare fire-and-forget.
 - Platform admin: request-scoped `getVerifiedPlatformUser` dedupes `auth.getUser`; every `/api/admin/*` still calls `requirePlatformAdmin`.
 - Admin funnel/growth: one cohort fetch, chunked `.in()` (100), set-based D7 return-visit / retention; cache-aside + single-flight via `getOrComputeCached` (TTL 120s, `fresh=1` bypass). Lab scripts: `scripts/perf/measure-admin-funnel.ts`, `measure-funnel-before-after.ts`.
+- Homepage `/` LCP element (lab + field attribution): SSR text `span.hero-copy-heading__lead` (“Mock Interview practice”). Local Lighthouse mobile **simulated** LCP ~5.2 s is **not** interchangeable with field Speed Insights; Playwright observed LCP is ~0.4–0.5 s without CPU throttle. Production Speed Insights (28d, `vercel.speed_insights.lcp_ms` p75): `/` ~2.53 s overall, `/`+mobile ~2.74 s, `/`+desktop ~2.63 s; primary attribution `#landing-hero-heading>span.hero-copy-heading__lead.block` ~2 s. Prior Tailwind route-split / font / ambient experiments did not move lab LCP — do not repeat without new causal evidence. Lab artifacts under gitignored `tmp-lh/`.
 
 ### Heavy server-side dependencies must be route-scoped
 

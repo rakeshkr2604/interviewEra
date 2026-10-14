@@ -17,6 +17,8 @@ import { Reveal } from '@/components/landing/landing-home-shared';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import type { PaidPlanId } from '@/lib/pricing/plans';
+/** Pricing-only styles — removed from shared marketing.css critical path (Loop 18). */
+import './pricing-page.css';
 
 type PublicPricingJson = {
   plans?: Partial<

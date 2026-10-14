@@ -1,0 +1,531 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   Pricing page — comparison matrix card + section polish
+   Used by src/components/pricing/PricingComparisonTable.tsx and
+   src/app/(marketing)/pricing/PricingPageClient.tsx
+   ═══════════════════════════════════════════════════════════════════════ */
+
+.ie-cmp {
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: var(--ie-radius-2xl);
+  background: color-mix(in srgb, var(--card-bg) 96%, transparent);
+  box-shadow: var(--card-shadow);
+}
+
+.ie-cmp-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+
+.ie-cmp-table th,
+.ie-cmp-table td {
+  padding: 0.7rem 0.55rem;
+  vertical-align: middle;
+  text-align: center;
+}
+
+.ie-cmp-table th:first-child,
+.ie-cmp-table td:first-child {
+  padding-left: 1rem;
+  text-align: left;
+}
+
+.ie-cmp-table td:last-child,
+.ie-cmp-table thead th:last-child {
+  padding-right: 0.75rem;
+}
+
+/* Header row — banded so the card reads as header + body, not 13 equal rows */
+.ie-cmp-table thead th {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 95%, transparent);
+}
+
+.ie-cmp-table thead th:first-child {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.ie-cmp-plan-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.5rem;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
+.ie-cmp-plan-pill--muted {
+  color: var(--text-secondary);
+  background: color-mix(in srgb, var(--text-muted) 16%, transparent);
+}
+
+.ie-cmp-plan-pill--accent {
+  color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+}
+
+.ie-cmp-plan-pill--success {
+  color: color-mix(in srgb, var(--accent-success) 85%, #065f46);
+  background: color-mix(in srgb, var(--accent-success) 18%, transparent);
+}
+
+html[data-theme="dark"] .ie-cmp-plan-pill--success {
+  color: var(--accent-success);
+}
+
+/* Feature label column */
+.ie-cmp-table tbody th {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.ie-cmp-table tbody td {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+}
+
+.ie-cmp-table tbody tr {
+  border-top: 1px solid color-mix(in srgb, var(--card-border) 75%, transparent);
+  transition: background-color var(--ie-duration-normal) var(--ie-ease-standard);
+}
+
+.ie-cmp-table tbody tr:nth-child(even) {
+  background: color-mix(in srgb, var(--text-primary) 3%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ie-cmp-table tbody tr:hover {
+    background: color-mix(in srgb, var(--accent-primary) 8%, transparent);
+  }
+}
+
+/* Recommended column — continuous tinted band through header + body */
+.ie-cmp-table [data-hl] {
+  background: color-mix(in srgb, var(--accent-success) 9%, transparent);
+  box-shadow:
+    inset 1px 0 0 color-mix(in srgb, var(--accent-success) 20%, transparent),
+    inset -1px 0 0 color-mix(in srgb, var(--accent-success) 20%, transparent);
+}
+
+.ie-cmp-table thead th[data-hl] {
+  color: var(--accent-success);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ie-cmp-table tbody tr:hover [data-hl] {
+    background: color-mix(in srgb, var(--accent-success) 15%, transparent);
+  }
+}
+
+.ie-cmp-icon {
+  display: inline-block;
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--accent-success);
+}
+
+.ie-cmp-icon--off {
+  color: color-mix(in srgb, var(--text-muted) 65%, transparent);
+}
+
+/* Text/number values outrank the boolean ticks — they carry the real difference */
+.ie-cmp-value {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.ie-cmp-value--hl {
+  font-weight: 700;
+  color: var(--accent-success);
+}
+
+@media (min-width: 640px) {
+  .ie-cmp-table th,
+  .ie-cmp-table td {
+    padding: 0.9rem 1rem;
+  }
+
+  .ie-cmp-table th:first-child,
+  .ie-cmp-table td:first-child {
+    padding-left: 1.5rem;
+  }
+
+  .ie-cmp-table td:last-child,
+  .ie-cmp-table thead th:last-child {
+    padding-right: 1.25rem;
+  }
+
+  .ie-cmp-table thead th {
+    font-size: 0.95rem;
+  }
+
+  .ie-cmp-table thead th:first-child {
+    font-size: 0.7rem;
+  }
+
+  .ie-cmp-table tbody th {
+    font-size: 0.9rem;
+  }
+
+  .ie-cmp-table tbody td {
+    font-size: 0.85rem;
+  }
+
+  .ie-cmp-value {
+    font-size: 0.9375rem;
+  }
+
+  .ie-cmp-plan-pill {
+    font-size: 0.78rem;
+    padding: 0.32rem 0.8rem;
+  }
+
+  .ie-cmp-icon {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+}
+
+/* ─── Hover lift for pricing surface cards ─── */
+.ie-pricing-lift {
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color var(--ie-duration-normal) var(--ie-ease-standard),
+    box-shadow 260ms var(--ie-ease-standard);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ie-pricing-lift:hover {
+    transform: translateY(-3px);
+    border-color: color-mix(in srgb, var(--accent-primary) 30%, var(--card-border));
+    box-shadow: 0 18px 40px -18px color-mix(in srgb, var(--accent-primary) 35%, transparent);
+  }
+}
+
+/* ─── Quick-pick hint cards (color-coded by plan) ─── */
+.ie-pricing-hint {
+  height: 100%;
+  border-radius: var(--ie-radius-xl);
+  border: 1px solid var(--card-border);
+  border-left-width: 3px;
+  background: var(--card-bg);
+  padding: 1rem 1.1rem;
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms var(--ie-ease-standard);
+}
+
+.ie-pricing-hint--muted {
+  border-left-color: color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.ie-pricing-hint--accent {
+  border-left-color: var(--accent-primary);
+}
+
+.ie-pricing-hint--success {
+  border-left-color: var(--accent-success);
+}
+
+.ie-pricing-hint__plan {
+  margin: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ie-pricing-hint--muted .ie-pricing-hint__plan {
+  color: var(--text-muted);
+}
+
+.ie-pricing-hint--accent .ie-pricing-hint__plan {
+  color: var(--accent-primary);
+}
+
+.ie-pricing-hint--success .ie-pricing-hint__plan {
+  color: var(--accent-success);
+}
+
+.ie-pricing-hint__title {
+  margin: 0.35rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.ie-pricing-hint__body {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ie-pricing-hint:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px -18px color-mix(in srgb, var(--accent-primary) 28%, transparent);
+  }
+}
+
+/* ─── FAQ disclosure — smooth open where supported, no-op elsewhere ─── */
+.ie-pricing-faq {
+  interpolate-size: allow-keywords;
+  transition:
+    border-color var(--ie-duration-normal) var(--ie-ease-standard),
+    background-color var(--ie-duration-normal) var(--ie-ease-standard);
+}
+
+.ie-pricing-faq:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 28%, var(--card-border));
+}
+
+.ie-pricing-faq::details-content {
+  block-size: 0;
+  overflow: hidden;
+  transition:
+    block-size 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    content-visibility 300ms;
+  transition-behavior: allow-discrete;
+}
+
+.ie-pricing-faq[open]::details-content {
+  block-size: auto;
+}
+
+.ie-pricing-faq summary::marker,
+.ie-pricing-faq summary::-webkit-details-marker {
+  display: none;
+  content: '';
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-cmp-table tbody tr,
+  .ie-pricing-lift,
+  .ie-pricing-hint,
+  .ie-pricing-faq {
+    transition: none !important;
+  }
+
+  .ie-pricing-lift:hover,
+  .ie-pricing-hint:hover {
+    transform: none;
+  }
+
+  .ie-pricing-faq::details-content {
+    transition: none !important;
+  }
+}
+
+/* ─── Pricing hero — rotating headline line ───
+   Height comes from an invisible sizer set to the longest phrase, so the
+   crossfade never reflows the hero. Only opacity/transform transition; the
+   background-clip:text gradient must never participate (it breaks the clip). */
+.ie-hero-rotate {
+  position: relative;
+  display: block;
+  margin-top: 0.1em;
+}
+
+.ie-hero-rotate__sizer {
+  display: block;
+  visibility: hidden;
+}
+
+.ie-hero-rotate__item {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(100deg, #4f46e5 0%, #7c3aed 55%, #6366f1 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  opacity: 0;
+  transform: translateY(0.28em);
+  transition:
+    opacity 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ie-hero-rotate__item[data-active="true"] {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+html[data-theme="dark"] .ie-hero-rotate__item {
+  background: linear-gradient(100deg, #818cf8 0%, #a78bfa 55%, #93c5fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-hero-rotate__item {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ─── Pricing WhatsApp support CTA ───
+   Same surface tokens as TechnicalIssueProtection so both support cards read as
+   one family; theming follows --card-* / --text-* in light and dark. */
+.ie-pricing-wa {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-radius: var(--ie-radius-2xl);
+  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+  padding: 1.25rem 1.25rem;
+  color: var(--text-primary);
+}
+
+@media (min-width: 640px) {
+  .ie-pricing-wa {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1.25rem;
+    padding: 1.25rem 1.5rem;
+  }
+}
+
+.ie-pricing-wa__lead {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.ie-pricing-wa__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  margin-top: 0.125rem;
+  border-radius: var(--ie-radius-md);
+  color: #25d366;
+  background: color-mix(in srgb, #25d366 14%, transparent);
+}
+
+.ie-pricing-wa__copy {
+  max-width: 34rem;
+}
+
+/* Support-rank block — matches the technical-issue card's heading weight */
+.ie-pricing-wa__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--text-primary);
+}
+
+.ie-pricing-wa__body {
+  margin: 0.375rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.ie-pricing-wa__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+@media (min-width: 640px) {
+  .ie-pricing-wa__actions {
+    width: auto;
+    min-width: 13.5rem;
+  }
+}
+
+.ie-pricing-wa__btn {
+  display: inline-flex;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: var(--ie-radius-md);
+  padding: 0 1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition:
+    background-color var(--ie-duration-normal) var(--ie-ease-standard),
+    border-color var(--ie-duration-normal) var(--ie-ease-standard),
+    opacity var(--ie-duration-normal) var(--ie-ease-standard);
+}
+
+.ie-pricing-wa__btn--primary {
+  color: #fff;
+  background: var(--accent-primary);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--accent-primary) 28%, transparent);
+}
+
+.ie-pricing-wa__btn--ghost {
+  color: var(--text-primary);
+  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ie-pricing-wa__btn--primary:hover {
+    opacity: 0.9;
+  }
+
+  .ie-pricing-wa__btn--ghost:hover {
+    border-color: color-mix(in srgb, #25d366 45%, var(--card-border));
+    background: color-mix(in srgb, #25d366 10%, transparent);
+  }
+}
+
+.ie-pricing-enquiry__phone {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--card-border);
+  border-radius: var(--ie-radius-md);
+  background: color-mix(in srgb, var(--bg-secondary) 70%, transparent);
+  padding-left: 0.65rem;
+  overflow: hidden;
+}
+
+.ie-pricing-enquiry__cc {
+  flex-shrink: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ie-pricing-wa__btn {
+    transition: none !important;
+  }
+}
+

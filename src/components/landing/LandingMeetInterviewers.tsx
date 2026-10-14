@@ -46,12 +46,12 @@ function InterviewRoundCard({
       <div className="ie-meet-media">
         <video
           ref={videoRef}
-          src={round.videoSrc}
+          data-src={round.videoSrc}
           poster={round.posterSrc}
           muted
           loop
           playsInline
-          preload="metadata"
+          preload="none"
           aria-hidden
         />
         <div
@@ -123,6 +123,13 @@ export default function LandingMeetInterviewers() {
       for (const v of videoRefs.current) v?.pause();
     };
 
+    const ensureSrc = (v: HTMLVideoElement) => {
+      const mediaSrc = v.dataset.src;
+      if (mediaSrc && !v.getAttribute('src')) {
+        v.src = mediaSrc;
+      }
+    };
+
     const playActive = () => {
       if (prefersReducedMotion() || !inViewRef.current) {
         pauseAll();
@@ -132,6 +139,7 @@ export default function LandingMeetInterviewers() {
       videoRefs.current.forEach((v, i) => {
         if (!v) return;
         if (i === idx) {
+          ensureSrc(v);
           v.muted = true;
           void v.play().catch(() => {});
         } else {
@@ -143,8 +151,15 @@ export default function LandingMeetInterviewers() {
     const onVisibility = (visible: boolean) => {
       inViewRef.current = visible;
       section.classList.toggle('is-in-view', visible);
-      if (!visible) pauseAll();
-      else playActive();
+      if (!visible) {
+        pauseAll();
+        return;
+      }
+      // Warm poster remains; attach video src only once the section is near the viewport.
+      for (const v of videoRefs.current) {
+        if (v) ensureSrc(v);
+      }
+      playActive();
     };
 
     if (!('IntersectionObserver' in window)) {
@@ -174,6 +189,8 @@ export default function LandingMeetInterviewers() {
     videoRefs.current.forEach((v, i) => {
       if (!v) return;
       if (i === index) {
+        const mediaSrc = v.dataset.src;
+        if (mediaSrc && !v.getAttribute('src')) v.src = mediaSrc;
         v.muted = true;
         void v.play().catch(() => {});
       } else {

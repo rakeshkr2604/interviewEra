@@ -326,7 +326,7 @@ export function TimelineDeviceHeader({ state, videoVisible }: DeviceHeaderProps)
               muted
               playsInline
               loop
-              preload="auto"
+              preload="none"
               aria-label={`${TIMELINE_INTERVIEWER.name}, your AI interviewer, live on video`}
             />
           ) : (

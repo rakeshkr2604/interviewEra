@@ -65,6 +65,41 @@ async function settleHomepage(page: Page) {
   await page.waitForTimeout(600);
 }
 
+/**
+ * ViewportDeferred islands omit section IDs until near the viewport.
+ * scrollIntoViewIfNeeded on a missing locator deadlocks — scroll the document
+ * until IntersectionObserver mounts the island, then bring it into view.
+ * Polls on DOM attachment (not fixed sleeps) after each scroll step.
+ */
+async function revealDeferredSection(page: Page, selector: string, timeoutMs = 30_000) {
+  const target = page.locator(selector).first();
+  const deadline = Date.now() + timeoutMs;
+
+  while (Date.now() < deadline) {
+    if ((await target.count()) > 0) {
+      await target.scrollIntoViewIfNeeded({ timeout: Math.max(1_000, deadline - Date.now()) });
+      return target;
+    }
+    await page.evaluate(() => {
+      const step = Math.max(240, Math.floor(window.innerHeight * 0.75));
+      window.scrollBy(0, step);
+    });
+    // Short attachment poll so IntersectionObserver can mount after the scroll.
+    try {
+      await target.waitFor({ state: 'attached', timeout: 250 });
+      await target.scrollIntoViewIfNeeded({ timeout: Math.max(1_000, deadline - Date.now()) });
+      return target;
+    } catch {
+      // Keep scrolling until deadline.
+    }
+  }
+
+  await expect(target, `deferred section ${selector} never mounted`).toBeAttached({
+    timeout: 1_000,
+  });
+  return target;
+}
+
 test.describe('Release validation — homepage', () => {
   for (const viewport of VIEWPORTS) {
     test(`layout + sections @ ${viewport.label}`, async ({ page }, testInfo) => {
@@ -77,8 +112,7 @@ test.describe('Release validation — homepage', () => {
       await assertNoHorizontalOverflow(page);
 
       for (const section of HOMEPAGE_SECTIONS) {
-        const target = page.locator(section.selector).first();
-        await target.scrollIntoViewIfNeeded({ timeout: 30_000 });
+        const target = await revealDeferredSection(page, section.selector);
         if (section.selector.startsWith('.') || section.selector.includes('heading')) {
           await expect(target).toBeVisible({ timeout: 15_000 });
         } else {
@@ -116,10 +150,10 @@ test.describe('Release validation — homepage', () => {
     await expect(nav.getByRole('link', { name: 'For Teams' })).toHaveCount(0);
 
     await page.getByRole('link', { name: /See Sample Interview Report/i }).first().click();
-    await page.locator('#interview-report').scrollIntoViewIfNeeded();
+    await revealDeferredSection(page, '#interview-report');
     await expect(page.locator('#interview-report')).toBeInViewport();
 
-    await page.locator('#home-faq-heading').first().scrollIntoViewIfNeeded();
+    await revealDeferredSection(page, '#home-faq-heading');
     const faqTab = page.getByRole('tab').first();
     await expect(faqTab).toBeVisible();
     await faqTab.click();
@@ -140,7 +174,7 @@ test.describe('Release validation — homepage', () => {
 
     await expect(page.getByRole('button', { name: 'Open navigation menu' })).toBeVisible();
 
-    await page.evaluate(() => document.querySelector('#how')?.scrollIntoView({ block: 'start' }));
+    await revealDeferredSection(page, '#how');
     await expect(page.locator('#landing-timeline-heading')).toBeVisible({ timeout: 15_000 });
     await assertNoHorizontalOverflow(page);
 

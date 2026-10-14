@@ -12,7 +12,8 @@ export const TIMELINE_INTERVIEWER = {
   role: 'AI Interviewer',
   videoSrc: '/avatars/female/meera-ai.mp4',
   posterSrc: '/assets/meera-intro-poster.webp',
-  avatarSrc: '/avatars/female/meera-avatar.png',
+  /** Static placeholder when video is off — keep tiny (not the 1.5MB PNG source). */
+  avatarSrc: '/assets/meera-intro-poster.webp',
 } as const;
 
 export const TIMELINE_SPINE_LABELS = [

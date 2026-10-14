@@ -1,15 +1,10 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-
 /**
- * Homepage hero H1 (left column):
+ * Homepage hero H1 (left column) — Server Component (no hydration on the LCP text).
  *   Mock Interview practice
- *   [rotating accent]
+ *   [CSS-animated rotating accent]
  *
- * CSS-only crossfade (no `motion/react`) — landing deliberately dropped Framer
- * Motion from the LCP path. Height is reserved from the longest phrase so
- * rotation never shifts the CTA / trust strip.
+ * Rotation is decorative; the first phrase is also in `.sr-only` for a11y/SEO.
+ * Height is reserved from the longest phrase so rotation never shifts the CTA.
  */
 
 export const LANDING_HERO_ROTATING_PHRASES = [
@@ -19,32 +14,11 @@ export const LANDING_HERO_ROTATING_PHRASES = [
   'built around your resume.',
 ] as const;
 
-const ROTATE_MS = 2800;
-
 const LONGEST_PHRASE = LANDING_HERO_ROTATING_PHRASES.reduce((a, b) =>
   a.length >= b.length ? a : b,
 );
 
-function prefersReducedMotion(): boolean {
-  if (typeof window === 'undefined' || !('matchMedia' in window)) return false;
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-}
-
 export default function LandingHeroHeadline() {
-  const [index, setIndex] = useState(0);
-
-  useEffect(() => {
-    if (prefersReducedMotion() || LANDING_HERO_ROTATING_PHRASES.length <= 1) return;
-    const id = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % LANDING_HERO_ROTATING_PHRASES.length);
-    }, ROTATE_MS);
-    return () => window.clearInterval(id);
-  }, []);
-
   return (
     <h1
       id="landing-hero-heading"
@@ -65,7 +39,8 @@ export default function LandingHeroHeadline() {
           <span
             key={phrase}
             className="ie-lh-hero-rotate__item v3-hero-gradient-text"
-            data-active={i === index ? 'true' : undefined}
+            style={{ animationDelay: `${i * 2.8}s` }}
+            data-first={i === 0 ? 'true' : undefined}
           >
             {phrase}
           </span>

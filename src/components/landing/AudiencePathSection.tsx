@@ -78,7 +78,7 @@ export function AudiencePathSection() {
   return (
     <section
       className={cn(
-        'px-4 py-16 sm:px-5 sm:py-20 lg:py-24',
+        'landing-audience-path px-4 py-16 sm:px-5 sm:py-20 lg:py-24',
         'ie-lh-surface-35 relative overflow-hidden border-b',
       )}
       aria-labelledby="audience-path-heading"

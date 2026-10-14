@@ -1,10 +1,12 @@
-import './LandingHeroSimulator.css';
+import './LandingHeroSimulatorShell.css';
 import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimulatorPoster';
 
 /**
  * Static first-paint shell for the hero simulator.
  * Matches the live card footprint (poster + chrome) so dynamic() loading never CLS-spins.
  * No video, no turn engine, no timers.
+ *
+ * Loop 21: shell CSS only — full LandingHeroSimulator.css loads with the deferred island.
  */
 export function LandingHeroSimulatorShell() {
   return (
@@ -13,7 +15,7 @@ export function LandingHeroSimulatorShell() {
       role="img"
       aria-label="Animated Sample Session Mock Interview demo"
     >
-      <div className="sim-card" aria-hidden="true">
+      <div className="sim" aria-hidden="true">
         <div className="sim-chrome">
           <div className="sim-dots">
             <span />

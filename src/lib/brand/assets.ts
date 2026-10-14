@@ -32,10 +32,10 @@ export const BRAND_ICON_CIRCLE_PATH = '/brand/icons/ui/interviewera-icon-circle.
 
 /** Full lockups — UI crops (board captions removed); white-first on a light plate in dark chrome. */
 export const BRAND_LOGO_HORIZONTAL_PATH = '/brand/primary/ui/interviewera-horizontal.webp' as const
-/** Navbar monogram (full IE from vertical board — horizontal extract clips the I). */
-export const BRAND_MONOGRAM_NAV_PATH = '/brand/primary/ui/interviewera-monogram-nav.png' as const
+/** Navbar monogram (full IE from vertical board — horizontal extract clips the I). WebP for light chrome. */
+export const BRAND_MONOGRAM_NAV_PATH = '/brand/primary/ui/interviewera-monogram-nav.webp' as const
 /** Navbar wordmark-only (InterviewEra) — dark ink; light chrome only (dark uses CSS wordmark). */
-export const BRAND_WORDMARK_NAV_PATH = '/brand/primary/ui/interviewera-wordmark-nav.png' as const
+export const BRAND_WORDMARK_NAV_PATH = '/brand/primary/ui/interviewera-wordmark-nav.webp' as const
 export const BRAND_LOGO_VERTICAL_PATH = '/brand/primary/ui/interviewera-primary-vertical.webp' as const
 export const BRAND_LOGO_STACKED_PATH = '/brand/primary/ui/interviewera-stacked.webp' as const
 

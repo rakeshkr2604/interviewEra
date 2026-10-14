@@ -1,17 +1,18 @@
 import MarketingLayout from '@/app/(marketing)/layout';
 import { HomeMoneyPageLinks } from '@/components/seo/HomeMoneyPageLinks';
-import { AudiencePathSection } from '@/components/landing/AudiencePathSection';
 import LandingHero from '@/components/landing/LandingHero';
 import {
+  AudiencePathSectionLazy,
+  InterviewTransformationSectionLazy,
+  LandingFaqLazy,
   LandingFinalCtaLazy,
   LandingMeetInterviewersLazy,
   LandingScoringEngineLazy,
   LandingTimelineSectionLazy,
+  LandingTrustMetricsLazy,
 } from '@/components/landing/LandingHomeClient';
-import { InterviewTransformationSection } from '@/components/landing/interview-transformation/InterviewTransformationSection';
-import { LandingFaq } from '@/components/landing/LandingFaq';
+import { LandingFaqJsonLd } from '@/components/landing/LandingFaqJsonLd';
 import { LandingFounderSection } from '@/components/landing/LandingFounderSection';
-import { LandingTrustMetrics } from '@/components/landing/LandingTrustMetrics';
 import { PAGE_SEO } from '@/lib/seo/metadata';
 
 export const metadata = PAGE_SEO.home;
@@ -28,20 +29,33 @@ function HeroBetaPill() {
  *
  * Section order: Hero → AudiencePath → TrustMetrics → Timeline → ScoringEngine → Founder →
  * MeetInterviewers → InterviewTransformation → FAQ → FinalCta → MoneyPageLinks.
+ *
+ * LCP: hero simulator poster (`female-avatar-*.avif`) — single high-priority preload only.
  */
 export default function Page() {
   return (
     <MarketingLayout>
+      {/* Hoisted to <head> — matches LandingHeroSimulatorPoster srcSet/sizes. */}
+      <link
+        rel="preload"
+        as="image"
+        type="image/avif"
+        href="/assets/female-avatar-600.avif"
+        imageSrcSet="/assets/female-avatar-300.avif 300w, /assets/female-avatar-600.avif 600w"
+        imageSizes="(max-width: 560px) 280px, 150px"
+        fetchPriority="high"
+      />
       <main id="main-content">
         <LandingHero countPill={<HeroBetaPill />} />
-        <AudiencePathSection />
-        <LandingTrustMetrics />
+        <AudiencePathSectionLazy />
+        <LandingTrustMetricsLazy />
         <LandingTimelineSectionLazy />
         <LandingScoringEngineLazy />
         <LandingFounderSection />
         <LandingMeetInterviewersLazy />
-        <InterviewTransformationSection />
-        <LandingFaq />
+        <InterviewTransformationSectionLazy />
+        <LandingFaqJsonLd />
+        <LandingFaqLazy />
         <LandingFinalCtaLazy />
         <HomeMoneyPageLinks />
       </main>

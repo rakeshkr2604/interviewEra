@@ -22,6 +22,8 @@ export function LandingHeroSimulatorPoster() {
         height={200}
         decoding="async"
         loading="eager"
+        // Hero LCP candidate on mobile — discover early without competing video bytes.
+        fetchPriority="high"
       />
     </picture>
   );

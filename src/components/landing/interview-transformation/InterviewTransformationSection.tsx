@@ -12,7 +12,7 @@ import { TransformationRibbon } from '@/components/landing/interview-transformat
 import { TrustStatement } from '@/components/landing/interview-transformation/TrustStatement';
 import './InterviewTransformation.css';
 
-export function InterviewTransformationSection() {
+export default function InterviewTransformationSection() {
   return (
     <section
       id="practice-transformation"

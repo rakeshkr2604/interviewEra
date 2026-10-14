@@ -1,105 +1,40 @@
-'use client';
-
 import type { ReactNode } from 'react';
-import { useEffect, useState } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
-import { CommunityCTA } from '@/components/community/CommunityCTA';
 import { cn } from '@/lib/utils';
 
 /**
- * Minimal client island so the homepage stays static (better bfcache): primary CTA href
- * upgrades from /signup → /dashboard after idle Supabase check.
+ * Hero CTAs as a Server Component shell + thin TrackedCtaLink client leaves.
  *
- * Hierarchy: CTAs → trust strip → audience line → optional community link.
- * Trust sits above conditional community CTA to avoid CLS when community appears.
+ * Auth-aware `/signup` → `/dashboard` swap was removed from the critical path:
+ * middleware already sends signed-in users from `/signup` to `/dashboard`, and
+ * the idle Supabase probe competed with LCP/TBT on mobile (Loop 16/17 traces).
+ *
+ * Hierarchy: CTAs → trust strip → audience line.
  */
 export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: ReactNode }) {
-  const [primaryHref, setPrimaryHref] = useState<'/signup' | '/dashboard'>('/signup');
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    let unsub: (() => void) | undefined;
-    let idleHandle: number | undefined;
-    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-
-    type IdleWin = Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number };
-    const w = window as IdleWin;
-
-    const work = async () => {
-      try {
-        const { createClient } = await import('@/lib/supabase/client');
-        if (cancelled) return;
-        const supabase = createClient();
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.getUser();
-        if (error) {
-          const { signOutIfStaleAuth } = await import('@/lib/supabase/session');
-          await signOutIfStaleAuth(supabase, error);
-        }
-        const authed = !!(user && !error);
-        if (!cancelled) {
-          setPrimaryHref(authed ? '/dashboard' : '/signup');
-          setIsAuthenticated(authed);
-        }
-        const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-          if (!cancelled) {
-            setPrimaryHref(session?.user ? '/dashboard' : '/signup');
-            setIsAuthenticated(!!session?.user);
-          }
-        });
-        unsub = () => sub.subscription.unsubscribe();
-      } catch {
-        /* keep /signup */
-      }
-    };
-
-    if (w.requestIdleCallback) {
-      idleHandle = w.requestIdleCallback(() => void work(), { timeout: 2000 });
-    } else {
-      timeoutHandle = setTimeout(() => void work(), 0);
-    }
-
-    return () => {
-      cancelled = true;
-      unsub?.();
-      if (idleHandle !== undefined) {
-        const cw = window as Window & { cancelIdleCallback?: (id: number) => void };
-        cw.cancelIdleCallback?.(idleHandle);
-      }
-      if (timeoutHandle !== undefined) clearTimeout(timeoutHandle);
-    };
-  }, []);
-
-  const primaryLabel = isAuthenticated ? 'Dashboard' : 'Start Free Mock Interview';
-
   return (
     <div className="hero-cta-island max-w-[32rem]">
       <div className="hero-cta-island__actions flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
         <TrackedCtaLink
-          href={primaryHref}
+          href="/signup"
           ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
-          ctaText={primaryLabel}
+          ctaText="Start Free Mock Interview"
           section="hero"
-          authenticated={isAuthenticated}
           className="v3-btn-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold no-underline sm:w-auto sm:px-8"
           style={{
             color: '#fff',
             fontFamily: "'DM Sans', sans-serif",
           }}
         >
-          {primaryLabel}
+          Start Free Mock Interview
         </TrackedCtaLink>
         <TrackedCtaLink
           href="/#interview-report"
           ctaKey={CTA_KEYS.SEE_SAMPLE_REPORT}
           ctaText="See Sample Interview Report"
           section="hero_secondary"
-          authenticated={isAuthenticated}
           className="v3-btn-secondary hero-v3-btn-secondary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-[1.5px] px-6 py-3.5 text-[14.5px] font-semibold no-underline sm:w-auto sm:px-7 sm:text-[15px]"
           style={{
             borderColor: T.bord2,
@@ -136,11 +71,6 @@ export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: Reac
           </li>
         ))}
       </ul>
-
-      {/* Reserved line height so optional community link does not shove layout */}
-      <div className="mt-2 min-h-[1.25rem] sm:mt-2.5">
-        <CommunityCTA placement="landing_hero" className="mb-0 block text-[13px]" />
-      </div>
     </div>
   );
 }

@@ -11,8 +11,8 @@ import { LandingHeroSimulatorPoster } from '@/components/landing/LandingHeroSimu
  * - Animation engine runs only in useEffect (post-hydration), with full teardown of
  *   every timeout / rAF / interval on unmount → no leaks, no orphan loops.
  * - prefers-reduced-motion → renders the final scored state once, no loop, no video.
- * - Video is preload="metadata" and only plays while in view (IntersectionObserver
- *   on the tile), with abort-safe play retry so poster never sticks forever.
+ * - Video src is assigned after idle; preload="none" until then. Plays while in view
+ *   (IntersectionObserver on the tile), with abort-safe play retry so poster stays.
  * - Decorative: host carries an aria-label; inner DOM is aria-hidden and the fake
  *   controls are removed from the tab order.
  * - Loaded via next/dynamic from LandingHeroSimulatorIsland (poster shell first).
@@ -548,26 +548,55 @@ export default function LandingHeroSimulator() {
       attempt();
     };
 
+    const attachVideoPipeline = () => {
+      if (cancelled || !video) return;
+      const mediaSrc = video.dataset.src;
+      if (mediaSrc && !video.getAttribute('src')) {
+        video.src = mediaSrc;
+      }
+      const observeTarget = videoTile ?? video;
+      if ('IntersectionObserver' in window) {
+        io = new IntersectionObserver(
+          (entries) => {
+            const entry = entries[0];
+            if (!entry) return;
+            syncVideo(entry.isIntersecting);
+          },
+          { root: null, rootMargin: '12% 0px', threshold: 0.1 },
+        );
+        io.observe(observeTarget);
+      } else {
+        syncVideo(true);
+      }
+    };
+
     const beginActive = () => {
       if (cancelled) return;
-      if (video) {
-        const observeTarget = videoTile ?? video;
-        if ('IntersectionObserver' in window) {
-          io = new IntersectionObserver(
-            (entries) => {
-              const entry = entries[0];
-              if (!entry) return;
-              syncVideo(entry.isIntersecting);
-            },
-            { root: null, rootMargin: '12% 0px', threshold: 0.1 },
-          );
-          io.observe(observeTarget);
-        } else {
-          syncVideo(true);
-        }
+      // Mobile / coarse pointer: keep the optimized poster; only fetch the 2MB MP4
+      // after an explicit gesture so lab LCP/TBT are not dominated by hero media.
+      const preferPosterOnly =
+        typeof window.matchMedia === 'function' &&
+        window.matchMedia('(max-width: 768px), (hover: none) and (pointer: coarse)').matches;
+
+      let onGesture: (() => void) | null = null;
+      if (video && preferPosterOnly) {
+        onGesture = () => {
+          attachVideoPipeline();
+          if (onGesture) {
+            videoTile?.removeEventListener('pointerdown', onGesture);
+            videoTile?.removeEventListener('focusin', onGesture);
+          }
+        };
+        videoTile?.addEventListener('pointerdown', onGesture, { passive: true });
+        videoTile?.addEventListener('focusin', onGesture);
+        gestureCleanup = onGesture;
+      } else if (video) {
+        attachVideoPipeline();
       }
       runTurn();
     };
+
+    let gestureCleanup: (() => void) | null = null;
 
     const idleHandle: number = usedIdle
       ? iw.requestIdleCallback!(beginActive, { timeout: 1800 })
@@ -577,6 +606,10 @@ export default function LandingHeroSimulator() {
       cancelled = true;
       if (usedIdle) iw.cancelIdleCallback?.(idleHandle);
       else clearTimeout(idleHandle);
+      if (gestureCleanup) {
+        videoTile?.removeEventListener('pointerdown', gestureCleanup);
+        videoTile?.removeEventListener('focusin', gestureCleanup);
+      }
       timeouts.forEach((id) => clearTimeout(id));
       rafs.forEach((id) => cancelAnimationFrame(id));
       pendingResolvers.forEach((fn) => fn());
@@ -657,11 +690,11 @@ export default function LandingHeroSimulator() {
             <div className="sim-video-tile">
               <LandingHeroSimulatorPoster />
               <video
-                src="/avatars/female/meera-ai.mp4"
+                data-src="/avatars/female/meera-ai.mp4"
                 loop
                 muted
                 playsInline
-                preload="metadata"
+                preload="none"
                 tabIndex={-1}
               />
               <div className="sim-listen-overlay" />

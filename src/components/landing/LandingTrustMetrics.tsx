@@ -14,6 +14,8 @@ import {
   type TrustMetricId,
 } from '@/lib/landing/trust-metrics';
 import { cn } from '@/lib/utils';
+/** Co-located with this viewport-deferred island (Loop 18 critical CSS split). */
+import './LandingTrustMetrics.css';
 
 const COUNTER_DURATION_S = 0.7;
 const STAGGER_S = 0.1;

@@ -16,7 +16,10 @@ const FOUNDER = siteOrganizationStructured.founder;
  */
 export function LandingFounderSection() {
   return (
-    <section className={LANDING_HOME_SECTION} aria-labelledby="landing-founder-heading">
+    <section
+      className={cn(LANDING_HOME_SECTION, 'landing-founder-section')}
+      aria-labelledby="landing-founder-heading"
+    >
       <div className={LANDING_PAGE_CONTAINER}>
         <div className={LANDING_HOME_HEADER_BLOCK}>
           <span className={LANDING_HOME_EYEBROW}>Built by someone in the same race</span>
