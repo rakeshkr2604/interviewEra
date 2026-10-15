@@ -66,7 +66,7 @@ export function ReactHubArticle({
               Interview Questions
             </Link>
             <span aria-hidden className="mx-1.5">›</span>
-            <Link href={`${questionsHubPath()}/topics`} className="hover:underline" style={{ color: 'var(--text-muted)' }}>
+            <Link href={`${questionsHubPath()}#topics`} className="hover:underline" style={{ color: 'var(--text-muted)' }}>
               Topics
             </Link>
             <span aria-hidden className="mx-1.5">›</span>

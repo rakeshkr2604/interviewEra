@@ -92,19 +92,25 @@ export function clampMetaDescription(text: string, max = SEO_MAX_DESCRIPTION): s
   return (sp > max * 0.55 ? cut.slice(0, sp) : cut) + '…'
 }
 
-/** Trim page title segment before the root layout brand template is applied. */
-export function clampTitleSegment(text: string, max = SEO_MAX_TITLE_SEGMENT): string {
+const DANGLING_TAIL = /(?:[\s,:;|&(–—-]+|\s+(?:and|or|the|a|an|for|of|to|in|on|with|vs\.?|at))+$/i
+
+/** Cut at a word boundary, then drop trailing separators/connectives ("…Eligibility,", "…Questions and"). */
+function clampAtWordBoundary(text: string, max: number): string {
   if (text.length <= max) return text
   const cut = text.slice(0, max - 1)
   const sp = cut.lastIndexOf(' ')
-  return sp > max * 0.5 ? cut.slice(0, sp) : cut
+  const head = sp > max * 0.5 ? cut.slice(0, sp) : cut
+  const trimmed = head.replace(DANGLING_TAIL, '')
+  return trimmed.length > max * 0.5 ? trimmed : head
+}
+
+/** Trim page title segment before the root layout brand template is applied. */
+export function clampTitleSegment(text: string, max = SEO_MAX_TITLE_SEGMENT): string {
+  return clampAtWordBoundary(text, max)
 }
 
 function clampAbsoluteDocumentTitle(text: string, max = SEO_MAX_DOCUMENT_TITLE): string {
-  if (text.length <= max) return text
-  const cut = text.slice(0, max - 1)
-  const sp = cut.lastIndexOf(' ')
-  return sp > max * 0.5 ? cut.slice(0, sp) : cut
+  return clampAtWordBoundary(text, max)
 }
 
 /** Clamp a fully composed brand-first or brand-last social title. */

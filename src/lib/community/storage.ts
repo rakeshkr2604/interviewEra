@@ -68,6 +68,23 @@ export function dismissBanner(): void {
   notifyCommunityStorageChange();
 }
 
+/** `<html>` attribute that reserves the marketing banner strip before hydration (no CLS). */
+export const COMMUNITY_BANNER_BOOT_ATTR = 'data-community-banner';
+
+/**
+ * Pre-paint inline script mirroring `shouldShowBanner()` + the hub-path exclusion in
+ * `CommunityBanner`. Must stay in sync with `isBannerDismissed` / `hasJoinedCommunity`.
+ */
+export function communityBannerBootScript(hubPath: string): string {
+  return `(function(){try{var p=location.pathname;if(p===${JSON.stringify(hubPath)}||p.indexOf(${JSON.stringify(`${hubPath}/`)})===0)return;var j=localStorage.getItem(${JSON.stringify(KEYS.joinedPlatforms)});if(j){try{var a=JSON.parse(j);if(Array.isArray(a)&&a.length>0)return;}catch(e){}}var d=localStorage.getItem(${JSON.stringify(KEYS.bannerDismissed)});if(d){var n=Number(d);if(!isFinite(n)||Date.now()-n<${BANNER_DISMISS_TTL_MS})return;}document.documentElement.setAttribute(${JSON.stringify(COMMUNITY_BANNER_BOOT_ATTR)},'show');}catch(e){}})();`;
+}
+
+/** Drop the pre-paint reservation once the banner is dismissed or will not render. */
+export function releaseCommunityBannerSlot(): void {
+  if (typeof document === 'undefined') return;
+  document.documentElement.removeAttribute(COMMUNITY_BANNER_BOOT_ATTR);
+}
+
 export function isWidgetDismissed(): boolean {
   return readStorage(KEYS.widgetDismissed) === '1';
 }

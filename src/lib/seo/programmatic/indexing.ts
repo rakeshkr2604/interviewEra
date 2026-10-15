@@ -56,18 +56,46 @@ export function isSkillIndexable(skill: Skill): boolean {
 }
 
 /**
+ * Intersections with a bespoke editorial article (own question set, hiring
+ * process, FAQ) rendered by `companies/[company]/[role]/page.tsx`. Every other
+ * intersection falls back to the role question bank under a company H1 — a
+ * 2026-10-15 shingle audit measured 73–97% text overlap with sibling
+ * intersections for those fallbacks, so they stay `noindex, follow`.
+ * Add a key here only when the page ships its own editorial article.
+ */
+export const EDITORIAL_INTERSECTION_KEYS: ReadonlySet<string> = new Set([
+  'amazon:software-engineer',
+  'microsoft:software-engineer',
+  'infosys:software-engineer',
+  'infosys:java-developer',
+  'freshworks:frontend-developer',
+  'wipro:software-engineer',
+  'wipro:java-developer',
+  'wipro:qa-engineer',
+  'wipro:data-analyst',
+])
+
+/**
  * Company × role intersection pages ship as static routes from
- * `HIGH_VALUE_INTERSECTIONS`. They reuse the role question bank with
- * company-specific framing — index when both parents clear the content bar
- * so metadata, sitemap, and internal links stay aligned (no sitemap/noindex split).
- *
- * Editorial pillar hubs (Amazon/Microsoft/Infosys/Freshworks) still override
- * metadata in their page files but also satisfy this gate.
+ * `HIGH_VALUE_INTERSECTIONS`. Only editorial intersections are indexable;
+ * template fallbacks remain crawlable (`follow`) but are held out of the index
+ * and sitemap so they do not dilute the role and company pages they duplicate.
  */
 export function isIntersectionIndexable(company: Company, role: Role): boolean {
   const isPublishedIntersection = HIGH_VALUE_INTERSECTIONS.some(
     (pair) => pair.company === company.slug && pair.role === role.slug,
   )
   if (!isPublishedIntersection) return false
+  if (!EDITORIAL_INTERSECTION_KEYS.has(`${company.slug}:${role.slug}`)) return false
   return isCompanyIndexable(company) && isRoleIndexable(role)
+}
+
+/**
+ * `/tools/ats-checker/[role]` variants share one FAQ, checklist, and HowTo
+ * with only the role name swapped (83–88% sibling text overlap, 2026-10-15),
+ * and the checker itself lives on `/tools/ats-checker`. Held out of the index
+ * until a variant carries role-specific resume guidance.
+ */
+export function isAtsRoleVariantIndexable(_role: Role): boolean {
+  return false
 }

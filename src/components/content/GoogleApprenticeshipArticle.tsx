@@ -19,6 +19,7 @@ import {
   GOOGLE_APPRENTICESHIP_OUTSIDE_INDIA_ROWS,
   GOOGLE_APPRENTICESHIP_RESUME_TIPS,
   GOOGLE_APPRENTICESHIP_SOURCES,
+  GOOGLE_APPRENTICESHIP_STATUS_CHECKED,
   GOOGLE_APPRENTICESHIP_TOC,
   GOOGLE_APPRENTICESHIP_TRACKS_COLUMNS,
   GOOGLE_APPRENTICESHIP_TRACKS_ROWS,
@@ -38,16 +39,16 @@ function DeadlineCallout() {
         borderColor: 'color-mix(in srgb, var(--accent-warning) 40%, var(--card-border))',
         background: 'color-mix(in srgb, var(--accent-warning) 10%, var(--card-bg))',
       }}
-      aria-label="Application deadline"
+      aria-label="Application status"
     >
       <p className="m-0 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--accent-warning)' }}>
-        Act now
+        Status checked {GOOGLE_APPRENTICESHIP_STATUS_CHECKED}
       </p>
       <p className="mt-2 m-0 text-base font-semibold leading-snug sm:text-lg" style={{ color: 'var(--text-primary)' }}>
-        Applications for the India cohort close on <strong>{GOOGLE_APPRENTICESHIP_DEADLINE}</strong>.
+        Applications for the India 2027 cohort closed on <strong>{GOOGLE_APPRENTICESHIP_DEADLINE}</strong>.
       </p>
       <p className="mt-2 m-0 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        If you have been searching &ldquo;Google apprenticeship last date,&rdquo; apply first through{' '}
+        We have not found an announced next application window. Watch{' '}
         <a
           href="https://careers.google.com"
           className="font-medium underline-offset-4 hover:underline"
@@ -56,8 +57,8 @@ function DeadlineCallout() {
           target="_blank"
         >
           careers.google.com
-        </a>
-        , then use this guide for eligibility and prep details.
+        </a>{' '}
+        for new listings, and use this guide to get your resume and interview answers ready before the next cycle.
       </p>
     </aside>
   )
@@ -78,8 +79,9 @@ export function GoogleApprenticeshipArticle() {
             Google Apprenticeship 2026: Eligibility, Salary, Last Date, Application Process &amp; India Guide
           </h1>
           <p className="ie-blog-article-deck">
-            Google&apos;s listings call this the &ldquo;2027 cohort&rdquo; because the program starts in March 2027
-            — but applications, the deadline, and eligibility below are all live right now in 2026.
+            Google&apos;s listings call this the &ldquo;2027 cohort&rdquo; because the program starts in March 2027.
+            Applications for that cohort ran in 2026 and closed on {GOOGLE_APPRENTICESHIP_DEADLINE}; the eligibility,
+            tracks, and preparation advice below still apply to the next cycle.
           </p>
           <div
             className="ie-blog-article-meta mt-4 flex flex-wrap gap-2 text-sm"
@@ -99,9 +101,9 @@ export function GoogleApprenticeshipArticle() {
 
         <p>
           If you&apos;ve been searching &ldquo;Google apprenticeship&rdquo; or &ldquo;Google apprenticeship last
-          date,&rdquo; here&apos;s the one thing to act on first:{' '}
-          <strong>applications for the India cohort close on {GOOGLE_APPRENTICESHIP_DEADLINE}.</strong> Bookmark this,
-          apply, then come back for the details below.
+          date,&rdquo; here is the short answer:{' '}
+          <strong>the India 2027-cohort window closed on {GOOGLE_APPRENTICESHIP_DEADLINE}.</strong> The program
+          details below are what to prepare for when Google opens the next window.
         </p>
 
         <BlogEditorialToc sections={GOOGLE_APPRENTICESHIP_TOC} twoColumnList />
@@ -208,10 +210,10 @@ export function GoogleApprenticeshipArticle() {
           <h2 id="google-apprenticeship-last-date">Google Apprenticeship Last Date</h2>
           <DeadlineCallout />
           <p>
-            The application deadline for the current India cohort is <strong>{GOOGLE_APPRENTICESHIP_DEADLINE}</strong>.
-            The program itself starts in March 2027 (some tracks mention March or June 2027), which is why you will see
-            it referred to as both &ldquo;2026 applications&rdquo; and the &ldquo;2027 cohort&rdquo; depending on the
-            source.
+            The application deadline for the India 2027 cohort was <strong>{GOOGLE_APPRENTICESHIP_DEADLINE}</strong>,
+            and that window has closed. The program itself starts in March 2027 (some tracks mention March or June
+            2027), which is why you will see it referred to as both &ldquo;2026 applications&rdquo; and the &ldquo;2027
+            cohort&rdquo; depending on the source.
           </p>
         </section>
 
@@ -338,8 +340,9 @@ export function GoogleApprenticeshipArticle() {
           <p className="mt-4">
             <em>
               Disclaimer: Program details, deadlines, and figures are based on publicly available job listings as of
-              late July 2026 and may change. Always verify current details on Google&apos;s official careers portal
-              before applying.
+              late July 2026 and may change; the application status was re-checked on{' '}
+              {GOOGLE_APPRENTICESHIP_STATUS_CHECKED}. Always verify current details on Google&apos;s official careers
+              portal before applying.
             </em>
           </p>
         </footer>

@@ -56,7 +56,7 @@ export function GoogleApprenticeshipHeroVisual() {
         </p>
         <p className="ie-ga-hero-visual__status">
           <span className="ie-ga-hero-visual__pulse" aria-hidden />
-          Applications open · Deadline {GOOGLE_APPRENTICESHIP_DEADLINE}
+          2027-cohort applications closed {GOOGLE_APPRENTICESHIP_DEADLINE}
         </p>
         <dl className="ie-ga-hero-visual__grid">
           {GOOGLE_APPRENTICESHIP_QUICK_FACTS.map(([label, value]) => (

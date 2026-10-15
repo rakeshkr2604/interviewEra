@@ -67,7 +67,7 @@ export const metadata: Metadata = generateMetadata({
 });
 
 const IMG_BASE = '/blog/ai-mock-interviews-smartest-prep-2026';
-const DASHBOARD_URL = `${siteConfig.url}/dashboard`;
+const SIGNUP_URL = `${siteConfig.url}/signup`;
 const ABSOLUTE_IMG = {
   journey: `${siteConfig.url}${IMG_BASE}/journey-roadmap.png`,
   venn: `${siteConfig.url}${IMG_BASE}/venn-visual.png`,
@@ -242,7 +242,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
             style={{ background: '#F3F0FF' }}
           >
             <Link
-              href={DASHBOARD_URL}
+              href={SIGNUP_URL}
               className={`text-[1.05rem] font-semibold leading-relaxed text-[#4B2F9E] no-underline transition-opacity hover:opacity-85 sm:text-[1.0625rem] ${CTA_FOCUS}`}
             >
               Want to see how AI feedback actually works? Try your first mock interview free →
@@ -263,7 +263,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
           <p>
             Imagine having a personal interview coach available 24/7, ready to help you perform whenever you want.
             That&apos;s what AI mock interview platforms like{' '}
-            <Link href="/dashboard" className="ie-blog-inline-link font-medium">
+            <Link href="/signup" className="ie-blog-inline-link font-medium">
               InterviewEra
             </Link>{' '}
             offer you.
@@ -526,7 +526,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
           </p>
           <p className="mb-0">
             I urge you to give it a try! Start on{' '}
-            <Link href="/dashboard" className="ie-blog-inline-link font-medium">
+            <Link href="/signup" className="ie-blog-inline-link font-medium">
               InterviewEra&apos;s free plan
             </Link>
             , which gives you 3 free credits to start practicing without needing a credit card. It&apos;s up to you to be
@@ -547,7 +547,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
                 for you.
               </p>
               <Link
-                href={DASHBOARD_URL}
+                href={SIGNUP_URL}
                 className={`mt-8 inline-flex min-h-[3rem] items-center justify-center rounded-[12px] border-2 border-white bg-[#FACC15] px-8 text-center text-lg font-semibold text-[#1A0A4C] transition-[transform,box-shadow,background-color] hover:bg-[#fbbf24] hover:shadow-lg sm:mt-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white`}
               >
                 Start Practicing Free →

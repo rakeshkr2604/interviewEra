@@ -531,9 +531,9 @@ export const WIPRO_CONTEXTUAL_LINKS = [
   { href: '/blog/top-dsa-interview-questions', label: 'Top DSA Questions' },
   { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Interview Guide' },
   { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },
-  { href: '/blog/aptitude-preparation-guide', label: 'Aptitude Preparation Guide' },
+  { href: '/resources/online-assessment-preparation', label: 'Online Assessment & Aptitude Guide' },
   { href: '/tools/question-generator/companies/wipro', label: 'Wipro Question Generator' },
-  { href: '/tools/mock-interview', label: 'Mock Interview Tool' },
+  { href: '/how-it-works', label: 'How AI Mock Interviews Work' },
   { href: '/interview-questions/companies/tcs/software-engineer', label: 'TCS Software Engineer Questions' },
   { href: '/interview-questions/companies/infosys/software-engineer', label: 'Infosys Software Engineer Questions' },
 ] as const

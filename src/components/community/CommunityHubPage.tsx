@@ -35,7 +35,7 @@ const RESOURCE_LINKS = [
   },
   {
     title: 'Resume & ATS tools',
-    href: '/tools',
+    href: '/tools/ats-checker',
     description: 'Free tools to sharpen your resume before mocks.',
   },
 ] as const;

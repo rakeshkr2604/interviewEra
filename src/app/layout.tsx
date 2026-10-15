@@ -19,7 +19,11 @@ import { AttributionCapture } from "@/components/analytics/AttributionCapture";
 import { CtaAuthCache } from "@/components/analytics/CtaAuthCache";
 import { FunnelQueryCapture } from "@/components/analytics/FunnelQueryCapture";
 import { siteConfig } from "@/lib/seo/metadata";
+import { COMMUNITY_HUB_PATH } from "@/lib/community/community";
+import { communityBannerBootScript } from "@/lib/community/storage";
 import "./globals.css";
+
+const COMMUNITY_BANNER_BOOT_SCRIPT = communityBannerBootScript(COMMUNITY_HUB_PATH);
 
 /**
  * Marketing/heading font — keep above-the-fold weights only.
@@ -159,6 +163,7 @@ export default function RootLayout({
             __html: `(function(){try{var s=localStorage.getItem('ie-theme');var d=window.matchMedia('(prefers-color-scheme: dark)').matches;var t=s==='light'?'light':s==='dark'?'dark':(d?'dark':'light');var r=document.documentElement;r.setAttribute('data-theme',t);if(t==='dark')r.classList.add('dark');else r.classList.remove('dark');}catch(e){}})();`,
           }}
         />
+        <script dangerouslySetInnerHTML={{ __html: COMMUNITY_BANNER_BOOT_SCRIPT }} />
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>

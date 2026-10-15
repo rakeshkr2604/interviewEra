@@ -16,7 +16,7 @@ export const AGENTIC_MINDSET_ALT =
 export const AGENTIC_MINDSET_WIDTH = 1200
 export const AGENTIC_MINDSET_HEIGHT = 800
 
-export const AGENTIC_META_TITLE = 'Agentic AI Interview Round (2026): The Ultimate Guide'
+export const AGENTIC_META_TITLE = 'Agentic AI Interview Round 2026: Prep Guide'
 export const AGENTIC_H1 =
   'Agentic AI Interview Round (2026): The Ultimate Guide to Cracking AI-Assisted Technical Interviews'
 export const AGENTIC_H1_LINE = 'Agentic AI Interview Round (2026):'

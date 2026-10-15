@@ -214,7 +214,7 @@ export default function InterviewQuestionsHubPage() {
       </section>
 
       {/* ── Browse by Skill ───────────────────────────────────────────────── */}
-      <section className={CONTENT_SECTION}>
+      <section id="topics" className={CONTENT_SECTION}>
         <div className={`${LANDING_PAGE_CONTAINER} px-4 sm:px-5`}>
           <MarketingSectionHeader
             eyebrow="By technology"

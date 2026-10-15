@@ -3,9 +3,9 @@ import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell'
 import { GoogleApprenticeshipArticle } from '@/components/content/GoogleApprenticeshipArticle'
 import { JsonLdScript } from '@/components/seo/JsonLdScript'
 import {
-  GOOGLE_APPRENTICESHIP_AUTHOR_NAME,
   GOOGLE_APPRENTICESHIP_CANONICAL_PATH,
   GOOGLE_APPRENTICESHIP_DESCRIPTION,
+  GOOGLE_APPRENTICESHIP_DOCUMENT_TITLE,
   GOOGLE_APPRENTICESHIP_FAQ_ITEMS,
   GOOGLE_APPRENTICESHIP_LAST_UPDATED,
   GOOGLE_APPRENTICESHIP_META_TITLE,
@@ -21,9 +21,10 @@ const PAGE_URL = canonicalUrl(GOOGLE_APPRENTICESHIP_CANONICAL_PATH)
 
 export const metadata: Metadata = generateMetadata({
   title: GOOGLE_APPRENTICESHIP_META_TITLE,
+  documentTitleAbsolute: GOOGLE_APPRENTICESHIP_DOCUMENT_TITLE,
   description: GOOGLE_APPRENTICESHIP_DESCRIPTION,
   path: GOOGLE_APPRENTICESHIP_CANONICAL_PATH,
-  socialTitle: brandArticleOgTitle(GOOGLE_APPRENTICESHIP_META_TITLE),
+  socialTitle: brandArticleOgTitle(GOOGLE_APPRENTICESHIP_DOCUMENT_TITLE),
   keywords: [
     'Google Apprenticeship 2026',
     'Google Apprenticeship India',
@@ -62,9 +63,10 @@ const ARTICLE_LD = PAGE_URL
       dateModified: GOOGLE_APPRENTICESHIP_LAST_UPDATED,
       inLanguage: 'en-IN',
       author: {
-        '@type': 'Person',
-        name: GOOGLE_APPRENTICESHIP_AUTHOR_NAME,
-        affiliation: { '@type': 'Organization', name: siteConfig.name, url: siteConfig.url },
+        '@type': 'Organization',
+        '@id': schemaIds.organization,
+        name: siteConfig.name,
+        url: siteConfig.url,
       },
       publisher: { '@id': schemaIds.organization },
     }

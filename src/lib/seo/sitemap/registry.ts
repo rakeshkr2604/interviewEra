@@ -26,6 +26,7 @@ import {
   isCompanyIndexable,
   isSkillIndexable,
   isIntersectionIndexable,
+  isAtsRoleVariantIndexable,
 } from '@/lib/seo/programmatic/indexing';
 import { getRoleBySlug, getCompanyBySlug } from '@/lib/seo/programmatic';
 import { FRESHWORKS_FE_LAST_UPDATED } from '@/lib/seo/programmatic/freshworks-fe-hub';
@@ -33,12 +34,17 @@ import { AMAZON_SE_LAST_UPDATED } from '@/lib/seo/programmatic/amazon-se-hub';
 import { MICROSOFT_SE_LAST_UPDATED } from '@/lib/seo/programmatic/microsoft-se-hub';
 import { INFOSYS_SE_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-se-hub';
 import { INFOSYS_JAVA_LAST_UPDATED } from '@/lib/seo/programmatic/infosys-java-hub';
+import { WIPRO_SWE_LAST_UPDATED } from '@/lib/seo/programmatic/wipro-swe-hub';
+import { WIPRO_JAVA_LAST_UPDATED } from '@/lib/seo/programmatic/wipro-java-hub';
+import { WIPRO_QA_LAST_UPDATED } from '@/lib/seo/programmatic/wipro-qa-hub';
+import { WIPRO_DA_LAST_UPDATED } from '@/lib/seo/programmatic/wipro-da-hub';
 import { TOP_DSA_LAST_UPDATED } from '@/lib/seo/blog/top-dsa-hub';
 import { AGENTIC_LAST_UPDATED } from '@/lib/seo/blog/agentic-ai-hub';
 import { WHAT_IS_AGENTIC_AI_CONFIG } from '@/lib/seo/blog/agentic-spoke-what-is';
 import { AGENTIC_CODING_ROUND_CONFIG } from '@/lib/seo/blog/agentic-spoke-coding-round';
 import { AI_PROMPT_ENGINEERING_CONFIG } from '@/lib/seo/blog/agentic-spoke-prompt-engineering';
 import { CURSOR_AI_INTERVIEW_CONFIG } from '@/lib/seo/blog/agentic-spoke-cursor';
+import { GOOGLE_APPRENTICESHIP_LAST_UPDATED } from '@/lib/seo/content/google-apprenticeship-hub';
 import type { RoleSlug, CompanySlug, SkillSlug, StarTopicSlug } from '@/lib/seo/programmatic';
 
 export type SitemapSourceEntry = {
@@ -83,7 +89,7 @@ export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
     path: '/google-apprenticeship',
     changeFrequency: 'weekly',
     priority: 0.9,
-    lastModified: '2026-07-28',
+    lastModified: GOOGLE_APPRENTICESHIP_LAST_UPDATED,
   },
   { path: '/help-center', changeFrequency: 'monthly', priority: 0.62 },
   { path: '/contact', changeFrequency: 'monthly', priority: 0.55 },
@@ -250,6 +256,10 @@ const EDITORIAL_INTERSECTION_LASTMOD: Partial<Record<string, string>> = {
   'microsoft:software-engineer': MICROSOFT_SE_LAST_UPDATED,
   'infosys:software-engineer': INFOSYS_SE_LAST_UPDATED,
   'infosys:java-developer': INFOSYS_JAVA_LAST_UPDATED,
+  'wipro:software-engineer': WIPRO_SWE_LAST_UPDATED,
+  'wipro:java-developer': WIPRO_JAVA_LAST_UPDATED,
+  'wipro:qa-engineer': WIPRO_QA_LAST_UPDATED,
+  'wipro:data-analyst': WIPRO_DA_LAST_UPDATED,
 }
 
 export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
@@ -303,8 +313,8 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     }
   }
 
-  // High-value intersection pages — currently held out of the index (soft
-  // duplicates of the role bank), so they must not appear in the sitemap.
+  // Intersection pages — only editorial intersections clear the gate; template
+  // fallbacks duplicate the role bank and stay out of the sitemap.
   for (const pair of HIGH_VALUE_INTERSECTIONS) {
     const company = getCompanyBySlug(pair.company)
     const role = getRoleBySlug(pair.role)
@@ -399,8 +409,9 @@ export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     }
   }
 
-  // ATS role variants — /tools/ats-checker/[role]
+  // ATS role variants — /tools/ats-checker/[role] (gated in indexing.ts)
   for (const role of ROLES) {
+    if (!isAtsRoleVariantIndexable(role)) continue
     const url = canonicalUrl(toolAtsRolePath(role.slug as RoleSlug))
     if (url != null) {
       entries.push({

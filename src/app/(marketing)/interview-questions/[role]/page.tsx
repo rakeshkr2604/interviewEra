@@ -124,8 +124,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const role = getRoleBySlug(roleSlug)
   if (!role) return {}
   if (role.slug === 'business-analyst') {
-    const title =
-      'Business Analyst Interview Questions and Answers for Freshers & Experienced (2026)'
+    const title = 'Business Analyst Interview Questions (2026)'
     const description =
       'Business Analyst interview questions with expert answers for India 2026: BA workflow, SQL, stakeholder scenarios, salary, resume mistakes, and a 90-day plan.'
     return baseGenerateMetadata({

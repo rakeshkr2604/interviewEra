@@ -15,7 +15,7 @@ export default function MarketingLayout({ children }: MarketingLayoutProps) {
       className="ie-landing-premium flex min-h-screen flex-col"
       style={{ background: 'var(--page-gradient)', color: 'var(--text-primary)' }}
     >
-      {/* Reserved strip avoids CLS when the dismissible banner hydrates. */}
+      {/* Strip height is reserved pre-paint (marketing.css + root boot script) so the deferred banner does not shift the page. */}
       <div className="min-h-0" data-community-banner-slot>
         <CommunityBannerDeferred />
       </div>

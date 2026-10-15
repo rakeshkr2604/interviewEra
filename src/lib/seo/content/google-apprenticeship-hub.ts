@@ -1,27 +1,34 @@
 export const GOOGLE_APPRENTICESHIP_CANONICAL_PATH = '/google-apprenticeship'
 
+/** Full `<title>` (no brand template) — keeps the head query intact within 60 chars. */
+export const GOOGLE_APPRENTICESHIP_DOCUMENT_TITLE =
+  'Google Apprenticeship 2026: Eligibility, Salary & Last Date'
+
 export const GOOGLE_APPRENTICESHIP_META_TITLE =
   'Google Apprenticeship 2026: Eligibility, Salary, Last Date & India Guide'
 
 export const GOOGLE_APPRENTICESHIP_DESCRIPTION =
-  'Google Apprenticeship applications are open in India — eligibility, salary, last date (Aug 3, 2026), and application process for Software Development, Data Analytics, Digital Marketing & Project Management tracks.'
+  'Google Apprenticeship India: 2027-cohort applications closed on Aug 3, 2026. Eligibility, salary estimates, four tracks, interview prep, and the next cycle.'
 
 export const GOOGLE_APPRENTICESHIP_PUBLISHED_DATE = '2026-07-28'
-export const GOOGLE_APPRENTICESHIP_LAST_UPDATED = '2026-07-28'
+export const GOOGLE_APPRENTICESHIP_LAST_UPDATED = '2026-10-15'
 export const GOOGLE_APPRENTICESHIP_READING_TIME = '18 min read'
 export const GOOGLE_APPRENTICESHIP_AUTHOR_NAME = 'InterviewEra Team'
 export const GOOGLE_APPRENTICESHIP_REVIEWER_NAME = 'InterviewEra Editorial'
+/** Program details (tracks, eligibility, locations) were verified against listings on this date. */
 export const GOOGLE_APPRENTICESHIP_LAST_VERIFIED = '28 July 2026'
+/** Application-window status was re-checked on this date. */
+export const GOOGLE_APPRENTICESHIP_STATUS_CHECKED = '15 October 2026'
 
 export const GOOGLE_APPRENTICESHIP_HERO_ALT =
-  'Google Apprenticeship 2026 India guide — applications open, August 3 2026 deadline, four tracks, Bengaluru Gurgaon Hyderabad Mumbai'
+  'Google Apprenticeship 2026 India guide — 2027-cohort applications closed August 3 2026, four tracks, Bengaluru Gurgaon Hyderabad Mumbai'
 
 export const GOOGLE_APPRENTICESHIP_DEADLINE = 'August 3, 2026'
 export const GOOGLE_APPRENTICESHIP_DEADLINE_ISO = '2026-08-03'
 
 export const GOOGLE_APPRENTICESHIP_QUICK_FACTS = [
-  ['Status', 'Applications open'],
-  ['Last date to apply', 'August 3, 2026'],
+  ['Status', 'Closed for the 2027 cohort; next window not yet announced'],
+  ['Last date to apply', 'August 3, 2026 (passed)'],
   ['Program start', 'March 2027 (some tracks: March or June 2027)'],
   ['Duration', '12 months (Software) or 24 months (Data Analytics, Marketing, Project Management)'],
   ['Salary/stipend', 'Paid; exact figure not officially disclosed (unofficial estimates: ₹41,600–₹66,600/month)'],
@@ -48,8 +55,8 @@ export const GOOGLE_APPRENTICESHIP_TOC = [
 ] as const
 
 export const GOOGLE_APPRENTICESHIP_LATEST_UPDATES = [
-  'Applications open now for the India cohort across all four tracks.',
-  'Last date to apply: August 3, 2026.',
+  'Applications for the India 2027 cohort closed on August 3, 2026, across all four tracks.',
+  'As of 15 October 2026 we have not found an announced next application window — watch Google Careers for new listings.',
   'Program start: March 2027 (June 2027 for some tracks).',
   'No new tracks announced this cycle — Software, Data Analytics, Digital Business Marketing, and Project Management remain.',
   'Locations unchanged: Bengaluru, Gurgaon, Hyderabad, Mumbai.',
@@ -163,7 +170,7 @@ export const GOOGLE_APPRENTICESHIP_FAQ_ITEMS = [
   {
     question: 'Is the Google Apprenticeship program open now?',
     answer:
-      'Yes, for India — across all four tracks — with an application deadline of August 3, 2026.',
+      'No. Applications for the India 2027 cohort closed on August 3, 2026. As of 15 October 2026 we have not found an announced next window, so check Google Careers for new apprenticeship listings.',
   },
   {
     question: 'Who can apply for Google Apprenticeship?',
@@ -222,7 +229,7 @@ export const GOOGLE_APPRENTICESHIP_FAQ_ITEMS = [
   },
   {
     question: 'What is the Google Apprenticeship application deadline / last date to apply?',
-    answer: 'August 3, 2026, for the current India cohort.',
+    answer: 'The last date for the India 2027 cohort was August 3, 2026. That window has closed.',
   },
   {
     question: 'Does Google Apprenticeship guarantee a full-time job?',

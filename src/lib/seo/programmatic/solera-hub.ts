@@ -12,7 +12,7 @@ export const SOLERA_PROCESS_ALT =
 export const SOLERA_PROCESS_WIDTH = 1672
 export const SOLERA_PROCESS_HEIGHT = 941
 
-export const SOLERA_META_TITLE = 'Solera Interview Questions (2026) – Hiring & Careers Hub'
+export const SOLERA_META_TITLE = 'Solera Interview Questions & Hiring (2026)'
 export const SOLERA_CANONICAL_PATH = '/interview-questions/solera'
 export const SOLERA_DESCRIPTION =
   'Solera careers 2026 — cognitive assessment, automotive SaaS, salary estimates, hiring calendar, Bengaluru/Hyderabad drives, and interview prep.'
@@ -841,8 +841,8 @@ export const SOLERA_CONTEXTUAL_LINKS = [
   { href: '/blog/top-dsa-interview-questions', label: 'Top DSA Questions' },
   { href: '/blog/how-to-prepare-for-placement-interviews', label: 'Placement Interview Guide' },
   { href: '/blog/what-is-star-method-with-examples', label: 'STAR Method Guide' },
-  { href: '/blog/aptitude-preparation-guide', label: 'Aptitude Preparation Guide' },
-  { href: '/tools/mock-interview', label: 'Mock Interview Tool' },
+  { href: '/resources/online-assessment-preparation', label: 'Online Assessment & Aptitude Guide' },
+  { href: '/how-it-works', label: 'How AI Mock Interviews Work' },
   { href: '/tools/question-generator/companies/solera', label: 'Solera Question Generator' },
 ] as const
 

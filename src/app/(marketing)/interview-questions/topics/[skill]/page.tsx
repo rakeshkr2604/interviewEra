@@ -269,7 +269,7 @@ export default async function SkillQuestionsPage({ params }: Props) {
               Interview Questions
             </Link>
             <span aria-hidden>›</span>
-            <Link href={`${questionsHubPath()}/topics`} className="hover:underline" style={{ color: 'var(--text-muted)' }}>
+            <Link href={`${questionsHubPath()}#topics`} className="hover:underline" style={{ color: 'var(--text-muted)' }}>
               Topics
             </Link>
             <span aria-hidden>›</span>

@@ -1,8 +1,8 @@
 # SEO / AEO / GEO
 
 > Status: CANONICAL
-> Last Verified: 2026-10-14
-> Verification Scope: Sitemap, noindex audit, analytics SoT + optional analytics cookie consent gating + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths + public preparation guides
+> Last Verified: 2026-10-15
+> Verification Scope: Sitemap, noindex audit, analytics SoT + optional analytics cookie consent gating + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths + public preparation guides + programmatic indexing gate (editorial intersections, ATS variants) + title clamp
 > Authority: Indexing + funnel analytics
 
 ## Purpose
@@ -17,6 +17,9 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 - Free preparation guides stay public and indexable, listed in the pages sitemap: `/resources/chatgpt-interview-preparation`, `/resources/hr-interview-answer-framework`, `/resources/online-assessment-preparation`. The `/resources` index remains the blog and guide library. The interactive toolkit home is the logged-in `/prepare` page (noindex, sidebar **Interview Prep**). Nested `/resources/` is public in `src/proxy.ts`. Speaking-practice PDFs are static files at `/resources/guides/*.pdf`, linked from the assessment guide. They are not separate HTML sitemap entries.
 - Prompt Builder (`/tools/prompt-builder`) is a public free tool and a logged-in sidebar Tools item. Funnel counts use `tool_usage_events.tool = prompt_builder` with `mode` set to the preparation goal only. Resume text, prompts, and job descriptions are not stored. Migration `118_prompt_builder_usage_events.sql` widens `tool_usage_events_tool_check` to keep `ats`, `question_generator`, and `star`, and adds `prompt_builder`. Page views and signup CTA clicks on `/tools/prompt-builder` stay on the existing `page_view` and `landing_cta_clicked` events and are not counted as prompt runs.
 - Programmatic pages: `src/lib/seo/programmatic/`
+- Indexing gate SoT: `src/lib/seo/programmatic/indexing.ts` (metadata robots + sitemap both read it). Company × role intersections are indexable **only** when listed in `EDITORIAL_INTERSECTION_KEYS` (bespoke article in `companies/[company]/[role]/page.tsx`); template fallbacks are `noindex, follow` and absent from the sitemap. `/tools/ats-checker/[role]` variants are `noindex, follow` (`isAtsRoleVariantIndexable`). Evidence: [audits/seo-aeo-geo-2026-10-15.md](../audits/seo-aeo-geo-2026-10-15.md)
+- Titles: root template `InterviewEra | %s`; `clampTitleSegment` cuts at a word boundary and drops dangling separators/connectives. Long-title pages may set `documentTitleAbsolute` (≤60 chars)
+- Live crawl check: `npx tsx scripts/seo/live-crawl-audit.ts [origin] [outFile]` (status, canonical, robots, titles, JSON-LD parse, internal 404s)
 - `next-sitemap` config exists for reference — **not** wired into build
 - **`scripts/noindex-audit.ts`** runs on `npm run build` — must not be bypassed (Invariant #6)
 - Soft-404 risk: catalog dynamics set `dynamicParams = false` where `generateStaticParams` is used
@@ -38,6 +41,8 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 ## Architecture / Rules
 
 - New marketing/programmatic URL → register in sitemap registry or audit fails
+- New editorial intersection → add its key to `EDITORIAL_INTERSECTION_KEYS` and its `lastmod` to `EDITORIAL_INTERSECTION_LASTMOD` in the registry
+- `scripts/noindex-audit.ts` asserts both index (`VERIFICATION_PATHS`) and expected-noindex (`EXPECTED_NOINDEX_PATHS`) samples
 - Do not fire payment_completed only client-side
 
 ## Dependencies
@@ -49,6 +54,7 @@ noindex-audit · registry · product_events · Invariant #7 host normalization
 | Failure | Impact |
 |---|---|
 | Sitemap URL + noindex | Build fail |
+| Template duplicates indexable | GSC "Crawled – currently not indexed" growth; diluted quality signals |
 | Soft 200 not-found | Crawler soft-404 |
 | Duplicate product_events | Funnel inflation |
 

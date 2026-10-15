@@ -12,7 +12,7 @@ export const WIPRO_QA_PROCESS_ALT =
 export const WIPRO_QA_PROCESS_WIDTH = 1672
 export const WIPRO_QA_PROCESS_HEIGHT = 941
 
-export const WIPRO_QA_META_TITLE = 'Wipro QA Engineer Interview Questions and Answers (2026)'
+export const WIPRO_QA_META_TITLE = 'Wipro QA Engineer Interview Questions (2026)'
 export const WIPRO_QA_CANONICAL_PATH = '/interview-questions/companies/wipro/qa-engineer'
 export const WIPRO_QA_DESCRIPTION =
   'Wipro QA Engineer interview questions for India 2026: NLTH, manual testing, STLC, Selenium, API testing, salary ranges, 30-day roadmap, and expert sample answers.'

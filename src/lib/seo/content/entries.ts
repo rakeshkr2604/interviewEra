@@ -695,7 +695,7 @@ export const EDITORIAL_CONTENT_ENTRIES: readonly ContentEntry[] = [
     path: '/google-apprenticeship',
     title: 'Google Apprenticeship 2026: Eligibility, Salary, Last Date & India Guide',
     description:
-      'Google Apprenticeship applications open in India — eligibility, salary, Aug 3 2026 deadline, and application process for all four tracks.',
+      'Google Apprenticeship India: 2027-cohort applications closed Aug 3, 2026. Eligibility, salary estimates, four tracks, and how to prepare for the next cycle.',
     category: 'Career',
     cluster: 'Placement Preparation',
     type: 'blog',

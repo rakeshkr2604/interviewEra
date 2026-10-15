@@ -48,6 +48,7 @@ import {
   isCompanyIndexable,
   isSkillIndexable,
   isIntersectionIndexable,
+  isAtsRoleVariantIndexable,
 } from './indexing'
 
 /** Bump this each January 1. Used in all programmatic page titles. */
@@ -175,8 +176,6 @@ export function intersectionPageMetadata(company: Company, role: Role): Metadata
     description: buildIntersectionDescription(company, role),
     path,
     keywords: buildIntersectionKeywords(company, role),
-    // Held out of the index until bespoke per-intersection content exists
-    // (they currently reuse the role question bank — soft duplicate).
     noIndex: !isIntersectionIndexable(company, role),
     noIndexFollow: true,
   })
@@ -300,6 +299,8 @@ export function toolAtsRoleMetadata(role: Role): Metadata {
       `is my ${role.label} resume ATS friendly`,
       `${role.label} resume scanner`,
     ],
+    noIndex: !isAtsRoleVariantIndexable(role),
+    noIndexFollow: true,
   })
 }
 

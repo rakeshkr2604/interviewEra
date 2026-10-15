@@ -60,7 +60,7 @@ const FAQ_PAIRS = [
   {
     question: 'Why do I need an ATS-optimised resume?',
     answer:
-      'Over 75% of large companies use ATS software. A resume that parsers struggle to read may be rejected before any recruiter sees it — even if you are well-qualified for the role. Improving parseability, structure, and keyword alignment increases your chances of reaching the interview stage.',
+      'Many employers, especially large companies running campus and volume hiring, screen applications through an ATS. A resume that parsers struggle to read may be filtered before any recruiter sees it — even if you are well-qualified for the role. Improving parseability, structure, and keyword alignment increases your chances of reaching the interview stage.',
   },
   {
     question: 'What makes a resume ATS-friendly?',

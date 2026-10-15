@@ -12,7 +12,7 @@ export const WIPRO_SWE_PROCESS_ALT =
 export const WIPRO_SWE_PROCESS_WIDTH = 1672
 export const WIPRO_SWE_PROCESS_HEIGHT = 941
 
-export const WIPRO_SWE_META_TITLE = 'Wipro Software Engineer Interview Questions and Answers (2026)'
+export const WIPRO_SWE_META_TITLE = 'Wipro Software Engineer Questions (2026)'
 export const WIPRO_SWE_CANONICAL_PATH = '/interview-questions/companies/wipro/software-engineer'
 export const WIPRO_SWE_DESCRIPTION =
   'Wipro Software Engineer interview questions for India 2026: NLTH, DSA, OOP, DBMS, SQL, salary ranges, 30-day roadmap, and expert sample answers.'

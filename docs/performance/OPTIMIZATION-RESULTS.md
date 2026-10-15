@@ -1,8 +1,8 @@
 # Optimization results
 
 > Status: CANONICAL
-> Last Verified: 2026-10-13
-> Verification Scope: Loop 6–8 dashboard release evidence + Loop 9 sign-in/admin funnel lab benchmarks
+> Last Verified: 2026-10-15
+> Verification Scope: Loop 6–8 dashboard release evidence + Loop 9 sign-in/admin funnel lab benchmarks + marketing CLS (hero shell, community banner)
 > Authority: Claimed improvements must match evidence below
 
 ## Purpose
@@ -217,6 +217,12 @@ Verified:
 | Full `computeGrowthMetrics` 30d median ms | (legacy not re-timed end-to-end) | **234** | 5 | Post-fix only |
 
 Password sign-in end-to-end lab: **SKIPPED** (`PERF_SIGNIN_USER_ID` unset). Production authenticated smoke: **BLOCKED** (owner test account). No Loop 9 migration — existing indexes sufficient.
+
+### Marketing CLS — hero shell + community banner (2026-10-15, lab)
+
+Root causes: the SSR hero simulator shell was 242px shorter than the live card at desktop (missing footer; transcript `min-height: 120px` vs live `height: 372px`), and the deferred community banner inserted ~53px into flow after idle with no reserved space (every marketing page). Fix: shell footprint matches the live card above 560px; `communityBannerBootScript` reserves the strip pre-paint only for visitors who will see the banner.
+
+Same-build Playwright A/B (n=3 median, fresh visitor): `/` desktop CLS **0.172 → 0.004**, mobile **0.062 → 0.000**; other marketing pages desktop **~0.037 → ≤0.001**, mobile **~0.062 → ≤0.005**. Production desktop Lighthouse baseline `/` score 67 / TBT 916 / CLS 0.101 (n=3). Desktop TBT is **not** addressed (GPU-less lab artefact tied to the desktop simulator mount; see [audits/seo-aeo-geo-2026-10-15.md](../audits/seo-aeo-geo-2026-10-15.md)). Field CLS: **not read** (Vercel access 403).
 
 ### Remaining blockers
 

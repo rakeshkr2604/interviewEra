@@ -12,7 +12,7 @@ export const WIPRO_DA_PROCESS_ALT =
 export const WIPRO_DA_PROCESS_WIDTH = 1672
 export const WIPRO_DA_PROCESS_HEIGHT = 941
 
-export const WIPRO_DA_META_TITLE = 'Wipro Data Analyst Interview Questions and Answers (2026)'
+export const WIPRO_DA_META_TITLE = 'Wipro Data Analyst Interview Questions (2026)'
 export const WIPRO_DA_CANONICAL_PATH = '/interview-questions/companies/wipro/data-analyst'
 export const WIPRO_DA_DESCRIPTION =
   'Wipro Data Analyst interview questions for India 2026: NLTH online test, SQL, Python, statistics, case studies, salary ranges, 30-day roadmap, and expert sample answers.'
@@ -348,7 +348,7 @@ export const WIPRO_DA_CONTEXTUAL_LINKS = [
   { href: '/interview-questions/companies/accenture/data-analyst', label: 'Accenture DA Questions' },
   { href: '/interview-questions/companies/hcl/data-analyst', label: 'HCL DA Questions' },
   { href: '/interview-questions/companies/cognizant/data-analyst', label: 'Cognizant DA Questions' },
-  { href: '/interview-questions/companies/amazon/data-scientist', label: 'Amazon Data Scientist Questions' },
+  { href: '/interview-questions/data-scientist', label: 'Data Scientist Interview Questions' },
   { href: '/interview-questions/business-analyst', label: 'Business Analyst Questions' },
   { href: '/interview-questions/topics/sql', label: 'SQL Questions' },
   { href: '/interview-questions/topics/python', label: 'Python Questions' },

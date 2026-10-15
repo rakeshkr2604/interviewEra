@@ -21,6 +21,7 @@ import {
   intersectionPageMetadata,
   rolePageMetadata,
   skillPageMetadata,
+  toolAtsRoleMetadata,
 } from '../src/lib/seo/programmatic/metadata'
 import {
   isCompanyIndexable,
@@ -69,9 +70,19 @@ const VERIFICATION_PATHS = [
   '/interview-questions/frontend-developer',
   '/interview-questions/companies/amazon/software-engineer',
   '/interview-questions/companies/microsoft/software-engineer',
+  '/interview-questions/companies/infosys/java-developer',
+  '/interview-questions/companies/wipro/data-analyst',
+] as const
+
+/**
+ * Template duplicates held out of the index by `indexing.ts` — must resolve to
+ * noindex and must not appear in the sitemap.
+ */
+const EXPECTED_NOINDEX_PATHS = [
   '/interview-questions/companies/tcs/java-developer',
   '/interview-questions/companies/cognizant/software-engineer',
   '/interview-questions/companies/cred/backend-developer',
+  '/tools/ats-checker/software-engineer',
 ] as const
 
 function pathFromUrl(url: string): string {
@@ -117,6 +128,12 @@ function resolveMetadata(path: string): Metadata | null {
       })
     }
     return skillPageMetadata(skill)
+  }
+
+  const atsRoleMatch = path.match(/^\/tools\/ats-checker\/([^/]+)$/)
+  if (atsRoleMatch) {
+    const role = getRoleBySlug(atsRoleMatch[1])
+    return role ? toolAtsRoleMetadata(role) : null
   }
 
   const intersectionMatch = path.match(/^\/interview-questions\/companies\/([^/]+)\/([^/]+)$/)
@@ -262,6 +279,15 @@ function main() {
     const ok = !noindex
     console.log(`${ok ? '✓' : '✗'} ${path} → ${flag} (sitemap: ${inSitemap})`)
     if (noindex) failures.push(`${path} (verification path noindex)`)
+  }
+
+  console.log('\n--- Expected noindex paths ---')
+  for (const path of EXPECTED_NOINDEX_PATHS) {
+    const noindex = metadataImpliesNoIndex(resolveMetadata(path))
+    const inSitemap = sitemapUrls.has(`${ORIGIN}${path}`)
+    const ok = noindex && !inSitemap
+    console.log(`${ok ? '✓' : '✗'} ${path} → ${noindex ? 'noindex' : 'index,follow'} (sitemap: ${inSitemap})`)
+    if (!ok) failures.push(`${path} (expected noindex and absent from sitemap)`)
   }
 
   console.log('\n=== RESULT ===')

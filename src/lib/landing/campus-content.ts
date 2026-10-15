@@ -4,7 +4,7 @@
  */
 
 export const CAMPUS_META = {
-  title: 'AI Mock Interviews for Campus Placements',
+  title: 'AI Mock Interview Platform for Colleges',
   description:
     'Train your entire placement batch with AI mock interviews — cohort analytics, unlimited sessions, and zero extra T&P workload. From ₹799/student/year.',
 } as const;

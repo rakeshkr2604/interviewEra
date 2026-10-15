@@ -5,6 +5,35 @@
    Loop 18: scoring / trust / pricing section CSS co-located on their islands
    (LandingScoringEngine.css, LandingTrustMetrics.css, pricing/pricing-page.css). */
 
+/* ─── Community banner strip — reserved pre-paint by `communityBannerBootScript` ───
+   Heights are the tallest rendered banner per breakpoint (copy wraps differently),
+   so the deferred banner mounts into its slot without pushing the page (CLS). */
+html[data-community-banner='show'] [data-community-banner-slot] {
+  min-height: 54px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-primary) 22%, var(--card-border));
+  background: color-mix(in srgb, var(--accent-primary) 8%, var(--bg-secondary));
+}
+
+html[data-community-banner='show'] [data-community-banner-slot]:has(> [aria-label='Community announcement']) {
+  border-bottom: 0;
+}
+
+@media (min-width: 640px) {
+  html[data-community-banner='show'] [data-community-banner-slot] {
+    min-height: 60px;
+  }
+}
+
+@media (min-width: 768px) {
+  html[data-community-banner='show'] [data-community-banner-slot] {
+    min-height: 53px;
+  }
+}
+
+[data-community-banner-slot] > [aria-label='Community announcement'] {
+  min-height: inherit;
+}
+
 /* ─── Scroll reveal — content stays visible; transform-only motion ─── */
 .ie-reveal {
   opacity: 1;

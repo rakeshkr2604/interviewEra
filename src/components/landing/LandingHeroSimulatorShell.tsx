@@ -58,6 +58,31 @@ export function LandingHeroSimulatorShell() {
             <div className="sim-conv" />
           </div>
         </div>
+
+        {/* Footer must match the live card height or the hero grows when the island mounts (desktop CLS). */}
+        <div className="sim-foot sim-foot--static">
+          <div className="sim-foot-left">
+            <div className="sim-mic muted">
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.5a2 2 0 00-2 2v5a2 2 0 104 0v-5a2 2 0 00-2-2z" stroke="currentColor" strokeWidth="1.4" />
+                <path d="M3.5 7.5v1a4.5 4.5 0 009 0v-1M8 13v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span className="sim-foot-status">AI is reading the question…</span>
+          </div>
+          <div className="sim-foot-right">
+            <span className="sim-prev-btn disabled">
+              <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                <path d="M7 9L3 6l4-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Previous
+            </span>
+            <span className="sim-next-btn primary disabled">
+              <span>Next question</span>
+              <span className="arrow">→</span>
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -102,6 +102,7 @@ failed-emails.csv
 /audit-phase1*.png
 /phase1-*.png
 scripts/seo-audit-report.json
+/.seo-audit/
 scripts/gsc-audit-report.json
 scripts/gsc-audit-report.md
 scripts/gsc-authoritative-audit.json

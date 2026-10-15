@@ -5,7 +5,11 @@ import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import { COMMUNITY_COPY, COMMUNITY_HUB_PATH } from '@/lib/community/community';
 import { trackCommunityView, trackCommunityInteraction } from '@/lib/community/analytics';
-import { dismissBanner, shouldShowBanner } from '@/lib/community/storage';
+import {
+  dismissBanner,
+  releaseCommunityBannerSlot,
+  shouldShowBanner,
+} from '@/lib/community/storage';
 import { useCommunityStorageSnapshot } from '@/lib/community/use-community-storage';
 import { CommunityHubLink } from '@/components/community/CommunityHubLink';
 import { cn } from '@/lib/utils';
@@ -27,6 +31,10 @@ export function CommunityBanner({
   const onCommunityHub =
     pathname === COMMUNITY_HUB_PATH || pathname.startsWith(`${COMMUNITY_HUB_PATH}/`);
   const show = !onCommunityHub && storageShow && !dismissedLocally;
+
+  useEffect(() => {
+    if (!show && placement === 'landing_banner') releaseCommunityBannerSlot();
+  }, [show, placement]);
 
   useEffect(() => {
     if (!show || viewedRef.current) return;
