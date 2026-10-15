@@ -2,8 +2,8 @@
 
 > Status: AUDIT (point-in-time)
 > Last Verified: 2026-10-15
-> Verification Scope: Live crawl of interviewera.com (production `e4069fe`), GSC screenshots (6 May–14 Oct 2026), source audit of `src/lib/seo/**`, lab performance on production + local builds
-> Authority: Engineering evidence for branch `seo/indexing-metadata-loop`. Canonical policy lives in [SEO_AEO_GEO](../Core/SEO_AEO_GEO.md).
+> Verification Scope: Live crawl of interviewera.com (production `e4069fe` before, `ef1040d` after), GSC screenshots (6 May–14 Oct 2026), source audit of `src/lib/seo/**`, lab performance on production + local builds
+> Authority: Engineering evidence for PR #174. Canonical policy lives in [SEO_AEO_GEO](../Core/SEO_AEO_GEO.md).
 
 ## Purpose
 
@@ -78,7 +78,7 @@ Sitemap: **285 → 204** URLs (C, local build). `npm run audit:noindex` PASS wit
 
 **H:** The 81 de-listed URLs plausibly make up a large share of the 108 "crawled — currently not indexed". This cannot be confirmed without the GSC URL export.
 
-## Fixes shipped (branch `seo/indexing-metadata-loop`)
+## Fixes shipped (PR #174, production `ef1040d`)
 
 | # | Severity | Finding | Root cause | Fix | Verified |
 |---|---|---|---|---|---|
@@ -121,13 +121,35 @@ Lab only; no field CWV read (see access limits). Desktop = Lighthouse `--preset=
 
 Cohorts (L, `/`, 1350px): dismissed-banner and joined visitors get no reserved strip and no banner; dismiss collapses the slot (user-initiated, excluded from CLS). Local desktop Lighthouse on `/` (local `next start`, uncompressed) CLS 0.038 after the shell fix alone — TBT on local builds is not comparable with production and is not claimed.
 
+**Production after deploy (`ef1040d`, same harness, desktop n=3 median, L):**
+
+| Page | Score before → after | TBT before → after | CLS before → after |
+|---|---|---|---|
+| `/` | 67 → 71 | 916 → 919 | 0.101 → **0.003** |
+| `/google-apprenticeship` | 98 → 96 | 108 → 147 | 0.037 → **0.001** |
+| `/interview-questions/companies/infosys/java-developer` | 90 → 97 | 247 → 133 | 0.049 → **0.011** |
+| `/tools/question-generator` | 95 → 99 | 172 → 64 | 0.037 → **0.001** |
+| `/blog/agentic-coding-round` | 100 → 99 | 22 → 51 | 0.037 → **0** |
+
+CLS improvement is consistent. TBT moves both ways within lab variance and `/` is unchanged — **no TBT improvement is claimed**. Field CLS/INP: pending (Speed Insights not readable from this environment).
+
+## Release record
+
+| Step | Evidence |
+|---|---|
+| PR | [#174](https://github.com/rakesh2604/InterviewEra/pull/174) — all CI checks green (lint/typecheck, build, E2E auth, PDF regression, secret scan, security audit, Vercel preview) |
+| Preview indexing | Preview URL returns `302` → Vercel SSO with `X-Robots-Tag: noindex` (not crawlable). Content on preview not readable without Vercel auth; same commit verified on a local staging-env build |
+| Merge | Squash `ef1040d` on `main`, 2026-10-15 08:37 UTC (owner-authorized) |
+| Production deploy | GitHub deployment `7087961301` for `ef1040d`: `success` |
+| Live crawl after deploy | 204 sitemap URLs (pages 19 · blog 17 · tools 76 · questions 92); 0 sitemap non-200 / noindex / canonical mismatch; 0 internal 404s; template intersections + ATS variants `noindex, follow`; `http://` and `www.` → `308` `https://interviewera.com/` |
+
 ## Tests run
 
 | Check | Result |
 |---|---|
 | `npm run lint` | PASS (0 warnings) |
 | `npm run typecheck` | PASS |
-| `npm test` | PASS (see final report for counts) |
+| `npm test` | PASS — 374 files / 2658 tests |
 | `npm run audit:noindex` / `npm run build` | PASS — 204 sitemap URLs, 0 contradictions |
 | Marketing Playwright (`playwright.staging.config.ts`, staging Supabase `iiowrzfwemaxytbykjrg`, local staging-env `next start`) | 66/69 first run; the 3 failures (campus redirect host, nav auth timing, deferred-section timing) passed on rerun with server host matching `NEXT_PUBLIC_APP_URL` |
 | Live/local crawl | `scripts/seo/live-crawl-audit.ts` |
