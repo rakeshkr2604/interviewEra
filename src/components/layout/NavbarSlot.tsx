@@ -1,12 +1,8 @@
 'use client';
 
-import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
-
-const Navbar = dynamic(
-  () => import('@/components/layout/Navbar').then((mod) => mod.Navbar),
-  { ssr: true },
-);
+import { Navbar } from '@/components/layout/Navbar';
+import { shouldSuppressNavbar } from '@/lib/layout/navbar-suppress';
 
 /**
  * Thin wrapper that renders <Navbar /> only on marketing-side routes.
@@ -16,39 +12,16 @@ const Navbar = dynamic(
  *
  * Place this in the root layout so the Navbar is globally available
  * without adding it to every marketing sub-layout individually.
+ *
+ * Static import (not `next/dynamic`): dynamic SSR of this client chrome was
+ * stacking AuthNavPlaceholder + AnonymousNav as sibling headers. Suppress
+ * prefixes still keep Navbar off authenticated routes; question-bank isolation
+ * remains via `@/lib/seo/content/nav-links` (not `programmatic/questions`).
+ *
+ * Suppress prefixes: `@/lib/layout/navbar-suppress`.
  */
-
-const SUPPRESS_PREFIXES = [
-  '/dashboard',
-  '/onboarding',
-  '/interview',
-  '/report',
-  '/history',
-  '/analytics',
-  '/settings',
-  '/upgrade',
-  '/feedback',
-  '/profile',
-  '/admin',
-  '/platform',
-  '/college/dashboard',
-  '/college/signup',
-  '/notifications',
-  '/readiness',
-  '/roadmap',
-  '/resume',
-  '/login',
-  '/signup',
-  '/forgot-password',
-  '/reset-password',
-  '/auth',
-] as const;
-
 export function NavbarSlot() {
   const pathname = usePathname() ?? '';
-  const suppressed = SUPPRESS_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
-  if (suppressed) return null;
+  if (shouldSuppressNavbar(pathname)) return null;
   return <Navbar />;
 }

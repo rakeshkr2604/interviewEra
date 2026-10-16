@@ -209,6 +209,20 @@ export function BillingUsageCard({
           {BILLING_PAYMENT_METHODS_NOTE}
         </p>
 
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+          <Link href="/help#credits-plans" className="underline-offset-2 hover:underline" style={{ color: 'var(--accent-link)' }}>
+            Credits & plans FAQ
+          </Link>
+          {' · '}
+          <Link href="/refund" className="underline-offset-2 hover:underline" style={{ color: 'var(--accent-link)' }}>
+            Refund Policy
+          </Link>
+          {' · '}
+          <Link href="/contact" className="underline-offset-2 hover:underline" style={{ color: 'var(--accent-link)' }}>
+            Contact support
+          </Link>
+        </p>
+
         {showUpgradeNudge ? (
           <div
             className="rounded-2xl border-2 px-4 py-4 sm:px-5"

@@ -41,7 +41,7 @@ Loop 5 ne staging `next start` pe gated `[perf:dashboard]` traces liye. Warmed d
 | Migration 116 | Init-plan RLS + recovery composite + advisor FK indexes |
 | Weekly digest prefetch ([`weekly-digest-data.ts`](../../src/lib/email/weekly-digest-data.ts)) | Eligible users from lookback interviews; reports/V1 hops once; send stays sequential + idempotent |
 | Recovery `prefetchSentLifecycleKeys` | One chunked `lifecycle_email_log` read instead of per-row lookups; dry-run still skips the log |
-| [`nav-links.ts`](../../src/lib/seo/content/nav-links.ts) + dynamic `NavbarSlot` | Stops `questions.ts` (~492 KB raw / 156 KB gzip) riding the root-layout client graph onto `/dashboard` |
+| [`nav-links.ts`](../../src/lib/seo/content/nav-links.ts) + static `NavbarSlot` + [`navbar-suppress.ts`](../../src/lib/layout/navbar-suppress.ts) | Stops `questions.ts` (~492 KB raw / 156 KB gzip) riding marketing chrome; suppress list keeps Navbar off app routes (static import — `next/dynamic` SSR was stacking placeholder + live nav) |
 | History overshoot clamp | `?page=99` re-fetches the last page instead of a false empty state; lifetime counts stay exact |
 | [`ScoreTrendChartSlot.tsx`](../../src/components/dashboard/ScoreTrendChartSlot.tsx) | `ssr: false` is illegal in Server Component `DashboardMain`; the client slot dropped Recharts (`6465`, 83 KB gzip) from the dashboard hint graph |
 | `html { scrollbar-gutter: stable }` + dashboard chrome gutter | Field CLS attribution is the chrome footer + decorative blob, desktop-only (classic scrollbar). Overlay mobile scrollbars do not steal width |

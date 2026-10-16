@@ -1,14 +1,14 @@
 import { redirect } from 'next/navigation'
 import { SettingsPageClient } from '@/components/settings/SettingsPageClient'
-import { creditsMonthStartIsoIst } from '@/lib/settings/ist-month'
 import {
   parseNotificationPreferencesJson,
 } from '@/lib/settings/notification-preferences'
+import { loadBillingLedgerData } from '@/lib/settings/load-billing-data'
 import { getCachedAuthUser, getCachedSupabase } from '@/lib/dashboard/request-cache'
 import { loadCandidateSnapshot } from '@/lib/candidate/load-snapshot'
 import { privatePageMetadata } from '@/lib/seo/metadata'
 import type { PlanTier } from '@/types/app.types'
-import type { BillingPlanInfo, BillingPayment, BillingTx } from '@/components/settings/BillingUsageCard'
+import type { BillingPlanInfo } from '@/components/settings/BillingUsageCard'
 
 export const metadata = privatePageMetadata({
   title: 'Settings',
@@ -84,53 +84,11 @@ export default async function SettingsPage() {
     planStartedAt: (profile.plan_started_at as string | null) ?? null,
   }
 
-  const monthStart = creditsMonthStartIsoIst()
-  const [{ data: debitRows }, { data: paymentRows }, { data: txRows }, candidateSnapshot] =
+  const [{ creditsUsedThisMonth, recentPayments, recentTransactions }, candidateSnapshot] =
     await Promise.all([
-      supabase
-        .from('credit_transactions')
-        .select('amount')
-        .eq('user_id', user.id)
-        .eq('type', 'debit')
-        .gte('created_at', monthStart),
-      supabase
-        .from('payments')
-        .select('id, order_id, payment_id, amount, currency, status, plan, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      supabase
-        .from('credit_transactions')
-        .select('id, type, amount, reason, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(50),
+      loadBillingLedgerData(supabase, user.id),
       loadCandidateSnapshot(user.id, { client: supabase }),
     ])
-
-  const creditsUsedThisMonth =
-    debitRows?.reduce((sum, row) => sum + (Number(row.amount) || 0), 0) ?? 0
-
-  const recentPayments: BillingPayment[] =
-    paymentRows?.map((p) => ({
-      id: p.id as string,
-      order_id: p.order_id as string,
-      payment_id: p.payment_id as string | null,
-      amount: Number(p.amount) || 0,
-      currency: p.currency as string,
-      status: p.status as string,
-      plan: p.plan as string,
-      created_at: p.created_at as string,
-    })) ?? []
-
-  const recentTransactions: BillingTx[] =
-    txRows?.map((t) => ({
-      id: t.id as string,
-      type: t.type as string,
-      amount: Number(t.amount) || 0,
-      reason: t.reason,
-      created_at: t.created_at as string,
-    })) ?? []
 
   const digestUnsub = Boolean(profile.email_digest_unsubscribed)
   const notificationPrefs = parseNotificationPreferencesJson(profile.notification_preferences)

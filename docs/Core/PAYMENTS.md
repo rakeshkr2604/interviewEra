@@ -1,8 +1,8 @@
 # Payments
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
-> Verification Scope: Dual-path activation + Phase 7A recovery (PAYMENTS + PAYMENT_ARCHITECTURE merge)
+> Last Verified: 2026-10-15
+> Verification Scope: Dual-path activation + Phase 7A recovery (PAYMENTS + PAYMENT_ARCHITECTURE merge) + user-facing billing routes
 > Authority: Razorpay plan activation
 
 ## Purpose
@@ -46,6 +46,19 @@ flowchart LR
 Plans (list / promo floors): starter ₹299 / ₹149 · pro ₹799 / ₹399 — **code is SoT**, not marketing copy.
 
 Credit RPCs / ledger inserts: **service-role-only** (Invariant #2).
+
+### User-facing surfaces
+
+Plan/credits UI (one-time 30-day plans, no auto-renewal) is shared:
+
+| Route | Role |
+|---|---|
+| `/settings#settings-billing` | Billing section on Settings |
+| `/settings/billing` | Dedicated Billing page (Navbar “Billing”; same `BillingUsageCard`) |
+| `/upgrade` | Plan grid + checkout |
+| `/pricing` | Marketing pricing |
+
+Loader: `src/lib/settings/load-billing-data.ts`. Card: `src/components/settings/BillingUsageCard.tsx`.
 
 ## Architecture / Rules
 

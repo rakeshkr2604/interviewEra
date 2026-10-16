@@ -12,6 +12,8 @@ import {
   Gift,
   Building2,
   Bot,
+  Briefcase,
+  GraduationCap,
 } from 'lucide-react';
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit';
 import { BrandMarkIcon } from '@/components/brand/BrandMarkIcon';
@@ -29,7 +31,9 @@ const NAV_ITEMS = [
 
 const SYSTEM_ITEMS = [
   { href: '/platform/campus-approvals', label: 'Campus Approvals', icon: Building2, exact: false },
+  { href: '/platform/campus-page', label: 'Campus page', icon: GraduationCap, exact: false },
   { href: '/platform/coach', label: 'AI Interview Coach', icon: Bot, exact: false },
+  { href: '/platform/hiring-teams', label: 'Hiring Teams page', icon: Briefcase, exact: false },
 ] as const;
 
 function NavItem({

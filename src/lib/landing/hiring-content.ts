@@ -8,6 +8,13 @@ export const HIRING_META = {
     'Run structured AI interviews, score every candidate the same way, and manage your hiring pipeline from Applied to Offer — without interviewer bias.',
 } as const;
 
+/** Metadata when `/teams` is in Coming Soon mode (admin-togglable). */
+export const HIRING_COMING_SOON_META = {
+  title: 'Hiring Teams — Coming Soon',
+  description:
+    'Structured AI interviews and a shared hiring pipeline for recruiting teams are coming soon on InterviewEra. Contact us for early access or campus demos.',
+} as const;
+
 export const HIRING_HERO_BULLETS = [
   'Same rubric for every candidate',
   'Pipeline from Applied → Offer',

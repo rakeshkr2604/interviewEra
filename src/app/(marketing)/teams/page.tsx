@@ -1,21 +1,21 @@
-import { JsonLdScript } from '@/components/seo/JsonLdScript';
-import { HiringTeamsLandingClient } from '@/components/landing/hiring/HiringTeamsLandingClient';
-import { HIRING_FAQ, HIRING_META } from '@/lib/landing/hiring-content';
-import { generateMetadata } from '@/lib/seo/metadata';
-import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld';
-import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
+import type { Metadata } from 'next'
+import { JsonLdScript } from '@/components/seo/JsonLdScript'
+import { HiringTeamsComingSoon } from '@/components/landing/hiring/HiringTeamsComingSoon'
+import { HiringTeamsLandingClient } from '@/components/landing/hiring/HiringTeamsLandingClient'
+import {
+  HIRING_COMING_SOON_META,
+  HIRING_FAQ,
+  HIRING_META,
+} from '@/lib/landing/hiring-content'
+import { getTeamsLandingMode } from '@/lib/hiring/teams-landing-mode'
+import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata'
+import { breadcrumbListJsonLd, faqPageJsonLd } from '@/lib/seo/schema/jsonld'
+import { getCanonicalSiteOrigin } from '@/lib/seo/site-url'
 
-export const metadata = generateMetadata({
-  title: HIRING_META.title,
-  description: HIRING_META.description,
-  path: '/teams',
-  keywords:
-    'AI candidate evaluation, hiring team dashboard, structured interview scoring, recruiter pipeline, HR interview platform',
-});
+/** Mode is Redis-backed — must not be statically cached across toggles. */
+export const dynamic = 'force-dynamic'
 
-const ORIGIN = getCanonicalSiteOrigin();
-
-const TEAMS_FAQ_LD = faqPageJsonLd(HIRING_FAQ.map((item) => ({ question: item.q, answer: item.a })));
+const ORIGIN = getCanonicalSiteOrigin()
 
 const TEAMS_BREADCRUMB_LD = breadcrumbListJsonLd(
   [
@@ -23,16 +23,43 @@ const TEAMS_BREADCRUMB_LD = breadcrumbListJsonLd(
     { name: 'Hiring Teams', path: '/teams' },
   ],
   ORIGIN,
-);
+)
 
-export default function TeamsPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const mode = await getTeamsLandingMode()
+  if (mode === 'live') {
+    return buildPageMetadata({
+      title: HIRING_META.title,
+      description: HIRING_META.description,
+      path: '/teams',
+      keywords:
+        'AI candidate evaluation, hiring team dashboard, structured interview scoring, recruiter pipeline, HR interview platform',
+    })
+  }
+  return buildPageMetadata({
+    title: HIRING_COMING_SOON_META.title,
+    description: HIRING_COMING_SOON_META.description,
+    path: '/teams',
+    keywords: 'Hiring Teams coming soon, AI candidate evaluation, InterviewEra hiring',
+  })
+}
+
+export default async function TeamsPage() {
+  const mode = await getTeamsLandingMode()
+  const isLive = mode === 'live'
+
   return (
     <>
-      <JsonLdScript id="teams-faq-ld" data={TEAMS_FAQ_LD} />
+      {isLive ? (
+        <JsonLdScript
+          id="teams-faq-ld"
+          data={faqPageJsonLd(HIRING_FAQ.map((item) => ({ question: item.q, answer: item.a })))}
+        />
+      ) : null}
       <JsonLdScript id="teams-breadcrumb-ld" data={TEAMS_BREADCRUMB_LD} />
       <main id="main-content">
-        <HiringTeamsLandingClient />
+        {isLive ? <HiringTeamsLandingClient /> : <HiringTeamsComingSoon />}
       </main>
     </>
-  );
+  )
 }

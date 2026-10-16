@@ -29,6 +29,8 @@ const PATHS: {
   context: string;
   index: string;
   shot?: 'students' | 'colleges' | 'hiring';
+  /** Small status chip (e.g. Coming soon on Hiring Teams). */
+  badge?: string;
 }[] = [
   {
     title: 'Students',
@@ -53,6 +55,7 @@ const PATHS: {
     context: 'Campus readiness',
     index: '02',
     shot: 'colleges',
+    badge: 'Coming soon',
   },
   {
     title: 'Hiring Teams',
@@ -65,6 +68,7 @@ const PATHS: {
     context: 'Candidate evaluation',
     index: '03',
     shot: 'hiring',
+    badge: 'Coming soon',
   },
 ];
 
@@ -139,9 +143,25 @@ export function AudiencePathSection() {
                     <p className="mt-6 text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--accent-hover)]">
                       {path.context}
                     </p>
-                    <h3 className="ie-lh-text-primary mt-2 font-[family-name:var(--font-bricolage)] text-2xl font-bold leading-tight tracking-[-0.02em]">
-                      {path.title}
-                    </h3>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <h3 className="ie-lh-text-primary font-[family-name:var(--font-bricolage)] text-2xl font-bold leading-tight tracking-[-0.02em]">
+                        {path.title}
+                      </h3>
+                      {path.badge ? (
+                        <span
+                          className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]"
+                          style={{
+                            color: 'var(--accent-primary)',
+                            background:
+                              'color-mix(in srgb, var(--accent-primary) 12%, transparent)',
+                            border:
+                              '1px solid color-mix(in srgb, var(--accent-primary) 28%, transparent)',
+                          }}
+                        >
+                          {path.badge}
+                        </span>
+                      ) : null}
+                    </div>
                     <p className="ie-lh-text-secondary mt-3 max-w-sm text-[15px] leading-relaxed">
                       {path.description}
                     </p>

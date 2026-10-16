@@ -1,8 +1,8 @@
 # Feature Flags
 
 > Status: CANONICAL
-> Last Verified: 2026-10-13
-> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired; recovery email kill switch; PERF_DASHBOARD_TRACE
+> Last Verified: 2026-10-15
+> Verification Scope: Env-gated behaviors (from FLAGS.md); engine default retired; recovery email kill switch; PERF_DASHBOARD_TRACE; Teams landing mode
 > Authority: Flag registry
 
 ## Purpose
@@ -34,6 +34,8 @@ Every temporary/permanent env toggle. **New flags without an entry here = review
 | `INTERVIEW_RECOVERY_EMAIL_ENABLED` | unset → **off** | Phase 2 unfinished-interview recovery emails (`'1'` on). Cron registered; dry-run inventory works with flag off; real sends only when enabled and non-dry-run. |
 | Staging contract (`APP_ENV`, `EXPECTED_SUPABASE_PROJECT_REF`, …) | fail closed | Staging safety |
 | `PERF_DASHBOARD_TRACE` | unset → off | Staging-only `[perf:dashboard]` span logs (no user ids). Never leave on in production. |
+| `TEAMS_LANDING_MODE` | unset → Redis / default **`coming_soon`** | Optional **pin** for public `/teams`: `coming_soon` \| `live`. When set, overrides Redis and blocks Platform Admin toggles (409). Runtime SoT without env: Redis `product:teams:landing_mode` via `/platform/hiring-teams` + `GET/POST /api/admin/hiring-teams/page-mode`. Fail-closed default is Coming Soon until Hiring Teams product is ready. |
+| `CAMPUS_LANDING_MODE` | unset → Redis / default **`coming_soon`** | Optional **pin** for public `/campus`: `coming_soon` \| `live`. Same pattern as Teams: Redis `product:campus:landing_mode` via `/platform/campus-page` + `GET/POST /api/admin/campus/page-mode`. Fail-closed default is Coming Soon until campus sales motion is ready. |
 
 Client `localStorage.VOICE_DEBUG='1'` — prod verbose voice logs.
 
@@ -55,7 +57,8 @@ Leaving debug routes on · flipping Auth V2 without both-state tests · resurrec
 
 ## Verification
 
-Read implementing `flags.ts` before changing; exercise both states for Auth V2
+Read implementing `flags.ts` before changing; exercise both states for Auth V2.
+Marketing E2E assumes `/campus` (and `/teams`) default to **Coming Soon** unless CI pins `CAMPUS_LANDING_MODE` / `TEAMS_LANDING_MODE` to `live`.
 
 ## Change Triggers
 

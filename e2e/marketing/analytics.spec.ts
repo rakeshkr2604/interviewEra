@@ -117,17 +117,22 @@ test.describe('Marketing CTA analytics', () => {
     expect(events[0]?.cta_key).toBe('sign_up');
   });
 
-  test('campus bridge Set up Campus Workspace fires once', async ({ page }) => {
-    await gotoMarketingPage(page, '/campus', { heading: /placement outcomes/i });
-    await installCtaSpy(page);
-    const bridge = page
-      .locator('section[aria-labelledby="campus-workspace-bridge-heading"]')
-      .getByRole('link', {
-        name: 'Set up Campus Workspace',
-        exact: true,
-      });
-    await bridge.scrollIntoViewIfNeeded();
-    await clickTrackedCta(page, bridge);
-    expect((await getCtaEvents(page)).some((e) => e.cta_key === 'campus_workspace')).toBe(true);
-  });
+  // Live-landing bridge CTA needs CAMPUS_LANDING_MODE=live / Redis live.
+  // Default CI + prod fail-closed surface is Coming Soon (no workspace bridge).
+  test.skip(
+    'campus bridge Set up Campus Workspace fires once',
+    async ({ page }) => {
+      await gotoMarketingPage(page, '/campus', { heading: /placement outcomes/i });
+      await installCtaSpy(page);
+      const bridge = page
+        .locator('section[aria-labelledby="campus-workspace-bridge-heading"]')
+        .getByRole('link', {
+          name: 'Set up Campus Workspace',
+          exact: true,
+        });
+      await bridge.scrollIntoViewIfNeeded();
+      await clickTrackedCta(page, bridge);
+      expect((await getCtaEvents(page)).some((e) => e.cta_key === 'campus_workspace')).toBe(true);
+    },
+  );
 });

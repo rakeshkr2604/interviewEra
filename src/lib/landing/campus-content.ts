@@ -9,6 +9,13 @@ export const CAMPUS_META = {
     'Train your entire placement batch with AI mock interviews — cohort analytics, unlimited sessions, and zero extra T&P workload. From ₹799/student/year.',
 } as const;
 
+/** Metadata when `/campus` is in Coming Soon mode (admin-togglable). */
+export const CAMPUS_COMING_SOON_META = {
+  title: 'Campus Placements — Coming Soon',
+  description:
+    'AI mock interviews for college placement batches are coming soon on InterviewEra. Contact us for pilots, demos, and T&P rollout.',
+} as const;
+
 /** Shown under hero CTAs (replaces duplicate stat cards for cleaner hierarchy). */
 export const HERO_BULLETS = [
   'Run mocks for entire batches',

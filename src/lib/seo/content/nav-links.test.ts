@@ -20,9 +20,14 @@ describe('nav-links isolation', () => {
     const navbar = readFileSync('src/components/layout/Navbar.tsx', 'utf8');
     const footer = readFileSync('src/components/layout/MarketingFooter.tsx', 'utf8');
     const slot = readFileSync('src/components/layout/NavbarSlot.tsx', 'utf8');
+    const suppress = readFileSync('src/lib/layout/navbar-suppress.ts', 'utf8');
     expect(navbar).toMatch(/nav-links/);
     expect(navbar).not.toMatch(/seo\/content\/nav'/);
     expect(footer).toMatch(/nav-links/);
-    expect(slot).toMatch(/next\/dynamic/);
+    // Static NavbarSlot import — avoid dynamic-SSR double-header; suppress
+    // list keeps chrome off app routes; nav-links keeps questions.ts out.
+    expect(slot).not.toMatch(/from ['"]next\/dynamic['"]/);
+    expect(slot).toMatch(/navbar-suppress/);
+    expect(suppress).toMatch(/\/prepare/);
   });
 });
