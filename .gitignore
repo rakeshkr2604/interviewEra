@@ -152,8 +152,17 @@ scripts/_round2_*
 # One-off local verify / screenshot scripts
 /scripts/manual/_*.mjs
 
+# Local investigation / perf / SEO scratch scripts (never commit)
+scripts/**/_tmp-*
+
 # Local Playwright config for public-route checks
 /playwright.public.config.ts
+
+# Generated validation outputs (tracked chromium release screenshots stay)
+validation-results/screenshots/staging-*/
+validation-results/lighthouse/
+validation-results/playwright-report.json
+validation-results/nft-baseline.json
 
 # Local investigation notes (not part of the engineering program)
 /docs/investigations/
