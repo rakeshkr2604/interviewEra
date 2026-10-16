@@ -768,7 +768,7 @@ export default async function RoleQuestionsPage({ params }: Props) {
                 {role.category} · {role.fresherFriendly ? 'Fresher-friendly' : 'Experienced'}
               </p>
               <h1 className="ie-blog-article-h1">
-                <span className="ie-blog-article-h1__line">{role.label} Interview Questions</span>
+                <span className="ie-blog-article-h1__line">{role.label} Interview Questions</span>{' '}
                 <span className="ie-blog-article-h1__accent">India 2026</span>
               </h1>
               <p className="ie-blog-article-deck">{role.description}</p>

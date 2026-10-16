@@ -79,7 +79,7 @@ export function FreshworksFeHubArticle({
             {company.label} · {role.category}
           </p>
           <h1 className="ie-blog-article-h1">
-            <span className="ie-blog-article-h1__line">{company.label} {role.label}</span>
+            <span className="ie-blog-article-h1__line">{company.label} {role.label}</span>{' '}
             <span className="ie-blog-article-h1__accent">Interview Questions 2026</span>
           </h1>
           <p className="ie-blog-article-deck">

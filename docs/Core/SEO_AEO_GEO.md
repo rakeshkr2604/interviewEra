@@ -1,8 +1,8 @@
 # SEO / AEO / GEO
 
 > Status: CANONICAL
-> Last Verified: 2026-10-15
-> Verification Scope: Sitemap, noindex audit, analytics SoT + optional analytics cookie consent gating + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths + public preparation guides + programmatic indexing gate (editorial intersections, ATS variants) + title clamp
+> Last Verified: 2026-10-16
+> Verification Scope: Sitemap, noindex audit, analytics SoT + optional analytics cookie consent gating + interview milestones / admin Incomplete+COMPLETED + brand OG/JSON-LD logo paths + public preparation guides + programmatic indexing gate (editorial intersections, ATS variants) + title clamp + stable sitemap lastmod + Coming Soon campus/teams indexability
 > Authority: Indexing + funnel analytics
 
 ## Purpose
@@ -14,6 +14,8 @@ Search indexing policy and analytics integrity (GA4 backup vs server events).
 ### SEO
 
 - Hand-built sitemap Route Handlers (`sitemap.xml` → pages/blog/tools indexes) via `src/lib/seo/sitemap/registry.ts`
+- Sitemap `<lastmod>` uses stable content dates only. Registry builders never fall back to request-time `new Date()` for URL entries; omit `lastmod` only when no reliable date exists. Tool variants share `TOOL_VARIANT_LASTMOD` until per-variant dates ship.
+- `/campus` and `/teams` Coming Soon shells are `noindex, follow` and omitted from the pages sitemap (fail-closed). When admin Redis mode is `live`, metadata becomes indexable and `pages-sitemap.xml` includes the URL. Default IndexNow/audit set excludes both (202 URLs with both Coming Soon).
 - Free preparation guides stay public and indexable, listed in the pages sitemap: `/resources/chatgpt-interview-preparation`, `/resources/hr-interview-answer-framework`, `/resources/online-assessment-preparation`. The `/resources` index remains the blog and guide library. The interactive toolkit home is the logged-in `/prepare` page (noindex, sidebar **Interview Prep**). Nested `/resources/` is public in `src/proxy.ts`. Speaking-practice PDFs are static files at `/resources/guides/*.pdf`, linked from the assessment guide. They are not separate HTML sitemap entries.
 - Prompt Builder (`/tools/prompt-builder`) is a public free tool and a logged-in sidebar Tools item. Funnel counts use `tool_usage_events.tool = prompt_builder` with `mode` set to the preparation goal only. Resume text, prompts, and job descriptions are not stored. Migration `118_prompt_builder_usage_events.sql` widens `tool_usage_events_tool_check` to keep `ats`, `question_generator`, and `star`, and adds `prompt_builder`. Page views and signup CTA clicks on `/tools/prompt-builder` stay on the existing `page_view` and `landing_cta_clicked` events and are not counted as prompt runs.
 - Programmatic pages: `src/lib/seo/programmatic/`

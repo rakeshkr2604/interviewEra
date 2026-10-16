@@ -1,8 +1,8 @@
 # Brand Assets
 
 > Status: CANONICAL
-> Last Verified: 2026-10-10
-> Verification Scope: Logo Package v1 wiring; dark-chrome transparent purple mark + CSS wordmark (no white plate); squircle reserved for favicon/OG
+> Last Verified: 2026-10-16
+> Verification Scope: Logo Package v1 wiring; dark-chrome transparent purple mark + CSS wordmark (no white plate); squircle reserved for favicon/OG; self-hosted UI fonts
 > Authority: Production brand asset architecture and context mapping
 
 ## Purpose
@@ -17,6 +17,7 @@ Define where approved InterviewEra logo assets live, which variant each product 
 - **Path constants:** `src/lib/brand/assets.ts`
 - **Prepare script:** `npm run prepare:logo-package` → `scripts/prepare-logo-package-v1.mjs`
 - **Approved web color approximations:** `#09062D`, `#5B21F4`, `#9B6CFF` (`public/brand/BRAND_COLORS.txt`)
+- **UI fonts (self-hosted):** latin `woff2` under `src/fonts/{bricolage-grotesque,dm-sans,jetbrains-mono,instrument-serif}/`, loaded via `next/font/local` in `src/app/layout.tsx` (avoids Vercel `next/font/google` build flakes). See `src/fonts/README.md`.
 
 Legacy SVG marks under `public/brand/logos/` and `public/icons/` are **retained** but no longer referenced by production UI.
 

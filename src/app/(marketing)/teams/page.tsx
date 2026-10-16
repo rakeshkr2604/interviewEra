@@ -41,6 +41,10 @@ export async function generateMetadata(): Promise<Metadata> {
     description: HIRING_COMING_SOON_META.description,
     path: '/teams',
     keywords: 'Hiring Teams coming soon, AI candidate evaluation, InterviewEra hiring',
+    // Thin Coming Soon shell — keep crawlable for internal links, hold out of the index
+    // and pages sitemap until admin flips landing mode to live.
+    noIndex: true,
+    noIndexFollow: true,
   })
 }
 

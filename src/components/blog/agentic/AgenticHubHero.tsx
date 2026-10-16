@@ -32,7 +32,7 @@ export function AgenticHubHero({
           {category}
         </p>
         <h1 className="ie-blog-article-h1">
-          <span className="ie-blog-article-h1__line">{titleLine}</span>
+          <span className="ie-blog-article-h1__line">{titleLine}</span>{' '}
           <span className="ie-blog-article-h1__accent">{titleAccent}</span>
         </h1>
         <div className="ie-blog-article-meta flex flex-wrap gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>

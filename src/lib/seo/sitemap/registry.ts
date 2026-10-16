@@ -55,16 +55,14 @@ export type SitemapSourceEntry = {
   lastModified?: string | Date;
 };
 
-function toAbsolute(
-  entry: SitemapSourceEntry,
-  fallbackDate: Date,
-): MetadataRoute.Sitemap[number] | null {
+function toAbsolute(entry: SitemapSourceEntry): MetadataRoute.Sitemap[number] | null {
   const path = entry.path.startsWith('/') ? entry.path : `/${entry.path}`;
   const url = canonicalUrl(path);
   if (url == null) return null;
+  // Omit lastmod when no stable content date exists — never invent "now".
   return {
     url,
-    lastModified: entry.lastModified ?? fallbackDate,
+    ...(entry.lastModified !== undefined ? { lastModified: entry.lastModified } : {}),
     changeFrequency: entry.changeFrequency,
     priority: entry.priority,
   };
@@ -74,25 +72,89 @@ function notNull<T>(value: T | null): value is T {
   return value != null;
 }
 
+/**
+ * Stable lastmod dates for marketing/tool shells without per-route content
+ * timestamps. Bump only when the page's visible content or metadata materially
+ * changes — never substitute request time.
+ */
+const MARKETING_SHELL_LASTMOD = '2026-10-14'
+const TOOL_LANDING_LASTMOD = '2026-10-14'
+/** Shared lastmod for QGen / STAR tool variants until per-variant dates exist. */
+const TOOL_VARIANT_LASTMOD = '2026-05-21'
+const QUESTIONS_HUB_LASTMOD = '2026-05-21'
+const LEGAL_LASTMOD = '2026-10-01'
+
 /** Marketing / legal / campus — indexable HTML. */
 export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
-  { path: '/', changeFrequency: 'weekly', priority: 1.0 },
-  { path: '/interviewera', changeFrequency: 'monthly', priority: 0.9 },
-  { path: '/how-it-works', changeFrequency: 'monthly', priority: 0.85 },
-  { path: '/pricing', changeFrequency: 'weekly', priority: 0.9 },
-  { path: '/signup', changeFrequency: 'monthly', priority: 0.92 },
-  { path: '/campus', changeFrequency: 'monthly', priority: 0.78 },
-  { path: '/teams', changeFrequency: 'monthly', priority: 0.74 },
-  { path: '/about', changeFrequency: 'monthly', priority: 0.65 },
-  { path: '/community', changeFrequency: 'monthly', priority: 0.58 },
+  { path: '/', changeFrequency: 'weekly', priority: 1.0, lastModified: MARKETING_SHELL_LASTMOD },
+  {
+    path: '/interviewera',
+    changeFrequency: 'monthly',
+    priority: 0.9,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/how-it-works',
+    changeFrequency: 'monthly',
+    priority: 0.85,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/pricing',
+    changeFrequency: 'weekly',
+    priority: 0.9,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/signup',
+    changeFrequency: 'monthly',
+    priority: 0.92,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  // Included in the pages sitemap only while landing mode is `live` (see
+  // `buildPagesSitemapEntries`). Coming Soon shells stay out of the sitemap.
+  {
+    path: '/campus',
+    changeFrequency: 'monthly',
+    priority: 0.78,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/teams',
+    changeFrequency: 'monthly',
+    priority: 0.74,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/about',
+    changeFrequency: 'monthly',
+    priority: 0.65,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/community',
+    changeFrequency: 'monthly',
+    priority: 0.58,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
   {
     path: '/google-apprenticeship',
     changeFrequency: 'weekly',
     priority: 0.9,
     lastModified: GOOGLE_APPRENTICESHIP_LAST_UPDATED,
   },
-  { path: '/help-center', changeFrequency: 'monthly', priority: 0.62 },
-  { path: '/contact', changeFrequency: 'monthly', priority: 0.55 },
+  {
+    path: '/help-center',
+    changeFrequency: 'monthly',
+    priority: 0.62,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
+  {
+    path: '/contact',
+    changeFrequency: 'monthly',
+    priority: 0.55,
+    lastModified: MARKETING_SHELL_LASTMOD,
+  },
   { path: '/resources', changeFrequency: 'weekly', priority: 0.82, lastModified: '2026-10-14' },
   {
     path: '/resources/chatgpt-interview-preparation',
@@ -112,17 +174,37 @@ export const STATIC_MARKETING_ROUTES: SitemapSourceEntry[] = [
     priority: 0.8,
     lastModified: '2026-10-14',
   },
-  { path: '/privacy', changeFrequency: 'yearly', priority: 0.35 },
-  { path: '/terms', changeFrequency: 'yearly', priority: 0.35 },
-  { path: '/refund', changeFrequency: 'yearly', priority: 0.3 },
+  { path: '/privacy', changeFrequency: 'yearly', priority: 0.35, lastModified: LEGAL_LASTMOD },
+  { path: '/terms', changeFrequency: 'yearly', priority: 0.35, lastModified: LEGAL_LASTMOD },
+  { path: '/refund', changeFrequency: 'yearly', priority: 0.3, lastModified: LEGAL_LASTMOD },
 ];
 
 /** Free tools — landing only (results URLs are noindex + robots disallow). */
 export const TOOL_LANDING_ROUTES: SitemapSourceEntry[] = [
-  { path: '/tools/question-generator', changeFrequency: 'monthly', priority: 0.9 },
-  { path: '/tools/ats-checker', changeFrequency: 'monthly', priority: 0.9 },
-  { path: '/tools/star-builder', changeFrequency: 'monthly', priority: 0.9 },
-  { path: '/tools/prompt-builder', changeFrequency: 'monthly', priority: 0.9 },
+  {
+    path: '/tools/question-generator',
+    changeFrequency: 'monthly',
+    priority: 0.9,
+    lastModified: TOOL_LANDING_LASTMOD,
+  },
+  {
+    path: '/tools/ats-checker',
+    changeFrequency: 'monthly',
+    priority: 0.9,
+    lastModified: TOOL_LANDING_LASTMOD,
+  },
+  {
+    path: '/tools/star-builder',
+    changeFrequency: 'monthly',
+    priority: 0.9,
+    lastModified: TOOL_LANDING_LASTMOD,
+  },
+  {
+    path: '/tools/prompt-builder',
+    changeFrequency: 'monthly',
+    priority: 0.9,
+    lastModified: TOOL_LANDING_LASTMOD,
+  },
 ];
 
 /**
@@ -262,7 +344,7 @@ const EDITORIAL_INTERSECTION_LASTMOD: Partial<Record<string, string>> = {
   'wipro:data-analyst': WIPRO_DA_LAST_UPDATED,
 }
 
-export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
+export function buildQuestionsSitemapEntries(_now?: Date): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = []
 
   // Hub index page
@@ -271,7 +353,7 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (url != null) {
       entries.push({
         url,
-        lastModified: now,
+        lastModified: QUESTIONS_HUB_LASTMOD,
         changeFrequency: 'weekly',
         priority: 0.9,
       })
@@ -356,17 +438,44 @@ export function buildQuestionsSitemapEntries(now: Date): MetadataRoute.Sitemap {
   return entries
 }
 
-export function buildPagesSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  return STATIC_MARKETING_ROUTES.map((e) => toAbsolute(e, now)).filter(notNull);
+export type PagesSitemapOptions = {
+  /**
+   * Redis-backed campus landing mode. Fail-closed: omit `/campus` unless `live`
+   * so thin Coming Soon shells are never advertised in the sitemap.
+   */
+  campusMode?: 'live' | 'coming_soon'
+  /** Same gate for `/teams`. */
+  teamsMode?: 'live' | 'coming_soon'
+}
+
+export function buildPagesSitemapEntries(
+  _now?: Date,
+  options: PagesSitemapOptions = {},
+): MetadataRoute.Sitemap {
+  const campusMode = options.campusMode ?? 'coming_soon'
+  const teamsMode = options.teamsMode ?? 'coming_soon'
+  return STATIC_MARKETING_ROUTES.filter((entry) => {
+    if (entry.path === '/campus' && campusMode !== 'live') return false
+    if (entry.path === '/teams' && teamsMode !== 'live') return false
+    return true
+  })
+    .map((e) => toAbsolute(e))
+    .filter(notNull)
 }
 
 /**
  * Every indexable absolute URL across all child sitemaps — single source of truth for
  * IndexNow submissions (`npm run submit:indexnow` + `/api/indexnow/submit`).
+ *
+ * Campus/teams default to excluded (Coming Soon fail-closed). Pass live modes when
+ * submitting IndexNow after an admin enables the full landings.
  */
-export function buildAllIndexableUrls(now: Date = new Date()): string[] {
+export function buildAllIndexableUrls(
+  now: Date = new Date(),
+  pagesOptions: PagesSitemapOptions = {},
+): string[] {
   const all = [
-    ...buildPagesSitemapEntries(now),
+    ...buildPagesSitemapEntries(now, pagesOptions),
     ...buildBlogSitemapEntries(now),
     ...buildToolsSitemapEntries(now),
     ...buildQuestionsSitemapEntries(now),
@@ -374,12 +483,12 @@ export function buildAllIndexableUrls(now: Date = new Date()): string[] {
   return Array.from(new Set(all.map((e) => e.url)));
 }
 
-export function buildBlogSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  return BLOG_POST_ROUTES.map((e) => toAbsolute(e, now)).filter(notNull);
+export function buildBlogSitemapEntries(_now?: Date): MetadataRoute.Sitemap {
+  return BLOG_POST_ROUTES.map((e) => toAbsolute(e)).filter(notNull);
 }
 
-export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
-  const entries: MetadataRoute.Sitemap = TOOL_LANDING_ROUTES.map((e) => toAbsolute(e, now)).filter(
+export function buildToolsSitemapEntries(_now?: Date): MetadataRoute.Sitemap {
+  const entries: MetadataRoute.Sitemap = TOOL_LANDING_ROUTES.map((e) => toAbsolute(e)).filter(
     notNull,
   )
 
@@ -389,7 +498,7 @@ export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (url != null) {
       entries.push({
         url,
-        lastModified: now,
+        lastModified: TOOL_VARIANT_LASTMOD,
         changeFrequency: 'monthly',
         priority: 0.75,
       })
@@ -402,7 +511,7 @@ export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (url != null) {
       entries.push({
         url,
-        lastModified: now,
+        lastModified: TOOL_VARIANT_LASTMOD,
         changeFrequency: 'monthly',
         priority: 0.74,
       })
@@ -416,7 +525,7 @@ export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (url != null) {
       entries.push({
         url,
-        lastModified: now,
+        lastModified: TOOL_VARIANT_LASTMOD,
         changeFrequency: 'monthly',
         priority: 0.75,
       })
@@ -429,7 +538,7 @@ export function buildToolsSitemapEntries(now: Date): MetadataRoute.Sitemap {
     if (url != null) {
       entries.push({
         url,
-        lastModified: now,
+        lastModified: TOOL_VARIANT_LASTMOD,
         changeFrequency: 'monthly',
         priority: topic.sitemapPriority,
       })

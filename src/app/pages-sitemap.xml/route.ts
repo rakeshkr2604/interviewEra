@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
+import { getCampusLandingMode } from '@/lib/campus/campus-landing-mode';
+import { getTeamsLandingMode } from '@/lib/hiring/teams-landing-mode';
 import { isFullSiteCrawlBlocked } from '@/lib/seo/crawl-policy';
 import { buildPagesSitemapEntries } from '@/lib/seo/sitemap/registry';
 import { serializeUrlset } from '@/lib/seo/sitemap/serialize';
 
-export const revalidate = 3600;
+/** Redis-backed campus/teams mode — must not be statically cached across toggles. */
+export const dynamic = 'force-dynamic';
 
 export async function GET(): Promise<NextResponse> {
   if (isFullSiteCrawlBlocked()) {
@@ -13,12 +16,19 @@ export async function GET(): Promise<NextResponse> {
     );
   }
 
-  const xml = serializeUrlset(buildPagesSitemapEntries(new Date()));
+  const [campusMode, teamsMode] = await Promise.all([
+    getCampusLandingMode(),
+    getTeamsLandingMode(),
+  ]);
+
+  const xml = serializeUrlset(
+    buildPagesSitemapEntries(undefined, { campusMode, teamsMode }),
+  );
   return new NextResponse(xml, {
     status: 200,
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600',
     },
   });
 }

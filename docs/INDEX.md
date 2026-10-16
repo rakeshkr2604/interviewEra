@@ -64,6 +64,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [production-trust-hardening.md](audits/production-trust-hardening.md) | Privacy / legal / a11y / trust checklist audit + remediation evidence |
 | [founder-launch-readiness.md](audits/founder-launch-readiness.md) | GST/CA, entity, trust metrics, assets, DPAs, deletion retention, lawyer checklist |
 | [seo-aeo-geo-2026-10-15.md](audits/seo-aeo-geo-2026-10-15.md) | Keyword → URL map, indexing dispositions, title/CLS fixes, GSC follow-ups |
+| [seo-gsc-indexing-recovery-2026-10-16.md](audits/seo-gsc-indexing-recovery-2026-10-16.md) | GSC 284↔204 reconciliation, noindex classification, lastmod + Coming Soon gates |
 
 ## Performance
 

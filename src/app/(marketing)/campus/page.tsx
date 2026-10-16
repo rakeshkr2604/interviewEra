@@ -41,6 +41,10 @@ export async function generateMetadata(): Promise<Metadata> {
     description: CAMPUS_COMING_SOON_META.description,
     path: '/campus',
     keywords: 'Campus placements coming soon, college mock interviews, InterviewEra campus',
+    // Thin Coming Soon shell — keep crawlable for internal links, hold out of the index
+    // and pages sitemap until admin flips landing mode to live.
+    noIndex: true,
+    noIndexFollow: true,
   })
 }
 

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Bricolage_Grotesque, DM_Sans, JetBrains_Mono, Instrument_Serif } from "next/font/google";
+import localFont from "next/font/local";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { ThemeProvider } from "@/lib/theme/ThemeProvider";
@@ -26,53 +26,55 @@ import "./globals.css";
 const COMMUNITY_BANNER_BOOT_SCRIPT = communityBannerBootScript(COMMUNITY_HUB_PATH);
 
 /**
- * Marketing/heading font — keep above-the-fold weights only.
- * Hero typography uses 600/700/800; 400/500 weren't in use.
+ * Self-hosted latin subsets (`src/fonts/**`) — avoids Vercel build flakes in
+ * `next/font/google` when fonts.googleapis.com CSS fetch/parse returns null.
+ * Variable-font files cover the listed weight ranges.
  */
-const bricolage = Bricolage_Grotesque({
+const bricolage = localFont({
+  src: "../fonts/bricolage-grotesque/latin.woff2",
   variable: "--font-bricolage",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["600", "700", "800"],
+  weight: "600 800",
   preload: true,
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
 });
 
-/** Body font — 700 for `font-bold` on non-heading copy; avoid loading 800/900 here (use heading font for display nums).
- *  Do not preload alongside Bricolage — competing font preloads delay LCP text on `/`. */
-const dmSans = DM_Sans({
+/** Body font — do not preload alongside Bricolage (competing preloads delay LCP on `/`). */
+const dmSans = localFont({
+  src: "../fonts/dm-sans/latin.woff2",
   variable: "--font-dm-sans",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: "400 700",
   preload: false,
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
 });
 
-/**
- * Mono — used for code + landing metrics. Not LCP-critical on blog/marketing; avoid render-blocking preload.
- */
-const jetbrains = JetBrains_Mono({
+const jetbrains = localFont({
+  src: "../fonts/jetbrains-mono/latin.woff2",
   variable: "--font-jetbrains",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400", "600", "700"],
+  weight: "400 700",
   preload: false,
-  adjustFontFallback: true,
+  adjustFontFallback: "Arial",
 });
 
-/**
- * Editorial serif — used sparingly for emphasis (hero simulator score total).
- * Single weight, italic; not LCP-critical so no preload.
- */
-const instrumentSerif = Instrument_Serif({
+const instrumentSerif = localFont({
+  src: [
+    {
+      path: "../fonts/instrument-serif/latin-400-normal.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../fonts/instrument-serif/latin-400-italic.woff2",
+      weight: "400",
+      style: "italic",
+    },
+  ],
   variable: "--font-instrument-serif",
-  subsets: ["latin"],
   display: "swap",
-  weight: ["400"],
-  style: ["normal", "italic"],
   preload: false,
-  adjustFontFallback: true,
+  adjustFontFallback: "Times New Roman",
 });
 
 const defaultOgTitle = `${siteConfig.name} | ${siteConfig.socialDefaultHeadline}`;
