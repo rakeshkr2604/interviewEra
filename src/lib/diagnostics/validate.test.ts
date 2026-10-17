@@ -67,4 +67,23 @@ describe('validateDiagnosticIngestBody', () => {
     expect(meta.endpoint).toBe('/api/interview/script/turn');
     expect(meta.component).toBe('unknown');
   });
+
+  it('keeps mic failure classification metadata and strips free-form secrets', () => {
+    const meta = sanitizeMetadataForTests({
+      component: 'mic',
+      error_name: 'TimeoutError',
+      error_kind: 'timeout',
+      permission_state: 'prompt',
+      retry_count: 2,
+      transcript: 'SECRET ANSWER TEXT',
+      authorization: 'Bearer x',
+    });
+    expect(meta).toEqual({
+      component: 'mic',
+      error_name: 'TimeoutError',
+      error_kind: 'timeout',
+      permission_state: 'prompt',
+      retry_count: 2,
+    });
+  });
 });

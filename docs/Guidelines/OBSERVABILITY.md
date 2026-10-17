@@ -1,7 +1,7 @@
 # Observability
 
 > Status: CANONICAL
-> Last Verified: 2026-10-13
+> Last Verified: 2026-10-17
 > Verification Scope: Live logging + interview diagnostic events + gated dashboard TTFB spans
 > Authority: Current logging/telemetry — not the historical RFC backlog
 
@@ -58,7 +58,7 @@ Caps: **60 events/user/min** + **40 events/interview/min**. Interview UX remains
 
 ### Privacy boundaries
 
-- Metadata keys allowlisted in `DIAGNOSTIC_METADATA_KEYS`; transcripts/answers/tokens stripped.
+- Metadata keys allowlisted in `DIAGNOSTIC_METADATA_KEYS` (includes `error_name`, `error_kind`, `permission_state` for mic/STT classification); transcripts/answers/tokens stripped.
 - Error codes are short classifiers — never free-form stacks or answer text.
 - Admin loader re-sanitizes metadata; UI does not render raw JSON blobs.
 - Service-role only for insert/select/delete; candidates have no direct table access.

@@ -1,8 +1,8 @@
 # Voice Pipeline
 
 > Status: CANONICAL
-> Last Verified: 2026-10-03
-> Verification Scope: Importers of `src/lib/voice/**` + script session page + mic coordinator + diagnostic emit points
+> Last Verified: 2026-10-17
+> Verification Scope: Importers of `src/lib/voice/**` + script session page + mic coordinator + diagnostic emit points + P0 mic-ready-before-capture fix
 > Authority: Speech capture and playback for **current** product path
 
 ## Purpose
@@ -59,6 +59,9 @@ Chrome desktop: automated via `npm run verify:voice`. Edge/Firefox/Safari + mobi
 - All mic acquisition through coordinator owners (`keep_alive|pcm|debug_meter|settings_test`)
 - Generation counters on STT stop to ignore stale callbacks
 - Voice quota Redis: fail-open (“don’t block interviews”) on Redis errors
+- **Mic-ready gate:** `DeepgramSessionController` fires `onWsOpen` only after `startMic` succeeds (WS open alone must not start the answer timer). Script page thinking→answering uses that callback as `micReady`.
+- **Late streams:** `micCaptureCoordinator` stops orphan `getUserMedia` streams that resolve after timeout/abort so exclusive device locks cannot poison retries.
+- Durable mic diagnostics include allowlisted `error_name` / `error_kind` / `permission_state` / `retry_count` (not phase/browser only).
 
 ## Dependencies
 
@@ -72,6 +75,8 @@ Deepgram · ElevenLabs · browser Web Speech · script turn SSE · Upstash quota
 | Zombie Deepgram WS | Stale transcripts |
 | Flag mismatch SSE | Client expects stream, server returns JSON (or reverse) |
 | Mobile audio unlock | No TTS until gesture |
+| Mic-ready before capture (fixed 2026-10-17) | Warmup `[TIMEOUT]` with empty transcript; timer started on WS open while `getUserMedia` still pending |
+| Late timed-out stream (fixed 2026-10-17) | Subsequent acquires fail / silent input after acquire timeout |
 
 ## Verification
 

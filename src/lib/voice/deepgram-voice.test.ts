@@ -376,6 +376,8 @@ describe('DeepgramSessionController (integration mocks)', () => {
     vi.unstubAllGlobals()
     vi.restoreAllMocks()
     vi.doUnmock('@/lib/voice/stt-client')
+    vi.doUnmock('@/lib/voice/deepgram-circuit-breaker')
+    vi.doUnmock('@/lib/voice/stt-token')
   })
 
   it('refresh path passes lease id without releasing quota on teardown', async () => {
@@ -643,5 +645,118 @@ describe('DeepgramSessionController (integration mocks)', () => {
 
     expect(getReleaseCalls()).toBe(0)
     expect(controller.getSessionLeaseId()).toBe('lease-refresh-intact')
+  })
+
+  it('fires onWsOpen only after startMic succeeds (not on bare WS open)', async () => {
+    stubFetch('lease-mic-ready-order')
+    const events: string[] = []
+    let resolveMic!: () => void
+    const micGate = new Promise<void>((r) => {
+      resolveMic = r
+    })
+
+    vi.doMock('@/lib/voice/stt-client', () => ({
+      StreamingSTT: class {
+        async start(opts: { onOpen?: () => void }) {
+          queueMicrotask(() => opts.onOpen?.())
+        }
+        stop() {}
+        sendAudio() {}
+      },
+    }))
+
+    const { DeepgramSessionController } = await import('@/lib/voice/deepgram-session-controller')
+    const controller = new DeepgramSessionController(
+      'i1',
+      { interviewId: 'i1', questionIndex: 0, phase: 'warmup' },
+      () => {},
+      {
+        onPartial: () => {},
+        onFinal: () => {},
+        onWsOpen: () => {
+          events.push('onWsOpen')
+        },
+        onRefreshRestart: () => {},
+        onUiState: (state) => {
+          events.push(`ui:${state}`)
+        },
+        onFatalError: () => {},
+        isMounted: () => true,
+        startMic: async () => {
+          events.push('startMic_begin')
+          await micGate
+          events.push('startMic_done')
+          return () => {}
+        },
+        stopMic: () => {},
+        releaseAudio: async () => {
+          events.push('releaseAudio')
+        },
+      },
+    )
+
+    const startPromise = controller.start()
+    await vi.waitFor(() => {
+      expect(events).toContain('startMic_begin')
+    })
+    expect(events).not.toContain('onWsOpen')
+    expect(events).toContain('ui:connecting')
+
+    resolveMic()
+    await startPromise
+
+    expect(events).toContain('startMic_done')
+    expect(events).toContain('onWsOpen')
+    expect(events.indexOf('onWsOpen')).toBeGreaterThan(events.indexOf('startMic_done'))
+    expect(events).toContain('ui:connected')
+    controller.stop({ releaseQuota: true })
+  })
+
+  it('does not fire onWsOpen when startMic fails', async () => {
+    stubFetch('lease-mic-fail')
+    const onWsOpen = vi.fn()
+
+    vi.doMock('@/lib/voice/stt-client', () => ({
+      StreamingSTT: class {
+        async start(opts: { onOpen?: () => void }) {
+          queueMicrotask(() => opts.onOpen?.())
+        }
+        stop() {}
+        sendAudio() {}
+      },
+    }))
+    vi.doMock('@/lib/voice/deepgram-circuit-breaker', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('@/lib/voice/deepgram-circuit-breaker')>()
+      return {
+        ...actual,
+        computeBackoffMs: () => 0,
+        sleepMs: async () => {},
+      }
+    })
+
+    const { DeepgramSessionController } = await import('@/lib/voice/deepgram-session-controller')
+    const controller = new DeepgramSessionController(
+      'i1',
+      { interviewId: 'i1', questionIndex: 0, phase: 'warmup' },
+      () => {},
+      {
+        onPartial: () => {},
+        onFinal: () => {},
+        onWsOpen,
+        onRefreshRestart: () => {},
+        onUiState: () => {},
+        onFatalError: () => {},
+        isMounted: () => true,
+        startMic: async () => {
+          throw new DOMException('Permission denied', 'NotAllowedError')
+        },
+        stopMic: () => {},
+        releaseAudio: async () => {},
+      },
+    )
+
+    // start() engages typed-answer fallback via onFatalError; it does not rethrow.
+    await controller.start()
+    expect(onWsOpen).not.toHaveBeenCalled()
   })
 })

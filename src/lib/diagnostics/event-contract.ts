@@ -48,6 +48,12 @@ export const DIAGNOSTIC_METADATA_KEYS = [
   'phase',
   'endpoint',
   'provider',
+  /** Browser DOMException / Error.name (e.g. NotAllowedError, TimeoutError). */
+  'error_name',
+  /** Normalized mic/STT failure kind (permission_denied, timeout, …). */
+  'error_kind',
+  /** Permissions API state when known (granted | denied | prompt). */
+  'permission_state',
 ] as const;
 
 export type DiagnosticMetadataKey = (typeof DIAGNOSTIC_METADATA_KEYS)[number];

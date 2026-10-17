@@ -334,24 +334,51 @@ export class MicCaptureCoordinator {
         reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
         return
       }
+
+      let settled = false
+      const stopOrphanStream = (stream: MediaStream, reason: string) => {
+        try {
+          stream.getTracks().forEach((track) => track.stop())
+        } catch {
+          /* best-effort */
+        }
+        micFlowLog('mic_late_stream_stopped', { reason })
+      }
+
       const timeout = setTimeout(() => {
+        if (settled) return
+        settled = true
+        signal.removeEventListener('abort', onAbort)
         reject(new DOMException(`getUserMedia timed out after ${timeoutMs}ms`, 'TimeoutError'))
       }, timeoutMs)
+
       const onAbort = () => {
+        if (settled) return
+        settled = true
         clearTimeout(timeout)
         reject(signal.reason ?? new DOMException('Aborted', 'AbortError'))
       }
       signal.addEventListener('abort', onAbort, { once: true })
+
       navigator.mediaDevices
         .getUserMedia(getMicAudioConstraints())
         .then((stream) => {
           clearTimeout(timeout)
           signal.removeEventListener('abort', onAbort)
+          // Timeout/abort already rejected this attempt — a late stream must
+          // not linger holding exclusive device access for later acquires.
+          if (settled || signal.aborted) {
+            stopOrphanStream(stream, settled ? 'timeout_or_prior_reject' : 'aborted')
+            return
+          }
+          settled = true
           resolve(stream)
         })
         .catch((err) => {
           clearTimeout(timeout)
           signal.removeEventListener('abort', onAbort)
+          if (settled) return
+          settled = true
           reject(err)
         })
     })

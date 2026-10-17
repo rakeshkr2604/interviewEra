@@ -486,7 +486,8 @@ export default function ScriptInterviewPage() {
   // Both gates: mutated synchronously; never causes renders itself.
   const thinkingGateRef = useRef({ countdownDone: false, micReady: false })
   // One-shot callback set by kickoffVoiceInput (and by "Try voice again").
-  // Fired from onWsOpen. Cleared on fatal error / new question.
+  // Fired from onWsOpen AFTER mic capture is live (not merely WS open).
+  // Cleared on fatal error / new question.
   const onMicReadyRef = useRef<(() => void) | null>(null)
   // Mirrors uiPhase for reads inside async callbacks (avoids stale closures).
   const uiPhaseRef = useRef<UIPhase>('loading')

@@ -61,6 +61,63 @@ describe('MicCaptureCoordinator failure injection', () => {
     expect(coordinator.getCoordinatorState()).toBe('idle')
   })
 
+  it('stops late getUserMedia streams that resolve after timeout', async () => {
+    vi.useFakeTimers()
+    let resolveGum!: (stream: MediaStream) => void
+    getUserMedia.mockImplementation(
+      () =>
+        new Promise<MediaStream>((resolve) => {
+          resolveGum = resolve
+        }),
+    )
+    const promise = coordinator.acquire({ owner: 'pcm', acquireTimeoutMs: 1000, maxAttempts: 1 })
+    const assertion = expect(promise).rejects.toThrow(/timed out/i)
+    await vi.advanceTimersByTimeAsync(1001)
+    await assertion
+
+    const track = makeTrack()
+    const lateStream = makeStream([track])
+    resolveGum(lateStream)
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(track.stop).toHaveBeenCalled()
+    expect(coordinator.hasActiveCapture()).toBe(false)
+    expect(coordinator.getCoordinatorState()).toBe('idle')
+    vi.useRealTimers()
+  })
+
+  it('stops late getUserMedia streams after abort/cancel', async () => {
+    let resolveGum!: (stream: MediaStream) => void
+    getUserMedia.mockImplementation(
+      () =>
+        new Promise<MediaStream>((resolve) => {
+          resolveGum = resolve
+        }),
+    )
+    const ac = new AbortController()
+    const pending = coordinator.acquire({
+      owner: 'pcm',
+      signal: ac.signal,
+      acquireTimeoutMs: 30_000,
+      maxAttempts: 1,
+    })
+    await vi.waitFor(() => {
+      expect(getUserMedia).toHaveBeenCalled()
+      expect(resolveGum).toBeTypeOf('function')
+    })
+    ac.abort()
+    await expect(pending).rejects.toThrow()
+
+    const track = makeTrack()
+    resolveGum(makeStream([track]))
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(track.stop).toHaveBeenCalled()
+    expect(coordinator.hasActiveCapture()).toBe(false)
+  })
+
   it('forceRelease clears in-flight acquire', async () => {
     getUserMedia.mockReturnValue(new Promise(() => {}))
     const pending = coordinator.acquire({ owner: 'pcm', acquireTimeoutMs: 30_000 })

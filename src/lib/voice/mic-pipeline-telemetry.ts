@@ -8,11 +8,22 @@ import {
   diagnosticTypeForMicEvent,
   emitInterviewDiagnostic,
 } from '@/lib/diagnostics/client'
+import { classifyMicStartError } from '@/lib/interview/mic-error-classification'
 import { interviewTelemetry, getInterviewTelemetryRunId } from '@/lib/telemetry/interview-telemetry'
 import type { InterviewTelemetryContext } from '@/lib/telemetry/interview-telemetry'
 import { getPlatformContext } from '@/lib/voice/lifecycle-log'
 import { micCaptureCoordinator } from '@/lib/voice/mic-capture-coordinator'
 import { getSharedInterviewAudioContext, getCaptureAudioContextStates } from '@/lib/voice/audio-gesture'
+
+function asDiagString(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const trimmed = value.trim()
+  return trimmed ? trimmed.slice(0, 80) : undefined
+}
+
+function asDiagNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
 
 export type MicPipelineTelemetryEvent =
   | 'mic_permission_requested'
@@ -205,9 +216,27 @@ export function emitMicPipelineTelemetry(
     })
 
     // Durable diagnostics (best-effort) — failure-biased subset only.
+    // Include allowlisted error classification so production rows distinguish
+    // permission / timeout / device-busy (previously stripped to phase only).
     if (critical && ctx.interviewId) {
       const diagType = diagnosticTypeForMicEvent(event)
       if (diagType) {
+        const errorName = asDiagString(payload.error_name)
+        const errorKind =
+          asDiagString(payload.error_kind) ??
+          (errorName
+            ? classifyMicStartError(
+                Object.assign(new Error(asDiagString(payload.error_message) ?? errorName), {
+                  name: errorName,
+                }),
+              ).kind
+            : undefined)
+        const retryCount =
+          asDiagNumber(payload.retry_count) ?? asDiagNumber(payload.attempt)
+        const permissionState =
+          asDiagString(payload.permission_state) ??
+          asDiagString(snapshot.permission_state)
+
         emitInterviewDiagnostic({
           interviewId: ctx.interviewId,
           eventType: diagType,
@@ -218,6 +247,10 @@ export function emitMicPipelineTelemetry(
             platform: String(payload.platform ?? ''),
             browser: String(payload.browser ?? ''),
             phase: ctx.phase,
+            ...(errorName ? { error_name: errorName } : {}),
+            ...(errorKind ? { error_kind: errorKind } : {}),
+            ...(permissionState ? { permission_state: permissionState } : {}),
+            ...(retryCount != null ? { retry_count: retryCount } : {}),
           },
         })
       }

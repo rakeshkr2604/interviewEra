@@ -371,9 +371,12 @@ export class DeepgramSessionController {
             trackDeepgramEvent('deepgram_connect_success', this.telemetryCtx, this.track, {
               attempt: attempt + 1,
             })
-            this.health.setConnectionState('connected', null)
-            this.callbacks.onUiState('connected', null)
-            this.callbacks.onWsOpen()
+            // WS open ≠ capture ready. The script page uses onWsOpen as the
+            // micReady gate that starts the answer timer — firing it here
+            // started warmup's short timer before getUserMedia finished,
+            // producing empty-transcript [TIMEOUT] abandonments.
+            this.health.setConnectionState('connecting', 'Connecting microphone…')
+            this.callbacks.onUiState('connecting', 'Connecting microphone…')
           },
           onPartial: (chunk) => {
             if (!this.callbacks.isMounted()) return
@@ -428,6 +431,14 @@ export class DeepgramSessionController {
         this.micCleanup = cleanup
 
         if (this.abortConnectAttempt(stt)) return
+
+        // Capture is live — now safe to open the answering gate / start timer.
+        this.health.setConnectionState('connected', null)
+        this.callbacks.onUiState('connected', null)
+        if (this.callbacks.isMounted() && this.stt === stt) {
+          this.callbacks.onWsOpen()
+        }
+
         this.health.markSessionStarted()
         trackDeepgramEvent('voice_session_started', this.telemetryCtx, this.track, {
           is_refresh: isRefresh,
