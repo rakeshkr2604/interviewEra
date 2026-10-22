@@ -1,6 +1,7 @@
 import {
   isElevenLabsTtsBlocked,
   markElevenLabsBlockedForHttpStatus,
+  markElevenLabsTtsBlocked,
 } from '@/lib/voice/elevenlabs-tts-gate';
 
 import type { InterviewerId } from '@/lib/config/interviewers';
@@ -94,10 +95,14 @@ export class ProsodicTTS {
 
       if (shouldFallbackToBrowser) {
         if (!isSessionAuthFailure) {
-          markElevenLabsBlockedForHttpStatus(
-            response.status,
-            parsedBody?.error ?? `TTS unavailable (${response.status})`,
-          );
+          const reason = parsedBody?.error ?? `TTS unavailable (${response.status})`;
+          // Missing server config will not heal mid-session — block ElevenLabs
+          // for the tab instead of retrying /api/tts every 60s.
+          if (response.status === 503 && parsedBody?.error === 'TTS not configured') {
+            markElevenLabsTtsBlocked(reason);
+          } else {
+            markElevenLabsBlockedForHttpStatus(response.status, reason);
+          }
         }
         console.warn(
           '[TTS] Browser speech fallback:',

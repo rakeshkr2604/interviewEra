@@ -1,8 +1,8 @@
 # Interview Engine (V2.1)
 
 > Status: CANONICAL
-> Last Verified: 2026-10-10
-> Verification Note: Partial-write reconcile + resume-duration ceiling (2026-10-10)
+> Last Verified: 2026-10-22
+> Verification Note: Answer-quality (question-echo) recovery + interviewer tone hardening (2026-10-22); prior: adaptive follow-up report/PDF fidelity; partial-write reconcile + resume-duration ceiling
 > Verification Scope: Script engine routes, tables, lifecycle + durable milestones + stale cleanup + resume discoverability + recovery emails + in-route LLM fail-closed RL/cost guards + persisted V2.1 core-question plans (first-turn generation, duplicate-safe fallback)
 > Authority: Production interview path
 
@@ -176,6 +176,7 @@ sequenceDiagram
 - Follow-ups: same LLM call (`is_follow_up: true`), max 2 per parent core, do not consume `question_count` and do not consume a planned core slot
 - Answer context recovered so ack auto-advance cannot wipe the real answer
 - Optional LLM→TTS SSE gated by `VOICE_LLM_TTS_STREAMING` (unset → JSON-only)
+- **Answer quality (deterministic, no extra LLM):** `classifyCandidateAnswer` in `src/lib/interview/answer-quality.ts` compares `last_candidate_answer` to `parent_question` (`display_question`). Near-exact question echoes trigger a canned same-topic recovery (`is_follow_up: true`, same `display_question`) instead of a content probe; a second consecutive echo (or follow-up cap) moves on. Banned praise (leading or mid-speech sentence-initial) is stripped in turn authority. Runtime context exposes `answer_quality`. Reports annotate `answerQualityKind=question_echo` and replace over-crediting one-line summaries without changing the numeric rubric. No new DB columns / migration.
 
 ### Core question plan (new V2.1 interviews)
 
@@ -206,6 +207,15 @@ Migration: `113_v21_question_plan.sql`. Applied on staging (`20261005075120`) an
 ### Scoring
 
 One LLM call: relevance / content_accuracy / communication_clarity / structure / specificity. Overall in app code. Structure = semantic arc, not keyword match. **Never return null score** — neutral fallback (Invariant #4).
+
+### Script report (web + PDF)
+
+- Built by `loadOrGenerateScriptReport` from `answer_evaluations` + `script_turns` (`src/lib/interview/script-report/`).
+- **Adaptive follow-ups** (`llm_output.is_follow_up`) are first-class `per_question` rows with `isFollowUp`, `parentTurnIndex`, `coreSequence`, and `followUpSequence`. Web and PDF group each follow-up under its parent core chronologically.
+- Answered turns without a scored evaluation appear with `evaluationStatus: 'unavailable'` — scores are never invented.
+- **Session overall / dimension averages** = equal-weight mean of **all scored answers** (core + follow-up). Follow-ups are not a separate rubric; counts are exposed as scored core vs follow-up for clarity.
+- Cached `script_interview_reports` that omit follow-up coverage are regenerated once on view (same sticky path as insufficient_data → scores-arrived).
+- PDF export (`GET /api/report/script/export-pdf`) uses the **same** report payload via `@react-pdf/renderer` (`ScriptReportPDF`). Chromium print-to-PDF was not adopted (Vercel serverless Chromium cost/auth). Fidelity is structural/section parity, not pixel-identical CSS.
 
 ### REMOVED — Legacy V1
 

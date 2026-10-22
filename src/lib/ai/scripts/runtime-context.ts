@@ -47,6 +47,11 @@ export type RuntimeContextParams = {
    * true = follow-up allowed; false = do not follow up; unknown = LLM decides.
    */
   answer_probe_needed?: boolean | 'unknown'
+  /**
+   * Deterministic answer-quality kind for the current candidate response
+   * (substantive | question_echo | explicit_uncertainty | …).
+   */
+  answer_quality?: string
   /** Most recent dedicated CQ lifecycle action, or none before CQ entry. */
   candidate_question_action?: 'none' | 'invite' | 'guidance' | 'answer' | 'follow_up'
   candidate_question_guidance_shown?: boolean
@@ -111,6 +116,10 @@ export function buildRuntimeContext(params: RuntimeContextParams): string {
     contextLine(
       'answer_probe_needed',
       `${params.answer_probe_needed ?? 'unknown'} // true = answer is weak, a same-topic probe is REQUIRED while under cap; false = answer is strong, next core/phase; unknown = decide from last_candidate_answer`,
+    ),
+    contextLine(
+      'answer_quality',
+      `${params.answer_quality ?? 'substantive'} // deterministic: question_echo / explicit_uncertainty / irrelevant / etc. Never praise non-substantive kinds`,
     ),
     contextLine(
       'candidate_question_action',

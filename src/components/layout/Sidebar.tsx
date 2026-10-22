@@ -41,127 +41,71 @@ import { performClientLogout } from '@/lib/supabase/client-logout'
 import { ThemeToggle } from './ThemeToggle'
 import { StreakCounter } from './StreakCounter'
 import { WorkspaceSwitcher } from '@/components/layout/WorkspaceSwitcher'
-import { COMMUNITY_HUB_PATH } from '@/lib/community/community'
-import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path'
 import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
+import {
+  buildDashboardNavSections,
+  DEFAULT_DASHBOARD_SECTION_EXPANDED,
+  isDashboardNavLinkItem,
+  PINNED_DASHBOARD_NAV,
+  type DashboardNavComingSoonItem,
+  type DashboardNavIconKey,
+  type DashboardNavItem,
+  type DashboardNavLinkItem,
+  type DashboardNavSection,
+} from '@/lib/layout/dashboard-nav'
 
 const SIDEBAR_EXPANDED_STORAGE_KEY = 'ie:sidebar-sections-expanded'
 const SIDEBAR_EXPANDED_EVENT = 'ie:sidebar-sections-expanded'
 
 type NavIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: string }>
 
-type NavLinkItem = {
-  kind?: 'link'
-  href: string
-  label: string
-  icon: NavIcon
-  /** Narrow active match for dashboard home only. */
-  exact?: boolean
-}
-
-type NavComingSoonItem = {
-  kind: 'comingSoon'
-  id: string
-  label: string
-  icon: NavIcon
-  toastMessage: string
-}
-
+type NavLinkItem = Omit<DashboardNavLinkItem, 'icon'> & { icon: NavIcon }
+type NavComingSoonItem = Omit<DashboardNavComingSoonItem, 'icon'> & { icon: NavIcon }
 type NavItem = NavLinkItem | NavComingSoonItem
+type NavSection = { id: string; label: string; items: NavItem[] }
 
-type NavSection = {
-  id: string
-  label: string
-  items: NavItem[]
+const NAV_ICONS: Record<DashboardNavIconKey, NavIcon> = {
+  dashboard: LayoutDashboard,
+  play: Play,
+  bookMarked: BookMarked,
+  bot: Bot,
+  fileText: FileText,
+  history: History,
+  listChecks: ListChecks,
+  scanSearch: ScanSearch,
+  star: Star,
+  sparkles: Sparkles,
+  filePenLine: FilePenLine,
+  gauge: Gauge,
+  map: Map,
+  barChart: BarChart2,
+  bell: Bell,
+  award: Award,
+  settings: Settings,
+  creditCard: CreditCard,
+  shield: Shield,
+  users: Users,
 }
 
-/** Defaults: keep daily workflow open; tuck infrequent sections. */
-const DEFAULT_SECTION_EXPANDED: Record<string, boolean> = {
-  prepare: true,
-  practice: true,
-  tools: true,
-  insights: false,
-  account: false,
-  community: false,
-}
+const DEFAULT_SECTION_EXPANDED = DEFAULT_DASHBOARD_SECTION_EXPANDED
 
 const PINNED_DASHBOARD: NavLinkItem = {
-  href: '/dashboard',
-  label: 'Dashboard',
-  icon: LayoutDashboard,
-  exact: true,
+  ...PINNED_DASHBOARD_NAV,
+  icon: NAV_ICONS[PINNED_DASHBOARD_NAV.icon],
 }
 
-function buildNavSections(canAccessCoach = false): NavSection[] {
-  const practiceItems: NavItem[] = [
-    { href: getDefaultInterviewStartPath(), label: 'Start Interview', icon: Play },
-  ]
-  if (canAccessCoach) {
-    practiceItems.push({ href: '/coach', label: 'Coach', icon: Bot })
+function mapNavItem(item: DashboardNavItem): NavItem {
+  if (isDashboardNavLinkItem(item)) {
+    return { ...item, icon: NAV_ICONS[item.icon] }
   }
-  practiceItems.push(
-    { href: '/resume', label: 'Resume', icon: FileText },
-    { href: '/history', label: 'Interview History', icon: History },
-  )
+  return { ...item, icon: NAV_ICONS[item.icon] }
+}
 
-  return [
-    {
-      id: 'prepare',
-      label: 'Prepare',
-      items: [{ href: '/prepare', label: 'Interview Prep', icon: BookMarked }],
-    },
-    {
-      id: 'practice',
-      label: 'Practice',
-      items: practiceItems,
-    },
-    {
-      id: 'tools',
-      label: 'Tools',
-      items: [
-        {
-          href: '/tools/question-generator',
-          label: 'Interview Question Generator',
-          icon: ListChecks,
-        },
-        { href: '/tools/ats-checker', label: 'ATS Resume Checker', icon: ScanSearch },
-        { href: '/tools/star-builder', label: 'STAR Answer Builder', icon: Star },
-        { href: '/tools/prompt-builder', label: 'Prompt Builder', icon: Sparkles },
-        {
-          kind: 'comingSoon',
-          id: 'resume-builder',
-          label: 'Resume Builder',
-          icon: FilePenLine,
-          toastMessage: 'Coming soon — launching next week',
-        },
-      ],
-    },
-    {
-      id: 'insights',
-      label: 'Insights',
-      items: [
-        { href: '/readiness', label: 'Readiness', icon: Gauge },
-        { href: '/roadmap', label: 'Prep Roadmap', icon: Map },
-        { href: '/analytics', label: 'Performance Analytics', icon: BarChart2 },
-        { href: '/notifications', label: 'Notifications', icon: Bell },
-      ],
-    },
-    {
-      id: 'account',
-      label: 'Account',
-      items: [
-        { href: '/profile/badges', label: 'Badges', icon: Award },
-        { href: '/settings', label: 'Settings', icon: Settings },
-        { href: '/upgrade', label: 'Pricing', icon: CreditCard },
-        { href: '/college/dashboard', label: 'Campus Admin', icon: Shield },
-      ],
-    },
-    {
-      id: 'community',
-      label: 'Community',
-      items: [{ href: COMMUNITY_HUB_PATH, label: 'Community Hub', icon: Users }],
-    },
-  ]
+function mapNavSections(sections: DashboardNavSection[]): NavSection[] {
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.map(mapNavItem),
+  }))
 }
 
 function isLinkItem(item: NavItem): item is NavLinkItem {
@@ -169,9 +113,7 @@ function isLinkItem(item: NavItem): item is NavLinkItem {
 }
 
 function isItemActive(pathname: string, item: NavLinkItem): boolean {
-  if (item.exact) {
-    return pathname === item.href
-  }
+  if (item.exact) return pathname === item.href
   return pathname === item.href || pathname.startsWith(`${item.href}/`)
 }
 
@@ -391,7 +333,7 @@ export function Sidebar({
 
   const sections = useMemo(
     () =>
-      buildNavSections(canAccessCoach).map((section) => ({
+      mapNavSections(buildDashboardNavSections(canAccessCoach)).map((section) => ({
         ...section,
         items: section.items.filter(
           (item) =>

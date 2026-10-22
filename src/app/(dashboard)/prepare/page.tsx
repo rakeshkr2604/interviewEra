@@ -26,8 +26,8 @@ export default async function PreparePage() {
         title="Interview Prep"
         subtitle={
           <>
-            Build stronger answers, understand your target role, and prepare with free guides and practical
-            tools before your next mock. Blog posts and company guides stay in the{' '}
+            Warm up with speaking sheets, then use the tools below before your next mock. More guides live in
+            the{' '}
             <Link href="/resources" className="font-semibold underline-offset-4 hover:underline">
               resource library
             </Link>

@@ -262,21 +262,32 @@ export function CoachingFeedbackPanel({
             {vm.hasStrongerExample ? (
               <section>
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                  Sample answer
+                  Stronger version of your answer
                 </p>
                 <p className="mb-2 text-[11px] text-(--text-muted)">
-                  A 10/10 rewrite of your answer — adapt it, don&apos;t memorize.
+                  A clearer rewrite of what you said — practice with it; don&apos;t memorize.
                 </p>
                 <div className="min-h-[7.5rem] rounded-xl border border-(--card-border)/70 bg-(--bg-secondary)/50 p-3">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-(--text-primary) sm:text-[15px]">
                     {vm.sampleAnswerParagraphs.join('\n\n')}
                   </p>
                 </div>
+                {vm.strongerExampleNote ? (
+                  <p className="mt-2 text-[11px] leading-snug text-(--text-muted)">
+                    {vm.strongerExampleNote}
+                  </p>
+                ) : null}
               </section>
             ) : null}
 
             {vm.quickTip ? (
-              <section>
+              <section
+                className={
+                  vm.hasStrongerExample
+                    ? 'border-t border-(--card-border) pt-5'
+                    : undefined
+                }
+              >
                 <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
                   Quick tip
                 </p>

@@ -1,7 +1,7 @@
 # AI Pipelines
 
 > Status: CANONICAL
-> Last Verified: 2026-09-27
+> Last Verified: 2026-10-22
 > Verification Scope: OpenRouter routing, eval, report (code + prior AI_PIPELINE)
 > Authority: LLM and scoring pipelines (interview path detail → INTERVIEW_ENGINE)
 
@@ -30,12 +30,14 @@ LLM provider routing, evaluation principles, and report generation. Resume extra
 ### Reports
 
 - Script reports: `script_interview_reports` + generate/aggregate under `src/lib/interview/script-report/`
-- PDF: `@react-pdf/renderer`, Pro/Campus gated
+- `per_question` includes core + adaptive follow-up turns (parent linkage + evaluation availability); session score still averages all scored answers equally
+- PDF: same canonical payload via `@react-pdf/renderer` (`ScriptReportPDF`), Pro/Campus gated — not browser print-to-PDF
 - Insights: deterministic (`insight-engine`) — no extra LLM
 
 ## Architecture / Rules
 
 - Prompts: versioned fragments (`prompt-registry`), not a templating engine
+- Script interviewer tone: SCRIPT_H/T/M forbid unjustified praise; turn authority strips banned praise prefixes; question-echo recovery is deterministic (`answer-quality.ts`) — no extra model call per turn
 - Cost: `llm-cost-guard`
 - Shared wrapper: `chat-completion-core.completionWithRetries`
 

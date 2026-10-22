@@ -1,0 +1,137 @@
+/* Speaking-practice PDF carousel — InterviewEra prepare shelf */
+
+.speaking-pdf-carousel {
+  --speaking-pdf-gap: 1rem;
+  --speaking-pdf-card-width: min(18.5rem, calc(100vw - 4.5rem));
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  border: 2px solid var(--card-border);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--accent-primary) 7%, transparent),
+      transparent 42%
+    ),
+    color-mix(in srgb, var(--card-bg) 96%, transparent);
+  box-shadow: var(--card-shadow);
+}
+
+@media (min-width: 640px) {
+  .speaking-pdf-carousel {
+    --speaking-pdf-card-width: 19.5rem;
+    --speaking-pdf-gap: 1.125rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .speaking-pdf-carousel {
+    --speaking-pdf-card-width: 21rem;
+    --speaking-pdf-gap: 1.25rem;
+  }
+}
+
+.speaking-pdf-carousel__viewport {
+  overflow: hidden;
+  width: 100%;
+  padding: 1.25rem 0 1rem;
+  cursor: grab;
+  touch-action: pan-y;
+  -webkit-mask-image: linear-gradient(
+    90deg,
+    transparent,
+    #000 3%,
+    #000 97%,
+    transparent
+  );
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+
+.speaking-pdf-carousel__viewport:active {
+  cursor: grabbing;
+}
+
+.speaking-pdf-carousel__track {
+  display: flex;
+  width: max-content;
+  gap: var(--speaking-pdf-gap);
+  padding-inline: 1.25rem;
+  will-change: transform;
+  transform: translate3d(calc(var(--speaking-pdf-offset, 0px) * -1), 0, 0);
+}
+
+.speaking-pdf-carousel__group {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--speaking-pdf-gap);
+}
+
+.speaking-pdf-carousel__card {
+  flex: 0 0 var(--speaking-pdf-card-width);
+  width: var(--speaking-pdf-card-width);
+  max-width: var(--speaking-pdf-card-width);
+}
+
+.speaking-pdf-carousel--static .speaking-pdf-carousel__viewport {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x mandatory;
+  -webkit-mask-image: none;
+  mask-image: none;
+  cursor: default;
+}
+
+.speaking-pdf-carousel--static .speaking-pdf-carousel__track {
+  will-change: auto;
+  transform: none;
+}
+
+.speaking-pdf-carousel--static .speaking-pdf-carousel__card {
+  scroll-snap-align: start;
+}
+
+.speaking-pdf-carousel__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0 1rem 1.125rem;
+}
+
+.speaking-pdf-carousel__control {
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.75rem;
+  border: 2px solid var(--card-border);
+  background: color-mix(in srgb, var(--card-bg) 92%, transparent);
+  color: var(--text-primary);
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.speaking-pdf-carousel__control:hover {
+  border-color: color-mix(in srgb, var(--accent-primary) 45%, var(--card-border));
+  background: color-mix(in srgb, var(--accent-primary) 10%, transparent);
+  color: var(--accent-primary);
+}
+
+.speaking-pdf-carousel__control[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--accent-primary) 55%, var(--card-border));
+  background: color-mix(in srgb, var(--accent-primary) 14%, transparent);
+  color: var(--accent-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .speaking-pdf-carousel__track {
+    will-change: auto;
+  }
+}

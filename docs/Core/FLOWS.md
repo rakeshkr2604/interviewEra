@@ -62,8 +62,8 @@ Legacy `/report/[id]` may open **old V1 rows**. New completions use script repor
 
 ### E. Free preparation, then a mock
 
-1. Logged-in `/prepare` (sidebar **Interview Prep**): prompt builder entry, HR frameworks, assessment guide, readiness checklist. The same prompt builder is also a daily tool at public `/tools/prompt-builder` (sidebar **Tools** and the marketing tools menu). The public `/resources` page stays the blog and guide library
-2. Prompt text is generated in the browser. It is not stored and does not start an interview or spend a credit. Speaking PDFs are listed at the top of `/prepare` with in-page view and download. Files stay at `/resources/guides/`
+1. Logged-in `/prepare` (sidebar **Practice → Interview Prep**): prompt builder entry, HR frameworks, assessment guide, readiness checklist. The same prompt builder is also a daily tool at public `/tools/prompt-builder` (sidebar **Tools** and the marketing tools menu). The public `/resources` page stays the blog and guide library
+2. Prompt text is generated in the browser. It is not stored and does not start an interview or spend a credit. Speaking PDFs appear at the top of `/prepare` in a horizontal carousel (in-page view + download). Files stay at `/resources/guides/`
 3. "Start a focused mock interview" goes to `/interview/script/start` (optional existing `mode` query only). Logged-out visitors hit the normal login gate. The start page still requires the usual setup before `POST /api/interview/script/start`
 4. New accounts include the free credit allotment in `FREE_PLAN`. Paid plans stay on `/pricing`
 

@@ -79,6 +79,15 @@ import {
 } from '@/lib/interview/candidate-questions/guidance';
 import { buildCandidateQuestionConversation } from '@/lib/interview/candidate-questions/context';
 import { turnRequestSchema } from '@/lib/interview/script-turn-request-schema';
+import {
+  isSkipAnswer,
+  skipsUsedAfterAnswer,
+} from '@/lib/interview/skip-accounting';
+import {
+  buildAnswerQualityDirective,
+  classifyCandidateAnswer,
+  countConsecutiveQuestionEchoes,
+} from '@/lib/interview/answer-quality';
 
 const SPECIAL_VALUES = ['[NONE]', '[SKIPPED]', '[TIMEOUT]'] as const;
 
@@ -135,9 +144,10 @@ function turnResponse(
   turnIndex: number,
   interviewId: string,
   questionNumber: number,
+  skipsUsed: number,
 ): NextResponse {
   return NextResponse.json(
-    { turn, turnIndex, interviewId, questionNumber },
+    { turn, turnIndex, interviewId, questionNumber, skipsUsed },
     { status: 200 },
   );
 }
@@ -222,6 +232,14 @@ export async function POST(request: Request): Promise<NextResponse> {
       console.error(`[interview/script/turn] interview load failed (interviewId=${interviewId}):`, interviewError);
       return NextResponse.json({ error: 'Failed to load interview' }, { status: 500 });
     }
+
+    // Post-answer skip budget for this request (DB write happens later).
+    // Must feed runtime context + allow_skip authority so the next turn does
+    // not lag one skip behind the counter the candidate just consumed.
+    const skipsUsedForSession = skipsUsedAfterAnswer(interview.skips_used, lastAnswer);
+    const skipExtraUpdate = isSkipAnswer(lastAnswer)
+      ? { skips_used: skipsUsedForSession }
+      : {};
 
     // follow_up_enabled may be missing on rows created before the migration lands —
     // treat undefined as true (matches column DEFAULT).
@@ -346,7 +364,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         const coresBefore = countCoreQuestions(beforeRows);
         const questionNumber = displayQuestionNumberAfterTurn(coresBefore, turnForResponse);
 
-        return turnResponse(turnForResponse, resumeTurnIndex, interviewId, questionNumber);
+        return turnResponse(
+          turnForResponse,
+          resumeTurnIndex,
+          interviewId,
+          questionNumber,
+          interview.skips_used,
+        );
       }
       // Row missing despite advanced index — fall through to normal generation
       // (unique constraint still protects concurrent duplicates).
@@ -437,9 +461,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         performanceBucket: 'average',
         extraInterviewUpdate: {
           ...(extraInterviewUpdate ?? {}),
-          ...(lastAnswer === '[SKIPPED]'
-            ? { skips_used: interview.skips_used + 1 }
-            : {}),
+          ...skipExtraUpdate,
         },
       });
 
@@ -447,7 +469,13 @@ export async function POST(request: Request): Promise<NextResponse> {
         return NextResponse.json({ error: 'Failed to complete interview' }, { status: 500 });
       }
 
-      return turnResponse(closing, newTurnIndex, interviewId, coreQuestionsAsked);
+      return turnResponse(
+        closing,
+        newTurnIndex,
+        interviewId,
+        coreQuestionsAsked,
+        skipsUsedForSession,
+      );
     };
 
     /** Persist a canned non-closing turn (core entry / reserved CQ) without completing. */
@@ -480,7 +508,10 @@ export async function POST(request: Request): Promise<NextResponse> {
       } else {
         const { error: interviewUpdateError } = await serviceClient
           .from('interviews')
-          .update({ current_turn_index: newTurnIndex })
+          .update({
+            current_turn_index: newTurnIndex,
+            ...skipExtraUpdate,
+          })
           .eq('id', interviewId);
         if (interviewUpdateError) {
           console.error(
@@ -512,6 +543,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                   turnIndex: newTurnIndex,
                   interviewId,
                   questionNumber,
+                  skipsUsed: skipsUsedForSession,
                 }),
               ),
             );
@@ -526,7 +558,13 @@ export async function POST(request: Request): Promise<NextResponse> {
           },
         });
       }
-      return turnResponse(canned, newTurnIndex, interviewId, questionNumber);
+      return turnResponse(
+        canned,
+        newTurnIndex,
+        interviewId,
+        questionNumber,
+        skipsUsedForSession,
+      );
     };
 
     // STEP 2b — hard turn cap (no LLM call). Never skip candidate_questions
@@ -641,6 +679,21 @@ export async function POST(request: Request): Promise<NextResponse> {
       }
     }
 
+    const answerQuality = classifyCandidateAnswer({
+      answer: followUpCtx.last_candidate_answer || lastAnswer,
+      question: followUpCtx.parent_question,
+    });
+    const consecutiveQuestionEchoes = countConsecutiveQuestionEchoes({
+      turns: allTurns,
+      currentQuestion: followUpCtx.parent_question,
+      currentAnswer: followUpCtx.last_candidate_answer || lastAnswer,
+    });
+    const answerQualityDirective = buildAnswerQualityDirective({
+      quality: answerQuality,
+      consecutiveEchoes: consecutiveQuestionEchoes,
+      parentQuestion: followUpCtx.parent_question,
+    });
+
     const promptPhase = resolvePromptPhase(
       currentPhase,
       coreQuestionsAsked,
@@ -719,11 +772,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       hasValidParentCoreQuestion: followUpCtx.has_valid_parent_core_question,
       answerProbeNeeded,
       lastAnswer,
+      answerQuality,
     });
     const expectNewCore =
       questionPlan !== null &&
       currentPhase === 'core' &&
       !coreProbeRequired &&
+      !answerQualityDirective &&
       coreQuestionsAsked < interview.question_count &&
       (followUpsThisQuestion >= maxFollowUpsPerQuestion ||
         answerProbeNeeded === false ||
@@ -758,7 +813,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       current_phase: promptPhase,
       question_number: coreQuestionsAsked,
       total_questions: interview.question_count,
-      skips_used: interview.skips_used,
+      skips_used: skipsUsedForSession,
       max_skips: interview.max_skips,
       last_answer: followUpCtx.last_answer_for_prompt,
       multilingual_detected: multilingualDetected,
@@ -783,6 +838,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         interview.script_type === 'SCRIPT_M' ? interview.last_question_type : undefined,
       follow_up_cap_reached: followUpEnabled && followUpsThisQuestion >= maxFollowUpsPerQuestion,
       answer_probe_needed: answerProbeNeeded,
+      answer_quality: answerQuality.kind,
       candidate_question_action: lastCandidateQuestionAction(allTurns) ?? 'none',
       candidate_question_guidance_shown: candidateQuestionGuidanceTurns > 0,
       candidate_question_follow_ups: candidateQuestionFollowUps,
@@ -841,6 +897,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       hasValidParentCoreQuestion: followUpCtx.has_valid_parent_core_question,
       answerProbeNeeded,
       lastAnswer,
+      answerQuality,
     });
     const probeRequiredDirective = probeRequired
       ? `\n\nFOLLOW-UP REQUIRED (answer_probe_needed=true). The scored answer to parent_question is still weak, so the probe is mandatory, not optional. Set is_follow_up: true and is_question: true, keep phase "core", and ask ONE same-topic follow-up on parent_question targeting the gap in last_candidate_answer. Do NOT ask a new core question, do NOT move on, and do NOT change phase. Follow-ups used: ${followUpsThisQuestion}/${maxFollowUpsPerQuestion}.`
@@ -860,18 +917,22 @@ export async function POST(request: Request): Promise<NextResponse> {
         ? `\n\nCANDIDATE-QUESTION PHASE: Answer the candidate directly in 2-3 sentences. Do not invent company facts. Set candidate_question_action="answer" and is_question=false unless one precise clarification is genuinely required to answer usefully. Only then set candidate_question_action="follow_up", is_question=true. CQ follow-ups used: ${candidateQuestionFollowUps}/${MAX_CANDIDATE_QUESTION_FOLLOW_UPS}. This is a maximum, not a quota.`
         : '';
 
+    // Answer-quality recovery (echo / off-topic / uncertainty) wins over the
+    // score-based probe/move-on user-message shortcuts; authority still clamps.
     const userMessage =
       lastAnswer === '[NONE]'
         ? `Begin the interview.${alreadyAskedBlock}`
-        : capReached
-          ? `Ask the next new core question now.${alreadyAskedBlock}${capDirective}`
-          : probeNotNeeded
-            ? `Ask the next new core question now.${alreadyAskedBlock}${probeDirective}`
-            : probeRequired
-              ? `Ask the required same-topic follow-up now.${alreadyAskedBlock}${probeRequiredDirective}`
-              : continuation
-              ? `${continuation.instruction}${alreadyAskedBlock}${continuation.directive}`
-              : `${followUpCtx.last_answer_for_prompt}${alreadyAskedBlock}${candidateQuestionDirective}`;
+        : answerQualityDirective
+          ? `${followUpCtx.last_answer_for_prompt}${alreadyAskedBlock}${answerQualityDirective}`
+          : capReached
+            ? `Ask the next new core question now.${alreadyAskedBlock}${capDirective}`
+            : probeNotNeeded
+              ? `Ask the next new core question now.${alreadyAskedBlock}${probeDirective}`
+              : probeRequired
+                ? `Ask the required same-topic follow-up now.${alreadyAskedBlock}${probeRequiredDirective}`
+                : continuation
+                  ? `${continuation.instruction}${alreadyAskedBlock}${continuation.directive}`
+                  : `${followUpCtx.last_answer_for_prompt}${alreadyAskedBlock}${candidateQuestionDirective}`;
 
     const userMessageWithPlan =
       assignedCore
@@ -888,6 +949,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       turn: ScriptTurnOutput;
       turnIndex: number;
       questionNumber: number;
+      skipsUsed: number;
     };
     type TurnErr = { ok: false; status: number; body: Record<string, unknown> };
 
@@ -941,6 +1003,10 @@ export async function POST(request: Request): Promise<NextResponse> {
         selfIntroTurns: selfIntroTurnsCount,
         answerProbeNeeded,
         previousTurnWasAcknowledgment: followUpCtx.previous_turn_was_acknowledgment,
+        skipsUsed: skipsUsedForSession,
+        maxSkips: interview.max_skips,
+        answerQuality,
+        consecutiveQuestionEchoes,
       });
 
       const coreBinding = bindPlannedCoreQuestion({
@@ -1061,9 +1127,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             !validated.is_follow_up
               ? { last_question_type: validated.question_type }
               : {}),
-            ...(!reusedExistingTurn && lastAnswer === '[SKIPPED]'
-              ? { skips_used: interview.skips_used + 1 }
-              : {}),
+            ...(!reusedExistingTurn ? skipExtraUpdate : {}),
           },
         });
         if (!completeResult.ok) {
@@ -1081,8 +1145,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         ) {
           interviewUpdate.last_question_type = validated.question_type;
         }
-        if (!reusedExistingTurn && lastAnswer === '[SKIPPED]') {
-          interviewUpdate.skips_used = interview.skips_used + 1;
+        if (!reusedExistingTurn && isSkipAnswer(lastAnswer)) {
+          interviewUpdate.skips_used = skipsUsedForSession;
         }
 
         const { error: interviewUpdateError } = await serviceClient
@@ -1103,6 +1167,8 @@ export async function POST(request: Request): Promise<NextResponse> {
         questionNumber: reusedExistingTurn
           ? displayQuestionNumberAfterTurn(coreQuestionsAsked, turnForResponse)
           : questionNumberForClient,
+        // Reused turns already persisted the skip — report DB value, not +1 again.
+        skipsUsed: reusedExistingTurn ? interview.skips_used : skipsUsedForSession,
       };
     };
 
@@ -1179,6 +1245,7 @@ export async function POST(request: Request): Promise<NextResponse> {
               turnIndex: finalized.turnIndex,
               interviewId,
               questionNumber: finalized.questionNumber,
+              skipsUsed: finalized.skipsUsed,
             });
             controller.close();
           } catch (llmError) {
@@ -1251,6 +1318,7 @@ export async function POST(request: Request): Promise<NextResponse> {
         finalized.turnIndex,
         interviewId,
         finalized.questionNumber,
+        finalized.skipsUsed,
       );
     } finally {
       if (!costCommitted) {

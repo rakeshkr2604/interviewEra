@@ -22,7 +22,10 @@ function pickVoice(voice: TTSOptions['voice']): SpeechSynthesisVoice | null {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null
   const voices = window.speechSynthesis.getVoices()
   if (voices.length === 0) return null
-  const interviewer = getInterviewerById(voice === 'female' ? 'priya' : 'arjun')
+  const interviewer =
+    voice === 'female' || voice === 'male'
+      ? getInterviewerById(voice === 'female' ? 'priya' : 'arjun')
+      : getInterviewerById(voice as InterviewerId)
   if (interviewer) {
     return resolveVoiceForInterviewer(voices, interviewer)
   }
@@ -141,7 +144,11 @@ export function createBrowserSpeechFallbackForInterviewer(
     speak(text, options, signal) {
       const interviewer = getInterviewerById(interviewerId)
       const voiceOpt: TTSOptions['voice'] =
-        interviewer?.gender === 'male' ? 'male' : options.voice
+        interviewer?.gender === 'male'
+          ? 'male'
+          : interviewer?.gender === 'female'
+            ? 'female'
+            : options.voice
       return base.speak(text, { ...options, voice: voiceOpt }, signal)
     },
   }

@@ -170,6 +170,30 @@ describe('turn-authority overrides', () => {
     lastAnswer: 'Here is my answer about the topic in enough detail.',
   }
 
+  it('forces allow_skip false when session skip budget is exhausted', () => {
+    const result = applyTurnAuthorityOverrides({
+      turn: baseTurn({ allow_skip: true }),
+      coreQuestionsAsked: 1,
+      totalQuestions: 6,
+      ...baseOpts,
+      skipsUsed: 2,
+      maxSkips: 2,
+    })
+    expect(result.allow_skip).toBe(false)
+  })
+
+  it('keeps allow_skip when skip budget remains', () => {
+    const result = applyTurnAuthorityOverrides({
+      turn: baseTurn({ allow_skip: true }),
+      coreQuestionsAsked: 1,
+      totalQuestions: 6,
+      ...baseOpts,
+      skipsUsed: 1,
+      maxSkips: 2,
+    })
+    expect(result.allow_skip).toBe(true)
+  })
+
   it('forces candidate_questions when core budget exhausted', () => {
     const result = applyTurnAuthorityOverrides({
       turn: baseTurn(),

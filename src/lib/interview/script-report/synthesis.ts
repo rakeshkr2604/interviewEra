@@ -294,15 +294,17 @@ export function buildScriptReportSynthesisUserPrompt(args: {
     .join('\n');
 
   const questionBrief = aggregate.perQuestion
+    .filter((q) => q.dimensions != null && q.overall != null)
     .slice(0, 12)
     .map((q) => {
+      const kind = q.isFollowUp ? 'follow-up' : 'core';
       const notes = (
-        Object.entries(q.dimensions) as [DimensionKey, { score: number; note?: string }][]
+        Object.entries(q.dimensions!) as [DimensionKey, { score: number; note?: string }][]
       )
         .map(([k, d]) => `    ${k}=${d.score}${d.note ? ` (${d.note.slice(0, 120)})` : ''}`)
         .join('\n');
       return [
-        `Q${q.turnIndex} [${q.questionType}] overall=${q.overall} suspect=${q.scoreSuspect}`,
+        `Q${q.turnIndex} [${q.questionType}] [${kind}] overall=${q.overall} suspect=${q.scoreSuspect}`,
         `  question: ${q.question.slice(0, 220)}`,
         `  answer excerpt: ${q.transcript.slice(0, 280)}`,
         `  summary: ${q.oneLineSummary ?? '(none)'}`,

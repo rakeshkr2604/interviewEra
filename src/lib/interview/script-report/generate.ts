@@ -5,17 +5,24 @@
  * interview_id). Losers wait for the claim to finish instead of dual LLM calls.
  */
 
-import { z } from 'zod';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { completeInterviewChat } from '@/lib/ai/interview-completion';
 import { reserveScriptLlmCost } from '@/lib/interview/script-llm-guards';
-import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
+import type { DimensionKey } from '@/lib/interview/answer-score/rubric';
 import {
   aggregateScriptAnswers,
   type AggregatedScriptReport,
   type PerQuestionReportRow,
-  type ScoredAnswerInput,
 } from '@/lib/interview/script-report/aggregate';
+import {
+  annotateCoreFollowUpHierarchy,
+  buildPerQuestionReportRows,
+  buildScoredAnswerInputs,
+  normalizePerQuestionRow,
+  reportLacksFollowUpCoverage,
+  type EvalRowForReport,
+  type ScriptTurnForReport,
+} from '@/lib/interview/script-report/per-question';
 import {
   SCRIPT_REPORT_SYNTHESIS_VERSION,
   buildDeterministicSynthesis,
@@ -33,29 +40,6 @@ const GENERATING_STALE_MS = 90_000;
 /** How long a concurrent waiter polls for the claim owner to finish. */
 const WAIT_FOR_CLAIM_MS = 55_000;
 const WAIT_POLL_MS = 750;
-
-const dimensionStoredSchema = z.object({
-  score: z.number(),
-  note: z.string().optional(),
-});
-
-type EvalRow = {
-  turn_index: number;
-  question: string;
-  transcript: string;
-  question_type: 'technical' | 'behavioral';
-  overall: number | string | null;
-  dimensions: unknown;
-  prompt_version: string;
-  score_suspect: boolean | null;
-  status: string;
-  raw_model_output: string | null;
-};
-
-type TurnRow = {
-  turn_index: number;
-  structured_answer: unknown;
-};
 
 export type ScriptReportStatus =
   | 'generating'
@@ -89,44 +73,6 @@ const TERMINAL_STATUSES = new Set<ScriptReportStatus>([
   'failed',
 ]);
 
-function parseOneLineSummary(raw: string | null): string | null {
-  if (!raw) return null;
-  try {
-    const first = raw.split('\n---RETRY---\n')[0] ?? raw;
-    const start = first.indexOf('{');
-    const end = first.lastIndexOf('}');
-    if (start === -1 || end <= start) return null;
-    const parsed = JSON.parse(first.slice(start, end + 1)) as { one_line_summary?: unknown };
-    return typeof parsed.one_line_summary === 'string' ? parsed.one_line_summary : null;
-  } catch {
-    return null;
-  }
-}
-
-function extractModelAnswerLines(structured: unknown): string[] {
-  if (!structured || typeof structured !== 'object') return [];
-  const coaching = (structured as { coaching_reference?: { restructured_example?: unknown } })
-    .coaching_reference;
-  const lines = coaching?.restructured_example;
-  if (!Array.isArray(lines)) return [];
-  return toSampleAnswerParagraphs(
-    lines.filter((l): l is string => typeof l === 'string'),
-  ).slice(0, 6);
-}
-
-function parseDimensions(
-  raw: unknown,
-): Record<DimensionKey, { score: number; note?: string }> | null {
-  if (!raw || typeof raw !== 'object') return null;
-  const out = {} as Record<DimensionKey, { score: number; note?: string }>;
-  for (const key of DIMENSION_KEYS) {
-    const parsed = dimensionStoredSchema.safeParse((raw as Record<string, unknown>)[key]);
-    if (!parsed.success) return null;
-    out[key] = parsed.data;
-  }
-  return out;
-}
-
 function parseLlmJson(content: string): unknown {
   try {
     return JSON.parse(content);
@@ -155,7 +101,11 @@ function mapRow(existing: Record<string, unknown>): ScriptInterviewReportRecord 
     placement_signal: (existing.placement_signal as string | null) ?? null,
     scored_answer_count: Number(existing.scored_answer_count ?? 0),
     prompt_versions: (existing.prompt_versions as string[]) ?? [],
-    per_question: (existing.per_question ?? []) as PerQuestionReportRow[],
+    per_question: Array.isArray(existing.per_question)
+      ? (existing.per_question as unknown[])
+          .map(normalizePerQuestionRow)
+          .filter((r): r is PerQuestionReportRow => r != null)
+      : [],
     synthesis,
     synthesis_model: (existing.synthesis_model as string | null) ?? null,
     synthesis_prompt_version:
@@ -416,7 +366,11 @@ async function runSynthesis(args: {
   }
 
   const missingModelAnswerTurnIndexes = args.aggregate.perQuestion
-    .filter((q) => q.modelAnswerLines.length === 0)
+    .filter(
+      (q) =>
+        (q.evaluationStatus ?? 'scored') === 'scored' &&
+        q.modelAnswerLines.length === 0,
+    )
     .map((q) => q.turnIndex);
 
   const systemPrompt = buildScriptReportSynthesisSystemPrompt();
@@ -484,18 +438,54 @@ async function runSynthesis(args: {
 }
 
 function mergeModelAnswers(
-  aggregate: Extract<AggregatedScriptReport, { kind: 'scored' }>,
+  perQuestion: PerQuestionReportRow[],
   synthesis: ScriptReportSynthesis,
 ): PerQuestionReportRow[] {
   const fillByTurn = new Map(
     (synthesis.model_answer_fillins ?? []).map((f) => [f.turn_index, f.lines]),
   );
-  return aggregate.perQuestion.map((q) => {
+  return perQuestion.map((q) => {
     if (q.modelAnswerLines.length > 0) return q;
     const fill = fillByTurn.get(q.turnIndex);
     if (!fill?.length) return q;
     return { ...q, modelAnswerLines: toSampleAnswerParagraphs(fill).slice(0, 6) };
   });
+}
+
+async function loadTurnsAndEvals(
+  serviceClient: SupabaseClient,
+  interviewId: string,
+): Promise<
+  | { ok: true; turns: ScriptTurnForReport[]; evals: EvalRowForReport[] }
+  | { ok: false; error: unknown }
+> {
+  const [{ data: evals, error: evalError }, { data: turns, error: turnError }] =
+    await Promise.all([
+      serviceClient
+        .from('answer_evaluations')
+        .select(
+          'turn_index, question, transcript, question_type, overall, dimensions, prompt_version, score_suspect, status, raw_model_output',
+        )
+        .eq('interview_id', interviewId)
+        .order('turn_index', { ascending: true }),
+      serviceClient
+        .from('script_turns')
+        .select(
+          'turn_index, phase, is_question, llm_output, answer_text, question_type, structured_answer',
+        )
+        .eq('interview_id', interviewId)
+        .order('turn_index', { ascending: true }),
+    ]);
+
+  if (evalError || turnError) {
+    return { ok: false, error: evalError ?? turnError };
+  }
+
+  return {
+    ok: true,
+    turns: (turns ?? []) as ScriptTurnForReport[],
+    evals: (evals ?? []) as EvalRowForReport[],
+  };
 }
 
 async function buildAndPersistReport(args: {
@@ -507,23 +497,10 @@ async function buildAndPersistReport(args: {
 }): Promise<ScriptInterviewReportRecord> {
   const { serviceClient, interviewId, userId, role, scriptType } = args;
 
-  const [{ data: evals, error: evalError }, { data: turns, error: turnError }] = await Promise.all([
-    serviceClient
-      .from('answer_evaluations')
-      .select(
-        'turn_index, question, transcript, question_type, overall, dimensions, prompt_version, score_suspect, status, raw_model_output',
-      )
-      .eq('interview_id', interviewId)
-      .eq('status', 'scored')
-      .order('turn_index', { ascending: true }),
-    serviceClient
-      .from('script_turns')
-      .select('turn_index, structured_answer')
-      .eq('interview_id', interviewId),
-  ]);
+  const loaded = await loadTurnsAndEvals(serviceClient, interviewId);
 
-  if (evalError || turnError) {
-    console.error('[script-report] eval/turn load failed:', evalError ?? turnError);
+  if (!loaded.ok) {
+    console.error('[script-report] eval/turn load failed:', loaded.error);
     const failedPayload = {
       interview_id: interviewId,
       user_id: userId,
@@ -558,28 +535,9 @@ async function buildAndPersistReport(args: {
     };
   }
 
-  const turnByIndex = new Map<number, TurnRow>(
-    ((turns ?? []) as TurnRow[]).map((t) => [t.turn_index, t]),
-  );
-
-  const scoredInputs: ScoredAnswerInput[] = [];
-  for (const row of (evals ?? []) as EvalRow[]) {
-    const dims = parseDimensions(row.dimensions);
-    if (!dims || row.overall == null) continue;
-    const turn = turnByIndex.get(row.turn_index);
-    scoredInputs.push({
-      turnIndex: row.turn_index,
-      question: row.question,
-      transcript: row.transcript,
-      questionType: row.question_type,
-      overall: Number(row.overall),
-      dimensions: dims,
-      promptVersion: row.prompt_version,
-      scoreSuspect: Boolean(row.score_suspect),
-      oneLineSummary: parseOneLineSummary(row.raw_model_output),
-      modelAnswerLines: extractModelAnswerLines(turn?.structured_answer),
-    });
-  }
+  const annotated = annotateCoreFollowUpHierarchy(loaded.turns);
+  const scoredInputs = buildScoredAnswerInputs(annotated, loaded.evals);
+  const displayPerQuestion = buildPerQuestionReportRows(annotated, loaded.evals);
 
   const aggregate = aggregateScriptAnswers(scoredInputs);
 
@@ -690,7 +648,9 @@ async function buildAndPersistReport(args: {
     }
   }
 
-  const perQuestion = mergeModelAnswers(aggregate, synthesis);
+  // Persist the full display list (cores + follow-ups, including unscored).
+  // Session overall/dimension averages remain from scoredInputs only.
+  const perQuestion = mergeModelAnswers(displayPerQuestion, synthesis);
   const status: ScriptReportStatus = usedLlm ? 'ready' : 'partial';
 
   const synthesisWithMeta = {
@@ -833,6 +793,35 @@ export async function loadOrGenerateScriptReport(args: {
           });
         }
       }
+
+      // Cached reports generated before follow-up metadata must rebuild so
+      // adaptive follow-ups appear under their parent cores. Session scores
+      // are recomputed with the same scored-answer set (no rubric change).
+      if (
+        !forceRegenerate &&
+        (claim.report.status === 'ready' || claim.report.status === 'partial')
+      ) {
+        const coverage = await loadTurnsAndEvals(serviceClient, interviewId);
+        if (
+          coverage.ok &&
+          reportLacksFollowUpCoverage({
+            perQuestion: claim.report.per_question,
+            turns: coverage.turns,
+            evals: coverage.evals,
+          })
+        ) {
+          console.info('[script-report] regenerating report for follow-up coverage', {
+            interviewId,
+            priorStatus: claim.report.status,
+            priorPerQuestion: claim.report.per_question.length,
+          });
+          return loadOrGenerateScriptReport({
+            ...args,
+            forceRegenerate: true,
+          });
+        }
+      }
+
       maybeQueueOwedCompletionEmail({
         skipOwedCompletionEmail,
         serviceClient,

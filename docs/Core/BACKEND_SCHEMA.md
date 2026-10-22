@@ -1,7 +1,7 @@
 # Backend Schema
 
 > Status: CANONICAL
-> Last Verified: 2026-10-13
+> Last Verified: 2026-10-22
 > Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC + V2.1 question-plan columns on questions + dashboard perf indexes / RLS init-plan (116)
 > Authority: Schema overview for agents (migrations remain legal SoT)
 
@@ -25,10 +25,10 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 | Table | Notes |
 |---|---|
 | `interviews` | `engine='v2.1'` + script columns; one-active partial unique index; recovery composite `idx_interviews_user_engine_status_started` (migration 116, apply staging-first) |
-| `script_turns` | turn_index, question/answer, follow-up flags, structure fields; `answered_at` (migration 115) = candidate submit moment for retention duration |
+| `script_turns` | turn_index, question/answer, follow-up flags in `llm_output.is_follow_up`, structure fields; `answered_at` (migration 115) = candidate submit moment for retention duration. Follow-ups are **not** separate tables — same row set as cores. |
 | `questions` | Shared with V1. V2.1 core plans use nullable `question_type`, `difficulty`, `source`, `plan_status` (`planned`/`asked`/`skipped`), `grounding`. `plan_status` NULL means a legacy V1 row. Partial unique index on `(interview_id, order_index)` only where `plan_status` is set. Migration 113. |
-| `answer_evaluations` | per-answer scores |
-| `script_interview_reports` | completion reports |
+| `answer_evaluations` | per-answer scores keyed by `(interview_id, turn_index)` — cores and follow-ups share this table |
+| `script_interview_reports` | completion reports; `per_question` JSONB holds display rows (including follow-up metadata). No schema migration required for follow-up reporting — application contract only. |
 | `resume_interview_snapshots` | resume freeze at interview |
 | `abandon_stale_active_interviews()` | service-role RPC (migration 109 replaces return type); returns `(interview_id, user_id)` per transitioned stale V2.1 active row; 45m last-activity; stale predicate re-checked on UPDATE; no credit change; no `product_events` write in SQL |
 

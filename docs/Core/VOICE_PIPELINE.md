@@ -19,7 +19,7 @@ STT/TTS architecture, mic ownership rules, and verification rituals.
 | Mic PCM | `useMicrophone` → `pcm-capture-graph` via `micCaptureCoordinator` |
 | STT | `DeepgramSessionController` + `stt-client` (`StreamingSTT`) → `/api/stt/*` |
 | Diagnostics | Mic/STT failures → `emitInterviewDiagnostic` → `POST /api/interview/diagnostics`; TTS request vs playback failures classified on `onPlaybackFailed`; STT session release → `logSTTSession` → `voice_usage_logs` (best-effort; never blocks voice) |
-| TTS | session speak helpers / `useVoicePlayer` → `/api/tts` (ElevenLabs); playback failures ≠ synthesis/request failures in diagnostics |
+| TTS | session speak helpers / `useVoicePlayer` → `/api/tts` (ElevenLabs); on soft failure (`fallback: browser_tts`, incl. 503 not configured) **must** play via `speechSynthesis` (`createBrowserSpeechFallbackForInterviewer`) then `onPlaybackComplete` — do not treat the soft error as a hard mute; playback failures ≠ synthesis/request failures in diagnostics |
 | Early TTS | optional SSE first-sentence from `POST /api/interview/script/turn` when `VOICE_LLM_TTS_STREAMING` is on |
 
 **Singleton mic gate:** `micCaptureCoordinator` (`idle|acquiring|active`). Chrome treats concurrent `getUserMedia` + Web Speech as **silent input** — never run both (Invariant #5).

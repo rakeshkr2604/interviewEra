@@ -21,7 +21,7 @@ Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
 | `/onboarding`, `/interview/new` | **Redirect** → `/interview/script/start` |
 | `/interview/session/[id]` | **Retired notice** only (not a live V1 engine) |
 | `/dashboard`, `/resume`, `/settings`, … | Candidate shell |
-| `/prepare` | Logged-in Interview Prep workspace (sidebar). Noindex. Public articles stay on `/resources` |
+| `/prepare` | Logged-in Interview Prep workspace (sidebar Practice). Noindex. Public articles stay on `/resources` |
 | `/pricing`, `/blog`, `/resources`, `/interview-questions/**` | Marketing / SEO |
 | `/tools/prompt-builder` | Local ChatGPT prompt builder. Public, no account. Usage counts record the goal only. |
 | `/resources/chatgpt-interview-preparation` | Local ChatGPT prompt builder + guide. No resume upload. |

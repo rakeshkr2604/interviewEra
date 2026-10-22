@@ -31,6 +31,17 @@ describe('H/T/M follow-up prompt contract', () => {
     expect(text).toContain('NEVER emit is_follow_up: true when answer_probe_needed = false')
   })
 
+  for (const file of ['SCRIPT_H.md', 'SCRIPT_T.md', 'SCRIPT_M.md'] as const) {
+    it(`${file} forbids unjustified praise and documents answer_quality`, () => {
+      const text = fs.readFileSync(path.join(SCRIPTS_DIR, file), 'utf8')
+      expect(text).toContain('answer_quality')
+      expect(text).toContain('Tone policy (mandatory)')
+      expect(text).toContain('Great answer!')
+      expect(text).toContain('question_echo')
+      expect(text).toMatch(/Never praise merely because an answer was submitted/i)
+    })
+  }
+
   it('SCRIPT_T example is a technical trade-off follow-up', () => {
     const text = fs.readFileSync(path.join(SCRIPTS_DIR, 'SCRIPT_T.md'), 'utf8')
     expect(text).toContain('What trade-off would you consider before choosing GraphQL over REST')

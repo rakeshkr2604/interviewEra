@@ -56,6 +56,7 @@ describe('runtime-context personalization fields', () => {
     expect(block).toMatch(/up to 2 follow-ups when warranted, not always 2/)
     expect(block).toContain('answer_probe_needed:')
     expect(block).toMatch(/answer_probe_needed:\s+unknown/)
+    expect(block).toContain('answer_quality:')
     expect(block).toContain('recent_acknowledgments:')
     expect(block).toContain('parent_question:')
     expect(block).toContain('last_candidate_answer:')

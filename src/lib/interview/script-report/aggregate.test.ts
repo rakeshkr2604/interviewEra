@@ -56,6 +56,8 @@ describe('script-report aggregate', () => {
     if (one.kind !== 'scored') return;
     expect(one.limitedData).toBe(true);
     expect(one.scoredAnswerCount).toBe(1);
+    expect(one.scoredCoreCount).toBe(1);
+    expect(one.scoredFollowUpCount).toBe(0);
 
     const two = aggregateScriptAnswers([
       answer({ turnIndex: 0 }),
@@ -73,6 +75,20 @@ describe('script-report aggregate', () => {
     expect(three.kind).toBe('scored');
     if (three.kind !== 'scored') return;
     expect(three.limitedData).toBe(false);
+  });
+
+  it('counts follow-ups separately without changing equal-weight average policy', () => {
+    const agg = aggregateScriptAnswers([
+      answer({ turnIndex: 2, overall: 8, isFollowUp: false }),
+      answer({ turnIndex: 3, overall: 4, isFollowUp: true, parentTurnIndex: 2 }),
+    ]);
+    expect(agg.kind).toBe('scored');
+    if (agg.kind !== 'scored') return;
+    expect(agg.scoredAnswerCount).toBe(2);
+    expect(agg.scoredCoreCount).toBe(1);
+    expect(agg.scoredFollowUpCount).toBe(1);
+    expect(agg.perQuestion[1]!.isFollowUp).toBe(true);
+    expect(agg.perQuestion[1]!.parentTurnIndex).toBe(2);
   });
 
   it('means per dimension and weights overall like score-v1.2', () => {

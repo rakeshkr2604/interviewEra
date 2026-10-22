@@ -15,6 +15,11 @@ import {
   scriptMFollowUpCanBecomeNextCore,
 } from './script-m-progression'
 import type { ScriptType } from './script-loader'
+import {
+  MAX_QUESTION_ECHO_RECOVERIES,
+  stripUnjustifiedPraisePrefix,
+  type AnswerQualityResult,
+} from '@/lib/interview/answer-quality'
 
 export type Difficulty = 'easy' | 'medium' | 'hard'
 
@@ -457,6 +462,56 @@ export function cannedRequiredFollowUpTurn(opts: {
 }
 
 /**
+ * Re-ask the same parent after the candidate echoed the question.
+ * is_follow_up true so it does not consume a new core slot; speech ends with
+ * the exact display_question (canonicalization invariant).
+ */
+export function cannedQuestionEchoRecoveryTurn(
+  parentQuestion: string,
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  const q = parentQuestion.trim() || 'Can you answer the question I asked?'
+  return {
+    speech: `You repeated the question rather than answering it. Could you explain what you understand about it, or say if you're unsure? ${q}`,
+    display_question: q,
+    tip: null,
+    timer_seconds: 90,
+    reading_buffer_seconds: 3,
+    auto_submit: false,
+    allow_skip: true,
+    show_auto_structure: true,
+    phase: 'core',
+    is_question: true,
+    is_follow_up: true,
+    question_difficulty: null,
+    interviewer_emotion: emotion,
+  }
+}
+
+/** Neutral redirect when the answer is clearly off-topic. */
+export function cannedIrrelevantRedirectTurn(
+  parentQuestion: string,
+  emotion: ScriptTurnOutput['interviewer_emotion'] = 'neutral',
+): ScriptTurnOutput {
+  const q = parentQuestion.trim() || 'Can you answer the question I asked?'
+  return {
+    speech: `Let's stay with the question I asked. ${q}`,
+    display_question: q,
+    tip: null,
+    timer_seconds: 90,
+    reading_buffer_seconds: 3,
+    auto_submit: false,
+    allow_skip: true,
+    show_auto_structure: true,
+    phase: 'core',
+    is_question: true,
+    is_follow_up: true,
+    question_difficulty: null,
+    interviewer_emotion: emotion,
+  }
+}
+
+/**
  * Answerable next-core fallback when a second consecutive core
  * acknowledgment would otherwise persist. SCRIPT_M keeps alternation;
  * H/T use a single unused template of the script's type.
@@ -545,12 +600,24 @@ export function probeIsRequired(opts: {
   hasValidParentCoreQuestion?: boolean
   answerProbeNeeded?: boolean | 'unknown'
   lastAnswer: string
+  /**
+   * When the candidate echoed / needs recovery, do not force a content probe
+   * that treats the echo as a weak substantive answer.
+   */
+  answerQuality?: AnswerQualityResult | null
 }): boolean {
   if (opts.requestPhase !== 'core') return false
   if (!opts.followUpEnabled) return false
   if (opts.answerProbeNeeded !== true) return false
   if (opts.hasValidParentCoreQuestion !== true) return false
   if (NO_ANSWER_VALUES.has(opts.lastAnswer.trim())) return false
+  if (
+    opts.answerQuality?.kind === 'question_echo' ||
+    opts.answerQuality?.kind === 'clarification_request' ||
+    opts.answerQuality?.kind === 'irrelevant'
+  ) {
+    return false
+  }
   const max = opts.maxFollowUpsPerQuestion ?? 2
   return opts.followUpsThisQuestion < max
 }
@@ -630,8 +697,23 @@ export function applyTurnAuthorityOverrides(opts: {
   answerProbeNeeded?: boolean | 'unknown'
   /** True when the previous persisted core turn had is_question=false. */
   previousTurnWasAcknowledgment?: boolean
+  /**
+   * Session skip budget *after* applying the current lastAnswer.
+   * When skipsUsed >= maxSkips, force allow_skip false (LLM may lag).
+   */
+  skipsUsed?: number
+  maxSkips?: number
+  /** Deterministic answer-quality classification for the current lastAnswer. */
+  answerQuality?: AnswerQualityResult | null
+  /** Consecutive question-echo answers on the same ask (includes current). */
+  consecutiveQuestionEchoes?: number
 }): ScriptTurnOutput {
-  return canonicalizeTurnSpeech(resolveTurnAuthorityOverrides(opts))
+  const resolved = resolveTurnAuthorityOverrides(opts)
+  const withoutPraise = {
+    ...resolved,
+    speech: stripUnjustifiedPraisePrefix(resolved.speech),
+  }
+  return canonicalizeTurnSpeech(withoutPraise)
 }
 
 function resolveTurnAuthorityOverrides(
@@ -703,6 +785,47 @@ function resolveTurnAuthorityOverrides(
   ].filter((q) => q.trim())
   const followUpText = turn.display_question || turn.speech
   const candidateQuestion = (turn.display_question ?? '').trim() || followUpText
+  const parentQ = (opts.parentQuestion ?? '').trim()
+  const quality = opts.answerQuality
+  const consecutiveEchoes = opts.consecutiveQuestionEchoes ?? 0
+
+  // Question-echo / off-topic recovery before content-probe enforcement.
+  // Bounded by MAX_QUESTION_ECHO_RECOVERIES and the existing follow-up cap.
+  if (
+    !nonCorePhase &&
+    opts.followUpEnabled &&
+    opts.hasValidParentCoreQuestion !== false &&
+    parentQ &&
+    quality?.kind === 'question_echo'
+  ) {
+    if (
+      consecutiveEchoes >= MAX_QUESTION_ECHO_RECOVERIES ||
+      opts.followUpsThisQuestion >= maxFollowUps
+    ) {
+      if (opts.coreQuestionsAsked >= opts.totalQuestions) {
+        return cannedCandidateQuestionsTurn(turn.interviewer_emotion)
+      }
+      return cannedNextCoreQuestionTurn({
+        scriptType: opts.scriptType,
+        lastQuestionType: opts.lastQuestionType,
+        parentQuestionType: opts.parentQuestionType,
+        alreadyAsked: asked,
+        emotion: turn.interviewer_emotion,
+      })
+    }
+    return cannedQuestionEchoRecoveryTurn(parentQ, turn.interviewer_emotion)
+  }
+
+  if (
+    !nonCorePhase &&
+    opts.followUpEnabled &&
+    opts.hasValidParentCoreQuestion !== false &&
+    parentQ &&
+    quality?.kind === 'irrelevant' &&
+    opts.followUpsThisQuestion < maxFollowUps
+  ) {
+    return cannedIrrelevantRedirectTurn(parentQ, turn.interviewer_emotion)
+  }
 
   const rejectAdaptiveOffViolation = (): ScriptTurnOutput => {
     if (opts.scriptType === 'SCRIPT_M' && lastWasMoveOn) {
@@ -1034,6 +1157,18 @@ function resolveTurnAuthorityOverrides(
   // Never allow moving backward in the phase order (e.g. core → warmup).
   if (phaseRank(turn.phase) < phaseRank(opts.requestPhase)) {
     turn = { ...turn, phase: opts.requestPhase as ScriptTurnOutput['phase'] }
+  }
+
+  // Skip budget exhausted — never leave the Skip control enabled.
+  const maxSkips = opts.maxSkips
+  const skipsUsed = opts.skipsUsed
+  if (
+    turn.allow_skip &&
+    typeof maxSkips === 'number' &&
+    typeof skipsUsed === 'number' &&
+    skipsUsed >= maxSkips
+  ) {
+    turn = { ...turn, allow_skip: false }
   }
 
   return turn

@@ -21,6 +21,11 @@ export type ScoredAnswerInput = {
   oneLineSummary?: string | null;
   /** From script_turns.structured_answer.coaching_reference when present. */
   modelAnswerLines?: string[];
+  /** Adaptive follow-up metadata — optional for legacy callers/tests. */
+  isFollowUp?: boolean;
+  parentTurnIndex?: number | null;
+  coreSequence?: number;
+  followUpSequence?: number | null;
 };
 
 export type ScoreBand = 'needs_work' | 'developing' | 'competitive' | 'strong';
@@ -46,13 +51,31 @@ export type PerQuestionReportRow = {
   turnIndex: number;
   question: string;
   questionType: 'technical' | 'behavioral';
-  overall: number;
-  dimensions: Record<DimensionKey, { score: number; note?: string }>;
+  /**
+   * Numeric score when evaluationStatus is 'scored'. Null when the answer
+   * exists but scoring failed / never completed — never coerce to 0.
+   */
+  overall: number | null;
+  dimensions: Record<DimensionKey, { score: number; note?: string }> | null;
   transcript: string;
   scoreSuspect: boolean;
   oneLineSummary: string | null;
   modelAnswerLines: string[];
   focusNote: string | null;
+  /** Absent on legacy cached rows → treat as 'scored' when overall+dims present. */
+  evaluationStatus?: 'scored' | 'unavailable';
+  /** Absent on legacy cached rows → treat as core question. */
+  isFollowUp?: boolean;
+  parentTurnIndex?: number | null;
+  /** 1-based index among core questions in the session. */
+  coreSequence?: number;
+  /** 1-based index among follow-ups under the same parent core. */
+  followUpSequence?: number | null;
+  /**
+   * Optional deterministic answer-quality kind (e.g. question_echo).
+   * Informational only — does not change session score math.
+   */
+  answerQualityKind?: string;
 };
 
 export type AggregatedScriptReport =
@@ -68,11 +91,20 @@ export type AggregatedScriptReport =
       dimensionAverages: Record<DimensionKey, number>;
       scoreBand: ScoreBand;
       placementSignal: PlacementSignal;
+      /** Count of scored answers that entered the session average (core + follow-up). */
       scoredAnswerCount: number;
+      /** Core questions among the scored inputs (excludes follow-ups). */
+      scoredCoreCount: number;
+      /** Adaptive follow-ups among the scored inputs. */
+      scoredFollowUpCount: number;
       /** True when 1 ≤ count < MIN_SCORED_ANSWERS_FOR_FULL_REPORT */
       limitedData: boolean;
       promptVersions: string[];
       weakestDimensions: DimensionKey[];
+      /**
+       * Scored rows only — used for synthesis prompts and score math.
+       * Full display (including unscored answers) is assembled in generate.ts.
+       */
       perQuestion: PerQuestionReportRow[];
     };
 
@@ -184,6 +216,9 @@ export function aggregateScriptAnswers(answers: ScoredAnswerInput[]): Aggregated
     .sort((a, b) => dimensionAverages[a] - dimensionAverages[b])
     .slice(0, 3);
 
+  const scoredCoreCount = answers.filter((a) => a.isFollowUp !== true).length;
+  const scoredFollowUpCount = answers.filter((a) => a.isFollowUp === true).length;
+
   const perQuestion: PerQuestionReportRow[] = answers.map((a) => {
     const weakKey = [...ANSWER_SCORE_DIMENSION_KEYS].sort(
       (x, y) => a.dimensions[x].score - a.dimensions[y].score,
@@ -200,6 +235,11 @@ export function aggregateScriptAnswers(answers: ScoredAnswerInput[]): Aggregated
       oneLineSummary: a.oneLineSummary ?? null,
       modelAnswerLines: a.modelAnswerLines ?? [],
       focusNote: weak?.note?.trim() || null,
+      evaluationStatus: 'scored' as const,
+      isFollowUp: a.isFollowUp === true,
+      parentTurnIndex: a.parentTurnIndex ?? null,
+      coreSequence: a.coreSequence,
+      followUpSequence: a.followUpSequence ?? null,
     };
   });
 
@@ -210,6 +250,8 @@ export function aggregateScriptAnswers(answers: ScoredAnswerInput[]): Aggregated
     scoreBand: scoreBandFor(overall),
     placementSignal: placementSignalFor(overall),
     scoredAnswerCount: answers.length,
+    scoredCoreCount,
+    scoredFollowUpCount,
     limitedData: answers.length < MIN_SCORED_ANSWERS_FOR_FULL_REPORT,
     promptVersions,
     weakestDimensions,

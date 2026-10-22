@@ -8,6 +8,7 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { generateMetadata as buildPageMetadata } from '@/lib/seo/metadata';
 import { ReportPanel } from '@/components/report/ReportPanel';
 import { BlurredSection } from '@/components/report/BlurredSection';
+import { ScriptReportPerQuestion } from '@/components/report/ScriptReportPerQuestion';
 import { ScriptReportGeneratingRefresh } from '@/components/interview/ScriptReportGeneratingRefresh';
 import { ScriptRadarChart } from '@/components/report/ReportDynamicCharts';
 import { loadOrGenerateScriptReport } from '@/lib/interview/script-report/generate';
@@ -39,7 +40,7 @@ import {
   sessionReadiness,
   strongestWeakestLabels,
 } from '@/lib/interview/script-report/recruiter-view';
-import { DIMENSION_KEYS, type DimensionKey } from '@/lib/interview/answer-score/rubric';
+import type { DimensionKey } from '@/lib/interview/answer-score/rubric';
 import type { ScriptReportSynthesis } from '@/lib/interview/script-report/synthesis';
 import type { PlanTier, SignalStrength } from '@/types/app.types';
 
@@ -762,128 +763,14 @@ export default async function ScriptReportPage({ params }: PageProps) {
         </BlurredSection>
       )}
 
-      {/* 5. Per-question — scores free; notes Starter+; model answers Pro */}
+      {/* 5. Per-question — cores + nested adaptive follow-ups; notes Starter+; model answers Pro */}
       <ReportPanel eyebrow="Per-question analysis" title="Answers, scores, and model examples">
-        <div className="space-y-5" data-testid="script-report-per-question">
-          {report.per_question.map((q) => (
-            <article
-              key={q.turnIndex}
-              className="rounded-xl border-2 p-4 sm:p-5"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span
-                  className="rounded-md px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide"
-                  style={{
-                    background:
-                      q.questionType === 'technical'
-                        ? 'color-mix(in srgb, #3b82f6 18%, transparent)'
-                        : 'color-mix(in srgb, var(--accent-primary) 16%, transparent)',
-                    color: 'var(--text-primary)',
-                  }}
-                >
-                  {q.questionType}
-                </span>
-                <span
-                  className="text-sm font-semibold tabular-nums"
-                  style={{ color: scoreColor(q.overall) }}
-                >
-                  {Number(q.overall).toFixed(1)} / 10
-                </span>
-                {q.scoreSuspect && (
-                  <span className="text-xs font-medium" style={{ color: 'var(--accent-warning)' }}>
-                    Score flagged for review
-                  </span>
-                )}
-              </div>
-              <h3
-                className="mt-2 text-sm font-semibold sm:text-base"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {q.question}
-              </h3>
-              {q.oneLineSummary && seeDetails && (
-                <p className="mt-2 text-sm italic" style={{ color: 'var(--text-secondary)' }}>
-                  {q.oneLineSummary}
-                </p>
-              )}
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-wide"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Your answer
-                  </p>
-                  <p
-                    className="mt-1 whitespace-pre-wrap text-sm leading-relaxed"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    {q.transcript}
-                  </p>
-                </div>
-                <div>
-                  <p
-                    className="text-xs font-bold uppercase tracking-wide"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Model answer example
-                  </p>
-                  <BlurredSection
-                    userTier={planTier}
-                    requiredTier="pro"
-                    upgradeLabel="Upgrade to Pro to see model answer comparisons"
-                  >
-                    {q.modelAnswerLines.length > 0 ? (
-                      <p
-                        className="mt-1 whitespace-pre-wrap text-sm leading-relaxed"
-                        data-testid="script-report-model-answer"
-                        style={{ color: 'var(--text-secondary)' }}
-                      >
-                        {q.modelAnswerLines.join('\n\n')}
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-                        No example available for this turn.
-                      </p>
-                    )}
-                  </BlurredSection>
-                </div>
-              </div>
-              {seeDetails && (
-                <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                  {DIMENSION_KEYS.map((key) => {
-                    const d = q.dimensions[key];
-                    if (!d) return null;
-                    return (
-                      <li key={key} className="text-sm">
-                        <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                          {dimensionLabel(key)} · {Number(d.score).toFixed(1)}
-                        </span>
-                        {d.note && (
-                          <span style={{ color: 'var(--text-secondary)' }}> — {d.note}</span>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-              {!seeDetails && (
-                <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Dimension notes unlock on Starter.
-                </p>
-              )}
-              {seePro && q.focusNote && (
-                <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
-                    Recruiter miss:{' '}
-                  </span>
-                  {q.focusNote}
-                </p>
-              )}
-            </article>
-          ))}
-        </div>
+        <ScriptReportPerQuestion
+          perQuestion={report.per_question}
+          planTier={planTier}
+          seeDetails={seeDetails}
+          seePro={seePro}
+        />
       </ReportPanel>
     </div>
   );

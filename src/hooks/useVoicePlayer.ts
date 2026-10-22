@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ProsodicTTS, TTSFallbackToBrowserError } from '@/lib/voice/tts-client';
-import type { InterviewerId } from '@/lib/config/interviewers';
+import { getInterviewerById, type InterviewerId } from '@/lib/config/interviewers';
 import type { InterviewerTone, TTSVoiceKey } from '@/lib/voice/tts-client';
 import { lifecycleLog, lifecycleWarn } from '@/lib/voice/lifecycle-log';
 import {
@@ -11,6 +11,15 @@ import {
 } from '@/lib/voice/audio-gesture';
 import { interviewFlowLog } from '@/lib/voice/interview-flow-log';
 import { normalizePlaybackArg, type PlaybackCallbacks } from '@/lib/voice/playback-callbacks';
+import { readAiVoiceEnabled } from '@/lib/settings/client-preferences';
+import { createBrowserSpeechFallbackForInterviewer } from '@/lib/voice/tts/browser-speech-synthesizer';
+import type { TtsFallbackSpeaker } from '@/lib/voice/tts/tts-pipeline';
+
+function interviewerIdFromVoice(voice: TTSVoiceKey | InterviewerId): InterviewerId | null {
+  if (voice === 'male') return 'arjun';
+  if (voice === 'female') return 'priya';
+  return getInterviewerById(voice as InterviewerId) ? (voice as InterviewerId) : null;
+}
 
 export interface UseVoicePlayerReturn {
   isPlaying: boolean;
@@ -57,6 +66,15 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
   const seqRef = useRef<number>(0);
   const mountedRef = useRef<boolean>(true);
   const fetchAbortRef = useRef<AbortController | null>(null);
+  const browserFallbackRef = useRef<TtsFallbackSpeaker>(
+    createBrowserSpeechFallbackForInterviewer(interviewerIdFromVoice(voice)),
+  );
+
+  useEffect(() => {
+    browserFallbackRef.current = createBrowserSpeechFallbackForInterviewer(
+      interviewerIdFromVoice(voice),
+    );
+  }, [voice]);
 
   const clearProgressLoop = useCallback(() => {
     if (progressRafRef.current !== null) {
@@ -96,6 +114,11 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
     seqRef.current += 1;
     fetchAbortRef.current?.abort();
     fetchAbortRef.current = null;
+    try {
+      browserFallbackRef.current.cancel();
+    } catch {
+      /* idempotent */
+    }
     clearProgressLoop();
     if (sourceRef.current) {
       try { sourceRef.current.stop(); } catch { /* already stopped */ }
@@ -427,19 +450,99 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
           lifecycleLog('voice-player', 'speak_aborted', { mySeq });
           return;
         }
+
+        // ElevenLabs soft failure → actually speak via browser speechSynthesis.
+        // Previously we only logged "using browser speech" and called onPlaybackFailed,
+        // so the interviewer never read the question when /api/tts returned 503.
+        if (err instanceof TTSFallbackToBrowserError) {
+          if (!readAiVoiceEnabled()) {
+            const disabledMsg = 'AI voice is disabled in settings.';
+            lifecycleWarn('voice-player', 'speak_failed', { mySeq, err: disabledMsg });
+            if (mountedRef.current && mySeq === seqRef.current) {
+              setIsPlaying(false);
+              setError(disabledMsg);
+            }
+            callbacks.onPlaybackFailed?.(disabledMsg);
+            return;
+          }
+
+          const fallback = browserFallbackRef.current;
+          if (!fallback.isAvailable()) {
+            const unavailable =
+              err.httpStatus === 429
+                ? 'Voice playback limit reached.'
+                : 'Voice service unavailable right now.';
+            lifecycleWarn('voice-player', 'speak_failed', { mySeq, err: unavailable });
+            if (mountedRef.current && mySeq === seqRef.current) {
+              setIsPlaying(false);
+              setError(unavailable);
+            }
+            callbacks.onPlaybackFailed?.(unavailable);
+            return;
+          }
+
+          try {
+            interviewFlowLog('tts', 'browser_tts_fallback_start', {
+              seq: mySeq,
+              textLen: text.length,
+              httpStatus: err.httpStatus,
+            });
+            lifecycleLog('voice-player', 'browser_fallback_speak_start', { mySeq });
+            if (mountedRef.current && mySeq === seqRef.current) {
+              setError(null);
+              setIsPlaying(true);
+              setPlaybackProgress(0);
+              callbacks.onPlaybackStarted?.();
+            }
+            await fallback.speak(
+              text,
+              { voice: resolvedVoice, tone },
+              abortController.signal,
+            );
+            if (mySeq !== seqRef.current || !mountedRef.current) {
+              lifecycleLog('voice-player', 'browser_fallback_superseded', {
+                mySeq,
+                current: seqRef.current,
+              });
+              return;
+            }
+            clearProgressLoop();
+            setPlaybackProgress(1);
+            setIsPlaying(false);
+            lifecycleLog('voice-player', 'browser_fallback_speak_end', { mySeq });
+            interviewFlowLog('tts', 'browser_tts_fallback_complete', {
+              seq: mySeq,
+              textLen: text.length,
+            });
+            callbacks.onPlaybackComplete?.();
+            return;
+          } catch (fallbackErr) {
+            if (fallbackErr instanceof DOMException && fallbackErr.name === 'AbortError') {
+              lifecycleLog('voice-player', 'browser_fallback_aborted', { mySeq });
+              return;
+            }
+            const fallbackMessage =
+              fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr);
+            lifecycleWarn('voice-player', 'browser_fallback_failed', {
+              mySeq,
+              err: fallbackMessage,
+            });
+            if (mountedRef.current && mySeq === seqRef.current) {
+              setIsPlaying(false);
+              setError('Voice playback failed.');
+            }
+            callbacks.onPlaybackFailed?.('Voice playback failed.');
+            return;
+          }
+        }
+
         const message = err instanceof Error ? err.message : String(err);
         lifecycleWarn('voice-player', 'speak_failed', { mySeq, err: message });
         if (mountedRef.current && mySeq === seqRef.current) setIsPlaying(false);
 
         let failMessage = 'Voice playback failed.';
         if (mountedRef.current && mySeq === seqRef.current) {
-          if (err instanceof TTSFallbackToBrowserError) {
-            failMessage =
-              err.httpStatus === 429
-                ? 'Voice playback limit reached.'
-                : 'Voice service unavailable right now.';
-            setError(failMessage);
-          } else if (message.includes('decode') || message.includes('AudioContext') || message.includes('autoplay')) {
+          if (message.includes('decode') || message.includes('AudioContext') || message.includes('autoplay')) {
             failMessage = 'Audio playback is blocked. Tap Retry Audio on this question.';
             setError(failMessage);
           } else {
@@ -453,7 +556,7 @@ export function useVoicePlayer(voice: TTSVoiceKey | InterviewerId): UseVoicePlay
         }
       }
     },
-    [voice, stop, playBuffered, playStreamed],
+    [voice, stop, playBuffered, playStreamed, clearProgressLoop],
   );
 
   // StrictMode remount: cleanup sets mountedRef false; useRef persists across

@@ -48,6 +48,7 @@ import {
 } from '@/lib/interview/script-session-prep'
 import { buildReviewLoadTurnPayload } from '@/lib/interview/build-review-load-turn-payload'
 import { coreProgressLabels } from '@/lib/interview/follow-up-progress-label'
+import { canOfferSkip } from '@/lib/interview/skip-accounting'
 import { normalizeComplexityNotationForScoring } from '@/lib/interview/normalize-complexity-notation'
 import {
   answerScoreNeededOnApprove,
@@ -220,6 +221,8 @@ type TurnApiResponse = {
   interviewId: string
   /** Server-derived core question count (excludes follow-ups). */
   questionNumber?: number
+  /** Authoritative interviews.skips_used after this turn (updates Skip N/M UI). */
+  skipsUsed?: number
 }
 
 function sinceT0Ms(t0: number | null): number | null {
@@ -1425,6 +1428,17 @@ export default function ScriptInterviewPage() {
       if (typeof data.questionNumber === 'number' && Number.isFinite(data.questionNumber)) {
         questionNumberRef.current = data.questionNumber
         setQuestionNumber(data.questionNumber)
+      }
+
+      // Sync skip counter from the turn that just consumed (or reported) budget.
+      if (typeof data.skipsUsed === 'number' && Number.isFinite(data.skipsUsed)) {
+        const nextSkips = Math.max(0, Math.floor(data.skipsUsed))
+        setInterview((prev) => {
+          if (!prev || prev.skips_used === nextSkips) return prev
+          const updated = { ...prev, skips_used: nextSkips }
+          interviewRef.current = updated
+          return updated
+        })
       }
 
       setFirstTurnShown(true)
@@ -3491,8 +3505,12 @@ export default function ScriptInterviewPage() {
                   <RotateCcw size={16} aria-hidden />
                 </button>
 
-                {/* Skip button */}
-                {currentTurn?.allow_skip && (
+                {/* Skip button — model allow_skip AND remaining session budget */}
+                {canOfferSkip({
+                  allowSkip: currentTurn?.allow_skip === true,
+                  skipsUsed: interview?.skips_used ?? 0,
+                  maxSkips: interview?.max_skips ?? 0,
+                }) && (
                   <button
                     type="button"
                     onClick={handleSkip}

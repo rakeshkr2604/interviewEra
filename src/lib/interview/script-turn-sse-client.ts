@@ -10,6 +10,8 @@ export type ScriptTurnApiResponse = {
   turnIndex: number
   interviewId: string
   questionNumber: number
+  /** Authoritative interviews.skips_used after this turn request. */
+  skipsUsed?: number
 }
 
 export type ScriptTurnSseHandlers = {
