@@ -833,14 +833,26 @@ function resolveTurnAuthorityOverrides(
   }
 
   const rejectAdaptiveOffViolation = (): ScriptTurnOutput => {
-    if (opts.scriptType === 'SCRIPT_M' && lastWasMoveOn) {
-      const nextType = nextScriptMCoreQuestionType(
-        opts.lastQuestionType ?? opts.parentQuestionType,
-      )
-      return (
-        cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion) ??
-        cannedMoveOnTurn(turn.interviewer_emotion)
-      )
+    if (lastWasMoveOn) {
+      if (opts.scriptType === 'SCRIPT_M') {
+        const nextType = nextScriptMCoreQuestionType(
+          opts.lastQuestionType ?? opts.parentQuestionType,
+        )
+        return (
+          cannedScriptMNextCoreTurn(nextType, asked, turn.interviewer_emotion) ??
+          cannedMoveOnTurn(turn.interviewer_emotion)
+        )
+      }
+      // H/T: same reason as the blocked-FU branches below — a second
+      // consecutive cannedMoveOnTurn stacks non-question acks and trips the
+      // client's consecutive-ack recovery guard.
+      return cannedNextCoreQuestionTurn({
+        scriptType: opts.scriptType,
+        lastQuestionType: opts.lastQuestionType,
+        parentQuestionType: opts.parentQuestionType,
+        alreadyAsked: asked,
+        emotion: turn.interviewer_emotion,
+      })
     }
     return cannedMoveOnTurn(turn.interviewer_emotion)
   }
@@ -952,6 +964,25 @@ function resolveTurnAuthorityOverrides(
         )
       }
 
+      // A second consecutive cannedMoveOnTurn (lastWasMoveOn already true)
+      // stacks a non-question ack on top of a non-question ack — that is
+      // what trips the client's consecutive-ack recovery guard and surfaces
+      // "The interviewer produced an unexpected response." Every blocked-FU
+      // branch below must escalate through here instead of calling
+      // cannedMoveOnTurn directly whenever lastWasMoveOn is true.
+      const escalateAfterMoveOn = () => {
+        if (opts.scriptType === 'SCRIPT_M') {
+          return scriptMEscalateToNextCore()
+        }
+        return cannedNextCoreQuestionTurn({
+          scriptType: opts.scriptType,
+          lastQuestionType: opts.lastQuestionType,
+          parentQuestionType: opts.parentQuestionType,
+          alreadyAsked: asked,
+          emotion: turn.interviewer_emotion,
+        })
+      }
+
       // Adaptive OFF core already returned above. Non-core: drop flag, keep speech.
       if (!opts.followUpEnabled) {
         turn = { ...turn, is_follow_up: false }
@@ -976,7 +1007,7 @@ function resolveTurnAuthorityOverrides(
         } else if (lastWasMoveOn) {
           // H/T: a *new* wrongly-flagged question may proceed; repeats must not.
           if (repeatsAlreadyAskedQuestion(followUpText, asked)) {
-            return cannedMoveOnTurn(turn.interviewer_emotion)
+            return escalateAfterMoveOn()
           }
           turn = { ...turn, is_follow_up: false }
         } else {
@@ -988,7 +1019,7 @@ function resolveTurnAuthorityOverrides(
         }
         if (lastWasMoveOn) {
           if (repeatsAlreadyAskedQuestion(followUpText, asked)) {
-            return cannedMoveOnTurn(turn.interviewer_emotion)
+            return escalateAfterMoveOn()
           }
           turn = { ...turn, is_follow_up: false }
         } else {
@@ -1000,19 +1031,13 @@ function resolveTurnAuthorityOverrides(
         // (this branch is not taken). A second invalid after move-on must
         // escalate — another cannedMoveOn loops the client with no question.
         if (lastWasMoveOn) {
-          if (opts.scriptType === 'SCRIPT_M') {
-            return scriptMEscalateToNextCore()
-          }
-          return cannedNextCoreQuestionTurn({
-            scriptType: opts.scriptType,
-            lastQuestionType: opts.lastQuestionType,
-            parentQuestionType: opts.parentQuestionType,
-            alreadyAsked: asked,
-            emotion: turn.interviewer_emotion,
-          })
+          return escalateAfterMoveOn()
         }
         return cannedMoveOnTurn(turn.interviewer_emotion)
       } else if (specialNoFollowUp || noParent) {
+        if (lastWasMoveOn) {
+          return escalateAfterMoveOn()
+        }
         return cannedMoveOnTurn(turn.interviewer_emotion)
       } else {
         // Non-core phase: drop the flag, keep speech.

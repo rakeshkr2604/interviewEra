@@ -1128,7 +1128,13 @@ describe('turn-authority overrides', () => {
     expect(displayQuestionNumberAfterTurn(1, result)).toBe(2)
   })
 
-  it('H/T cap + move-on + duplicate FU does not restate the parent as a new core', () => {
+  it('H/T cap + move-on + duplicate FU escalates to a new core instead of stacking a second move-on', () => {
+    // lastAnswer already being a move-on means a *second* cannedMoveOnTurn
+    // here would stack two consecutive non-question acks in a row, which
+    // trips the client's consecutive-ack recovery guard ("The interviewer
+    // produced an unexpected response.") — see turn-authority.ts
+    // escalateAfterMoveOn. The fallback must be a real, unasked core
+    // question, not another ack and not a restatement of the parent.
     const fu = 'What did you personally do in that disagreement, not what the team did?'
     const parent =
       'Tell me about a time you disagreed with a classmate or project teammate about approach.'
@@ -1148,9 +1154,83 @@ describe('turn-authority overrides', () => {
       alreadyAskedQuestions: [parent, fu],
       scriptType: 'SCRIPT_H',
     })
-    expect(result).toEqual(cannedMoveOnTurn('neutral'))
-    expect(result.display_question).toBeNull()
-    expect(displayQuestionNumberAfterTurn(1, result)).toBe(1)
+    expect(result.is_question).toBe(true)
+    expect(result.is_follow_up).toBe(false)
+    expect(result.display_question).not.toBeNull()
+    expect(result.display_question).not.toBe(parent)
+    expect(result.display_question).not.toBe(fu)
+    expect(displayQuestionNumberAfterTurn(1, result)).toBe(2)
+  })
+
+  it('H/T answerProbeNeeded-false + already moved on escalates instead of a second move-on', () => {
+    const fu = 'What did you personally do in that disagreement?'
+    const parent = 'Tell me about a time you disagreed with a classmate or project teammate about approach.'
+    const result = applyTurnAuthorityOverrides({
+      turn: baseTurn({
+        is_follow_up: true,
+        display_question: fu,
+        speech: fu,
+      }),
+      coreQuestionsAsked: 1,
+      totalQuestions: 4,
+      ...baseOpts,
+      hasValidParentCoreQuestion: true,
+      answerProbeNeeded: false,
+      lastAnswer: cannedMoveOnTurn().speech,
+      lastFollowUpQuestion: fu,
+      parentQuestion: parent,
+      alreadyAskedQuestions: [parent, fu],
+      scriptType: 'SCRIPT_H',
+    })
+    expect(result.is_question).toBe(true)
+    expect(result.is_follow_up).toBe(false)
+    expect(result.display_question).not.toBeNull()
+    expect(result.display_question).not.toBe(parent)
+    expect(displayQuestionNumberAfterTurn(1, result)).toBe(2)
+  })
+
+  it('H/T no valid parent + already moved on escalates instead of a second move-on', () => {
+    const result = applyTurnAuthorityOverrides({
+      turn: baseTurn({
+        is_follow_up: true,
+        display_question: 'Some stray follow-up text.',
+        speech: 'Some stray follow-up text.',
+      }),
+      coreQuestionsAsked: 1,
+      totalQuestions: 4,
+      ...baseOpts,
+      hasValidParentCoreQuestion: false,
+      lastAnswer: cannedMoveOnTurn().speech,
+      scriptType: 'SCRIPT_T',
+    })
+    expect(result.is_question).toBe(true)
+    expect(result.is_follow_up).toBe(false)
+    expect(result.display_question).not.toBeNull()
+    expect(displayQuestionNumberAfterTurn(1, result)).toBe(2)
+  })
+
+  it('Adaptive OFF + already moved on escalates instead of a second move-on', () => {
+    const fu = 'Can you elaborate on your answer with more detail?'
+    const result = applyTurnAuthorityOverrides({
+      turn: baseTurn({
+        is_question: true,
+        is_follow_up: true,
+        display_question: fu,
+        speech: `I appreciate the honesty there. ${fu}`,
+      }),
+      coreQuestionsAsked: 1,
+      totalQuestions: 4,
+      ...baseOpts,
+      followUpEnabled: false,
+      hasValidParentCoreQuestion: true,
+      lastAnswer: cannedMoveOnTurn().speech,
+      scriptType: 'SCRIPT_H',
+      parentQuestion: 'Tell me about yourself — your background, what you enjoy working on, and what\'s brought you to practice for Software Engineer today.',
+    })
+    expect(result.is_question).toBe(true)
+    expect(result.is_follow_up).toBe(false)
+    expect(result.display_question).not.toBeNull()
+    expect(displayQuestionNumberAfterTurn(1, result)).toBe(2)
   })
 
   it('cap + already moved on strips FU flag to break ack loop', () => {
