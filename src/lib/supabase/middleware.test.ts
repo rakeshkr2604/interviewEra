@@ -92,5 +92,38 @@ describe('updateSession auth refresh path', () => {
     const cleared = result.response.cookies.get('sb-proj-auth-token');
     expect(cleared).toBeUndefined();
   });
+
+  it('treats a hung Supabase auth call as unauthenticated instead of hanging the request', async () => {
+    // Regression: getUser() had no timeout, so a slow/unresponsive Supabase
+    // auth endpoint hung every request through proxy.ts (including /login,
+    // which is itself an AUTH_ROUTE) up to the platform's own function
+    // timeout. See AUTH_CHECK_TIMEOUT_MS in middleware.ts.
+    vi.useFakeTimers();
+    try {
+      getUserMock.mockImplementationOnce(() => new Promise(() => {})) // never resolves
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { updateSession } = await import('@/lib/supabase/middleware');
+      const request = new NextRequest('http://localhost/login', {
+        headers: { cookie: 'sb-proj-auth-token=maybe-still-valid' },
+      });
+
+      const resultPromise = updateSession(request);
+      await vi.advanceTimersByTimeAsync(5000);
+      const result = await resultPromise;
+
+      expect(result.user).toBeNull();
+      expect(result.response.status).toBe(200);
+      // A timeout is not evidence the session is invalid — must not wipe a
+      // cookie that might still be good once Supabase recovers.
+      const cleared = result.response.cookies.get('sb-proj-auth-token');
+      expect(cleared).toBeUndefined();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('auth check timed out after 5000ms'),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 

@@ -4,6 +4,26 @@ import type { User } from '@supabase/supabase-js';
 import { shouldClearStaleAuthCookies } from '@/lib/supabase/session';
 const AUTH_TRACE_ENABLED = process.env.IE_DIAGNOSTICS_AUTH_TRACE === '1';
 
+/**
+ * supabase.auth.getUser() below has no built-in timeout. Every request to an
+ * auth route or a protected page runs through this (proxy.ts),
+ * so a slow/unresponsive Supabase auth endpoint — e.g. a transient platform
+ * blip, not necessarily anything in this app — previously hung the entire
+ * request (observed up to the platform's 300s function timeout) instead of
+ * degrading. /login is itself an AUTH_ROUTE, so this is also why "Sign in"
+ * could appear to do nothing: the click navigated, but the server response
+ * never came back. Race it instead and treat a timeout the same as "no
+ * confirmed user" (see the catch block) so the page still renders quickly.
+ */
+const AUTH_CHECK_TIMEOUT_MS = 5000;
+
+class AuthCheckTimeoutError extends Error {
+  constructor() {
+    super('auth_check_timeout');
+    this.name = 'AuthCheckTimeoutError';
+  }
+}
+
 /** Remove Supabase chunk cookies from the raw Cookie header (name-only check). */
 function cookieHeaderWithoutSupabase(raw: string | null): string | null {
   if (!raw) return null;
@@ -90,7 +110,12 @@ export async function updateSession(
     const {
       data: { user },
       error,
-    } = await supabase.auth.getUser();
+    } = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new AuthCheckTimeoutError()), AUTH_CHECK_TIMEOUT_MS);
+      }),
+    ]);
     if (error) {
       if (shouldClearStaleAuthCookies(error)) {
         rewriteForwardRequestWithoutSupabaseCookies();
@@ -141,6 +166,15 @@ export async function updateSession(
     }
     return { response: supabaseResponse, user };
   } catch (err) {
+    if (err instanceof AuthCheckTimeoutError) {
+      // Always logged (not gated on AUTH_TRACE_ENABLED) — this is the one
+      // signal that distinguishes "Supabase auth was slow" from the flood of
+      // downstream timeouts it causes across unrelated routes.
+      console.warn(
+        `[update-session] auth check timed out after ${AUTH_CHECK_TIMEOUT_MS}ms — proceeding unauthenticated for this request`,
+      );
+      return { response: supabaseResponse, user: null };
+    }
     if (shouldClearStaleAuthCookies(err)) {
       rewriteForwardRequestWithoutSupabaseCookies();
       clearSupabaseAuthCookies();
