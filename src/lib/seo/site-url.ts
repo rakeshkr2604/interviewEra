@@ -20,6 +20,25 @@ function isLocalhostHost(hostname: string): boolean {
   );
 }
 
+/**
+ * Pure origin derivation from a request's `host` header (+ optional
+ * `x-forwarded-proto`) — for same-session preview links that must follow
+ * whichever environment is actually serving the request (localhost in dev,
+ * the real host in staging/prod), unlike {@link getCanonicalSiteOrigin}
+ * which always returns production on purpose (sitemap/OG/share links need a
+ * real public URL regardless of where they were generated from).
+ */
+export function originFromRequestHost(
+  host: string | null | undefined,
+  forwardedProto?: string | null,
+): string | null {
+  const h = host?.trim();
+  if (!h) return null;
+  const hostname = h.split(':')[0] ?? h;
+  const proto = forwardedProto?.trim() || (isLocalhostHost(hostname) ? 'http' : 'https');
+  return `${proto}://${h}`;
+}
+
 function originFromEnv(value: string | undefined): string | null {
   const raw = value?.trim();
   if (!raw) return null;

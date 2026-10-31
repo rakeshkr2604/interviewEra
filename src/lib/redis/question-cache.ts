@@ -1,6 +1,5 @@
 import getRedis, { isRedisConfigured } from './client';
 import type { ParsedResume } from '@/types/app.types';
-import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 
 const TTL_SECONDS = 3600; // 1 hour per spec
 
@@ -14,11 +13,13 @@ export interface CachedGeneratedQuestion {
 // Stable hash of the resume's key signals (not the full text — avoids
 // cache misses from whitespace/formatting differences in the same resume).
 function hashResume(parsed: ParsedResume | unknown): string {
-  const p = coerceParsedResume(parsed);
+  if (!parsed || typeof parsed !== 'object') return '00000000';
+  const d = parsed as Record<string, unknown>;
+  const skills = Array.isArray(d.skills) ? (d.skills as string[]).slice(0, 8).sort().join(',') : '';
   const sig = [
-    p.target_role,
-    p.experience_estimate,
-    p.skills.slice(0, 8).sort().join(','),
+    typeof d.target_role === 'string' ? d.target_role : '',
+    typeof d.experience_estimate === 'string' ? d.experience_estimate : '',
+    skills,
   ].join('|');
 
   // djb2 hash — simple, fast, no crypto dependency

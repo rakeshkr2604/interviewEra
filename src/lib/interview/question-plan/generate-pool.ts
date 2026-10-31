@@ -19,6 +19,23 @@ import { frequentRecentQuestions } from './novelty';
 import { QUESTION_PLAN_POOL_MULTIPLIER, type CoreQuestionType, type PoolQuestion } from './types';
 import type { QuestionPlanContext } from './types';
 
+const HR_ROUND_RULES = [
+  'This is an HR / behavioral round, modelled on the HR and managerial rounds at top companies hiring in India: service MNCs (TCS, Infosys, Wipro, Accenture, Cognizant, Capgemini, Deloitte) and product companies (Amazon, Google, Microsoft, Meta, Flipkart, Walmart, Adobe, Atlassian).',
+  'Ask the questions candidates actually report from these rounds in interview experiences on Glassdoor, AmbitionBox, LeetCode Discuss, GeeksforGeeks and Reddit (r/developersIndia, r/cscareerquestions). Use the wording and level an HR or hiring manager uses, not invented puzzles.',
+  'Cover a spread of these areas, at most one question per area:',
+  '- Motivation & fit: why this role/company, why you should be hired, what you know about us, why leave your current job or switch domains(Experience candidate).',
+  '- Self-awareness: real strengths and weaknesses with evidence, feedback you acted on, a mistake you owned.',
+  '- Ownership & pressure: a tight deadline, juggling priorities, going beyond your role (Amazon-style Ownership / Bias for Action / Deliver Results).',
+  '- Teamwork & conflict: a disagreement with a teammate or manager, a difficult team member, persuading someone without authority.',
+  '- Failure & learning: a project or goal that failed, what you learned, what changed afterward.',
+  '- Leadership & initiative: leading a group or college/club activity, mentoring, raising the bar.',
+  '- Career & practical: career goals for the next few years, higher studies plans, relocation or shift flexibility, an education or career gap.',
+  'Behavioral questions must ask the candidate to RECALL a real past experience: "Tell me about a time…", "Give me an example of…", "Describe a situation where you…". Direct HR questions ("Why should we hire you?", "What is your biggest weakness?") are fine.',
+  'NEVER ask hypothetical or scenario questions: no "Imagine…", "Suppose…", "Consider a scenario…", "What would you do if…", "If you were to…".',
+  'NEVER ask technical questions in this round: no tools, languages, frameworks, debugging, system design, architecture, performance, or trade-off questions, even when the profile lists technical skills.',
+  'Keep each question to one or two sentences.',
+].join('\n');
+
 export function questionPlanPoolSize(required: number): number {
   return Math.max(required + 1, required * QUESTION_PLAN_POOL_MULTIPLIER);
 }
@@ -111,12 +128,12 @@ export async function generateCandidatePool(opts: {
     : `Role:${opts.role}. Skills:${opts.context.skills.join(', ') || 'n/a'}. Projects:${opts.context.projects.join('; ') || 'n/a'}`;
   const jd = clampJobDescriptionForQuestions(opts.context.jobDescription);
   const avoid = frequentRecentQuestions(opts.recentQuestions, 8);
-  const modeRule =
-    mode === 'technical'
+  const isHr = mode === 'hr' || opts.scriptType === 'SCRIPT_H';
+  const modeRule = isHr
+    ? `${HR_ROUND_RULES}\nEvery question must have category "behavioral" and question_type "behavioral".`
+    : mode === 'technical'
       ? 'Every question must be technical.'
-      : mode === 'hr'
-        ? 'Every question must be behavioral or situational. No technical questions.'
-        : 'Alternate technical and behavioral questions, starting with technical.';
+      : `Alternate technical and behavioral questions, starting with technical.\nFor the behavioral questions:\n${HR_ROUND_RULES}`;
 
   const prompt = [
     `Create ${poolSize} distinct CORE interview questions for one ${opts.role} candidate.`,
@@ -124,7 +141,9 @@ export async function generateCandidatePool(opts: {
     `Profile:${summary}`,
     jd ? `JD:${jd}` : 'JD:none',
     modeRule,
-    'Ground questions in this candidate\'s projects, skills, or the JD whenever those exist.',
+    isHr
+      ? 'Use the profile only to make an HR question personal (a project as the setting for a teamwork or ownership story, a career switch, a gap). Never ask about the tools, languages, or technical work in it.'
+      : 'Ground questions in this candidate\'s projects, skills, or the JD whenever those exist.',
     'Do not emit generic textbook questions such as stack versus heap, how a database index works, or CAP theorem unless the profile is specifically about that topic.',
     'No two questions may assess the same concept.',
     avoid.length > 0

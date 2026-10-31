@@ -24,21 +24,21 @@ function pickProgressFields(row: UserProgressRow): RetentionTierProgressPick {
  * Builds dashboard props from `user_progress` + `tier_config` for the upcoming tier (server-only I/O inside).
  * When no row exists yet, renders tier-1 scaffolding with gated progress preview.
  */
-async function loadLatestFailedSessionQualityFeedback(userId: string) {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from('session_quality_log')
-    .select(
-      'interview_id, session_score, questions_answered, total_questions, avg_answer_duration_sec, quality_met',
-    )
-    .eq('user_id', userId)
-    .order('completed_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+const SESSION_QUALITY_SELECT =
+  'interview_id, session_score, questions_answered, total_questions, avg_answer_duration_sec, quality_met' as const;
 
-  if (!data) return null;
+type SessionQualityRow = {
+  interview_id: string;
+  session_score: number;
+  questions_answered: number;
+  total_questions: number;
+  avg_answer_duration_sec: number;
+  quality_met: boolean;
+};
+
+function toQualityFeedback(data: SessionQualityRow) {
   return sessionQualityFeedbackFromLogRow({
-    interview_id: data.interview_id as string,
+    interview_id: data.interview_id,
     session_score: Number(data.session_score),
     questions_answered: Number(data.questions_answered),
     total_questions: Number(data.total_questions),
@@ -47,9 +47,48 @@ async function loadLatestFailedSessionQualityFeedback(userId: string) {
   });
 }
 
+/**
+ * One query answers both the weekly session count and the latest-session
+ * feedback: `count: 'exact'` returns the full week total while `limit(1)` keeps
+ * the payload to the single newest row. Only a user with no sessions this week
+ * needs the bounded fallback for their most recent session ever.
+ */
+async function loadSessionQualityWindow(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+  weekAgo: string,
+  wantLatest: boolean,
+): Promise<{ weeklySessions: number; latest: SessionQualityRow | null }> {
+  const { data, count } = await supabase
+    .from('session_quality_log')
+    .select(SESSION_QUALITY_SELECT, { count: 'exact' })
+    .eq('user_id', userId)
+    .gte('completed_at', weekAgo)
+    .order('completed_at', { ascending: false })
+    .limit(1);
+
+  const rows = (data ?? []) as SessionQualityRow[];
+  const weeklySessions = count ?? rows.length;
+  if (rows.length > 0 || !wantLatest) {
+    return { weeklySessions, latest: rows[0] ?? null };
+  }
+
+  const { data: older } = await supabase
+    .from('session_quality_log')
+    .select(SESSION_QUALITY_SELECT)
+    .eq('user_id', userId)
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return { weeklySessions, latest: (older as SessionQualityRow | null) ?? null };
+}
+
 export async function buildRetentionDashboardSnapFromRow(
   row: UserProgressRow | null,
   userId?: string,
+  /** Shared request client — avoids a second `createClient()` per dashboard load. */
+  client?: Awaited<ReturnType<typeof createClient>>,
 ): Promise<RetentionDashboardSnapshot> {
   const current_tier = row
     ? Math.min(MAX_TIER, Math.max(1, Math.round(Number(row.current_tier) || 1)))
@@ -70,24 +109,20 @@ export async function buildRetentionDashboardSnapFromRow(
       };
 
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const [nextCfg, lastSessionQualityFeedback, weeklyCountResult] = await Promise.all([
+  const [nextCfg, sessionQuality] = await Promise.all([
     current_tier < MAX_TIER ? getTierConfig(current_tier + 1) : Promise.resolve(null),
-    userId && total_sessions > 0
-      ? loadLatestFailedSessionQualityFeedback(userId)
-      : Promise.resolve(null),
     userId
-      ? createClient().then((supabase) =>
-          supabase
-            .from('session_quality_log')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId)
-            .gte('completed_at', weekAgo),
+      ? (client ? Promise.resolve(client) : createClient()).then((supabase) =>
+          loadSessionQualityWindow(supabase, userId, weekAgo, total_sessions > 0),
         )
-      : Promise.resolve({ count: undefined as number | undefined }),
+      : Promise.resolve(null),
   ]);
   const tierProgress =
     current_tier < MAX_TIER ? computeRetentionTierProgressView(progPick, nextCfg) : null;
-  const weeklySessions = userId ? (weeklyCountResult.count ?? 0) : undefined;
+  const weeklySessions = sessionQuality ? sessionQuality.weeklySessions : undefined;
+  const lastSessionQualityFeedback = sessionQuality?.latest
+    ? toQualityFeedback(sessionQuality.latest)
+    : null;
 
   const last5 = row?.last_5_sessions_avg ?? null;
   const overall = row?.overall_avg_score ?? null;

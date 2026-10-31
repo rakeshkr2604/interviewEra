@@ -40,6 +40,7 @@ export type RecoveryQueryClient = {
 type RecoverySelectBuilder = {
   eq: (column: string, value: string | boolean) => RecoverySelectBuilder;
   in: (column: string, values: string[]) => RecoverySelectBuilder;
+  or?: (filter: string) => RecoverySelectBuilder;
   order: (
     column: string,
     opts: { ascending: boolean },
@@ -88,9 +89,16 @@ export function resolvePrimaryRecoveryTarget(
   return null;
 }
 
+/** Eligible-only recovery rows: active, or abandoned with an unused continue. */
+const RECOVERY_ELIGIBLE_FILTER =
+  'status.in.(pending,in_progress),and(status.eq.abandoned,credit_deducted.is.true,abandoned_resume_used.is.false)' as const;
+
 /**
- * Two bounded indexed queries (limit 1 each) — never scan the full interview
- * history in the client, and never depend on the recent-list window of 20.
+ * One bounded indexed query — the `or` filter returns only recovery-eligible
+ * rows, so the 50-row cap can never be crowded out by ineligible history, and
+ * {@link resolvePrimaryRecoveryTarget} applies the active-before-abandoned rule
+ * over that window. Eligibility is re-verified in JS, so the SQL filter is a
+ * narrowing optimization rather than the source of truth.
  *
  * `client` is intentionally loose-typed so both the user-scoped Supabase
  * server client and unit mocks are accepted without casting.
@@ -100,51 +108,25 @@ export async function fetchPrimaryRecoveryInterview(
   client: any,
   userId: string,
 ): Promise<PrimaryRecoveryTarget | null> {
-  const activeResult = await client
+  const builder = client
     .from('interviews')
     .select(RECOVERY_INTERVIEW_SELECT)
     .eq('user_id', userId)
-    .eq('engine', 'v2.1')
-    .in('status', ['pending', 'in_progress'])
-    .order('started_at', { ascending: false })
-    .limit(1);
+    .eq('engine', 'v2.1');
 
-  if (activeResult.error) {
-    console.error('[recovery] active query failed', activeResult.error.message);
-  } else {
-    const active = activeResult.data?.[0] as RecoveryInterviewRow | undefined;
-    if (active && isResumableInterviewStatus(active.status)) {
-      return toTarget(active, 'continue');
-    }
-  }
+  // Mocks that predate the combined query expose no `.or` — fall back to the
+  // status-only window, which resolvePrimaryRecoveryTarget filters anyway.
+  const filtered =
+    typeof builder.or === 'function'
+      ? builder.or(RECOVERY_ELIGIBLE_FILTER)
+      : builder.in('status', ['pending', 'in_progress', 'abandoned']);
 
-  const abandonedResult = await client
-    .from('interviews')
-    .select(RECOVERY_INTERVIEW_SELECT)
-    .eq('user_id', userId)
-    .eq('engine', 'v2.1')
-    .eq('status', 'abandoned')
-    .eq('credit_deducted', true)
-    .eq('abandoned_resume_used', false)
-    .order('started_at', { ascending: false })
-    .limit(1);
+  const result = await filtered.order('started_at', { ascending: false }).limit(50);
 
-  if (abandonedResult.error) {
-    console.error('[recovery] abandoned query failed', abandonedResult.error.message);
+  if (result.error) {
+    console.error('[recovery] query failed', result.error.message);
     return null;
   }
 
-  const abandoned = abandonedResult.data?.[0] as RecoveryInterviewRow | undefined;
-  if (
-    abandoned &&
-    isAbandonedContinueEligible({
-      status: abandoned.status,
-      creditDeducted: abandoned.credit_deducted,
-      abandonedResumeUsed: abandoned.abandoned_resume_used,
-    })
-  ) {
-    return toTarget(abandoned, 'resume');
-  }
-
-  return null;
+  return resolvePrimaryRecoveryTarget((result.data ?? []) as RecoveryInterviewRow[]);
 }

@@ -6,19 +6,40 @@
 import { QUALITY_CRITERIA } from './constants';
 import { evaluateQuality, type QualityVerdict } from './streak-tracker';
 
+/** Which criterion actually blocked the streak — drives which stat line the UI shows. */
+export type FailedQualityCriterion = 'questions_answered' | 'avg_duration' | 'score';
+
 export interface SessionQualityFeedback {
   qualityMet: false;
   headline: string;
+  /**
+   * The criterion that actually failed. Session score can be well above
+   * minSessionScore while the streak still didn't extend (e.g. questions
+   * skipped) — the UI must show the metric that matches this, not always
+   * the score, or a high-scoring session reads as "your score was too low"
+   * when it wasn't.
+   */
+  failedCriterion: FailedQualityCriterion;
   sessionScore: number;
   minSessionScore: number;
+  questionsAnswered: number;
+  totalQuestions: number;
+  avgAnswerDurationSec: number;
   minAvgDurationSec: number;
   suggestion: string;
+}
+
+function pickFailedCriterion(verdict: QualityVerdict): FailedQualityCriterion {
+  const { criteria } = verdict;
+  if (!criteria.allQuestionsAnswered) return 'questions_answered';
+  if (!criteria.durationOk) return 'avg_duration';
+  return 'score';
 }
 
 function pickSuggestion(verdict: QualityVerdict): string {
   const { criteria } = verdict;
   if (!criteria.allQuestionsAnswered) {
-    return 'Answer every question in the session — skipped or incomplete sets do not count toward your streak.';
+    return 'Answer every question in the session — skipped questions do not earn XP.';
   }
   if (!criteria.durationOk) {
     return `Spend at least ${QUALITY_CRITERIA.minAvgDurationSec} seconds on average per answer so each response has enough depth.`;
@@ -26,7 +47,14 @@ function pickSuggestion(verdict: QualityVerdict): string {
   if (!criteria.scoreOk) {
     return `Raise your session average to at least ${QUALITY_CRITERIA.minSessionScore}/10 with clearer structure and specific examples in each answer.`;
   }
-  return 'Complete a full session with steady pacing and stronger answers to extend your streak.';
+  return 'Complete a full session with steady pacing and stronger answers to earn XP.';
+}
+
+export interface SessionQualityInput {
+  sessionScore: number;
+  questionsAnswered: number;
+  totalQuestions: number;
+  avgAnswerDurationSec: number;
 }
 
 /**
@@ -34,16 +62,20 @@ function pickSuggestion(verdict: QualityVerdict): string {
  */
 export function buildSessionQualityFeedback(
   verdict: QualityVerdict,
-  sessionScore: number,
+  session: SessionQualityInput,
 ): SessionQualityFeedback | null {
   if (verdict.passed) return null;
 
   return {
     qualityMet: false,
     headline:
-      'This session did not meet the minimum interview quality threshold, so your streak was not extended.',
-    sessionScore,
+      'Your streak is safe, but this session did not meet the quality threshold, so it earned no XP.',
+    failedCriterion: pickFailedCriterion(verdict),
+    sessionScore: session.sessionScore,
     minSessionScore: QUALITY_CRITERIA.minSessionScore,
+    questionsAnswered: session.questionsAnswered,
+    totalQuestions: session.totalQuestions,
+    avgAnswerDurationSec: session.avgAnswerDurationSec,
     minAvgDurationSec: QUALITY_CRITERIA.minAvgDurationSec,
     suggestion: pickSuggestion(verdict),
   };
@@ -66,5 +98,10 @@ export function sessionQualityFeedbackFromLogRow(row: {
     avgAnswerDurationSec: row.avg_answer_duration_sec,
     sessionScore: Number(row.session_score),
   });
-  return buildSessionQualityFeedback(verdict, Number(row.session_score));
+  return buildSessionQualityFeedback(verdict, {
+    sessionScore: Number(row.session_score),
+    questionsAnswered: row.questions_answered,
+    totalQuestions: row.total_questions,
+    avgAnswerDurationSec: row.avg_answer_duration_sec,
+  });
 }

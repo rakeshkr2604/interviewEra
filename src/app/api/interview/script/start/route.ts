@@ -4,7 +4,6 @@ import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { createInterviewWithCredit } from '@/lib/utils/credits';
 import { checkRateLimit, buildRateLimitHttpResponse } from '@/lib/redis/rate-limit';
 import type { ScriptType } from '@/lib/ai/scripts/script-loader';
-import { createResumeInterviewSnapshot } from '@/lib/resume/interview-snapshot';
 import { setQuestionPlanStatus } from '@/lib/interview/question-plan/persist';
 import { trackInterviewEvent } from '@/lib/analytics/interview-events';
 import { persistMilestoneEventOnce } from '@/lib/analytics/milestone-events-store';
@@ -15,7 +14,7 @@ import {
 } from '@/lib/interview/active-interview-policy';
 
 const scriptStartSchema = z.object({
-  resumeId: z.string().uuid(),
+  resumeId: z.string().uuid().optional(),
   role: z.string().min(1).max(100),
   difficulty: z.enum(['easy', 'medium', 'hard']),
   interviewerId: z.enum(['priya', 'arjun']),
@@ -118,22 +117,24 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     const serviceClient = createServiceClient();
 
-    // Step 4 — validate resume is usable (parsed / review_ready / verified)
-    const { data: resumeRow, error: resumeErr } = await serviceClient
-      .from('resumes')
-      .select('id, status, lifecycle_status, deleted_at')
-      .eq('id', resumeId)
-      .eq('user_id', user.id)
-      .maybeSingle();
+    // Step 4 — validate resume if provided
+    if (resumeId) {
+      const { data: resumeRow, error: resumeErr } = await serviceClient
+        .from('resumes')
+        .select('id, status, deleted_at')
+        .eq('id', resumeId)
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (resumeErr || !resumeRow || resumeRow.deleted_at) {
-      return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
-    }
-    if (resumeRow.status !== 'parsed') {
-      return NextResponse.json(
-        { error: 'Resume is not ready. Finish parsing before starting an interview.' },
-        { status: 422 },
-      );
+      if (resumeErr || !resumeRow || resumeRow.deleted_at) {
+        return NextResponse.json({ error: 'Resume not found' }, { status: 404 });
+      }
+      if (resumeRow.status !== 'parsed') {
+        return NextResponse.json(
+          { error: 'Resume is not ready. Finish parsing before starting an interview.' },
+          { status: 422 },
+        );
+      }
     }
 
     // Step 5 — duplicate prevention. A retry reuses the just-created script
@@ -141,18 +142,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Stale vs genuine-active is decided inside create_interview_with_credit;
     // do not 409 here on every pending/in_progress row.
     const recentCutoff = new Date(Date.now() - 90_000).toISOString();
-    const { data: recentInterview, error: recentError } = await serviceClient
+    let recentQuery = serviceClient
       .from('interviews')
       .select('id')
       .eq('user_id', user.id)
-      .eq('resume_id', resumeId)
       .eq('role', role)
       .eq('engine', 'v2.1')
       .eq('status', 'in_progress')
       .gte('created_at', recentCutoff)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
+    if (resumeId) recentQuery = recentQuery.eq('resume_id', resumeId);
+    const { data: recentInterview, error: recentError } = await recentQuery.maybeSingle();
 
     if (recentError) {
       console.error('[interview/script/start] recent-interview lookup failed', {
@@ -190,7 +191,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // Step 7 — atomically create the v2.1 interview and its linked credit debit.
     const creditResult = await createInterviewWithCredit({
       userId: user.id,
-      resumeId,
+      resumeId: resumeId ?? null,
       role,
       difficulty,
       questionCount,
@@ -240,20 +241,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       });
     }
 
-    // Step 8 — freeze resume content for this interview (immutable snapshot)
-    const snapshot = await createResumeInterviewSnapshot(serviceClient, {
-      interviewId,
-      resumeId,
-      jobDescription,
-    });
-    if (!snapshot) {
-      console.warn('[interview/script/start] snapshot not created; turn will use live fallback', {
-        interviewId,
-        resumeId,
-      });
-    }
-
-    // Step 8b — mark this interview for a persisted core plan.
+    // Step 8 — mark this interview for a persisted core plan.
     // Generation runs on the first turn so startup stays inside the 30s route budget.
     // Interviews created before this marker stay on the legacy turn path.
     await setQuestionPlanStatus(serviceClient, interviewId, 'pending');
@@ -285,7 +273,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       {
         interviewId,
         scriptType,
-        resumeSnapshotId: snapshot?.id ?? null,
+        resumeSnapshotId: null,
       },
       { status: 201 },
     );

@@ -1,19 +1,24 @@
 import { redirect } from 'next/navigation'
 import { DashboardMain } from './DashboardMain'
-import { DashboardHeaderActions } from '@/components/dashboard/DashboardHeaderActions'
+import { DashboardHeroGreeting } from '@/components/dashboard/DashboardHeroGreeting'
 import { UserSummaryCard } from '@/components/dashboard/UserSummaryCard'
+import { DashboardAccountLinksCard } from '@/components/dashboard/DashboardAccountLinksCard'
 import { CreditsOverviewCard } from '@/components/dashboard/CreditsOverviewCard'
+import { DashboardProgressOverview } from '@/components/dashboard/DashboardProgressOverview'
+import { DashboardReadinessCard } from '@/components/dashboard/DashboardReadinessCard'
+import { DashboardScoreTrendSection } from '@/components/dashboard/DashboardScoreTrendSection'
 import { QuickActionsGrid } from '@/components/dashboard/QuickActionsGrid'
 import { RetentionProgressCard } from '@/components/dashboard/RetentionProgressCard'
 import { DashboardCommunityCard } from '@/components/community/DashboardCommunityCard'
 import { ProfileCompletionCard } from '@/components/dashboard/ProfileCompletionCard'
-import { ReadinessOverviewCard } from '@/components/candidate/ReadinessOverviewCard'
+import { ReadinessFocusAreas } from '@/components/candidate/ReadinessFocusAreas'
 import { RecommendationsStrip } from '@/components/candidate/RecommendationsStrip'
 import { computeReadinessScore } from '@/lib/candidate/readiness-score'
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap'
 import { loadDashboardPageData } from '@/lib/dashboard/load-dashboard-page-data'
+import { buildDashboardFocusAreas } from '@/lib/dashboard/focus-areas'
+import { REPORT_DIMENSION_LABELS } from '@/lib/utils/report-radar-dimensions'
 import { formatDateEnIn } from '@/lib/datetime/ist'
-import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
 import { resolveProfileOnboarding } from '@/lib/profile/onboarding-state'
 import type { PlanTier } from '@/types/app.types'
 import type { User } from '@supabase/supabase-js'
@@ -23,37 +28,70 @@ export async function DashboardPageBody({ user }: { user: User }) {
     userData,
     interviewsRaw,
     rows,
+    progressInterviews,
     completedCount,
     recoveryTarget,
     retentionDashboardSnap,
     candidateSnapshot,
   } = await loadDashboardPageData(user.id)
 
-  const reports = rows.flatMap((i) => {
-    if (i.status !== 'completed') return []
+  type ScoredReport = { overall_score: number; generated_at: string | null }
+
+  // Build scored reports from progressInterviews (50 most recent completed) so the
+  // trend chart and avg score reflect actual history, not just the activity-list rows.
+  const reports: ScoredReport[] = progressInterviews.flatMap((i): ScoredReport[] => {
     if (i.engine === 'v2.1') {
-      return (i.script_interview_reports ?? [])
+      return (Array.isArray(i.script_interview_reports) ? i.script_interview_reports : [])
         .filter((r) => (r.status === 'ready' || r.status === 'partial') && r.overall != null)
-        .map((r) => ({ overall_score: Number(r.overall) }))
+        .map((r) => ({ overall_score: Number(r.overall), generated_at: r.generated_at ?? null }))
     }
-    return (i.reports ?? []).map((r) => ({
-      overall_score: r.overall_score,
-    }))
+    return (Array.isArray(i.reports) ? i.reports : [])
+      .filter((r) => r.overall_score != null)
+      .map((r) => ({ overall_score: Number(r.overall_score), generated_at: r.generated_at }))
   })
   const avgScore =
     reports.length > 0
       ? (reports.reduce((s, r) => s + (r.overall_score || 0), 0) / reports.length).toFixed(1)
       : null
 
+  // Chronological (oldest → newest) for the trend chart's x-axis.
+  const chronologicalReports = [...reports]
+    .filter((r) => r.generated_at != null)
+    .sort((a, b) => Date.parse(a.generated_at as string) - Date.parse(b.generated_at as string))
+
+  const trendPoints = chronologicalReports.map((r, idx) => ({
+    label: `#${idx + 1}`,
+    score: r.overall_score,
+  }))
+
+  // Progress-overview window math: 50 most recent completed interviews, scored or not.
+  // Use completed_at when set; fall back to started_at (legacy rows may lack completed_at).
+  // Score is null when no report is ready yet — overview counts all completed sessions
+  // but only averages scored ones. Uses a dedicated query (not the activity-list rows)
+  // so that recently-started-but-not-completed interviews don't crowd out completed ones.
+  const progressPoints = progressInterviews
+    .flatMap((i) => {
+      const completedAt = i.completed_at ?? i.started_at
+      if (!completedAt) return []
+      let score: number | null = null
+      if (i.engine === 'v2.1') {
+        const sirs = Array.isArray(i.script_interview_reports) ? i.script_interview_reports : []
+        const rep = sirs.find((r) => (r.status === 'ready' || r.status === 'partial') && r.overall != null)
+        score = rep?.overall != null ? Number(rep.overall) : null
+      } else {
+        const reps = Array.isArray(i.reports) ? i.reports : []
+        const rep = reps.find((r) => r.overall_score != null)
+        score = rep?.overall_score != null ? Number(rep.overall_score) : null
+      }
+      return [{ completedAt, score }]
+    })
+    .sort((a, b) => Date.parse(a.completedAt) - Date.parse(b.completedAt))
+
   const memberSince = userData?.created_at ? formatDateEnIn(userData.created_at) : ''
   const creditsRemaining = userData?.credits_remaining ?? 0
   const displayName = userData?.name || user.email?.split('@')[0] || 'Student'
   const planTier = (userData?.plan_tier ?? 'free') as PlanTier
   const currentStreak = retentionDashboardSnap?.current_streak ?? 0
-  const profileEmail = user.email ?? ''
-  const avatarPath =
-    userData && typeof userData.avatar_path === 'string' ? userData.avatar_path : null
-  const oauthPictureUrl = resolveOAuthPictureUrl(user.user_metadata)
 
   const recoveryInterview = recoveryTarget
     ? {
@@ -77,22 +115,23 @@ export async function DashboardPageBody({ user }: { user: User }) {
 
   const readiness = computeReadinessScore(candidateSnapshot)
   const roadmap = generatePersonalizedRoadmap(candidateSnapshot)
+  const focusAreas = buildDashboardFocusAreas(candidateSnapshot.dimensionAverages, 5)
+  const weakDimensionLabels = roadmap.weakDimensions.map((d) => REPORT_DIMENSION_LABELS[d])
 
   return (
     <>
+      <DashboardHeroGreeting displayName={displayName} />
+
       <div className="dashboard-section grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:items-stretch lg:gap-6 xl:gap-8">
-        <UserSummaryCard
-          userData={userData}
-          displayName={displayName}
-          memberSince={memberSince}
-          completedCount={completedCount}
-          avgScore={avgScore}
-          currentStreak={currentStreak}
-          email={profileEmail}
-          avatarPath={avatarPath}
-          oauthPictureUrl={oauthPictureUrl}
-          recoveryInterview={recoveryInterview}
-        />
+        <div className="flex h-full flex-col gap-3 sm:gap-4">
+          <UserSummaryCard
+            userData={userData}
+            recoveryInterview={recoveryInterview}
+            targetRole={roadmap.targetRole}
+            weakDimensionLabels={weakDimensionLabels}
+          />
+          <DashboardAccountLinksCard memberSince={memberSince} />
+        </div>
 
         <CreditsOverviewCard
           creditsRemaining={creditsRemaining}
@@ -105,38 +144,32 @@ export async function DashboardPageBody({ user }: { user: User }) {
 
       <ProfileCompletionCard resolution={profileOnboarding} />
 
-      <QuickActionsGrid resumeCompletionPct={candidateSnapshot.resumeCompletionPct} />
+      <DashboardProgressOverview
+        points={progressPoints}
+        lifetimeCompletedCount={completedCount}
+        currentStreak={currentStreak}
+      />
 
-      <ReadinessOverviewCard readiness={readiness} />
+      <div className="dashboard-section grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:gap-6 xl:gap-8">
+        <DashboardReadinessCard readiness={readiness} />
+        <DashboardScoreTrendSection points={trendPoints} avgScore={avgScore} />
+      </div>
+
+      <QuickActionsGrid />
 
       {profileOnboarding.state === 'complete' ? (
-        <RecommendationsStrip roadmap={roadmap} />
+        <div className="dashboard-section grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:gap-6 xl:gap-8">
+          <RecommendationsStrip roadmap={roadmap} />
+          <ReadinessFocusAreas areas={focusAreas} />
+        </div>
       ) : null}
 
       <DashboardCommunityCard />
 
-      <RetentionProgressCard snap={retentionDashboardSnap} />
-
-      <div className="dashboard-section">
-        <DashboardMain
-          rows={rows}
-          userData={userData}
-          avgScore={avgScore}
-          currentStreak={currentStreak}
-        />
+      <div className="dashboard-section grid grid-cols-1 gap-3 sm:gap-4 lg:grid-cols-2 lg:gap-6 xl:gap-8">
+        <DashboardMain rows={rows} />
+        <RetentionProgressCard snap={retentionDashboardSnap} />
       </div>
     </>
-  )
-}
-
-export async function DashboardHeaderActionsFromData({ userId }: { userId: string }) {
-  const { userData } = await loadDashboardPageData(userId)
-  return (
-    <DashboardHeaderActions
-      creditsRemaining={userData?.credits_remaining ?? 0}
-      planTier={userData?.plan_tier}
-      planExpiresAt={userData?.plan_expires_at}
-      planStatus={userData?.plan_status}
-    />
   )
 }

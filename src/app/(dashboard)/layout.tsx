@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { DashboardChrome } from '@/components/layout/DashboardChrome'
 import { isPlatformAdminUser } from '@/lib/admin/auth'
 import { assertCoachAccess } from '@/lib/coach/access'
+import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
 import {
   dashboardPerfMark,
   dashboardPerfNow,
@@ -28,6 +29,12 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   let canAccessAdmin = false
   let isPlatformAdmin = false
   let canAccessCoach = false
+  let topBarUser: {
+    displayName: string
+    email: string
+    avatarPath: string | null
+    oauthPictureUrl: string | null
+  } | null = null
 
   if (user) {
     const chromeStarted = dashboardPerfNow()
@@ -47,6 +54,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     canAccessCoach = coachAccess.allowed
     const streak = Number(progress?.current_streak ?? 0)
     initialStreak = Number.isFinite(streak) ? streak : 0
+
+    topBarUser = {
+      displayName: profile?.name || user.email?.split('@')[0] || 'Student',
+      email: user.email ?? '',
+      avatarPath: (profile && typeof profile.avatar_path === 'string' ? profile.avatar_path : null) ?? null,
+      oauthPictureUrl: resolveOAuthPictureUrl(user.user_metadata),
+    }
   }
 
   dashboardPerfMark('layout.total', layoutStarted)
@@ -57,6 +71,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
       canAccessAdmin={canAccessAdmin}
       showWorkspaceSwitcher={isPlatformAdmin}
       canAccessCoach={canAccessCoach}
+      topBarUser={topBarUser}
     >
       {children}
     </DashboardChrome>

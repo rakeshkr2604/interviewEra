@@ -63,6 +63,7 @@ import {
   resolveFollowUpGenerationContext,
 } from '@/lib/ai/scripts/follow-up-context';
 import { nextScriptMCoreQuestionType } from '@/lib/ai/scripts/script-m-progression';
+import { rewriteHypotheticalBehavioralTurn } from '@/lib/ai/scripts/hypothetical-framing-guard';
 import {
   assignedCoreDirective,
   bindPlannedCoreQuestion,
@@ -372,8 +373,44 @@ export async function POST(request: Request): Promise<NextResponse> {
           interview.skips_used,
         );
       }
-      // Row missing despite advanced index — fall through to normal generation
-      // (unique constraint still protects concurrent duplicates).
+      // Row missing despite advanced index. For a [NONE] boot mid-interview,
+      // try the latest available turn rather than generating a fresh warmup
+      // (which would 422 or duplicate-greet a candidate already in core).
+      if (lastAnswer === '[NONE]' && !resumeErr) {
+        const { data: latestRow } = await serviceClient
+          .from('script_turns')
+          .select('turn_index, llm_output, phase, is_question')
+          .eq('interview_id', interviewId)
+          .order('turn_index', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (latestRow?.llm_output) {
+          let turnForResponse: ScriptTurnOutput;
+          try {
+            turnForResponse = validateTurnOutput(latestRow.llm_output, interview.script_type);
+          } catch {
+            turnForResponse = latestRow.llm_output as ScriptTurnOutput;
+            if (turnForResponse.is_follow_up === undefined) {
+              turnForResponse = { ...turnForResponse, is_follow_up: false };
+            }
+          }
+          console.warn(
+            JSON.stringify({
+              event: 'turn_boot_fallback_latest',
+              interviewId,
+              resumeTurnIndex,
+              fallbackTurnIndex: latestRow.turn_index,
+            }),
+          );
+          return turnResponse(
+            turnForResponse,
+            latestRow.turn_index as number,
+            interviewId,
+            0,
+            interview.skips_used,
+          );
+        }
+      }
       console.warn(
         `[interview/script/turn] idempotent resume index=${resumeTurnIndex} missing row (interviewId=${interviewId}) — generating`,
       );
@@ -1018,6 +1055,17 @@ export async function POST(request: Request): Promise<NextResponse> {
         context: planContext,
       });
       validated = coreBinding.turn;
+
+      // After binding: the plan replaces display_question, so a guard applied
+      // earlier would never reach the candidate.
+      const isBehavioralTurn =
+        interview.script_type === 'SCRIPT_H' ||
+        (interview.script_type === 'SCRIPT_M' && validated.question_type === 'behavioral');
+      validated = rewriteHypotheticalBehavioralTurn(validated, {
+        isBehavioral: isBehavioralTurn,
+        interviewId,
+        turnIndex: interview.current_turn_index + 1,
+      });
 
       // Authority may replace speech/display_question (canned CQ / self_intro)
       // and canonicalizes speech to optional-bridge + exact display_question.

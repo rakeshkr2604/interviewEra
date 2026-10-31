@@ -34,10 +34,13 @@ describe('Phase 1 resume discoverability contracts', () => {
     expect(cta).toContain('requestInterviewResume');
     expect(cta).toContain('Continue interview');
     expect(cta).toContain('Resume interview');
+    // Single eligible-only query: engine scope is a literal filter, the
+    // abandoned-eligibility predicates live in the `or` filter, and the read
+    // stays row-bounded.
     expect(fetchSrc).toContain(".eq('engine', 'v2.1')");
-    expect(fetchSrc).toContain(".eq('credit_deducted', true)");
-    expect(fetchSrc).toContain(".eq('abandoned_resume_used', false)");
-    expect(fetchSrc).toContain('.limit(1)');
+    expect(fetchSrc).toContain('credit_deducted.is.true');
+    expect(fetchSrc).toContain('abandoned_resume_used.is.false');
+    expect(fetchSrc).toMatch(/\.limit\(\d+\)/);
   });
 
   it('History CTAs distinguish Continue vs Resume interview', () => {

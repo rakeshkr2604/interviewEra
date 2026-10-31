@@ -31,7 +31,11 @@ export function isPlatformAdmin(email: string): boolean {
   return getPlatformAdminEmails().has(email.toLowerCase());
 }
 
-async function isPlatformRoleAdmin(userId: string): Promise<boolean> {
+/**
+ * Request-scoped `cache()` — the dashboard layout and the coach-access gate both
+ * ask for this on the same render, and the answer cannot change mid-request.
+ */
+const isPlatformRoleAdmin = cache(async (userId: string): Promise<boolean> => {
   try {
     const svc = createServiceClient();
     const { data: profile } = await svc
@@ -43,7 +47,7 @@ async function isPlatformRoleAdmin(userId: string): Promise<boolean> {
   } catch {
     return false;
   }
-}
+});
 
 /** Request-scoped verified user (auth.getUser). Never caches across requests. */
 export const getVerifiedPlatformUser = cache(async () => {

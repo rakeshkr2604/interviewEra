@@ -623,7 +623,7 @@ describe('processInterviewRetention — v2.1 script engine', () => {
     });
   });
 
-  it('8.2/10 session that fails duration does not increment streak', async () => {
+  it('8.2/10 session that fails duration earns no XP but still counts for the streak', async () => {
     db.interviews = [
       {
         id: IV_V21,
@@ -654,8 +654,8 @@ describe('processInterviewRetention — v2.1 script engine', () => {
 
     expect(result.sessionLogged).toBe(true);
     expect(result.qualityMet).toBe(false);
-    expect(result.streak).toBe(0);
-    expect(db.user_progress[0].current_streak).toBe(0);
+    expect(result.streak).toBe(1);
+    expect(db.user_progress[0].current_streak).toBe(1);
     expect(db.user_progress[0].total_xp).toBe(0);
     expect(db.session_quality_log[0]).toMatchObject({
       session_score: 8.2,
@@ -664,7 +664,7 @@ describe('processInterviewRetention — v2.1 script engine', () => {
     });
   });
 
-  it('score below 6.0 does not qualify even with valid duration', async () => {
+  it('score below minimum does not qualify even with valid duration', async () => {
     db.interviews = [
       {
         id: IV_V21,
@@ -682,13 +682,13 @@ describe('processInterviewRetention — v2.1 script engine', () => {
       coreAnswerTurn(4, '2026-10-09T13:18:14.000Z', '2026-10-09T13:20:14.000Z'),
     ];
     db.answer_evaluations = [
-      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 5.0, dimensions: scriptEvalDims(5) },
-      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 5.0, dimensions: scriptEvalDims(5) },
+      { interview_id: IV_V21, turn_index: 3, status: 'scored', overall: 4.0, dimensions: scriptEvalDims(4) },
+      { interview_id: IV_V21, turn_index: 4, status: 'scored', overall: 4.0, dimensions: scriptEvalDims(4) },
     ];
 
     const result = await processInterviewRetention(USER_UUID, IV_V21);
     expect(result.qualityMet).toBe(false);
-    expect(result.streak).toBe(0);
+    expect(result.streak).toBe(1);
     expect(db.session_quality_log[0].quality_met).toBe(false);
   });
 
@@ -729,7 +729,7 @@ describe('processInterviewRetention — v2.1 script engine', () => {
     const result = await processInterviewRetention(USER_UUID, IV_V21);
     expect(result.qualityMet).toBe(false);
     expect(db.session_quality_log[0].avg_answer_duration_sec).toBe(0);
-    expect(db.user_progress[0].current_streak).toBe(0);
+    expect(db.user_progress[0].total_xp).toBe(0);
   });
 
   it('missing evaluation set is an observable recoverable failure', async () => {

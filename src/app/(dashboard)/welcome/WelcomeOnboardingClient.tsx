@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CheckCircle2, ChevronLeft, ChevronRight, FileText, Sparkles } from 'lucide-react';
 import { StepIndicator } from '@/components/onboarding/StepIndicator';
-import { ResumeUploadPanel } from '@/components/resume/workspace/ResumeUploadPanel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,10 +28,9 @@ type OnboardingResponse = {
     preferredRole: string;
     experienceLevel: ExperienceLevel | null;
   };
-  resume: { id: string; status: string; isPrimary: boolean } | null;
 };
 
-const STEP_LABELS = ['You & role', 'Experience', 'Resume', 'Ready'];
+const STEP_LABELS = ['You & role', 'Experience', 'Ready'];
 const EXPERIENCE_OPTIONS: Array<{ value: ExperienceLevel; label: string; detail: string }> = [
   { value: 'fresher', label: 'Student / Fresher', detail: 'No full-time experience yet' },
   { value: 'junior', label: 'Junior', detail: '1–2 years' },
@@ -57,15 +55,16 @@ async function saveAction(body: Record<string, unknown>): Promise<OnboardingResp
 export function WelcomeOnboardingClient({ initial }: { initial: OnboardingResponse }) {
   const router = useRouter();
   const [serverState, setServerState] = useState(initial);
-  const [step, setStep] = useState<ProfileOnboardingStep>(initial.firstMissingStep);
+  // Step 3 (resume) is skipped — map it to step 4 (Ready) so the UI lands on the summary screen.
+  const resolvedInitialStep: ProfileOnboardingStep =
+    initial.firstMissingStep === 3 ? 4 : initial.firstMissingStep;
+  const [step, setStep] = useState<ProfileOnboardingStep>(resolvedInitialStep);
   const [name, setName] = useState(initial.profile.name.toLowerCase() === 'user' ? '' : initial.profile.name);
   const [preferredRole, setPreferredRole] = useState(initial.profile.preferredRole);
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel | null>(
     initial.profile.experienceLevel,
   );
-  const [resume, setResume] = useState(initial.resume);
   const [busy, setBusy] = useState(false);
-  const [uploadBusy, setUploadBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -94,7 +93,7 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
     setBusy(true);
     setError('');
     try {
-      await saveAction({ action: 'complete', resumeId: resume?.id ?? null });
+      await saveAction({ action: 'complete' });
       router.push(destination);
       router.refresh();
     } catch (saveError) {
@@ -102,6 +101,9 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
       setBusy(false);
     }
   };
+
+  // Map internal step (1,2,4) to visible indicator step (1,2,3) for the 3-step UI.
+  const indicatorStep: ProfileOnboardingStep = step === 4 ? 3 : step;
 
   return (
     <div className="mx-auto w-full max-w-4xl overflow-x-hidden pb-8">
@@ -122,7 +124,7 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
           Three short steps help InterviewEra tailor practice without turning signup into a long form.
         </p>
         <div className="mx-auto mt-4 max-w-xl">
-          <StepIndicator currentStep={step} totalSteps={4} labels={STEP_LABELS} />
+          <StepIndicator currentStep={indicatorStep} totalSteps={3} labels={STEP_LABELS} />
         </div>
       </header>
 
@@ -231,61 +233,6 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
                 experienceLevel &&
                 void runSave(
                   { action: 'save-step', step: 2, experienceLevel },
-                  3,
-                )
-              }
-            />
-          </div>
-        ) : null}
-
-        {step === 3 ? (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Make practice resume-aware</h2>
-              <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                InterviewEra uses your resume to ask questions about your actual experience.
-              </p>
-            </div>
-            {resume ? (
-              <div
-                className="flex items-center gap-3 rounded-2xl border p-4"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--accent-success) 45%, var(--card-border))',
-                  background: 'color-mix(in srgb, var(--accent-success) 8%, var(--card-bg))',
-                }}
-              >
-                <CheckCircle2 className="size-5 shrink-0" style={{ color: 'var(--accent-success)' }} aria-hidden />
-                <div>
-                  <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Resume already added</p>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                    {resume.isPrimary ? 'Primary resume' : 'Active resume'} · {resume.status}
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <ResumeUploadPanel
-                compactEmpty
-                analyticsSource="profile_onboarding"
-                title="Add your resume"
-                subtitle="PDF or TXT · max 4 MB · InterviewEra uses it to tailor questions and preparation."
-                onBusyChange={setUploadBusy}
-                onSuccess={(payload) => {
-                  const uploaded = { id: payload.resumeId, status: 'parsed', isPrimary: true };
-                  setResume(uploaded);
-                  void runSave(
-                    { action: 'save-step', step: 3, resumeId: payload.resumeId },
-                    4,
-                  );
-                }}
-              />
-            )}
-            <NavigationRow
-              busy={busy || uploadBusy}
-              continueLabel={resume ? 'Continue' : 'Skip for now'}
-              onBack={() => setStep(2)}
-              onContinue={() =>
-                void runSave(
-                  { action: 'save-step', step: 3, resumeId: resume?.id ?? null },
                   4,
                 )
               }
@@ -310,11 +257,10 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
                 value={EXPERIENCE_OPTIONS.find((option) => option.value === experienceLevel)?.label ?? 'Missing'}
                 onEdit={() => setStep(2)}
               />
-              <SummaryRow label="Resume" value={resume ? 'Added' : 'Not added'} onEdit={() => setStep(3)} />
             </div>
             {serverState.completionPercentage < 100 ? (
               <p className="text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                Missing: {serverState.missingFields.map(profileFieldLabel).join(', ') || 'Resume'}
+                Missing: {serverState.missingFields.map(profileFieldLabel).join(', ') || 'None'}
               </p>
             ) : null}
             <div className="grid gap-3 sm:grid-cols-2">
@@ -338,7 +284,7 @@ export function WelcomeOnboardingClient({ initial }: { initial: OnboardingRespon
               type="button"
               className="mx-auto flex min-h-10 items-center gap-1 text-sm font-medium"
               style={{ color: 'var(--text-secondary)' }}
-              onClick={() => setStep(3)}
+              onClick={() => setStep(2)}
             >
               <ChevronLeft className="size-4" aria-hidden /> Back
             </button>

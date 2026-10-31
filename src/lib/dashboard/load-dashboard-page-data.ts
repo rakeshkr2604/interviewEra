@@ -1,4 +1,4 @@
-import type { InterviewWithReportsRow, UserRow } from '@/app/(dashboard)/dashboard/dashboard-types'
+import type { InterviewWithReportsRow, ProgressInterviewRow, UserRow } from '@/app/(dashboard)/dashboard/dashboard-types'
 import type { RetentionDashboardSnapshot } from '@/components/dashboard/RetentionProgressCard'
 import {
   CANDIDATE_DASHBOARD_INTERVIEWS_SELECT,
@@ -38,6 +38,8 @@ export type DashboardPageData = {
   userError: { message: string } | null
   interviewsRaw: InterviewWithReportsRow[]
   rows: InterviewWithReportsRow[]
+  /** 50 most recent completed interviews — used for 7d/30d progress window stats. */
+  progressInterviews: ProgressInterviewRow[]
   completedCount: number
   recoveryTarget: PrimaryRecoveryTarget | null
   retentionDashboardSnap: RetentionDashboardSnapshot | null
@@ -56,6 +58,14 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
   const loaderStarted = dashboardPerfNow()
   const supabase = await getCachedSupabase()
 
+  // Progress Overview shows 7d/30d windows plus a delta against the *preceding*
+  // window, so 60 days is the real data requirement. Bounding by date keeps the
+  // read on the (user_id, status, started_at) index instead of walking back
+  // through unbounded history for a fixed row count.
+  const progressWindowStart = new Date(
+    Date.now() - 60 * 24 * 60 * 60 * 1000,
+  ).toISOString()
+
   const wave1Started = dashboardPerfNow()
   const [
     { data: userData, error: userError },
@@ -65,6 +75,7 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
     recoveryTarget,
     { data: resumes },
     { data: enrollment },
+    { data: progressInterviewsRaw },
   ] = await Promise.all([
     timedDashboardSpan('wave1.userRow', () => getCachedDashboardUserRow(userId), {
       cached: true,
@@ -107,8 +118,18 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
         .eq('enrollment_status', 'active')
         .maybeSingle(),
     ),
+    timedDashboardSpan('wave1.progressInterviews', () =>
+      supabase
+        .from('interviews')
+        .select('id, started_at, completed_at, engine, reports(id, overall_score, generated_at)')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .gte('started_at', progressWindowStart)
+        .order('started_at', { ascending: false })
+        .limit(60),
+    ),
   ])
-  dashboardPerfMark('wave1', wave1Started, { queryCount: 7, wave: 1 })
+  dashboardPerfMark('wave1', wave1Started, { queryCount: 8, wave: 1 })
 
   const progressTableMissing = Boolean(
     progressErr &&
@@ -118,7 +139,10 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
   )
 
   const interviewRows = (interviewsRaw ?? []) as InterviewWithReportsRow[]
+  const progressInterviewRows = (progressInterviewsRaw ?? []) as ProgressInterviewRow[]
   const interviewIds = interviewRows.map((row) => row.id)
+  // Union with progress interview IDs so wave2 fetches script reports for all of them.
+  const allScriptReportIds = [...new Set([...interviewIds, ...progressInterviewRows.map((r) => r.id)])]
   const enrollmentCollegeId =
     enrollment && typeof enrollment.college_id === 'string' ? enrollment.college_id : null
   const userCampusOrgId =
@@ -128,11 +152,11 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
   const wave2Started = dashboardPerfNow()
   const [scriptReportsResult, orgResult, retentionDashboardSnap] = await Promise.all([
     timedDashboardSpan('wave2.scriptReports', () =>
-      interviewIds.length > 0
+      allScriptReportIds.length > 0
         ? supabase
             .from('script_interview_reports')
             .select(CANDIDATE_SNAPSHOT_SCRIPT_REPORTS_SELECT)
-            .in('interview_id', interviewIds)
+            .in('interview_id', allScriptReportIds)
             .in('status', ['ready', 'partial'])
         : Promise.resolve({
             data: [] as CandidateSnapshotScriptReportRow[],
@@ -149,6 +173,7 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
         : buildRetentionDashboardSnapFromRow(
             (progressSnap as UserProgressRow | null) ?? null,
             userId,
+            supabase,
           ),
     ),
   ])
@@ -169,8 +194,13 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
     scriptByInterview.set(report.interview_id, list)
   }
 
-  const baseRows = interviewRows.slice(0, 5)
-  const rows: InterviewWithReportsRow[] = baseRows.map((row) => ({
+  // All 20 fetched interviews, fully joined with v2.1 reports — NOT pre-sliced.
+  // Display sections (Recent Activity top-3, Score Trend last-5) already slice
+  // client-side via pickRecentInterviews()/`.slice(-5)`; Progress Overview's
+  // period windowing (7d/30d/all-time) needs the full set to be accurate.
+  // This is zero extra queries: script_interview_reports was already fetched
+  // for every interview id in wave 2 — previously discarded past the first 5.
+  const rows: InterviewWithReportsRow[] = interviewRows.map((row) => ({
     ...row,
     script_interview_reports: scriptByInterview.get(row.id) ?? [],
   }))
@@ -210,11 +240,18 @@ export const loadDashboardPageData = cache(async function loadDashboardPageData(
     console.error('dashboard user_progress fetch', progressErr.message)
   }
 
+  // Enrich progressInterviews with script_interview_reports from the shared wave2 fetch.
+  const progressInterviewsEnriched = progressInterviewRows.map((row) => ({
+    ...row,
+    script_interview_reports: scriptByInterview.get(row.id) ?? [],
+  }))
+
   return {
     userData: userData ?? null,
     userError: userError ?? null,
     interviewsRaw: interviewRows,
     rows,
+    progressInterviews: progressInterviewsEnriched,
     completedCount: completedCountTotal ?? 0,
     recoveryTarget,
     retentionDashboardSnap,

@@ -29,6 +29,10 @@ export type DashboardNavItem = DashboardNavLinkItem | DashboardNavComingSoonItem
 export type DashboardNavSection = {
   id: string
   label: string
+  /** When true, items render directly without a collapsible section header. */
+  flat?: boolean
+  /** When true, section header is non-interactive and items are always visible. */
+  alwaysOpen?: boolean
   items: DashboardNavItem[]
 }
 
@@ -45,7 +49,6 @@ export type DashboardNavIconKey =
   | 'sparkles'
   | 'filePenLine'
   | 'gauge'
-  | 'map'
   | 'barChart'
   | 'bell'
   | 'award'
@@ -58,9 +61,7 @@ export type DashboardNavIconKey =
 export const DEFAULT_DASHBOARD_SECTION_EXPANDED: Record<string, boolean> = {
   practice: true,
   tools: true,
-  insights: false,
-  account: false,
-  community: false,
+  insights: true,
 }
 
 export const PINNED_DASHBOARD_NAV: DashboardNavLinkItem = {
@@ -112,7 +113,6 @@ export function buildDashboardNavSections(canAccessCoach = false): DashboardNavS
     practiceItems.push({ href: '/coach', label: 'Coach', icon: 'bot' })
   }
   practiceItems.push(
-    { href: '/resume', label: 'Resume', icon: 'fileText' },
     { href: '/history', label: 'Interview History', icon: 'history' },
   )
 
@@ -120,11 +120,13 @@ export function buildDashboardNavSections(canAccessCoach = false): DashboardNavS
     {
       id: 'practice',
       label: 'Practice',
+      alwaysOpen: true,
       items: practiceItems,
     },
     {
       id: 'tools',
       label: 'Tools',
+      alwaysOpen: true,
       items: [
         {
           href: '/tools/question-generator',
@@ -147,26 +149,19 @@ export function buildDashboardNavSections(canAccessCoach = false): DashboardNavS
       id: 'insights',
       label: 'Insights',
       items: [
-        { href: '/readiness', label: 'Readiness', icon: 'gauge' },
-        { href: '/roadmap', label: 'Prep Roadmap', icon: 'map' },
+        { href: '/readiness', label: 'Readiness & Roadmap', icon: 'gauge' },
         { href: '/analytics', label: 'Performance Analytics', icon: 'barChart' },
-        { href: '/notifications', label: 'Notifications', icon: 'bell' },
       ],
     },
     {
-      id: 'account',
-      label: 'Account',
+      id: 'misc',
+      label: '',
+      flat: true,
       items: [
-        { href: '/profile/badges', label: 'Badges', icon: 'award' },
-        { href: '/settings', label: 'Settings', icon: 'settings' },
+        { href: COMMUNITY_HUB_PATH, label: 'Community Hub', icon: 'users' },
         { href: '/upgrade', label: 'Pricing', icon: 'creditCard' },
         { href: '/college/dashboard', label: 'Campus Admin', icon: 'shield' },
       ],
-    },
-    {
-      id: 'community',
-      label: 'Community',
-      items: [{ href: COMMUNITY_HUB_PATH, label: 'Community Hub', icon: 'users' }],
     },
   ]
 }

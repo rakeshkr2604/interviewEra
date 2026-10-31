@@ -61,9 +61,9 @@ export const TIER_4_UNLOCK = {
 export const QUALITY_CRITERIA = {
   minQuestionsAnswered: 5,
   /** Per-question average duration floor, in seconds. */
-  minAvgDurationSec: 45,
+  minAvgDurationSec: 30,
   /** Per-session minimum score (NUMERIC scale 0–10). */
-  minSessionScore: 6.0,
+  minSessionScore: 5.0,
 } as const;
 
 /**

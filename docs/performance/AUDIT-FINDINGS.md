@@ -70,7 +70,7 @@ Left documented (not rewritten):
 - [`campus-organizations/route.ts`](../../src/app/api/platform/campus-organizations/route.ts) — parallel exact counts per org on a page of rows. Admin-only, already `Promise.all`.
 - [`notifications.ts`](../../src/lib/candidate/notifications.ts) — in-memory loop over at most two report refs. Not N+1.
 
-Loop 3 also clamped overshot `/history?page=` onto the last page (exact tab counts unchanged) and moved Recharts off the dashboard RSC graph via [`ScoreTrendChartSlot.tsx`](../../src/components/dashboard/ScoreTrendChartSlot.tsx) (`ssr: false` is illegal in the Server Component `DashboardMain`).
+Loop 3 also clamped overshot `/history?page=` onto the last page (exact tab counts unchanged) and moved Recharts off the dashboard RSC graph via `ScoreTrendChartSlot.tsx` (`ssr: false` is illegal in the Server Component `DashboardMain`) — later superseded by [`DashboardScoreTrendSection.tsx`](../../src/components/dashboard/DashboardScoreTrendSection.tsx).
 
 Loop 4 patched D11–D13 in application chrome (scrollbar gutter, tall skeletons, community SSR snapshot, 128px chart slot) and streamed the dashboard header (D12). Loop 5 traced the staging TTFB path: remaining floor is layout `auth.getUser` (~55–70 ms warmed) plus `user_progress` / `users` chrome (~140–270 ms), not a third snapshot wave and not a missing interviews index. No extra backend fold was added. D10 remains a **deploy** problem: production still serves the pre-fold waterfall. `markQuestionPlanRows` stays sequential CAS.
 

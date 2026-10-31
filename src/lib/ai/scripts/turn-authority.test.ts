@@ -4,6 +4,7 @@ import {
   cannedCandidateQuestionsTurn,
   cannedCoreEntryTurn,
   cannedMoveOnTurn,
+  cannedNextCoreQuestionTurn,
   cannedParentRedirectTurn,
   countCandidateQuestionsExchanges,
   countCoreQuestions,
@@ -1891,5 +1892,76 @@ describe('applyTurnAuthorityOverrides speech canonicalization (H/T/M)', () => {
     expect(result.phase).toBe('warmup')
     expect(result.speech).toBe(speech)
     expect(result.display_question).toBeNull()
+  })
+})
+
+describe('cannedNextCoreQuestionTurn — no-ack guarantee', () => {
+  const SCRIPT_H_FALLBACK = 'Tell me about a time you faced a setback or disagreement at work or in a project. What did you do, and what was the outcome?'
+  const SCRIPT_T_FALLBACK = 'Walk me through how you would approach this problem end to end, including the main trade-off you would make.'
+
+  it('SCRIPT_H: returns the canned fallback question when nothing is asked yet', () => {
+    const result = cannedNextCoreQuestionTurn({ scriptType: 'SCRIPT_H', alreadyAsked: [] })
+    expect(result.is_question).toBe(true)
+    expect(result.phase).toBe('core')
+    expect(result.display_question).toBe(SCRIPT_H_FALLBACK)
+  })
+
+  it('SCRIPT_T: returns the canned fallback question when nothing is asked yet', () => {
+    const result = cannedNextCoreQuestionTurn({ scriptType: 'SCRIPT_T', alreadyAsked: [] })
+    expect(result.is_question).toBe(true)
+    expect(result.display_question).toBe(SCRIPT_T_FALLBACK)
+  })
+
+  it('SCRIPT_H: returns candidate_questions (NOT an ack) when canned fallback is already asked', () => {
+    const result = cannedNextCoreQuestionTurn({
+      scriptType: 'SCRIPT_H',
+      alreadyAsked: [SCRIPT_H_FALLBACK],
+    })
+    // Must never return is_question:false — that would cause an infinite ack loop.
+    expect(result.is_question).toBe(true)
+    expect(result.phase).toBe('candidate_questions')
+    expect(result).toEqual(cannedCandidateQuestionsTurn())
+  })
+
+  it('SCRIPT_T: returns candidate_questions when canned fallback is already asked', () => {
+    const result = cannedNextCoreQuestionTurn({
+      scriptType: 'SCRIPT_T',
+      alreadyAsked: [SCRIPT_T_FALLBACK],
+    })
+    expect(result.is_question).toBe(true)
+    expect(result.phase).toBe('candidate_questions')
+  })
+
+  it('consecutive-ack guard never returns an ack when previousTurnWasAcknowledgment + all canned Qs used', () => {
+    const ackTurn: ScriptTurnOutput = {
+      speech: "Thanks. Let's keep going.",
+      display_question: null,
+      tip: null,
+      timer_seconds: 0,
+      reading_buffer_seconds: 0,
+      auto_submit: false,
+      allow_skip: false,
+      show_auto_structure: false,
+      phase: 'core',
+      is_question: false,
+      is_follow_up: false,
+      question_difficulty: null,
+      interviewer_emotion: 'neutral',
+    }
+    const result = applyTurnAuthorityOverrides({
+      turn: ackTurn,
+      coreQuestionsAsked: 2,
+      totalQuestions: 5,
+      followUpsThisQuestion: 0,
+      followUpEnabled: true,
+      requestPhase: 'core',
+      lastAnswer: cannedMoveOnTurn().speech,
+      previousTurnWasAcknowledgment: true,
+      scriptType: 'SCRIPT_H',
+      alreadyAskedQuestions: [SCRIPT_H_FALLBACK],
+    })
+    // Even when all canned fallback questions are exhausted, the guard must
+    // never produce another is_question:false turn — that loops the client.
+    expect(result.is_question).toBe(true)
   })
 })

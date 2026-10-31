@@ -35,6 +35,10 @@ export interface RoadmapInterviewRecommendation {
   href: string;
   difficulty: 'easy' | 'medium' | 'hard';
   reason: string;
+  guide: {
+    whatToExpect: string[];
+    howToPrepare: string[];
+  };
 }
 
 export interface RoadmapTopicRecommendation {
@@ -43,12 +47,22 @@ export interface RoadmapTopicRecommendation {
   description: string;
   dimension: keyof DimensionScores;
   priority: 'high' | 'medium' | 'low';
+  /** Current score for this dimension (0-10), when the candidate has evidence. */
+  currentScore: number | null;
+  guide: {
+    keyActions: string[];
+    commonMistakes: string[];
+    quickWin: string;
+  };
 }
 
 export interface RoadmapQuestionRecommendation {
   id: string;
   question: string;
   category: 'technical' | 'behavioral' | 'situational';
+  difficulty: 'easy' | 'medium' | 'hard';
+  /** What the interviewer is actually probing for — shown as "What they're testing". */
+  probing: string;
   dimension: keyof DimensionScores;
 }
 

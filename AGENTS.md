@@ -100,6 +100,7 @@ Full meanings preserved — do not bypass. Detail in linked Core docs.
 | Resume upload/parse | `docs/Core/RESUME_PIPELINE.md` |
 | Razorpay / credits grant | `docs/Core/PAYMENTS.md` |
 | Brand / logos / favicon / OG mark | `docs/Core/BRAND_ASSETS.md` |
+| Tiers / streaks / badges / XP / leaderboard | `docs/Core/GAMIFICATION.md` |
 | New migration | `docs/Guidelines/DATABASE_MIGRATIONS.md` + `.cursor/rules/supabase-migrations.mdc` |
 | Flags | `docs/Operations/FEATURE_FLAGS.md` |
 | Ship / CI | `docs/Operations/RELEASE.md`, `QUALITY_GATES.md` |

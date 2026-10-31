@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { Check, Copy } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -72,6 +73,7 @@ export function CoachingFeedbackPanel({
   fallbackCoaching,
 }: Props) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const vm = useMemo(
     () =>
@@ -84,6 +86,13 @@ export function CoachingFeedbackPanel({
       }),
     [coaching, score, displayQuestion, questionType, fallbackCoaching],
   )
+
+  const handleCopyAnswer = () => {
+    navigator.clipboard.writeText(vm.sampleAnswerParagraphs.join('\n\n')).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   return (
     <>
@@ -261,9 +270,24 @@ export function CoachingFeedbackPanel({
 
             {vm.hasStrongerExample ? (
               <section>
-                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
-                  Stronger version of your answer
-                </p>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-widest text-(--text-muted)">
+                    Stronger version of your answer
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopyAnswer}
+                    title={copied ? 'Copied!' : 'Copy to clipboard'}
+                    aria-label={copied ? 'Copied!' : 'Copy answer to clipboard'}
+                    className={`flex h-6 w-6 items-center justify-center rounded-md text-(--text-muted) transition-colors hover:text-(--accent-primary) ${IE_FOCUS_VISIBLE}`}
+                  >
+                    {copied ? (
+                      <Check className="size-3.5 text-(--accent-success)" />
+                    ) : (
+                      <Copy className="size-3.5" />
+                    )}
+                  </button>
+                </div>
                 <p className="mb-2 text-[11px] text-(--text-muted)">
                   A clearer rewrite of what you said — practice with it; don&apos;t memorize.
                 </p>

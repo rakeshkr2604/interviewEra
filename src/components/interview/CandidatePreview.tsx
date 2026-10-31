@@ -69,7 +69,7 @@ export function CandidatePreview({
             autoPlay
             muted
             playsInline
-            className="absolute inset-0 h-full w-full -scale-x-100 object-cover object-[center_28%] lg:scale-x-100"
+            className="absolute inset-0 h-full w-full object-cover object-[center_28%]"
             aria-label="Your camera preview"
           />
         ) : (

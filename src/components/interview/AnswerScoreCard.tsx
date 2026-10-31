@@ -13,6 +13,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { DIMENSION_LABELS, DIMENSION_EXPLAINERS } from '@/lib/interview/answer-score/rubric'
 
 export type AnswerDimensionScore = {
   /** 0–10 in steps of 0.5 (validated server-side). */
@@ -35,13 +36,19 @@ export type AnswerScore = {
 
 type DimensionKey = keyof AnswerScore['dimensions']
 
-const DIMENSIONS: Array<{ key: DimensionKey; label: string }> = [
-  { key: 'communication_clarity', label: 'Communication Clarity' },
-  { key: 'content_accuracy', label: 'Content Accuracy' },
-  { key: 'structure', label: 'Answer Structure' },
-  { key: 'specificity', label: 'Specificity' },
-  { key: 'relevance', label: 'Relevance' },
+/** Display order for the card — independent of DIMENSION_KEYS' canonical order. */
+const DIMENSION_ORDER: DimensionKey[] = [
+  'communication_clarity',
+  'content_accuracy',
+  'structure',
+  'specificity',
+  'relevance',
 ]
+
+const DIMENSIONS: Array<{ key: DimensionKey; label: string }> = DIMENSION_ORDER.map((key) => ({
+  key,
+  label: DIMENSION_LABELS[key],
+}))
 
 function barColor(v: number): string {
   if (v < 5.5) return 'var(--accent-error, #dc2626)'
@@ -177,15 +184,20 @@ export function AnswerScoreCard({
               ) : null}
             </p>
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-0.5">
+              {selected ? (
+                <p className="text-[11px] italic leading-snug text-(--text-muted)">
+                  {DIMENSION_EXPLAINERS[selected.key]}
+                </p>
+              ) : null}
               {selected?.note ? (
-                <p className="text-[13px] leading-relaxed text-(--text-primary)">
+                <p className="mt-1.5 text-[13px] leading-relaxed text-(--text-primary)">
                   {selected.note}
                 </p>
-              ) : (
+              ) : !selected ? (
                 <p className="text-[12px] text-(--text-muted)">
                   Tap a dimension above to see why it scored that way.
                 </p>
-              )}
+              ) : null}
 
               {focusAreas.length > 0 && (
                 <div className="mt-3 border-t border-(--card-border)/60 pt-2.5">

@@ -22,7 +22,6 @@ import {
   Award,
   FileText,
   Gauge,
-  Map,
   Bell,
   ChevronDown,
   BookMarked,
@@ -62,7 +61,7 @@ type NavIcon = ComponentType<{ size?: number; strokeWidth?: number; className?: 
 type NavLinkItem = Omit<DashboardNavLinkItem, 'icon'> & { icon: NavIcon }
 type NavComingSoonItem = Omit<DashboardNavComingSoonItem, 'icon'> & { icon: NavIcon }
 type NavItem = NavLinkItem | NavComingSoonItem
-type NavSection = { id: string; label: string; items: NavItem[] }
+type NavSection = { id: string; label: string; flat?: boolean; alwaysOpen?: boolean; items: NavItem[] }
 
 const NAV_ICONS: Record<DashboardNavIconKey, NavIcon> = {
   dashboard: LayoutDashboard,
@@ -77,7 +76,6 @@ const NAV_ICONS: Record<DashboardNavIconKey, NavIcon> = {
   sparkles: Sparkles,
   filePenLine: FilePenLine,
   gauge: Gauge,
-  map: Map,
   barChart: BarChart2,
   bell: Bell,
   award: Award,
@@ -408,18 +406,47 @@ export function Sidebar({
 
         {sections.map((section, sectionIndex) => {
           const panelId = `sidebar-section-${section.id}`
-          const isOpen = expanded[section.id] ?? DEFAULT_SECTION_EXPANDED[section.id] ?? true
-          const hasActiveChild = sectionContainsActive(pathname, section)
+          const borderClass = sectionIndex > 0 ? 'mt-1.5 border-t border-[var(--card-border)]/55 pt-2' : undefined
 
+          // Flat sections: render items directly with no collapsible header.
+          if (section.flat) {
+            return (
+              <div key={section.id} className={borderClass}>
+                <ul role="list" className="space-y-0.5">
+                  {section.items.map((item) => {
+                    if (!isLinkItem(item)) {
+                      return <li key={item.id}><ComingSoonRow item={item} /></li>
+                    }
+                    const active = isItemActive(pathname, item)
+                    return (
+                      <li key={item.href}>
+                        <NavLinkRow
+                          item={item}
+                          active={active}
+                          onNavigate={handleNavAttempt}
+                          navigationLocked={isGuarding}
+                          onNavigationBlocked={() => { interceptNavigation() }}
+                        />
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          }
+
+          // Collapsible (or always-open) sections.
+          const isOpen = section.alwaysOpen || (expanded[section.id] ?? DEFAULT_SECTION_EXPANDED[section.id] ?? true)
+          const hasActiveChild = sectionContainsActive(pathname, section)
           return (
-            <div
-              key={section.id}
-              className={
-                sectionIndex > 0
-                  ? 'mt-1.5 border-t border-[var(--card-border)]/55 pt-2'
-                  : undefined
-              }
-            >
+            <div key={section.id} className={borderClass}>
+              {section.alwaysOpen ? (
+                <div className="flex items-center gap-2 px-2 py-2">
+                  <span className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+                    {section.label}
+                  </span>
+                </div>
+              ) : (
               <button
                 type="button"
                 id={`${panelId}-trigger`}
@@ -429,8 +456,7 @@ export function Sidebar({
                 aria-controls={panelId}
                 onClick={() => toggleSection(section.id)}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.background =
-                    'color-mix(in srgb, var(--accent-primary) 8%, transparent)'
+                  e.currentTarget.style.background = 'color-mix(in srgb, var(--accent-primary) 8%, transparent)'
                   e.currentTarget.style.color = 'var(--text-secondary)'
                 }}
                 onMouseLeave={(e) => {
@@ -460,7 +486,7 @@ export function Sidebar({
                   aria-hidden
                 />
               </button>
-
+              )}
               <ul
                 id={panelId}
                 role="list"
@@ -470,13 +496,8 @@ export function Sidebar({
               >
                 {section.items.map((item) => {
                   if (!isLinkItem(item)) {
-                    return (
-                      <li key={item.id}>
-                        <ComingSoonRow item={item} />
-                      </li>
-                    )
+                    return <li key={item.id}><ComingSoonRow item={item} /></li>
                   }
-
                   const active = isItemActive(pathname, item)
                   return (
                     <li key={item.href}>
@@ -485,9 +506,7 @@ export function Sidebar({
                         active={active}
                         onNavigate={handleNavAttempt}
                         navigationLocked={isGuarding}
-                        onNavigationBlocked={() => {
-                          interceptNavigation()
-                        }}
+                        onNavigationBlocked={() => { interceptNavigation() }}
                       />
                     </li>
                   )

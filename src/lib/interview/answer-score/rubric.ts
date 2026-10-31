@@ -49,6 +49,29 @@ export const DIMENSION_WEIGHTS: Record<DimensionKey, number> = {
   specificity: 0.2,
 };
 
+/** Display name — single source of truth, shared by the live score card and the report. */
+export const DIMENSION_LABELS: Record<DimensionKey, string> = {
+  relevance: 'Relevance',
+  content_accuracy: 'Content Accuracy',
+  communication_clarity: 'Communication Clarity',
+  structure: 'Answer Structure',
+  specificity: 'Specificity',
+};
+
+/**
+ * One-line, candidate-facing explanation of what each dimension measures and
+ * why it matters — not a scoring note (that's per-answer and AI-generated).
+ * Kept to a single sentence each; this is a "what is this" primer, not a
+ * tutorial — the per-answer note carries the specific, actionable detail.
+ */
+export const DIMENSION_EXPLAINERS: Record<DimensionKey, string> = {
+  relevance: 'Does your answer actually address what was asked, or drift off-topic?',
+  content_accuracy: 'Are your facts, technical claims, and examples correct and consistent?',
+  communication_clarity: 'Can an interviewer follow your point the first time, without re-reading it?',
+  structure: 'Does your answer have a clear shape — situation, action, result — instead of a ramble?',
+  specificity: 'Do you back claims with real numbers, names, or outcomes instead of vague statements?',
+};
+
 /** Structure sub-rubric routed by question type. */
 export function subRubricForQuestionType(questionType: QuestionType): SubRubric {
   return questionType === 'behavioral' ? 'star' : 'logical_flow';
@@ -331,5 +354,81 @@ export function validateAnswerScoreOutput(
       score_suspect: suspectReasons.length > 0,
       suspect_reasons: suspectReasons,
     },
+  };
+}
+
+// ── Echoed-question detection (deterministic, pre-LLM) ─────────────────────
+//
+// Some candidates submit the interview question itself as their "answer"
+// (read it back verbatim, or paste/paraphrase it with no actual content).
+// Routing that through the LLM rubric is wasteful (costs a call) and
+// unreliable (the model may still award partial credit for topical overlap
+// with the question, since the answer IS on-topic by construction — it's
+// made of the question's own words). This is caught deterministically,
+// mirroring the relevance-0⇒specificity-0 and STAR-floor rules above: a
+// rubric invariant enforced in code, not left to prompt compliance alone.
+
+function normalizeToWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/**
+ * True when the transcript is substantially just the question's own words
+ * with little to no original content — a read-back, not an answer.
+ *
+ * Conservative by design (false negatives are fine; false positives zero a
+ * genuine answer): requires high word overlap with the question, low novel
+ * vocabulary, and a transcript no meaningfully longer than the question
+ * itself. A real answer — even a short one — reliably introduces names,
+ * numbers, or reasoning words the question never used.
+ */
+export function isEchoedQuestion(question: string, transcript: string): boolean {
+  const qWords = normalizeToWords(question);
+  const tWords = normalizeToWords(transcript);
+  // Too short on either side to judge reliably — let the LLM handle it.
+  if (qWords.length < 6 || tWords.length < 4) return false;
+
+  const qSet = new Set(qWords);
+  const overlapCount = tWords.filter((w) => qSet.has(w)).length;
+  const overlapRatio = overlapCount / tWords.length;
+
+  const uniqueAnswerWords = new Set(tWords);
+  const novelWords = [...uniqueAnswerWords].filter((w) => !qSet.has(w));
+  const novelRatio = novelWords.length / uniqueAnswerWords.size;
+
+  const lengthRatio = tWords.length / qWords.length;
+
+  return overlapRatio >= 0.75 && novelRatio <= 0.25 && lengthRatio <= 1.35;
+}
+
+/**
+ * Synthetic, deterministic score for an echoed-question submission. Not a
+ * "fabricated" score in the sense the audit docs warn against — it is the
+ * correct verdict for "no answer was given," computed the same way a real
+ * score is (via computeOverall), just without an LLM round-trip.
+ */
+export function buildEchoedQuestionScore(): ValidatedAnswerScore {
+  const note = 'This repeats the question instead of answering it — no actual content to evaluate.';
+  const dimensions: Record<DimensionKey, ScoredDimension> = {
+    relevance: { score: 0, note },
+    content_accuracy: { score: 0, note },
+    communication_clarity: {
+      score: 2,
+      note: 'Spoken clearly, but nothing was actually answered.',
+    },
+    structure: { score: 0, note },
+    specificity: { score: 0, note },
+  };
+  return {
+    dimensions,
+    overall: computeOverall(dimensions),
+    one_line_summary:
+      'You repeated the question back instead of answering it — try explaining your actual approach, reasoning, or experience in your own words.',
+    score_suspect: true,
+    suspect_reasons: ['echoed_question_detected'],
   };
 }

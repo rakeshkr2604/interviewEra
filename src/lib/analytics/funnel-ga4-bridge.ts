@@ -136,16 +136,6 @@ export function trackPricingPageViewedOnce(
   });
 }
 
-export function trackResumeUploadedGa4(
-  resumeId: string,
-  options: { userId?: string; source: string },
-): void {
-  trackFunnelGa4Once(`resume_uploaded:${resumeId}`, 'resume_uploaded', {
-    userId: options.userId,
-    resumeId,
-    source: options.source,
-  });
-}
 
 export async function trackMockInterviewCompletedGa4(
   payload: FunnelCompleteGa4Payload,

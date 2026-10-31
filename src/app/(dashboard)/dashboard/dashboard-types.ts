@@ -1,3 +1,14 @@
+/** Lightweight row for progress-overview window stats (completed interviews only). */
+export type ProgressInterviewRow = {
+  id: string
+  started_at: string | null
+  completed_at: string | null
+  engine: string | null
+  reports: { id: string; overall_score: number | null; generated_at: string | null }[] | null
+  /** Populated after wave2 join — null when no script reports exist. */
+  script_interview_reports?: { overall: number | null; status: string; generated_at: string | null }[] | null
+}
+
 /** Row from interviews + embedded reports (dashboard query). */
 export type InterviewWithReportsRow = {
   id: string

@@ -18,7 +18,7 @@ describe('buildDashboardNavSections', () => {
     const practiceLabels = practice!.items.map((item) => item.label)
     expect(practiceLabels).toContain('Interview Prep')
     expect(practiceLabels).toContain('Start Interview')
-    expect(practiceLabels).toContain('Resume')
+    expect(practiceLabels).not.toContain('Resume')
     expect(practiceLabels).toContain('Interview History')
 
     const prepLinks = practice!.items.filter(
@@ -55,7 +55,6 @@ describe('buildDashboardNavSections', () => {
       'Start Interview',
       'Interview Prep',
       'Coach',
-      'Resume',
       'Interview History',
     ])
   })

@@ -187,7 +187,7 @@ export type StreakAction =
   | 'incremented'             // continued from yesterday
   | 'restarted_after_gap'     // had a streak, broke it, starts new at 1
   | 'same_day_noop'           // already had a quality session today
-  | 'reset_quality_fail';     // quality criteria failed, streak → 0
+  | 'not_counted';            // no answered question — streak unchanged
 
 export interface UpdateStreakSuccess {
   ok: true;
@@ -315,10 +315,12 @@ export async function updateStreak(
   let streakAction: StreakAction;
   let newLastDate: string | null = lastDate;
 
-  if (!quality.passed) {
-    newStreak = 0;
-    streakAction = 'reset_quality_fail';
-    // Do NOT advance last_quality_session_date — a failing session is not a quality day.
+  // Streak = a day with at least one completed interview. Skips, low scores or
+  // short answers still count; quality only gates XP/tiers, never the streak.
+  const countsForStreak = sessionParse.data.questionsAnswered >= 1;
+
+  if (!countsForStreak) {
+    streakAction = 'not_counted';
   } else {
     const relation = classifyDayRelation(lastDate, today, yesterday);
     switch (relation) {
@@ -333,8 +335,17 @@ export async function updateStreak(
         newLastDate = today;
         break;
       case 'same_day':
-        // Already counted today — no streak change, no badge re-award.
-        streakAction = 'same_day_noop';
+        if (previousStreak === 0) {
+          // last_quality_session_date is today but streak is 0, meaning the
+          // earlier session today was an old-code quality-fail reset. Let this
+          // valid session start the streak fresh rather than staying stuck at 0.
+          newStreak = 1;
+          streakAction = 'restarted_after_gap';
+          newLastDate = today;
+        } else {
+          // Already got streak credit today — no change, no badge re-award.
+          streakAction = 'same_day_noop';
+        }
         break;
       case 'gap':
         newStreak = 1;
@@ -346,7 +357,7 @@ export async function updateStreak(
 
   // 4. Compute badges newly earned by the new streak length.
   const newBadgeKeys =
-    streakAction === 'same_day_noop' || streakAction === 'reset_quality_fail'
+    streakAction === 'same_day_noop' || streakAction === 'not_counted'
       ? []
       : computeNewlyEarnedBadges(newStreak, previousBadges);
 
@@ -363,7 +374,7 @@ export async function updateStreak(
   const longestStreak = Math.max(progress.longest_streak ?? 0, newStreak);
 
   // 5. Persist. Same-day no-op skips the write to avoid bumping updated_at unnecessarily.
-  if (streakAction === 'same_day_noop') {
+  if (streakAction === 'same_day_noop' || streakAction === 'not_counted') {
     logger.info('streak_same_day_noop', {
       userId,
       currentStreak: previousStreak,

@@ -1063,13 +1063,6 @@ function ScriptInterviewStartPage() {
                 )}
               </div>
 
-              {/* Tips */}
-              <div className="rounded-xl border border-(--accent-primary)/20 bg-(--accent-primary)/8 p-2.5">
-                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-widest text-(--accent-primary)">💡 Tips</p>
-                <p className="text-xs leading-relaxed text-(--text-secondary)">
-                  English &amp; Hindi supported for a natural flow. Your interviewer encourages English answers to build confidence.
-                </p>
-              </div>
             </div>
 
             {/* ── RIGHT: Session summary + Start ── */}

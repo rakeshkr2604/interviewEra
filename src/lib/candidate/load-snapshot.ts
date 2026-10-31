@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server';
-import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 import { parsePersistedDraft } from '@/lib/onboarding/persisted-draft';
 import {
   defaultCandidateProfile,
@@ -341,7 +340,7 @@ export async function loadCandidateSnapshot(
   if (latestResumeRow) {
     const parsed =
       latestResumeRow.status === 'parsed' && latestResumeRow.parsed_data
-        ? coerceParsedResume(latestResumeRow.parsed_data)
+        ? null
         : null;
     latestResume = {
       id: latestResumeRow.id as string,
@@ -350,8 +349,8 @@ export async function loadCandidateSnapshot(
       // @deprecated — always null; use GET /api/resume/:id/file for downloads.
       fileUrl: null,
       parsed,
-      parseQuality: parsed?.parse_quality ?? null,
-      parseWarning: parsed?.parse_warning ?? null,
+      parseQuality: null,
+      parseWarning: null,
     };
   }
 

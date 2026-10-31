@@ -6,6 +6,7 @@
  * running strictly on the client.
  */
 
+import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
 import { MAX_TIER } from './constants';
 import { logger } from './logger';
@@ -71,8 +72,14 @@ export async function getUserProgress(userId: string): Promise<UserProgressRow |
   }
 }
 
-/** Reads `public.tier_config`; returns null if the relation is absent (older DB forks). */
-export async function getTierConfig(tierId: number): Promise<TierConfig | null> {
+/**
+ * Reads `public.tier_config`; returns null if the relation is absent (older DB forks).
+ * Request-scoped `cache()` — tier rows are static config, so repeat reads within
+ * one render (dashboard card + analytics card) share a single round-trip.
+ */
+export const getTierConfig = cache(async function getTierConfig(
+  tierId: number,
+): Promise<TierConfig | null> {
   const bounded = Math.min(MAX_TIER, Math.max(1, Math.round(tierId)));
   try {
     const supabase = await createClient();
@@ -117,7 +124,7 @@ export async function getTierConfig(tierId: number): Promise<TierConfig | null> 
     });
     return null;
   }
-}
+});
 
 export async function getTierName(tierId: number): Promise<string> {
   const bounded = Math.min(MAX_TIER, Math.max(1, Math.round(tierId)));

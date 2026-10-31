@@ -71,6 +71,21 @@ export function scriptDimsToV1Shape(dims: ScriptDimensionAverages): DimensionSco
 }
 
 /**
+ * Reverse of the mapping above — which current rubric dimension a V1-shaped
+ * `DimensionScores` key actually carries. Use this to look up the correct
+ * `DIMENSION_EXPLAINERS` entry (keyed by rubric `DimensionKey`) for a V1 key
+ * shown in Insights/Analytics UI — the V1 key NAME (`technical_depth`,
+ * `confidence`) no longer matches what the data measures.
+ */
+export const V1_KEY_TO_RUBRIC_KEY: Record<keyof DimensionScores, ScriptDimensionKey> = {
+  communication_clarity: 'communication_clarity',
+  technical_depth: 'content_accuracy',
+  answer_structure: 'structure',
+  confidence: 'specificity',
+  relevance: 'relevance',
+};
+
+/**
  * Normalize a script report `dimension_averages` JSON blob to V1 shape, or null
  * when the payload is incomplete / not score-v1.2.
  */

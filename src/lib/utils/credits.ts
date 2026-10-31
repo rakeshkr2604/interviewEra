@@ -19,7 +19,7 @@ export interface CreditResult {
 
 export interface CreateInterviewWithCreditInput {
   userId: string;
-  resumeId: string;
+  resumeId: string | null;
   role: string;
   difficulty: InterviewDifficulty;
   questionCount: number;

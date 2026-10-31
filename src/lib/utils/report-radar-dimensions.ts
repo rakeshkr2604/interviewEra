@@ -9,11 +9,21 @@ export const REPORT_RADAR_DIMENSION_ORDER: (keyof DimensionScores)[] = [
   'relevance',
 ];
 
+/**
+ * Display labels for the V1-shaped `DimensionScores` keys.
+ *
+ * `technical_depth` and `confidence` are legacy internal key NAMES from the
+ * original V1 dimension scheme — current v2.1 interviews bridge different
+ * rubric dimensions onto those same slots (see script-dimension-bridge.ts:
+ * technical_depth ← content_accuracy, confidence ← specificity), so the
+ * labels here reflect what is ACTUALLY being measured today, not the
+ * original V1 concept the key name still carries.
+ */
 export const REPORT_DIMENSION_LABELS: Record<keyof DimensionScores, string> = {
   communication_clarity: 'Communication Clarity',
-  technical_depth: 'Technical Depth',
+  technical_depth: 'Content Accuracy',
   answer_structure: 'Answer Structure',
-  confidence: 'Confidence',
+  confidence: 'Specificity',
   relevance: 'Relevance',
 };
 

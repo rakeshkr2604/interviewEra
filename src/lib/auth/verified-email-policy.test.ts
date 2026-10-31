@@ -31,9 +31,9 @@ describe('verified email access policy', () => {
   it('requires verification for sensitive product APIs including account onboarding', () => {
     expect(requiresVerifiedEmailApi('/api/interview/script/start')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/report/report-1')).toBe(true);
-    expect(requiresVerifiedEmailApi('/api/resume/upload')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/payments/create-order')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/onboarding/state')).toBe(true);
+    expect(requiresVerifiedEmailApi('/api/resume/upload')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/account/onboarding')).toBe(true);
     expect(requiresVerifiedEmailApi('/api/account/profile')).toBe(false);
     expect(requiresVerifiedEmailApi('/api/auth/resend-verification')).toBe(false);

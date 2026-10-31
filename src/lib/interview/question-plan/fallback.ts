@@ -70,27 +70,24 @@ function technicalAngles(facts: ReturnType<typeof slotFacts>): string[] {
   return angles;
 }
 
+/** HR-round angles: motivation, ownership, conflict, failure, feedback. Never technical. */
 function behavioralAngles(facts: ReturnType<typeof slotFacts>): string[] {
-  const { skill, project, jd, role } = facts;
+  const { project, role } = facts;
   const angles = [
     project
       ? `Tell me about a decision you owned on ${project}. What was at stake, what did you do, and what was the result?`
-      : `Tell me about a time you had to learn ${skill} quickly for a ${role} task. What did you do, and what was the outcome?`,
+      : `Tell me about a time you took ownership of something that was not strictly your responsibility. What did you do, and what was the result?`,
     project
-      ? `Describe a disagreement about how to build ${project}. What did you specifically do, and how did it end?`
-      : `Describe a time you disagreed with a teammate about a ${role} decision involving ${skill}. What did you do, and what was the outcome?`,
+      ? `Describe a disagreement with a teammate while working on ${project}. What did you specifically do, and how did it end?`
+      : `Describe a time you disagreed with a teammate or manager. How did you handle it, and what was the outcome?`,
+    `Tell me about a time you had to meet a tight deadline while juggling other work. How did you prioritise, and what happened?`,
+    `Why do you want to work as a ${role}, and why should we pick you over other candidates?`,
+    `What is one real weakness you have, and give me an example of what you are doing about it.`,
     project
-      ? `On ${project}, tell me about a priority you had to drop. How did you choose, and what happened afterward?`
-      : `Tell me about a time you had to drop a priority while doing ${role} work. How did you choose, and what was the result?`,
-    jd
-      ? `The role calls out "${jd}". Tell me about a time your experience with ${skill} prepared you for that kind of work. What did you do?`
-      : `Tell me about a time ${skill} changed how you worked with other people on a ${role} problem. What did you do, and what was the outcome?`,
-    project
-      ? `What feedback did you receive while building ${project}, and what did you change because of it?`
-      : `What feedback have you acted on while developing ${skill} for ${role} work, and what changed afterward?`,
-    project
-      ? `When ${project} did not go as planned, what did you personally take responsibility for?`
-      : `Tell me about a ${role} setback involving ${skill}. What did you personally take responsibility for, and what was the outcome?`,
+      ? `When ${project} did not go as planned, what did you personally take responsibility for, and what did you learn?`
+      : `Tell me about a time you failed at something important. What did you learn, and what did you change afterward?`,
+    `Tell me about a piece of critical feedback you received. How did you react, and what did you change?`,
+    `Where do you see your career in the next three to five years, and how does this role fit into that?`,
   ];
   return angles;
 }
@@ -112,10 +109,10 @@ function emergencyAngles(role: string, questionType: CoreQuestionType): string[]
     ];
   }
   return [
-    `Tell me about a ${role} decision you would make differently now. What did you do, and what was the outcome?`,
-    `Describe a time you had to ask for help on ${role} work. What did you do, and what changed?`,
-    `Tell me about a commitment you could not keep on a ${role} task. How did you handle it?`,
-    `What feedback changed how you collaborate on ${role} work, and what did you do next?`,
+    `What motivates you in a ${role} job, and give me an example of a time that motivation was tested.`,
+    `Describe a time you had to work with someone who was difficult to work with. What did you do, and what changed?`,
+    `Tell me about a commitment you could not keep. How did you handle it, and what did you learn?`,
+    `Give me an example of a time you went beyond what was expected of you. What did you do, and what was the result?`,
   ];
 }
 

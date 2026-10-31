@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { motion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { useActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
 import { cn } from '@/lib/utils'
@@ -59,6 +60,16 @@ export function StreakCounter({
       const next = e.detail.streak
       if (next > lastKnown.current) {
         setPulse((p) => p + 1)
+        const msg =
+          next === 1
+            ? '🔥 Streak started! Keep it going tomorrow.'
+            : next >= 7
+              ? `🔥 ${next}-day streak! You're on fire!`
+              : `🔥 ${next}-day streak! Great consistency.`
+        toast.success(msg, {
+          description: 'Quality session counted toward your streak.',
+          duration: 5000,
+        })
       }
       lastKnown.current = next
       setStreak(next)

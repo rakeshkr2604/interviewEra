@@ -2,8 +2,6 @@
  * Bounded inputs for question generation (latency-critical).
  */
 
-import type { ParsedResume } from '@/types/app.types';
-import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume';
 import { clampText } from '@/lib/ai/context-hygiene';
 
 export const QUESTION_GEN_JD_MAX_CHARS = 1_800;
@@ -11,11 +9,14 @@ export const QUESTION_GEN_RESUME_SUMMARY_MAX = 600;
 /** Slightly larger budget for script turns — projects matter for freshers. */
 export const SCRIPT_RESUME_SUMMARY_MAX = 750;
 
-export function buildCompactResumeSummary(resume: ParsedResume | unknown, role: string): string {
-  const p = coerceParsedResume(resume);
-  const skills = p.skills.slice(0, 10).join(', ');
-  const target = p.target_role || role;
-  const exp = p.experience_estimate;
+export function buildCompactResumeSummary(resume: unknown, role: string): string {
+  if (!resume || typeof resume !== 'object') {
+    return clampText(`Target:${role}. Skills:n/a. Experience:Not specified`, QUESTION_GEN_RESUME_SUMMARY_MAX);
+  }
+  const d = resume as Record<string, unknown>;
+  const skills = Array.isArray(d.skills) ? (d.skills as string[]).slice(0, 10).join(', ') : '';
+  const target = (typeof d.target_role === 'string' && d.target_role) || role;
+  const exp = typeof d.experience_estimate === 'string' ? d.experience_estimate : 'Not specified';
   let s = `Target:${target}. Skills:${skills || 'n/a'}. Experience:${exp}`;
   if (role && role !== target) s += `. InterviewRole:${role}`;
   return clampText(s, QUESTION_GEN_RESUME_SUMMARY_MAX);
@@ -49,11 +50,9 @@ export function extractResumeProjectHints(resume: unknown, max = 4): string[] {
  * Script-engine resume summary: compact profile + project hints when present
  * (critical for fresher personalization).
  */
-export function buildScriptResumeSummary(resume: ParsedResume | unknown, role: string): string {
-  // Coerce first so parse-v2 `projects[].name` (and legacy title) always reach the summary.
-  const parsed = coerceParsedResume(resume);
-  const base = buildCompactResumeSummary(parsed, role);
-  const projects = extractResumeProjectHints(parsed);
+export function buildScriptResumeSummary(resume: unknown, role: string): string {
+  const base = buildCompactResumeSummary(resume, role);
+  const projects = extractResumeProjectHints(resume);
   if (projects.length === 0) return clampText(base, SCRIPT_RESUME_SUMMARY_MAX);
   return clampText(`${base}. Projects:${projects.join('; ')}`, SCRIPT_RESUME_SUMMARY_MAX);
 }

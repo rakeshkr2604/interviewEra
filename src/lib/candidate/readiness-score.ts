@@ -6,7 +6,7 @@ import type {
   ReadinessScoreResult,
 } from './types';
 
-const CATEGORY_WEIGHTS: Record<ReadinessCategoryScore['key'], number> = {
+export const CATEGORY_WEIGHTS: Record<ReadinessCategoryScore['key'], number> = {
   resume_quality: 0.15,
   interview_performance: 0.3,
   communication: 0.2,
@@ -14,7 +14,7 @@ const CATEGORY_WEIGHTS: Record<ReadinessCategoryScore['key'], number> = {
   consistency: 0.15,
 };
 
-function clampScore(value: number): number {
+export function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
@@ -91,7 +91,7 @@ function trendLabel(trend: ReadinessScoreResult['improvementTrend']): string {
   }
 }
 
-function weightedOverall(categories: ReadinessCategoryScore[]): number {
+export function weightedOverall(categories: ReadinessCategoryScore[]): number {
   const available = categories.filter((c) => c.hasEvidence && c.score != null);
   if (available.length === 0) return 0;
   const weightSum = available.reduce((sum, cat) => sum + CATEGORY_WEIGHTS[cat.key], 0);

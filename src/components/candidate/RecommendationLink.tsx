@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { trackCandidateEvent } from '@/lib/analytics/candidate-events';
 
 export function RecommendationLink({
@@ -11,6 +11,7 @@ export function RecommendationLink({
   source,
   children,
   className,
+  style,
 }: {
   href: string;
   recommendationId: string;
@@ -18,11 +19,13 @@ export function RecommendationLink({
   source: string;
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
   return (
     <Link
       href={href}
       className={className}
+      style={style}
       onClick={() =>
         trackCandidateEvent('recommendation_clicked', {
           recommendation_id: recommendationId,

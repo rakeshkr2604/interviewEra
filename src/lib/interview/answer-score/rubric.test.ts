@@ -6,6 +6,8 @@ import {
   notePraises,
   subRubricForQuestionType,
   validateAnswerScoreOutput,
+  isEchoedQuestion,
+  buildEchoedQuestionScore,
   DIMENSION_WEIGHTS,
   type DimensionKey,
   type ScoredDimension,
@@ -360,5 +362,82 @@ describe('validateAnswerScoreOutput', () => {
       expect(result.value.score_suspect).toBe(true);
       expect(result.value.suspect_reasons).toContain('low_stt_confidence');
     }
+  });
+});
+
+describe('isEchoedQuestion', () => {
+  const question =
+    'Tell me about a time you had to deliver something under a tight deadline with incomplete information.';
+
+  it('flags a verbatim read-back of the question', () => {
+    expect(isEchoedQuestion(question, question)).toBe(true);
+  });
+
+  it('flags a near-verbatim read-back with minor filler words added', () => {
+    const transcript =
+      'So um, tell me about a time you had to deliver something under a tight deadline with incomplete information, yeah.';
+    expect(isEchoedQuestion(question, transcript)).toBe(true);
+  });
+
+  it('does not flag a genuine short answer that reuses some question vocabulary', () => {
+    const transcript =
+      'During my internship at Zomato we had a tight deadline and the PM was unavailable, so I made assumptions, documented them, and shipped on time.';
+    expect(isEchoedQuestion(question, transcript)).toBe(false);
+  });
+
+  it('does not flag a genuine answer even when it opens by restating the topic', () => {
+    const transcript =
+      'That happened during my final year project when our professor changed requirements two days before submission. I prioritized the core features, informed the team, and we delivered a working demo with documented trade-offs.';
+    expect(isEchoedQuestion(question, transcript)).toBe(false);
+  });
+
+  it('does not flag when the question is too short to judge reliably', () => {
+    expect(isEchoedQuestion('Tell me about yourself.', 'Tell me about yourself please.')).toBe(
+      false,
+    );
+  });
+
+  it('does not flag when the transcript is too short to judge reliably', () => {
+    expect(isEchoedQuestion(question, 'Not sure honestly.')).toBe(false);
+  });
+
+  it('flags a technical question read back verbatim', () => {
+    const techQuestion =
+      "What's the difference between stack and heap memory, and when does each matter?";
+    expect(isEchoedQuestion(techQuestion, techQuestion)).toBe(true);
+  });
+
+  it('does not flag a genuine technical answer sharing question terms', () => {
+    const techQuestion =
+      "What's the difference between stack and heap memory, and when does each matter?";
+    const transcript =
+      'Stack is fast, fixed-size, used for local variables and function calls, while heap is for dynamic allocation that I manage manually or via garbage collection, and I use heap when object lifetime outlives the function scope.';
+    expect(isEchoedQuestion(techQuestion, transcript)).toBe(false);
+  });
+});
+
+describe('buildEchoedQuestionScore', () => {
+  it('zeroes relevance, accuracy, structure, and specificity', () => {
+    const result = buildEchoedQuestionScore();
+    expect(result.dimensions.relevance.score).toBe(0);
+    expect(result.dimensions.content_accuracy.score).toBe(0);
+    expect(result.dimensions.structure.score).toBe(0);
+    expect(result.dimensions.specificity.score).toBe(0);
+  });
+
+  it('computes overall from computeOverall (not a fabricated flat number)', () => {
+    const result = buildEchoedQuestionScore();
+    expect(result.overall).toBe(computeOverall(result.dimensions));
+  });
+
+  it('flags score_suspect with echoed_question_detected', () => {
+    const result = buildEchoedQuestionScore();
+    expect(result.score_suspect).toBe(true);
+    expect(result.suspect_reasons).toContain('echoed_question_detected');
+  });
+
+  it('gives an actionable one_line_summary telling the candidate to actually answer', () => {
+    const result = buildEchoedQuestionScore();
+    expect(result.one_line_summary.toLowerCase()).toContain('repeated the question');
   });
 });

@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker';
 import { RoadmapPageContent } from '@/components/candidate/RoadmapPageContent';
 import { generatePersonalizedRoadmap } from '@/lib/candidate/roadmap';
@@ -27,11 +26,6 @@ export default async function RoadmapPage() {
   return (
     <>
       <CandidatePageTracker event="roadmap_opened" extra={{ target_role: roadmap.targetRole }} />
-      <DashboardPageHeader
-        eyebrow="Plan"
-        title="Personalized roadmap"
-        subtitle="Recommended interviews, topics, and tools based on your weakest dimensions."
-      />
       <RoadmapPageContent roadmap={roadmap} />
     </>
   );

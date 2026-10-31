@@ -42,13 +42,6 @@ export default async function WelcomePage({
           preferredRole: loaded.resolution.preferredRole,
           experienceLevel: loaded.resolution.experienceLevel,
         },
-        resume: loaded.activeResume
-          ? {
-              id: loaded.activeResume.id,
-              status: loaded.activeResume.status,
-              isPrimary: loaded.activeResume.isPrimary,
-            }
-          : null,
       }}
     />
   );

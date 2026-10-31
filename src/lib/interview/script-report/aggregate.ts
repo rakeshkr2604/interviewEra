@@ -6,6 +6,7 @@
 import {
   DIMENSION_KEYS as ANSWER_SCORE_DIMENSION_KEYS,
   DIMENSION_WEIGHTS as ANSWER_SCORE_WEIGHTS,
+  DIMENSION_LABELS,
   type DimensionKey,
 } from '@/lib/interview/answer-score/rubric';
 
@@ -108,16 +109,8 @@ export type AggregatedScriptReport =
       perQuestion: PerQuestionReportRow[];
     };
 
-const DIMENSION_LABEL: Record<DimensionKey, string> = {
-  relevance: 'Relevance',
-  content_accuracy: 'Content Accuracy',
-  communication_clarity: 'Communication Clarity',
-  structure: 'Answer Structure',
-  specificity: 'Specificity',
-};
-
 export function dimensionLabel(key: DimensionKey): string {
-  return DIMENSION_LABEL[key];
+  return DIMENSION_LABELS[key];
 }
 
 /** Arithmetic mean, rounded to 1 decimal. Empty input is a caller bug — never invent 5.0. */

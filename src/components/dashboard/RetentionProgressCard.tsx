@@ -1,5 +1,9 @@
 import { Flame, Layers, Sparkles, Trophy } from 'lucide-react';
 import { SessionQualityNotice } from '@/components/retention/SessionQualityNotice';
+import {
+  SkillBreakdownDetailsDialog,
+  type SkillDetailRow,
+} from '@/components/dashboard/SkillBreakdownDetailsDialog';
 import type { RetentionTierProgressView } from '@/lib/retention/dashboard-tier-progress';
 import { MAX_TIER } from '@/lib/retention/constants';
 import type { SessionQualityFeedback } from '@/lib/retention/quality-feedback';
@@ -15,6 +19,8 @@ export interface RetentionDashboardSnapshot {
   improvementTrend?: string | null;
   tierProgress?: RetentionTierProgressView | null;
   lastSessionQualityFeedback?: SessionQualityFeedback | null;
+  /** Optional — when provided, renders a "See details" link opening the skill-breakdown dialog. */
+  skillBreakdown?: SkillDetailRow[];
 }
 
 export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapshot | null }) {
@@ -110,6 +116,10 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
         <div className="mt-4">
           <SessionQualityNotice feedback={snap.lastSessionQualityFeedback} />
         </div>
+      ) : null}
+
+      {snap.skillBreakdown && snap.skillBreakdown.length > 0 ? (
+        <SkillBreakdownDetailsDialog skills={snap.skillBreakdown} reportCount={snap.total_sessions} />
       ) : null}
     </section>
   );

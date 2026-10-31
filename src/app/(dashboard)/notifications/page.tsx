@@ -3,6 +3,7 @@ import { DashboardPageHeader } from '@/components/layout/DashboardPageHeader';
 import { CandidatePageTracker } from '@/components/candidate/CandidatePageTracker';
 import { NotificationsFeed } from '@/components/candidate/NotificationsFeed';
 import { buildCandidateNotifications } from '@/lib/candidate/notifications';
+import { loadRecentReportInterviews } from '@/lib/candidate/load-recent-report-interviews';
 import {
   getCachedAuthUser,
   getCachedCandidateSnapshot,
@@ -21,8 +22,14 @@ export default async function NotificationsPage() {
   const user = await getCachedAuthUser();
   if (!user) redirect('/login');
 
-  const snapshot = await getCachedCandidateSnapshot(user.id);
-  const notifications = buildCandidateNotifications(snapshot);
+  // Snapshot covers resume / streak / enrollment items; the loader supplies the
+  // recent report alerts the snapshot's any-status window would miss.
+  const [snapshot, recentInterviews] = await Promise.all([
+    getCachedCandidateSnapshot(user.id),
+    loadRecentReportInterviews(user.id),
+  ]);
+
+  const notifications = buildCandidateNotifications(snapshot, recentInterviews);
 
   return (
     <>

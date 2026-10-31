@@ -688,7 +688,12 @@ export async function processInterviewRetention(
     sessionScore,
   });
   const qualityMet = qualityVerdict.passed;
-  const qualityFeedback = buildSessionQualityFeedback(qualityVerdict, sessionScore);
+  const qualityFeedback = buildSessionQualityFeedback(qualityVerdict, {
+    sessionScore,
+    questionsAnswered,
+    totalQuestions,
+    avgAnswerDurationSec,
+  });
 
   const xpAdded = qualityMet ? Math.round(sessionScore * 10) : 0;
   const totalXpNext = Math.max(0, (progressRowBefore.total_xp ?? 0) + xpAdded);

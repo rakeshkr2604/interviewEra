@@ -7,6 +7,7 @@ import { BrandChromeLockup } from '@/components/brand/BrandChromeLockup'
 import { BrandWordmarkSplit } from '@/components/brand/BrandWordmarkSplit'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { StreakCounter } from '@/components/layout/StreakCounter'
+import { DashboardTopBar } from '@/components/layout/DashboardTopBar'
 import { ActiveInterviewNavGuardProvider } from '@/components/interview/active-interview-nav-guard'
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container'
 import { NAV_SHELL_HEIGHT_CLASS } from '@/lib/theme/nav-classes'
@@ -19,6 +20,7 @@ export function DashboardChrome({
   canAccessAdmin,
   showWorkspaceSwitcher = false,
   canAccessCoach = false,
+  topBarUser = null,
 }: {
   children: React.ReactNode
   initialStreak: number
@@ -26,6 +28,13 @@ export function DashboardChrome({
   /** Platform admin only — Student / Campus / Hiring / Funnel switcher in sidebar. */
   showWorkspaceSwitcher?: boolean
   canAccessCoach?: boolean
+  /** Null when signed out — top bar (desktop only) is omitted entirely in that case. */
+  topBarUser?: {
+    displayName: string
+    email: string
+    avatarPath: string | null
+    oauthPictureUrl: string | null
+  } | null
 }) {
   useHeartbeat(true);
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -192,6 +201,15 @@ export function DashboardChrome({
           <StreakCounter key={initialStreak} initialStreak={initialStreak} />
         </header>
 
+        {topBarUser && !isImmersiveViewport ? (
+          <DashboardTopBar
+            displayName={topBarUser.displayName}
+            email={topBarUser.email}
+            avatarPath={topBarUser.avatarPath}
+            oauthPictureUrl={topBarUser.oauthPictureUrl}
+          />
+        ) : null}
+
         {/*
          * iPhone scroll freeze (do not reintroduce): below `lg` the shell column
          * grows with content, so the WINDOW is the only real scroller and this
@@ -222,7 +240,7 @@ export function DashboardChrome({
                 ? 'px-4 py-2 sm:px-5 md:py-3 lg:py-1.5 lg:pt-2'
                 : isInterviewSession
                   ? 'flex-1 p-0'
-                  : 'px-4 sm:px-5 py-5 sm:py-8 md:py-10 lg:py-12',
+                  : 'px-4 sm:px-5 py-4 sm:py-5 lg:py-6',
               isInterviewSession ? 'w-full min-w-0 max-w-none' : LANDING_PAGE_CONTAINER,
             )}
           >

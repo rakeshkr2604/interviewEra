@@ -527,9 +527,12 @@ export function cannedNextCoreQuestionTurn(opts: {
     const nextType = nextScriptMCoreQuestionType(
       opts.lastQuestionType ?? opts.parentQuestionType,
     )
+    // Returning cannedMoveOnTurn when all SCRIPT_M templates are exhausted
+    // would cause the consecutive-ack guard to loop indefinitely. Enter
+    // candidate_questions instead — it is always a valid escape hatch.
     return (
       cannedScriptMNextCoreTurn(nextType, opts.alreadyAsked, opts.emotion) ??
-      cannedMoveOnTurn(opts.emotion)
+      cannedCandidateQuestionsTurn(opts.emotion)
     )
   }
 
@@ -538,7 +541,9 @@ export function cannedNextCoreQuestionTurn(opts: {
     ? 'Walk me through how you would approach this problem end to end, including the main trade-off you would make.'
     : 'Tell me about a time you faced a setback or disagreement at work or in a project. What did you do, and what was the outcome?'
   if (findCoreDuplicate(display_question, opts.alreadyAsked).duplicate) {
-    return cannedMoveOnTurn(opts.emotion)
+    // Same reason: returning an ack here would cause an infinite ack loop via
+    // the consecutive-ack guard. Use the CQ invitation as a safe exit.
+    return cannedCandidateQuestionsTurn(opts.emotion)
   }
   return {
     speech: `Let's keep going. ${display_question}`,

@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase/server'
-import { coerceParsedResume } from '@/lib/resume/coerce-parsed-resume'
 import {
   coerceParsedJdFromDraft,
   draftToOnboardingData,
@@ -63,7 +62,7 @@ async function fetchResumeForUser(
       return {
         id: data.id,
         status: data.status as OnboardingResumeHydration['status'],
-        parsedData: data.parsed_data ? coerceParsedResume(data.parsed_data) : null,
+        parsedData: null,
         fileName: null,
       }
     }
@@ -82,7 +81,7 @@ async function fetchResumeForUser(
     return {
       id: parsed.id,
       status: 'parsed',
-      parsedData: parsed.parsed_data ? coerceParsedResume(parsed.parsed_data) : null,
+      parsedData: null,
       fileName: null,
     }
   }
@@ -101,7 +100,7 @@ async function fetchResumeForUser(
   return {
     id: inFlight.id,
     status: inFlight.status as OnboardingResumeHydration['status'],
-    parsedData: inFlight.parsed_data ? coerceParsedResume(inFlight.parsed_data) : null,
+    parsedData: null,
     fileName: null,
   }
 }

@@ -204,9 +204,28 @@ export function extractSpokenBridge(speech: string, displayQuestion: string): st
   return sentences.slice(0, firstQ).join(' ').trim()
 }
 
+function sentenceKey(sentence: string): string {
+  return sentence.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** Drops bridge sentences that repeat each other or already appear in the question. */
+function dedupeBridge(bridge: string, question: string): string {
+  const qKey = sentenceKey(question)
+  const sentences = splitSpokenSentences(bridge)
+  const seen = new Set<string>()
+  const kept: string[] = []
+  for (const sentence of sentences) {
+    const key = sentenceKey(sentence)
+    if (!key || seen.has(key) || qKey.includes(key)) continue
+    seen.add(key)
+    kept.push(sentence)
+  }
+  return kept.length === sentences.length ? bridge : kept.join(' ')
+}
+
 function joinBridgeAndQuestion(bridge: string, question: string): string {
-  const b = normalizeSpeechWhitespace(bridge)
   const q = normalizeSpeechWhitespace(question)
+  const b = dedupeBridge(normalizeSpeechWhitespace(bridge), q)
   if (!b) return q
   if (speechCarriesExactDisplayQuestion(b, q)) return b
   if (/[.!?…—–:\-]$/.test(b)) return `${b} ${q}`

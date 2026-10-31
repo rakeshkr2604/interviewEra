@@ -1,15 +1,6 @@
 import Link from 'next/link';
 import type { LucideIcon } from 'lucide-react';
-import {
-  BarChart2,
-  CalendarPlus,
-  FileSearch,
-  FileText,
-  Gauge,
-  Map,
-  MessageSquare,
-  Zap,
-} from 'lucide-react';
+import { CalendarPlus, FileSearch, Map, Zap } from 'lucide-react';
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 interface QuickAction {
@@ -19,58 +10,29 @@ interface QuickAction {
   icon: LucideIcon;
 }
 
-function buildQuickActions(resumeCompletionPct: number): QuickAction[] {
-  return [
-    {
-      label: 'Resume workspace',
-      description:
-        resumeCompletionPct >= 100
-          ? 'Resume ready — review or replace'
-          : `${resumeCompletionPct}% complete — upload to improve`,
-      href: '/resume',
-      icon: FileText,
-    },
-    {
-      label: 'Readiness score',
-      description: 'See placement readiness breakdown',
-      href: '/readiness',
-      icon: Gauge,
-    },
-    {
-      label: 'Prep roadmap',
-      description: 'Personalized topics and mocks',
-      href: '/roadmap',
-      icon: Map,
-    },
-    {
-      label: 'Mock interview',
-      description: 'Start a new session',
-      href: getDefaultInterviewStartPath(),
-      icon: CalendarPlus,
-    },
-    {
-      label: 'ATS checker',
-      description: 'Check resume compatibility',
-      href: '/tools/ats-checker',
-      icon: FileSearch,
-    },
-    {
-      label: 'Analytics',
-      description: 'See your progress',
-      href: '/analytics',
-      icon: BarChart2,
-    },
-    {
-      label: 'Feedback',
-      description: 'Share your thoughts',
-      href: '/feedback',
-      icon: MessageSquare,
-    },
-  ];
-}
+const QUICK_ACTIONS: QuickAction[] = [
+  {
+    label: 'Mock interview',
+    description: 'Start a new session',
+    href: getDefaultInterviewStartPath(),
+    icon: CalendarPlus,
+  },
+  {
+    label: 'Prep roadmap',
+    description: 'Personalized topics and mocks',
+    href: '/roadmap',
+    icon: Map,
+  },
+  {
+    label: 'ATS checker',
+    description: 'Check resume compatibility',
+    href: '/tools/ats-checker',
+    icon: FileSearch,
+  },
+];
 
-export function QuickActionsGrid({ resumeCompletionPct = 0 }: { resumeCompletionPct?: number }) {
-  const actions = buildQuickActions(resumeCompletionPct);
+export function QuickActionsGrid() {
+  const actions = QUICK_ACTIONS;
 
   return (
     <section className="dashboard-section" aria-labelledby="quick-actions-heading">
@@ -91,31 +53,33 @@ export function QuickActionsGrid({ resumeCompletionPct = 0 }: { resumeCompletion
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4 lg:gap-4">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-3 lg:gap-4">
         {actions.map((action) => {
           const Icon = action.icon;
           return (
             <Link
               key={action.label}
               href={action.href}
-              className="dashboard-premium-card dashboard-premium-card--muted dashboard-hover-lift block min-h-[5.25rem] px-3 py-3 active:opacity-95 sm:min-h-0 sm:px-4 sm:py-4 lg:px-4 lg:py-4"
+              className="dashboard-premium-card dashboard-premium-card--muted dashboard-hover-lift flex min-h-11 items-center gap-3 px-3 py-3 active:opacity-95 sm:px-4 sm:py-4 lg:px-4 lg:py-4"
               style={{ textDecoration: 'none' }}
             >
-              <div
-                className="mb-2.5 flex size-8 items-center justify-center rounded-lg"
+              <span
+                className="flex size-9 shrink-0 items-center justify-center rounded-lg"
                 style={{
                   background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)',
                   color: 'var(--text-muted)',
                 }}
               >
                 <Icon size={16} aria-hidden />
-              </div>
-              <p className="text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>
-                {action.label}
-              </p>
-              <p className="mt-0.5 text-[11px] leading-snug sm:text-xs" style={{ color: 'var(--text-muted)' }}>
-                {action.description}
-              </p>
+              </span>
+              <span className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium leading-tight" style={{ color: 'var(--text-primary)' }}>
+                  {action.label}
+                </p>
+                <p className="mt-0.5 truncate text-[11px] leading-snug sm:text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {action.description}
+                </p>
+              </span>
             </Link>
           );
         })}

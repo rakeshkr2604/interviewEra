@@ -8,6 +8,7 @@ import { nextScriptMCoreQuestionType } from '@/lib/ai/scripts/script-m-progressi
 import { normalizeInterviewMode, validateQuestionAgainstMode } from '@/lib/interview/interview-mode';
 import { findCoreDuplicate, normalizeCoreQuestion } from './duplicate';
 import { nextFallbackQuestion } from './fallback';
+import { isUnsuitableHrQuestion } from './hr-question-guard';
 import { scoreQuestionNovelty } from './novelty';
 import type {
   CoreQuestionType,
@@ -105,6 +106,15 @@ export function assembleQuestionPlan(input: AssembleQuestionPlanInput): Assemble
     const text = candidate.questionText.trim();
     if (!text) continue;
     if (!validateQuestionAgainstMode(candidate.category, mode)) continue;
+    if (candidate.questionType === 'behavioral' && isUnsuitableHrQuestion(text)) {
+      events.push({
+        event: 'question_rejected_low_novelty',
+        questionType: candidate.questionType,
+        category: candidate.category,
+        rejectionReason: 'hr_unsuitable',
+      });
+      continue;
+    }
     const againstRejected = findCoreDuplicate(text, rejected);
     if (againstRejected.duplicate && againstRejected.kind) {
       events.push(rejectionEvent(againstRejected.kind, againstRejected.score, candidate.questionType, candidate.category));

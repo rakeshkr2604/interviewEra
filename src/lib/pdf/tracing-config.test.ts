@@ -19,7 +19,7 @@ describe('next.config PDF outputFileTracingIncludes', () => {
     expect(src).not.toMatch(/['"]\/\*\*['"]\s*:\s*\[[^\]]*@napi-rs\/canvas/);
   });
 
-  it('keeps PDF tracing on the three production extract routes', () => {
+  it('keeps PDF tracing on the production extract routes', () => {
     expect(src).toContain('/api/resume/upload');
     expect(src).toContain('/api/job-description/extract');
     expect(src).toContain('/tools/ats-checker');

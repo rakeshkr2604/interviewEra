@@ -116,7 +116,7 @@ Missing why / trade-off (parent = REST vs GraphQL):
   "speech": "That's a useful point. What trade-off would you consider before choosing GraphQL over REST in a production application?",
   "display_question": "What trade-off would you consider before choosing GraphQL over REST in a production application?",
   "tip": "Tip: Name a concrete cost — caching, N+1, payload size, schema change, or operational complexity.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,
@@ -135,7 +135,7 @@ States WHAT not HOW:
   "speech": "Right — and how does that part actually work under the constraint you just named?",
   "display_question": "How does that part actually work under the constraint you just named?",
   "tip": "Tip: Walk through the mechanism, not the slogan.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,
@@ -363,7 +363,7 @@ Extract ONE technical detail from `last_answer`. `display_question` always null 
 
 | Difficulty | timer_seconds | reading_buffer_seconds |
 |---|---|---|
-| easy | 90 | 3 |
+| easy | 120 | 3 |
 | medium | 180 | 4 |
 | hard | 240 | 5 |
 | system design (theory) | 300 | 5 |
@@ -378,7 +378,7 @@ Extract ONE technical detail from `last_answer`. `display_question` always null 
   "speech": "Two sorting algorithms both run in O(n log n) — can one still be faster in practice? Explain why.",
   "display_question": "Two sorting algorithms both have O(n log n) time complexity. Can one still be meaningfully faster than the other in practice? Why or why not?",
   "tip": "Tip: Think about constants hidden in Big-O, cache performance, in-place vs auxiliary space, and real-world input distributions. Quicksort vs Mergesort is a good example.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": true,
@@ -450,7 +450,7 @@ Extract ONE technical detail from `last_answer`. `display_question` always null 
   "speech": "Process versus thread — most people know the definition. Tell me a scenario where choosing a thread over a process would actually be wrong.",
   "display_question": "Most engineers know process vs thread definitions. Give me a concrete scenario where using a thread instead of a process would be the wrong choice — and why.",
   "tip": "Tip: Think about memory isolation needs, fault tolerance (one thread crash kills all), and security boundaries. Browser rendering isolation is a classic example.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": true,
@@ -468,7 +468,7 @@ Extract ONE technical detail from `last_answer`. `display_question` always null 
   "speech": "You mentioned {tech_from_resume} on your resume. What's one limitation of that technology that most developers overlook?",
   "display_question": "You listed {tech_from_resume} on your resume. What is one significant limitation or known weakness of that technology that many developers overlook or underestimate?",
   "tip": "Tip: This tests depth of knowledge. Anyone can say they used a technology — fewer know its real-world failure modes. Be honest if you hit this in practice.",
-  "timer_seconds": 150,
+  "timer_seconds": 180,
   "reading_buffer_seconds": 4,
   "auto_submit": false,
   "allow_skip": true,
@@ -536,7 +536,7 @@ Example — acknowledgment + next question in one turn:
   "speech": "Wait — you mentioned [their exact words]. Can you explain exactly how that part works?",
   "display_question": "Can you explain exactly how [specific thing they mentioned] works?",
   "tip": null,
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,
@@ -596,7 +596,7 @@ After follow-up answered:
   "speech": "What's the time and space complexity of that approach, and why?",
   "display_question": "What is the time complexity and space complexity of the approach you described? Walk me through your reasoning.",
   "tip": "Tip: State Big-O clearly. If uncertain, reason through it: how many operations per input element? Does space grow with input?",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,
@@ -615,7 +615,7 @@ After follow-up answered:
   "speech": "What are the concrete tradeoffs of that choice? What would you give up by going that route?",
   "display_question": "What are the concrete tradeoffs of the approach you described? What would you lose by choosing this over the most obvious alternative?",
   "tip": "Tip: Every architectural decision has a tradeoff. Naming them shows senior-level thinking. Latency, consistency, cost, complexity — pick the relevant ones.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,
@@ -679,7 +679,7 @@ After follow-up answered:
   "speech": "That's okay — how would you approach thinking about it? What's your first step?",
   "display_question": "How would you reason through this problem? What would be your first step in approaching it, even if you're unsure of the full answer?",
   "tip": "Tip: Always reason aloud. 'I'm not sure but I'd start by...' shows thinking ability. Partial reasoning is always better than silence.",
-  "timer_seconds": 90,
+  "timer_seconds": 120,
   "reading_buffer_seconds": 3,
   "auto_submit": false,
   "allow_skip": false,

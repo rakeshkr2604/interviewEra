@@ -32,6 +32,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [ROUTING.md](Core/ROUTING.md) | Key app + API routes |
 | [SEO_AEO_GEO.md](Core/SEO_AEO_GEO.md) | Sitemap, noindex, analytics |
 | [BRAND_ASSETS.md](Core/BRAND_ASSETS.md) | Logo Package v1 paths, favicon/PWA/OG mapping |
+| [GAMIFICATION.md](Core/GAMIFICATION.md) | Tiers, streaks, badges, XP — progression/retention mechanics |
 
 ## Guidelines
 

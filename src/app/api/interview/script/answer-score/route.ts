@@ -7,6 +7,8 @@ import {
   ANSWER_SCORE_PROMPT_VERSION,
   subRubricForQuestionType,
   validateAnswerScoreOutput,
+  isEchoedQuestion,
+  buildEchoedQuestionScore,
   type ValidatedAnswerScore,
 } from '@/lib/interview/answer-score/rubric';
 import {
@@ -203,6 +205,64 @@ export async function POST(request: Request): Promise<NextResponse> {
       question: displayQuestion,
     });
     const expectedSubRubric = subRubricForQuestionType(resolvedType);
+
+    // Deterministic pre-check: candidate read the question back instead of
+    // answering it. Caught before the LLM call — guarantees correct handling
+    // regardless of model behavior, and skips a wasted LLM spend.
+    if (isEchoedQuestion(displayQuestion, transcript)) {
+      const validated = buildEchoedQuestionScore();
+      const echoAuditRow = {
+        interview_id: interviewId,
+        turn_index: turnIndex,
+        user_id: user.id,
+        question: displayQuestion,
+        transcript,
+        question_type: resolvedType,
+        type_source: typeSource,
+        sub_rubric: expectedSubRubric,
+        prompt_version: ANSWER_SCORE_PROMPT_VERSION,
+        model: 'deterministic:echoed_question',
+        raw_model_output: '(skipped — echoed-question check matched, no LLM call made)',
+        stt_min_confidence: sttMinConfidence ?? null,
+        dimensions: validated.dimensions,
+        overall: validated.overall,
+        status: 'scored',
+        score_suspect: validated.score_suspect,
+        suspect_reasons: validated.suspect_reasons,
+      };
+      const { error: echoInsertError } = await serviceClient
+        .from('answer_evaluations')
+        .insert(echoAuditRow);
+      if (echoInsertError) {
+        const isDuplicate =
+          echoInsertError.code === '23505' ||
+          /duplicate key|unique constraint/i.test(echoInsertError.message ?? '');
+        if (!isDuplicate) {
+          console.error(
+            `[interview/script/answer-score] echoed-question audit insert failed (interviewId=${interviewId}, turnIndex=${turnIndex}):`,
+            echoInsertError,
+          );
+        }
+      }
+      console.info(
+        JSON.stringify({
+          event: 'answer_score_echoed_question_detected',
+          interviewId,
+          turnIndex,
+        }),
+      );
+      return NextResponse.json(
+        {
+          score: {
+            dimensions: validated.dimensions,
+            overall: validated.overall,
+            one_line_summary: validated.one_line_summary,
+            score_suspect: validated.score_suspect,
+          },
+        },
+        { status: 200 },
+      );
+    }
 
     const systemPrompt = buildAnswerScoreSystemPrompt(resolvedType);
     const inputBudget = getContextLimits('answer_score').maxInputChars;
