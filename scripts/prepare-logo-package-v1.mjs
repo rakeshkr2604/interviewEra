@@ -432,9 +432,22 @@ async function prepareUiIcon(sourceRelative, outBaseName) {
 /**
  * Package 03-favicon bitmaps are board extracts (white plate + label chrome).
  * Archive those unmodified under public/brand/favicon-source/, then emit clean
- * browser/PWA sizes from the prepared UI square mark (artwork unchanged).
+ * browser/PWA sizes from the prepared UI marks (artwork unchanged).
+ *
+ * Two different sources on purpose:
+ *  - `uiCirclePng` for the plain favicon-*.png/.ico set. Browsers and Google
+ *    Search crop favicons into a circular badge; a square/squircle source
+ *    gets its corners clipped by that crop (the "square logo in Google
+ *    search results" bug). A source that is already circular, on a
+ *    transparent background, is concentric with that crop and shows the
+ *    full mark.
+ *  - `uiSquarePng` for Apple touch / Android home-screen icons, unchanged:
+ *    those platforms apply their own rounded-square/adaptive mask over a
+ *    full-bleed square source, and swapping that source for an already-
+ *    circular one would show a smaller circle floating inside each
+ *    platform's own mask instead of filling it.
  */
-async function installFavicons(uiSquarePng) {
+async function installFavicons(uiCirclePng, uiSquarePng) {
   const favSrc = path.join(pkg, '03-favicon')
   const archiveDest = path.join(root, 'public', 'brand', 'favicon-source')
   const favDest = path.join(root, 'public', 'favicon')
@@ -447,9 +460,9 @@ async function installFavicons(uiSquarePng) {
     copyFile(from, path.join(archiveDest, entry))
   }
 
-  /** Resize UI square; optional opaque plate (Apple/PWA dislike large transparent margins). */
-  async function writeSizedIcon(outPath, size, { opaqueWhite = false } = {}) {
-    const resized = await sharp(uiSquarePng)
+  /** Resize a source mark; optional opaque plate (Apple/PWA dislike large transparent margins). */
+  async function writeSizedIcon(source, outPath, size, { opaqueWhite = false } = {}) {
+    const resized = await sharp(source)
       .resize(size, size, {
         fit: 'contain',
         background: { r: 0, g: 0, b: 0, alpha: 0 },
@@ -472,20 +485,22 @@ async function installFavicons(uiSquarePng) {
     } else {
       await sharp(resized).toFile(outPath)
     }
-    console.log('wrote', path.relative(root, outPath), '(from UI square)')
+    console.log('wrote', path.relative(root, outPath))
   }
 
   const faviconSizes = [16, 32, 48, 64, 128, 180, 192, 256, 512]
   for (const size of faviconSizes) {
-    await writeSizedIcon(path.join(favDest, `favicon-${size}x${size}.png`), size)
+    await writeSizedIcon(uiCirclePng, path.join(favDest, `favicon-${size}x${size}.png`), size)
   }
 
   // Apple touch: opaque white plate (iOS historically fills alpha with black)
-  await writeSizedIcon(path.join(favDest, 'apple-touch-icon.png'), 180, { opaqueWhite: true })
+  await writeSizedIcon(uiSquarePng, path.join(favDest, 'apple-touch-icon.png'), 180, {
+    opaqueWhite: true,
+  })
 
   const androidSizes = [72, 96, 128, 144, 152, 192, 384, 512]
   for (const size of androidSizes) {
-    await writeSizedIcon(path.join(favDest, `android-chrome-${size}x${size}.png`), size, {
+    await writeSizedIcon(uiSquarePng, path.join(favDest, `android-chrome-${size}x${size}.png`), size, {
       opaqueWhite: true,
     })
   }
@@ -648,7 +663,15 @@ async function main() {
     'ui',
     'interviewera-icon-square.png',
   )
-  await installFavicons(uiSquarePng)
+  const uiCirclePng = path.join(
+    root,
+    'public',
+    'brand',
+    'icons',
+    'ui',
+    'interviewera-icon-circle.png',
+  )
+  await installFavicons(uiCirclePng, uiSquarePng)
 
   // Rebuild multi-resolution favicon.ico from clean 16 + 32 PNGs when png-to-ico is available.
   try {

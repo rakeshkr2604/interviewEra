@@ -91,7 +91,7 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.12",
     "dotenv": "^16.4.5",
     "eslint": "^9.39.1",
     "eslint-config-next": "^16.3.7",
@@ -102,7 +102,7 @@
     "shadcn": "^4.6.0",
     "supabase": "^2.98.2",
     "tsx": "^4.23.1",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "uuid": "^11.0.0",
