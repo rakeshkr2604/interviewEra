@@ -8,6 +8,18 @@ vi.mock('@/lib/security/free-tool-rate-limit', () => ({
     checkAndConsumeFreeToolLimitMock(...args),
 }));
 
+const requireFreeToolUserMock = vi.fn();
+
+vi.mock('@/lib/security/free-tool-access', () => ({
+  requireFreeToolUser: () => requireFreeToolUserMock(),
+  clientIpFromHeaders: (h: Headers) => h.get('x-forwarded-for') ?? 'unknown',
+}));
+
+vi.mock('@/lib/analytics/free-tool-events', () => ({
+  recordFreeToolCompleted: () => undefined,
+}));
+
+
 vi.mock('@/lib/question-engine/generate', () => ({
   generateQgSet: (...args: unknown[]) => generateQgSetMock(...args),
 }));
@@ -35,6 +47,7 @@ import { generateQuestionsAction } from './actions';
 
 describe('generateQuestionsAction JD semantic validation', () => {
   beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({ ok: true, userId: 'u1', tier: 'free' });
     checkAndConsumeFreeToolLimitMock.mockReset();
     generateQgSetMock.mockReset();
     checkAndConsumeFreeToolLimitMock.mockResolvedValue({ ok: true });
@@ -84,5 +97,30 @@ We are looking for a candidate who will apply to this position.
     const result = await generateQuestionsAction({}, fd);
     expect(result.error).toBeUndefined();
     expect(generateQgSetMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('generateQuestionsAction — verified account required', () => {
+  beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({
+      ok: false,
+      code: 'AUTH_REQUIRED',
+      message: 'Create a free InterviewEra account or sign in to use this tool.',
+      status: 401,
+    });
+    checkAndConsumeFreeToolLimitMock.mockReset();
+    generateQgSetMock.mockReset();
+  });
+
+  it('returns AUTH_REQUIRED before rate limiting or any AI / parsing work', async () => {
+    const fd = new FormData();
+    fd.set('mode', 'role');
+    fd.set('role', 'Backend Engineer');
+    const state = await generateQuestionsAction({}, fd);
+    expect(state.code).toBe('AUTH_REQUIRED');
+    expect(state.error).toMatch(/sign in/i);
+    expect(checkAndConsumeFreeToolLimitMock).not.toHaveBeenCalled();
+    expect(generateQgSetMock).not.toHaveBeenCalled();
+    expect(generateQgSetMock).not.toHaveBeenCalled();
   });
 });

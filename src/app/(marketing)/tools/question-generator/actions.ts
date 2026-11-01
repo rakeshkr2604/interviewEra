@@ -3,7 +3,13 @@
 import { headers } from 'next/headers';
 import { isOpenRouterConfigured } from '@/lib/openrouter/client';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
-import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
+import {
+  clientIpFromHeaders,
+  requireFreeToolUser,
+  type FreeToolAuthErrorCode,
+} from '@/lib/security/free-tool-access';
+import { recordFreeToolCompleted } from '@/lib/analytics/free-tool-events';
+import { logToolUsage } from '@/lib/telemetry/tool-usage-logger';
 import { generateQgSet } from '@/lib/question-engine/generate';
 import {
   buildQgSetCacheKey,
@@ -27,6 +33,7 @@ export interface GenerateResult {
   meta?: QgResultMeta;
   cached?: boolean;
   error?: string;
+  code?: FreeToolAuthErrorCode | 'RATE_LIMITED' | 'RATE_LIMIT_UNAVAILABLE';
 }
 
 const LEVELS = new Set<string>(QG_LEVELS);
@@ -41,18 +48,15 @@ const FRIENDLY_LLM_ERROR =
 const FRIENDLY_INVALID_ERROR =
   'The AI returned an unexpected format twice in a row. Please try again in a moment.';
 
-function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
-  return (
-    headersList.get('x-forwarded-for')?.split(',')[0].trim() ??
-    headersList.get('x-real-ip') ??
-    'unknown'
-  );
-}
-
 export async function generateQuestionsAction(
   _prevState: GenerateResult,
   formData: FormData,
 ): Promise<GenerateResult> {
+  const access = await requireFreeToolUser();
+  if (!access.ok) {
+    return { error: access.message, code: access.code };
+  }
+
   const rawMode = (formData.get('mode') as string | null)?.trim() ?? 'role';
   const mode: QgMode =
     rawMode === 'jd' || rawMode === 'topic' || rawMode === 'company' ? rawMode : 'role';
@@ -98,15 +102,17 @@ export async function generateQuestionsAction(
   }
 
   const headersList = await headers();
-  const ip = getClientIp(headersList);
-  const signedIn = isSignedInFromHeaders(headersList);
+  const ip = clientIpFromHeaders(headersList);
+  const signedIn = true;
 
-  const limited = await checkAndConsumeFreeToolLimit('question-generator', ip, {
-    failClosed: true,
-  });
+  const limited = await checkAndConsumeFreeToolLimit(
+    'question-generator',
+    { userId: access.userId, ip, tier: access.tier },
+    { failClosed: true },
+  );
   if (!limited.ok) {
     logToolUsage({ tool: 'question_generator', mode, event: 'rate_limited', signed_in: signedIn });
-    return { error: limited.message };
+    return { error: limited.message, code: limited.code };
   }
 
   const isRoleAnchored = mode === 'role' || mode === 'company';
@@ -133,6 +139,7 @@ export async function generateQuestionsAction(
     const cachedQuestions = await getCachedQgSet(cacheKey);
     if (cachedQuestions) {
       logToolUsage({ tool: 'question_generator', mode, event: 'cache_hit', signed_in: signedIn });
+      recordFreeToolCompleted(access.userId, 'question_generator');
       return { questions: cachedQuestions, meta, cached: true };
     }
   }
@@ -165,5 +172,6 @@ export async function generateQuestionsAction(
 
   // cost_usd is null here — per-call cost lands in ai_call_logs (qg_set_generation).
   logToolUsage({ tool: 'question_generator', mode, event: 'run', signed_in: signedIn });
+  recordFreeToolCompleted(access.userId, 'question_generator');
   return { questions: result.questions, meta, cached: false };
 }

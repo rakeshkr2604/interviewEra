@@ -21,7 +21,7 @@ const ORIGIN = getCanonicalSiteOrigin()
 const WEBAPP_LD = webApplicationJsonLd({
   name: 'ChatGPT Interview Prompt Builder',
   description:
-    'Create a local interview-preparation prompt for your own ChatGPT chat. No account and no resume upload.',
+    'Create a local interview-preparation prompt for your own ChatGPT chat. Free with a registered InterviewEra account. No resume upload.',
   url: canonicalUrl('/tools/prompt-builder'),
   providerId: schemaIds.organization,
 })
@@ -54,7 +54,7 @@ export default function PromptBuilderToolPage() {
       <JsonLdScript id="prompt-builder-webapp-ld" data={WEBAPP_LD} />
       <JsonLdScript id="prompt-builder-breadcrumb-ld" data={BREADCRUMB_LD} />
       <FreeToolPageLayout
-        eyebrow="Free tool · no sign-up"
+        eyebrow="Free tool · free account"
         eyebrowIcon={Sparkles}
         title="ChatGPT prompt builder"
         description="Turn a target role into a prompt you can paste into your own ChatGPT chat. A resume is optional."

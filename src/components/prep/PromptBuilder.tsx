@@ -1,13 +1,19 @@
 'use client'
 
-import { useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard'
+import {
+  FreeToolAuthGate,
+  isFreeToolGateCode,
+  useFreeToolAuthGate,
+  type FreeToolGateReason,
+} from '@/components/tools/FreeToolAuthGate'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { useClientReady } from '@/components/prep/use-client-ready'
 import { copyText } from '@/lib/prep/copy-text'
 import { trackPrepEvent } from '@/lib/prep/analytics'
-import { recordPromptBuilderRun } from '@/app/(marketing)/tools/prompt-builder/actions'
+import { authorizePromptBuilderRun } from '@/app/(marketing)/tools/prompt-builder/actions'
 import {
   buildInterviewPrepPrompt,
   CANDIDATE_LEVEL_LABELS,
@@ -48,6 +54,46 @@ const INITIAL: PromptBuilderInput = {
   goal: 'comprehensive',
 }
 
+const DRAFT_KEY = 'ie-tool-draft:prompt_builder'
+
+type PromptDraft = Pick<PromptBuilderInput, 'targetRole' | 'targetCompany' | 'candidateLevel' | 'skills' | 'goal'>
+
+/** Resume text and job description are deliberately never persisted. */
+function savePromptDraft(values: PromptBuilderInput) {
+  const draft: PromptDraft = {
+    targetRole: values.targetRole,
+    targetCompany: values.targetCompany,
+    candidateLevel: values.candidateLevel,
+    skills: values.skills,
+    goal: values.goal,
+  }
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function readPromptDraft(): Partial<PromptDraft> | null {
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY)
+    if (!raw) return null
+    sessionStorage.removeItem(DRAFT_KEY)
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const out: Partial<PromptDraft> = {}
+    if (typeof parsed.targetRole === 'string') out.targetRole = parsed.targetRole.slice(0, PROMPT_FIELD_LIMITS.targetRole)
+    if (typeof parsed.targetCompany === 'string')
+      out.targetCompany = parsed.targetCompany.slice(0, PROMPT_FIELD_LIMITS.targetCompany)
+    if (typeof parsed.skills === 'string') out.skills = parsed.skills.slice(0, PROMPT_FIELD_LIMITS.skills)
+    if ((CANDIDATE_LEVELS as readonly string[]).includes(String(parsed.candidateLevel)))
+      out.candidateLevel = parsed.candidateLevel as CandidateLevel
+    if ((PREP_GOALS as readonly string[]).includes(String(parsed.goal))) out.goal = parsed.goal as PrepGoal
+    return out
+  } catch {
+    return null
+  }
+}
+
 export function PromptBuilder() {
   const baseId = useId()
   const roleRef = useRef<HTMLInputElement>(null)
@@ -57,6 +103,9 @@ export function PromptBuilder() {
   const [prompt, setPrompt] = useState<string | null>(null)
   const [editingInputs, setEditingInputs] = useState(true)
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'failed'>('idle')
+  const [authorizing, setAuthorizing] = useState(false)
+  const [serverError, setServerError] = useState<string | null>(null)
+  const { gateReason, openGate, closeGate, blockIfSignedOut } = useFreeToolAuthGate('prompt_builder')
   const ready = useClientReady()
 
   function update<K extends keyof PromptBuilderInput>(key: K, value: PromptBuilderInput[K]) {
@@ -64,7 +113,18 @@ export function PromptBuilder() {
     setError((current) => (current?.field === key ? null : current))
   }
 
-  function generatePrompt() {
+  useEffect(() => {
+    const draft = readPromptDraft()
+    if (draft) setValues((current) => ({ ...current, ...draft }))
+  }, [])
+
+  function showGate(reason: FreeToolGateReason) {
+    savePromptDraft(values)
+    openGate(reason)
+  }
+
+  async function generatePrompt() {
+    if (authorizing) return
     const result = validatePromptBuilder(values)
     if (!result.ok) {
       setError(result)
@@ -72,6 +132,26 @@ export function PromptBuilder() {
       roleRef.current?.focus()
       return
     }
+    setServerError(null)
+    if (blockIfSignedOut()) {
+      savePromptDraft(values)
+      return
+    }
+    setAuthorizing(true)
+    let access: Awaited<ReturnType<typeof authorizePromptBuilderRun>>
+    try {
+      access = await authorizePromptBuilderRun({ goal: result.value.goal })
+    } catch {
+      access = { ok: false, code: 'RATE_LIMIT_UNAVAILABLE', message: 'Could not start the builder. Please try again.' }
+    } finally {
+      setAuthorizing(false)
+    }
+    if (!access.ok) {
+      if (isFreeToolGateCode(access.code)) showGate(access.code)
+      else setServerError(access.message)
+      return
+    }
+    closeGate()
     const nextPrompt = buildInterviewPrepPrompt(result.value)
     setPrompt(nextPrompt)
     setError(null)
@@ -83,7 +163,6 @@ export function PromptBuilder() {
       level: result.value.candidateLevel,
       ...flags,
     })
-    void recordPromptBuilderRun({ goal: result.value.goal }).catch(() => {})
     requestAnimationFrame(() => {
       promptRef.current?.focus()
     })
@@ -91,13 +170,15 @@ export function PromptBuilder() {
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    generatePrompt()
+    void generatePrompt()
   }
 
   function onReset() {
     setValues(INITIAL)
     setPrompt(null)
     setError(null)
+    setServerError(null)
+    closeGate()
     setCopyStatus('idle')
     setEditingInputs(true)
     roleRef.current?.focus()
@@ -313,8 +394,17 @@ export function PromptBuilder() {
         )}
 
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          <button type="button" onClick={generatePrompt} className={`${IE_SUBMIT_BUTTON_CLASS} sm:w-auto`} style={IE_SUBMIT_BUTTON_STYLE}>
-            Generate prompt
+          <button
+            type="button"
+            onClick={() => {
+              void generatePrompt()
+            }}
+            disabled={authorizing}
+            aria-busy={authorizing || undefined}
+            className={`${IE_SUBMIT_BUTTON_CLASS} sm:w-auto disabled:opacity-70`}
+            style={IE_SUBMIT_BUTTON_STYLE}
+          >
+            {authorizing ? 'Checking access…' : 'Generate prompt'}
           </button>
           {prompt ? (
             <button
@@ -338,6 +428,16 @@ export function PromptBuilder() {
             Reset
           </button>
         </div>
+
+        {serverError ? (
+          <p className={IE_FIELD_ERROR_CLASS} role="alert">
+            {serverError}
+          </p>
+        ) : null}
+
+        {gateReason ? (
+          <FreeToolAuthGate tool="prompt_builder" reason={gateReason} onDismiss={closeGate} />
+        ) : null}
 
         {prompt ? (
           <div className={IE_FIELD_GROUP_CLASS}>

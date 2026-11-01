@@ -28,7 +28,7 @@ export const QGEN_FAQ_ITEMS = [
   {
     question: 'What is a free interview question generator?',
     answer:
-      'An interview question generator creates practice questions tailored to a job role, experience level, and domain. InterviewEra’s free tool produces 10 questions per run — technical, behavioral, and situational — with no sign-up.',
+      'An interview question generator creates practice questions tailored to a job role, experience level, and domain. InterviewEra’s free tool produces 10 questions per run — technical, behavioral, and situational — free with a registered InterviewEra account.',
   },
   {
     question: 'Can I generate random interview questions?',
@@ -38,7 +38,7 @@ export const QGEN_FAQ_ITEMS = [
   {
     question: 'Is this interview questions generator free?',
     answer:
-      'Yes — completely free. No account, no credit card, and no usage cap on the question generator. Generate as many sets as you need before campus placements or experienced-hire interviews.',
+      'Yes — free with a registered InterviewEra account. No credit card and no usage cap on the question generator. Generate as many sets as you need before campus placements or experienced-hire interviews.',
   },
   {
     question: 'How many questions does the generator create?',

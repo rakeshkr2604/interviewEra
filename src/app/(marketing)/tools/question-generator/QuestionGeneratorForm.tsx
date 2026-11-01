@@ -14,11 +14,20 @@ import { trackQgGenerate } from './qg-analytics';
 import { useQgProfile, type QgProfileDraft } from './use-qg-profile';
 import { QuestionGeneratorResultsView } from './QuestionGeneratorResultsView';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import {
+  FreeToolAuthGate,
+  isFreeToolGateCode,
+  useFreeToolAuthGate,
+} from '@/components/tools/FreeToolAuthGate';
+
+const QG_DRAFT_KEY = 'ie-tool-draft:question_generator';
 import { AuthErrorBanner, FormWarningBanner } from '@/components/auth/AuthErrorBanner';
 import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
 import {
   QG_COMPANY_MAX_CHARS,
+  QG_DOMAINS,
   QG_JD_MAX_CHARS,
+  QG_LEVELS,
   QG_TOPIC_MAX_CHARS,
   type QgDomain,
   type QgLevel,
@@ -250,6 +259,61 @@ export function QuestionGeneratorForm() {
     });
   }, []);
 
+  // Restore a draft saved when the auth gate sent the user away. Queued after the
+  // URL prefill microtask so the user's own typed values win. JD text is never stored.
+  useEffect(() => {
+    let draft: Record<string, unknown> | null = null;
+    try {
+      const raw = sessionStorage.getItem(QG_DRAFT_KEY);
+      if (raw) {
+        sessionStorage.removeItem(QG_DRAFT_KEY);
+        draft = JSON.parse(raw) as Record<string, unknown>;
+      }
+    } catch {
+      draft = null;
+    }
+    if (!draft) return;
+    const d = draft;
+    queueMicrotask(() => {
+      if (d.mode === 'role' || d.mode === 'jd' || d.mode === 'topic' || d.mode === 'company') setMode(d.mode);
+      if (typeof d.role === 'string') setRole(d.role.slice(0, 100));
+      if (typeof d.company === 'string') setCompany(d.company.slice(0, QG_COMPANY_MAX_CHARS));
+      if (typeof d.topic === 'string') setTopic(d.topic.slice(0, QG_TOPIC_MAX_CHARS));
+      if (typeof d.level === 'string' && (QG_LEVELS as readonly string[]).includes(d.level)) {
+        levelTouchedRef.current = true;
+        setLevel(d.level as QgLevel);
+      }
+      if (typeof d.domain === 'string' && (QG_DOMAINS as readonly string[]).includes(d.domain)) {
+        domainTouchedRef.current = true;
+        setDomain(d.domain as QgDomain);
+      }
+    });
+  }, []);
+
+  const { gateReason, openGate, closeGate, blockIfSignedOut } = useFreeToolAuthGate('question_generator');
+  const serverGateCode = isFreeToolGateCode(state.code) ? state.code : null;
+
+  function saveDraft() {
+    try {
+      sessionStorage.setItem(
+        QG_DRAFT_KEY,
+        JSON.stringify({ mode, role, level, domain, topic, company }),
+      );
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  const saveDraftRef = useRef(saveDraft);
+  useEffect(() => {
+    saveDraftRef.current = saveDraft;
+  });
+
+  useEffect(() => {
+    if (!serverGateCode) return;
+    saveDraftRef.current();
+    openGate(serverGateCode);
+  }, [state, serverGateCode, openGate]);
+
   // Prefill from the saved profile once it's loaded — after mount (never during
   // render) to avoid SSR/hydration mismatch, and never over values the user
   // has already typed or picked.
@@ -351,7 +415,18 @@ export function QuestionGeneratorForm() {
           </span>
         }
       >
-        <form action={formAction} className="space-y-6 p-5 sm:p-7 lg:p-8">
+        <form
+          action={formAction}
+          className="space-y-6 p-5 sm:p-7 lg:p-8"
+          onSubmit={(e) => {
+            if (blockIfSignedOut()) {
+              e.preventDefault();
+              saveDraft();
+              return;
+            }
+            closeGate();
+          }}
+        >
           <input type="hidden" name="mode" value={mode} />
 
           <div className={IE_FIELD_GROUP_CLASS}>
@@ -496,7 +571,7 @@ export function QuestionGeneratorForm() {
               />
               <p className={IE_HELPER_TEXT_CLASS}>
                 {jd.length.toLocaleString()}/{QG_JD_MAX_CHARS.toLocaleString()} characters. We read
-                it as data only — no account needed.
+                it as data only. Free with a registered InterviewEra account.
               </p>
             </div>
           )}
@@ -642,7 +717,11 @@ export function QuestionGeneratorForm() {
             )}
           </div>
 
-          {state.error ? <AuthErrorBanner message={state.error} /> : null}
+          {gateReason ? (
+            <FreeToolAuthGate tool="question_generator" reason={gateReason} onDismiss={closeGate} />
+          ) : state.error && !serverGateCode ? (
+            <AuthErrorBanner message={state.error} />
+          ) : null}
 
           <FormSubmitButton
             loading={isPending}

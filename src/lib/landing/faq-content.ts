@@ -1,6 +1,6 @@
 /** Homepage FAQ — canonical copy + category IA (single source of truth). */
 
-import { PAID_PLANS } from '@/lib/pricing/plans';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
 
 export type LandingFaqItem = { q: string; a: string };
 
@@ -67,7 +67,7 @@ export const LANDING_FAQ_REGISTRY = {
   },
   credits: {
     q: 'How do credits and pricing work?',
-    a: `One credit starts one mock interview session. Credits deduct when the session starts. A session that is started but left incomplete still uses that credit. Free sign-up includes 3 lifetime credits with no card required. Paid plans add more credits on one-time 30-day access: Starter (₹${PAID_PLANS.starter.amountInr}, 8 credits) and Pro (₹${PAID_PLANS.pro.amountInr}, 25 credits). When you run out, buy or renew a plan for more credits, or report a technical issue if the session failed because of a technical problem — see pricing for current limits.`,
+    a: `One credit starts one mock interview session. Credits deduct when the session starts. A session that is started but left incomplete still uses that credit. Free sign-up includes ${FREE_PLAN.credits} lifetime credits with no card required. Paid plans add more credits on one-time 30-day access: Starter (₹${PAID_PLANS.starter.amountInr}, 8 credits) and Pro (₹${PAID_PLANS.pro.amountInr}, 25 credits). When you run out, buy or renew a plan for more credits, or report a technical issue if the session failed because of a technical problem — see pricing for current limits.`,
   },
   privacy: {
     q: 'Is my interview data private?',

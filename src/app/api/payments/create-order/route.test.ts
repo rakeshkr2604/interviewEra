@@ -119,7 +119,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       plan,
     }));
     getEffectivePlanPrice.mockImplementation(async ({ plan }: { plan: 'starter' | 'pro' }) => {
-      const amount = plan === 'pro' ? 79900 : 29900;
+      const amount = plan === 'pro' ? 99900 : 39900;
       return {
         basePrice: amount,
         finalPrice: amount,
@@ -143,12 +143,12 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
     expect(createPlanOrder).toHaveBeenCalledWith({
       userId: 'user-1',
       plan: 'pro',
-      amountPaise: 79900,
+      amountPaise: 99900,
     });
     expect(paymentInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: 79900,
-        list_amount_paise: 79900,
+        amount: 99900,
+        list_amount_paise: 99900,
         discount_paise: 0,
       }),
     );
@@ -159,7 +159,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
         user_id: 'user-1',
         plan: 'pro',
         order_id: 'order-1',
-        amount: 79900,
+        amount: 99900,
       }),
     );
   });
@@ -170,8 +170,8 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error_code: null,
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       label: 'Launch 30',
       kind: 'promo',
       discount_type: 'percent',
@@ -185,7 +185,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
     });
 
     const response = await POST(
-      request({ plan: 'starter', code: 'LAUNCH30', amount: 100 }),
+      request({ plan: 'starter', code: 'EARLY100', amount: 100 }),
     );
 
     expect(response.status).toBe(200);
@@ -193,13 +193,13 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       expect.anything(),
       expect.objectContaining({
         plan: 'starter',
-        listAmountPaise: 29900,
-        promoFloorPaise: 14900,
+        listAmountPaise: 39900,
+        promoFloorPaise: 33900,
       }),
     );
     expect(createPlanOrder).toHaveBeenCalledWith(
       expect.objectContaining({
-        amountPaise: 20900,
+        amountPaise: 34900,
         redemptionId: 'redemption-1',
       }),
     );
@@ -219,15 +219,15 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error_code: null,
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       reservation_created: false,
       order_id: 'order-existing',
     });
     existingPaymentMaybeSingle.mockResolvedValue({
       data: {
         order_id: 'order-existing',
-        amount: 20900,
+        amount: 34900,
         currency: 'INR',
         plan: 'starter',
         status: 'created',
@@ -236,12 +236,12 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error: null,
     });
 
-    const response = await POST(request({ plan: 'starter', code: 'LAUNCH30' }));
+    const response = await POST(request({ plan: 'starter', code: 'EARLY100' }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       order_id: 'order-existing',
-      amount: 20900,
+      amount: 34900,
       reused: true,
     });
     expect(createPlanOrder).not.toHaveBeenCalled();
@@ -250,7 +250,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       expect.objectContaining({
         event_name: 'checkout_started',
         order_id: 'order-existing',
-        amount: 20900,
+        amount: 34900,
         campaign_code_id: 'campaign-1',
       }),
     );
@@ -262,13 +262,13 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error_code: 'CHECKOUT_INITIALIZING',
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       reservation_created: false,
       order_id: null,
     });
 
-    const response = await POST(request({ plan: 'starter', code: 'LAUNCH30' }));
+    const response = await POST(request({ plan: 'starter', code: 'EARLY100' }));
 
     expect(response.status).toBe(409);
     expect(await response.json()).toMatchObject({ code: 'CHECKOUT_INITIALIZING' });
@@ -281,14 +281,14 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error_code: null,
       redemption_id: 'redemption-new',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       reservation_created: true,
       order_id: null,
     });
     createPlanOrder.mockRejectedValue(new Error('provider unavailable'));
 
-    const response = await POST(request({ plan: 'starter', code: 'LAUNCH30' }));
+    const response = await POST(request({ plan: 'starter', code: 'EARLY100' }));
 
     expect(response.status).toBe(500);
     expect(releaseCampaignReservation).toHaveBeenCalledWith(
@@ -304,7 +304,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       redemption_id: null,
       campaign_code_id: 'campaign-1',
       discount_paise: 0,
-      final_amount_paise: 29900,
+      final_amount_paise: 39900,
     });
 
     const response = await POST(request({ plan: 'starter', code: 'EXPIRED' }));
@@ -318,9 +318,9 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
 
   it('charges the server-calculated global campaign price and ignores client amount', async () => {
     getEffectivePlanPrice.mockResolvedValue({
-      basePrice: 29900,
-      finalPrice: 23900,
-      discountAmount: 6000,
+      basePrice: 39900,
+      finalPrice: 35900,
+      discountAmount: 4000,
       discountPercent: 20,
       campaignId: 'global-1',
       campaignName: 'Limited Time Offer',
@@ -339,13 +339,13 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
     expect(createPlanOrder).toHaveBeenCalledWith({
       userId: 'user-1',
       plan: 'starter',
-      amountPaise: 23900,
+      amountPaise: 35900,
     });
     expect(paymentInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        amount: 23900,
-        list_amount_paise: 29900,
-        discount_paise: 6000,
+        amount: 35900,
+        list_amount_paise: 39900,
+        discount_paise: 4000,
         pricing_campaign_id: 'global-1',
       }),
     );
@@ -354,9 +354,9 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
 
   it('does not stack a weaker coupon on top of a better global campaign', async () => {
     getEffectivePlanPrice.mockResolvedValue({
-      basePrice: 29900,
-      finalPrice: 23900,
-      discountAmount: 6000,
+      basePrice: 39900,
+      finalPrice: 35900,
+      discountAmount: 4000,
       discountPercent: 20,
       campaignId: 'global-1',
       campaignName: 'Limited Time Offer',
@@ -371,8 +371,8 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       error_code: null,
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 3000,
-      final_amount_paise: 26900,
+      discount_paise: 2000,
+      final_amount_paise: 37900,
       reservation_created: true,
       order_id: null,
     });
@@ -382,16 +382,16 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
     expect(response.status).toBe(200);
     expect(releaseCampaignReservation).toHaveBeenCalledWith(expect.anything(), 'redemption-1');
     expect(createPlanOrder).toHaveBeenCalledWith(
-      expect.objectContaining({ amountPaise: 23900 }),
+      expect.objectContaining({ amountPaise: 35900 }),
     );
     expect(attachCampaignOrder).not.toHaveBeenCalled();
   });
 
   it('keeps rejecting an invalid coupon even when a global campaign is live', async () => {
     getEffectivePlanPrice.mockResolvedValue({
-      basePrice: 29900,
-      finalPrice: 23900,
-      discountAmount: 6000,
+      basePrice: 39900,
+      finalPrice: 35900,
+      discountAmount: 4000,
       discountPercent: 20,
       campaignId: 'global-1',
       campaignName: 'Limited Time Offer',
@@ -407,7 +407,7 @@ describe('POST /api/payments/create-order authoritative pricing', () => {
       redemption_id: null,
       campaign_code_id: null,
       discount_paise: 0,
-      final_amount_paise: 29900,
+      final_amount_paise: 39900,
     });
 
     const response = await POST(request({ plan: 'starter', code: 'NOPE' }));
@@ -440,8 +440,8 @@ describe('POST /api/payments/create-order attribution snapshot', () => {
       plan,
     }));
     getEffectivePlanPrice.mockResolvedValue({
-      basePrice: 79900,
-      finalPrice: 79900,
+      basePrice: 99900,
+      finalPrice: 99900,
       discountAmount: 0,
       discountPercent: 0,
       campaignId: null,
@@ -599,8 +599,8 @@ describe('POST /api/payments/create-order attribution snapshot', () => {
       error_code: null,
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       label: 'Launch 30',
       kind: 'promo',
       discount_type: 'percent',
@@ -613,7 +613,7 @@ describe('POST /api/payments/create-order attribution snapshot', () => {
       order_id: null,
     });
 
-    const response = await POST(request({ plan: 'starter', code: 'LAUNCH30' }));
+    const response = await POST(request({ plan: 'starter', code: 'EARLY100' }));
 
     expect(response.status).toBe(200);
     // Campaign path uses attachCampaignOrder, not paymentInsert directly
@@ -642,15 +642,15 @@ describe('POST /api/payments/create-order attribution snapshot', () => {
       error_code: null,
       redemption_id: 'redemption-1',
       campaign_code_id: 'campaign-1',
-      discount_paise: 9000,
-      final_amount_paise: 20900,
+      discount_paise: 5000,
+      final_amount_paise: 34900,
       reservation_created: false,
       order_id: 'order-existing',
     });
     existingPaymentMaybeSingle.mockResolvedValue({
       data: {
         order_id: 'order-existing',
-        amount: 20900,
+        amount: 34900,
         currency: 'INR',
         plan: 'starter',
         status: 'created',
@@ -659,7 +659,7 @@ describe('POST /api/payments/create-order attribution snapshot', () => {
       error: null,
     });
 
-    const response = await POST(request({ plan: 'starter', code: 'LAUNCH30' }));
+    const response = await POST(request({ plan: 'starter', code: 'EARLY100' }));
 
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ order_id: 'order-existing', reused: true });

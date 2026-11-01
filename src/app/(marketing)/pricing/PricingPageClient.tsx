@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Ticket } from 'lucide-react';
+import { Info, Ticket } from 'lucide-react';
 import { PricingPageViewTracker } from '@/components/analytics/PricingPageViewTracker';
 import {
   PricingPlanGrid,
@@ -12,11 +12,18 @@ import {
 import { PricingComparisonTable } from '@/components/pricing/PricingComparisonTable';
 import { PricingFaq } from '@/components/pricing/PricingFaq';
 import { PricingHeroHeadline } from '@/components/pricing/PricingHeroHeadline';
+import { PricingHeroRotator } from '@/components/pricing/PricingHeroRotator';
+import { PricingToolkitSection } from '@/components/pricing/PricingToolkitSection';
+import { PricingJourneySection } from '@/components/pricing/PricingJourneySection';
+import { PricingLaunchOffer } from '@/components/pricing/PricingLaunchOffer';
+import { PricingRoadmapCard } from '@/components/pricing/PricingRoadmapCard';
 import { CommunityCTA } from '@/components/community/CommunityCTA';
 import { Reveal } from '@/components/landing/landing-home-shared';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
-import type { PaidPlanId } from '@/lib/pricing/plans';
+import { FREE_PLAN, type PaidPlanId } from '@/lib/pricing/plans';
+import type { LaunchOffer } from '@/lib/pricing/launch-offer';
+import type { ComparisonGroup } from '@/lib/pricing/tiers';
 /** Pricing-only styles — removed from shared marketing.css critical path (Loop 18). */
 import './pricing-page.css';
 
@@ -67,27 +74,6 @@ function quotesFromPublicPricing(
   }
   return Object.keys(quotes).length ? quotes : undefined;
 }
-
-const PICK_HINTS = [
-  {
-    plan: 'Free',
-    tone: 'muted' as const,
-    title: 'Just exploring',
-    body: '3 credits to feel a real mock interview — no card needed.',
-  },
-  {
-    plan: 'Starter',
-    tone: 'accent' as const,
-    title: 'Interview coming up',
-    body: '8 sessions with full feedback and a 30-day roadmap.',
-  },
-  {
-    plan: 'Pro',
-    tone: 'success' as const,
-    title: 'Serious prep',
-    body: '25 sessions plus model answers and PDF export.',
-  },
-] as const;
 
 /**
  * Two header ranks keep the page readable: `primary` for the section that
@@ -141,19 +127,34 @@ function SectionIntro({
   );
 }
 
+const PRIMARY_CTA_CLASS =
+  'landing-cta-lift ie-focus-visible inline-flex min-h-12 items-center justify-center rounded-xl px-7 py-3 text-base font-semibold text-white';
+const PRIMARY_CTA_STYLE = { background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)' };
+
 export function PricingPageClient({
   campaignCode,
   initialQuotes,
+  launchOffer,
+  serverNow,
+  comparisonGroups,
 }: {
   campaignCode?: string;
   initialQuotes?: Partial<Record<PaidPlanId, PromoPlanQuote>>;
+  launchOffer?: LaunchOffer | null;
+  serverNow?: string;
+  comparisonGroups?: readonly ComparisonGroup[];
 }) {
   const router = useRouter();
   const [quotes, setQuotes] = useState(initialQuotes);
+  const [offer, setOffer] = useState(launchOffer ?? null);
 
   useEffect(() => {
     setQuotes(initialQuotes);
   }, [initialQuotes]);
+
+  useEffect(() => {
+    setOffer(launchOffer ?? null);
+  }, [launchOffer]);
 
   const handleExpired = useCallback(() => {
     if (campaignCode) {
@@ -178,6 +179,11 @@ export function PricingPageClient({
     })();
   }, [campaignCode, router]);
 
+  const handleLaunchOfferExpired = useCallback(() => {
+    setOffer(null);
+    router.refresh();
+  }, [router]);
+
   return (
     <main
       id="main-content"
@@ -186,8 +192,11 @@ export function PricingPageClient({
     >
       <PricingPageViewTracker sourcePage="/pricing" />
 
-      {/* Hero — page-level rank */}
-      <section className="relative px-4 pb-6 pt-10 text-center sm:px-6 sm:pb-7 sm:pt-12">
+      {/* Roadmap notice — top-of-page strip, planned release only */}
+      <PricingRoadmapCard />
+
+      {/* 1 · Hero — page-level rank */}
+      <section className="relative px-4 pb-6 pt-10 text-center sm:px-6 sm:pb-6 sm:pt-12">
         <div
           className="pointer-events-none absolute inset-x-0 top-0 mx-auto h-56 max-w-4xl opacity-50 blur-3xl"
           style={{
@@ -201,53 +210,90 @@ export function PricingPageClient({
             className="mb-2.5 text-xs font-bold uppercase tracking-[0.18em]"
             style={{ color: 'var(--accent-primary)' }}
           >
-            One-time interview credits
+            Plans &amp; pricing
           </p>
           <PricingHeroHeadline />
-          <div className="mx-auto mt-3.5 max-w-3xl space-y-1.5">
-            <p
-              className="whitespace-nowrap text-[clamp(0.75rem,2.85vw,1.125rem)] leading-relaxed"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              3 free interview credits included. Pay only when you need more practice.
-            </p>
-            <p className="text-sm leading-relaxed sm:text-[0.9375rem]" style={{ color: 'var(--text-muted)' }}>
-              <span className="font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          <p
+            className="mx-auto mt-4 max-w-2xl text-pretty text-base leading-relaxed sm:text-lg"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            One AI-powered platform for <PricingHeroRotator />.
+          </p>
+          <p
+            className="mx-auto mt-4 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm"
+            style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}
+          >
+            <Info className="size-3.5 shrink-0 opacity-70" aria-hidden />
+            <span>
+              <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
                 1 interview credit
               </span>{' '}
-              starts one mock interview session with a report.
-            </p>
+              = one mock interview session with a report.
+            </span>
+          </p>
+          <div className="mt-6 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
+            <TrackedCtaLink
+              href="/signup"
+              ctaKey={CTA_KEYS.SIGN_UP}
+              ctaText="Create your free account"
+              section="pricing_hero"
+              className={PRIMARY_CTA_CLASS}
+              style={PRIMARY_CTA_STYLE}
+            >
+              Create your free account <span aria-hidden>&nbsp;→</span>
+            </TrackedCtaLink>
+            <TrackedCtaLink
+              href="#compare-plans"
+              ctaKey={CTA_KEYS.COMPARE_PLANS}
+              ctaText="Compare plans"
+              section="pricing_hero"
+              className="ie-focus-visible inline-flex min-h-12 items-center justify-center rounded-xl border-2 px-7 py-3 text-base font-semibold"
+              style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
+            >
+              Compare plans
+            </TrackedCtaLink>
           </div>
         </div>
       </section>
 
-      {/* Plans — hero acts as this section's header, so cards stay the focus */}
-      <section className="px-4 pb-14 sm:px-6 sm:pb-16" aria-labelledby="pricing-plans">
+      {/* 2 · Free preparation toolkit */}
+      <PricingToolkitSection />
+
+      {/* 3 · How InterviewEra works */}
+      <PricingJourneySection />
+
+      {/* 4 · Plans */}
+      <section className="px-4 py-14 sm:px-6 sm:py-16" aria-labelledby="pricing-plans">
         <div className="mx-auto max-w-6xl">
-          <h2 id="pricing-plans" className="sr-only">
-            InterviewEra plans
-          </h2>
-          <PricingPlanGrid
-            variant="public"
-            promoCode={campaignCode}
-            promoQuotes={quotes}
-            onCampaignExpired={handleExpired}
-            belowGrid={
-              <div className="flex justify-center">
-                <Link
-                  href="/login?next=%2Fupgrade"
-                  className="ie-focus-visible inline-flex items-center gap-1.5 rounded-md text-sm font-medium underline-offset-4 hover:underline"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  <Ticket className="size-3.5 shrink-0 opacity-80" aria-hidden />
-                  Have a promo code?{' '}
-                  <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
-                    Sign in to apply it
-                  </span>
-                </Link>
-              </div>
-            }
+          <SectionIntro
+            eyebrow="Plans"
+            title="Choose how much mock-interview practice you need"
+            titleId="pricing-plans"
+            body={`New accounts get ${FREE_PLAN.credits} free mock-interview credits. Paid plans are one-time payments with 30-day access and no auto-renewal.`}
           />
+          <div className="mt-8">
+            <PricingPlanGrid
+              variant="public"
+              promoCode={campaignCode}
+              promoQuotes={quotes}
+              onCampaignExpired={handleExpired}
+              belowGrid={
+                <div className="flex justify-center">
+                  <Link
+                    href="/login?next=%2Fupgrade"
+                    className="ie-focus-visible inline-flex items-center gap-1.5 rounded-md text-sm font-medium underline-offset-4 hover:underline"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
+                    <Ticket className="size-3.5 shrink-0 opacity-80" aria-hidden />
+                    Have a promo code?{' '}
+                    <span className="font-semibold" style={{ color: 'var(--accent-primary)' }}>
+                      Sign in to apply it
+                    </span>
+                  </Link>
+                </div>
+              }
+            />
+          </div>
           <CommunityCTA
             placement="pricing_page"
             variant="compact"
@@ -259,48 +305,33 @@ export function PricingPageClient({
         </div>
       </section>
 
-      {/* Quick pick — supporting rank */}
+      {/* 5 · Comparison — primary rank: this is where the decision happens */}
       <section
-        className="border-y px-4 py-12 sm:px-6 sm:py-14"
-        style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
-        aria-labelledby="pick-title"
+        id="compare-plans"
+        className="scroll-mt-20 border-t px-4 py-14 sm:px-6 sm:py-20"
+        style={{ borderColor: 'var(--card-border)' }}
+        aria-labelledby="comparison-title"
       >
-        <div className="mx-auto max-w-5xl">
-          <SectionIntro
-            eyebrow="Quick pick"
-            title="Match the plan to where you are"
-            titleId="pick-title"
-          />
-          <div className="mt-7 grid gap-3 sm:grid-cols-3 sm:gap-4">
-            {PICK_HINTS.map((hint, index) => (
-              <Reveal key={hint.plan} delay={index * 0.05} className="h-full">
-                <article className={`ie-pricing-hint ie-pricing-hint--${hint.tone}`}>
-                  <p className="ie-pricing-hint__plan">{hint.plan}</p>
-                  <h3 className="ie-pricing-hint__title">{hint.title}</h3>
-                  <p className="ie-pricing-hint__body">{hint.body}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Comparison — primary rank: this is where the decision happens */}
-      <section className="px-4 py-14 sm:px-6 sm:py-20" aria-labelledby="comparison-title">
         <div className="mx-auto max-w-5xl">
           <SectionIntro
             rank="primary"
             eyebrow="Side-by-side"
-            title="What changes as you upgrade"
+            title="Compare every plan"
             titleId="comparison-title"
-            body={"Core practice stays the same. Paid plans add volume, deeper analysis, and\u00A0export."}
+            body="Preparation tools are free on every plan and never consume mock-interview credits. Paid plans add credits, detailed feedback, model answers and export."
           />
           <Reveal delay={0.06} className="mt-8 sm:mt-9">
-            <PricingComparisonTable />
+            <PricingComparisonTable groups={comparisonGroups} />
           </Reveal>
         </div>
       </section>
 
+      {/* 6 · Launch offer — only when a live, dated, non-exhausted campaign exists */}
+      {offer && serverNow ? (
+        <PricingLaunchOffer offer={offer} serverNow={serverNow} onExpired={handleLaunchOfferExpired} />
+      ) : null}
+
+      {/* 7 · FAQ */}
       <PricingFaq />
 
       {/* Closing CTA — outranks every section header except the h1 */}
@@ -315,23 +346,24 @@ export function PricingPageClient({
         />
         <Reveal className="relative mx-auto max-w-2xl">
           <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">
-            Start with one honest practice session
+            Start preparing with a free account
           </h2>
           <p
             className="mx-auto mt-3 max-w-lg text-base leading-relaxed sm:text-lg"
             style={{ color: 'var(--text-secondary)' }}
           >
-            No card required. Your 3 free interview credits unlock the moment you sign up.
+            No card required. New accounts get {FREE_PLAN.credits} free mock-interview credits and
+            all four preparation tools.
           </p>
           <TrackedCtaLink
             href="/signup"
             ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
-            ctaText="Start free"
+            ctaText="Create your free account"
             section="pricing_bottom"
-            className="landing-cta-lift ie-focus-visible mt-7 inline-flex min-h-13 items-center justify-center rounded-xl px-8 py-3.5 text-base font-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, var(--accent-primary), #6d28d9)' }}
+            className={`${PRIMARY_CTA_CLASS} mt-7 min-h-13 px-8 py-3.5`}
+            style={PRIMARY_CTA_STYLE}
           >
-            Start free
+            Create your free account
           </TrackedCtaLink>
           <p className="mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
             1 interview credit starts one mock interview session with a report.

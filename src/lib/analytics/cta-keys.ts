@@ -9,6 +9,8 @@ export const CTA_KEYS = {
   GET_STARTED: 'get_started',
   SIGN_UP: 'sign_up',
   PRICING_CTA: 'pricing_cta',
+  COMPARE_PLANS: 'compare_plans',
+  LAUNCH_OFFER: 'launch_offer',
   UPGRADE_CTA: 'upgrade_cta',
   SEE_HOW_IT_WORKS: 'see_how_it_works',
   SEE_SAMPLE_REPORT: 'see_sample_report',

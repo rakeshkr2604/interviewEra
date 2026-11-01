@@ -46,7 +46,7 @@ const ORIGIN = getCanonicalSiteOrigin()
 const WEBAPP_LD = webApplicationJsonLd({
   name: 'Free ATS Resume Checker',
   description:
-    'See how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free, no sign-up. Not a single universal ATS score.',
+    'See how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free with a registered InterviewEra account. Not a single universal ATS score.',
   url: canonicalUrl('/tools/ats-checker'),
   providerId: schemaIds.organization,
 })
@@ -70,7 +70,7 @@ const FAQ_PAIRS = [
   {
     question: 'Is the ATS checker free?',
     answer:
-      'Yes — the InterviewEra ATS checker is completely free to use. Upload your resume, review Parseability, Field Extraction, Structure Quality (and JD Match if you add a job description), and see actionable fixes. No sign-up required.',
+      'Yes — the InterviewEra ATS checker is free to use with a registered InterviewEra account. Upload your resume, review Parseability, Field Extraction, Structure Quality (and JD Match if you add a job description), and see actionable fixes. Sign in to analyse your resume.',
   },
 ]
 
@@ -140,7 +140,7 @@ export default async function AtsRolePage({ params }: Props) {
             className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Free tool · explainable checks · no sign-up
+            Free tool · explainable checks · free account
           </p>
           <h1
             className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl"
@@ -153,7 +153,7 @@ export default async function AtsRolePage({ params }: Props) {
             style={{ color: 'var(--text-secondary)' }}
           >
             See how a typical parser reads your {role.label} resume — Parseability, Field Extraction,
-            Structure Quality, and JD Match when you add a job description — with specific fixes. Free, no sign-up.
+            Structure Quality, and JD Match when you add a job description — with specific fixes. Free with a registered InterviewEra account.
           </p>
 
           <div className="mt-6 flex flex-wrap gap-3">

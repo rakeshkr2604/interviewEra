@@ -1,21 +1,20 @@
 /**
- * Per-tool, per-IP rate limits for marketing free tools.
- * Backed by shared Upstash Redis (`checkRateLimit`) so limits hold across
- * Vercel serverless instances. Policy numbers match the former in-memory limits.
+ * Fair-use limits for the interactive free preparation tools.
  *
- * ## Failure policy (LLM free tools)
- * All LLM-backed free tools (ATS, Question Generator, QG answer, STAR) MUST call
- * with `failClosed: true`. On Redis errors they return a generic 503-style message
- * (`REDIS_UNAVAILABLE_MESSAGE`) — never raw provider exceptions.
+ * Primary key = verified account id (hourly + daily). Secondary per-IP windows use
+ * much higher thresholds so a shared college / hostel NAT is not blocked broadly,
+ * while one IP cycling many accounts is still capped. All windows are checked and
+ * consumed atomically in one Redis script (`checkMultiWindowRateLimit`), so a single
+ * operation never double-consumes and concurrent calls cannot overshoot.
  *
- * Local/dev without Redis configured still fail-open inside `checkRateLimit`
- * (by design for DX). Production must configure Upstash so failClosed is meaningful.
+ * Free tools NEVER touch mock-interview credits.
  *
- * Tools may declare an optional `secondary` window (e.g. hourly + daily cap).
- * Windows are checked in order; the first blocked window denies the request.
+ * ## Failure policy
+ * LLM-backed tools (ATS, Question Generator, QG answer, STAR) MUST pass
+ * `failClosed: true`. Prompt Builder runs locally in the browser and passes false.
  */
 
-import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { checkMultiWindowRateLimit, type RateLimitWindow } from '@/lib/redis/rate-limit';
 
 export type FreeToolId =
   | 'ats-checker'
@@ -24,90 +23,140 @@ export type FreeToolId =
   | 'star-builder'
   | 'prompt-builder';
 
+export type FreeToolLimitTier = 'free' | 'paid';
+
 export type FreeToolRateLimitOptions = {
-  /**
-   * When true, deny the request if Redis is unavailable.
-   * Required `true` for all LLM free-tool call sites (cost / abuse control).
-   */
+  /** Deny when the abuse-control backend is unavailable. Required `true` for LLM tools. */
   failClosed: boolean;
 };
 
-type WindowPolicy = { limit: number; windowMs: number; userMessage: string };
-
-export const FREE_TOOL_RATE_LIMITS: Record<
-  FreeToolId,
-  WindowPolicy & { secondary?: WindowPolicy }
-> = {
-  'ats-checker': {
-    limit: 3,
-    windowMs: 60 * 60 * 1000,
-    userMessage: 'Rate limit reached. You can run up to 3 ATS checks per hour.',
-  },
-  'question-generator': {
-    limit: 5,
-    windowMs: 60 * 60 * 1000,
-    userMessage: 'Rate limit reached. You can generate up to 5 question sets per hour.',
-    secondary: {
-      limit: 15,
-      windowMs: 24 * 60 * 60 * 1000,
-      userMessage: 'Daily limit reached. You can generate up to 15 question sets per day.',
-    },
-  },
-  'question-generator-answer': {
-    limit: 30,
-    windowMs: 24 * 60 * 60 * 1000,
-    userMessage: 'Daily limit reached. You can reveal up to 30 answer guides per day.',
-  },
-  'star-builder': {
-    limit: 5,
-    windowMs: 60 * 60 * 1000,
-    userMessage: 'Rate limit reached. You can use the STAR builder up to 5 times per hour.',
-  },
-  'prompt-builder': {
-    limit: 40,
-    windowMs: 60 * 60 * 1000,
-    userMessage: 'Rate limit reached. You can generate up to 40 prompts per hour.',
-  },
+export type FreeToolLimitSubject = {
+  userId: string;
+  ip: string;
+  tier: FreeToolLimitTier;
 };
 
-const REDIS_UNAVAILABLE_MESSAGE =
-  'Service temporarily unavailable. Please retry in a moment.';
+type ToolLimits = { hourly: number; daily: number };
+
+const HOUR = 60 * 60;
+const DAY = 24 * HOUR;
+
+/** Approved per-account Free limits. */
+export const FREE_TIER_TOOL_LIMITS: Record<FreeToolId, ToolLimits> = {
+  'ats-checker': { hourly: 5, daily: 15 },
+  'question-generator': { hourly: 5, daily: 15 },
+  'question-generator-answer': { hourly: 10, daily: 30 },
+  'star-builder': { hourly: 5, daily: 15 },
+  'prompt-builder': { hourly: 20, daily: 40 },
+};
 
 /**
- * If allowed, increments usage for this window. Otherwise returns an error message.
- * Async — callers must await. Pass `failClosed` explicitly per call site.
+ * Starter / Pro / campus. Never stricter than the pre-launch per-IP policy
+ * (ATS 3/h, QG 5/h + 15/d, QG answer 30/d, STAR 5/h, Prompt 40/h). Where the old
+ * policy had no daily cap, daily = hourly × 24 so nothing was silently reduced.
  */
+export const PAID_TIER_TOOL_LIMITS: Record<FreeToolId, ToolLimits> = {
+  'ats-checker': { hourly: 5, daily: 120 },
+  'question-generator': { hourly: 5, daily: 15 },
+  'question-generator-answer': { hourly: 30, daily: 30 },
+  'star-builder': { hourly: 5, daily: 120 },
+  'prompt-builder': { hourly: 40, daily: 960 },
+};
+
+/** Secondary per-IP abuse ceiling, deliberately 10× the Free account limits. */
+export const IP_ABUSE_TOOL_LIMITS: Record<FreeToolId, ToolLimits> = {
+  'ats-checker': { hourly: 50, daily: 150 },
+  'question-generator': { hourly: 50, daily: 150 },
+  'question-generator-answer': { hourly: 100, daily: 300 },
+  'star-builder': { hourly: 50, daily: 150 },
+  'prompt-builder': { hourly: 200, daily: 400 },
+};
+
+const TOOL_NOUN: Record<FreeToolId, { one: string; many: string }> = {
+  'ats-checker': { one: 'ATS check', many: 'ATS checks' },
+  'question-generator': { one: 'question set', many: 'question sets' },
+  'question-generator-answer': { one: 'answer guide', many: 'answer guides' },
+  'star-builder': { one: 'STAR answer', many: 'STAR answers' },
+  'prompt-builder': { one: 'prompt', many: 'prompts' },
+};
+
+export const RATE_LIMIT_UNAVAILABLE_MESSAGE =
+  'This tool is temporarily unavailable. Please retry in a minute.';
+
+export type FreeToolLimitResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: 'RATE_LIMITED' | 'RATE_LIMIT_UNAVAILABLE';
+      message: string;
+      retryAfterSeconds: number;
+    };
+
+export function limitsForTier(toolId: FreeToolId, tier: FreeToolLimitTier): ToolLimits {
+  return tier === 'paid' ? PAID_TIER_TOOL_LIMITS[toolId] : FREE_TIER_TOOL_LIMITS[toolId];
+}
+
+export function buildFreeToolWindows(
+  toolId: FreeToolId,
+  subject: FreeToolLimitSubject,
+): RateLimitWindow[] {
+  const user = limitsForTier(toolId, subject.tier);
+  const ipLimits = IP_ABUSE_TOOL_LIMITS[toolId];
+  const ip = subject.ip || 'unknown';
+  return [
+    { key: `free-tool:${toolId}:user:${subject.userId}:hour`, windowSeconds: HOUR, limit: user.hourly },
+    { key: `free-tool:${toolId}:user:${subject.userId}:day`, windowSeconds: DAY, limit: user.daily },
+    { key: `free-tool:${toolId}:ip:${ip}:hour`, windowSeconds: HOUR, limit: ipLimits.hourly },
+    { key: `free-tool:${toolId}:ip:${ip}:day`, windowSeconds: DAY, limit: ipLimits.daily },
+  ];
+}
+
+export function formatRetryAfter(seconds: number): string {
+  if (seconds < 90) return 'about a minute';
+  const minutes = Math.ceil(seconds / 60);
+  if (minutes < 90) return `${minutes} minutes`;
+  const hours = Math.ceil(minutes / 60);
+  return `${hours} hours`;
+}
+
+function limitMessage(toolId: FreeToolId, windowIndex: number, limit: number, retryAfter: number): string {
+  const noun = limit === 1 ? TOOL_NOUN[toolId].one : TOOL_NOUN[toolId].many;
+  const wait = formatRetryAfter(retryAfter);
+  const suffix = 'Free tools never use your mock-interview credits.';
+  switch (windowIndex) {
+    case 0:
+      return `You've used your ${limit} ${noun} for this hour. Try again in ${wait}. ${suffix}`;
+    case 1:
+      return `You've reached today's fair-use limit of ${limit} ${noun}. Try again in ${wait}. ${suffix}`;
+    default:
+      return `Too many requests from your network right now. Please try again in ${wait}.`;
+  }
+}
+
+/** Atomically checks and consumes one unit across every window. */
 export async function checkAndConsumeFreeToolLimit(
   toolId: FreeToolId,
-  ip: string,
+  subject: FreeToolLimitSubject,
   options: FreeToolRateLimitOptions,
-): Promise<{ ok: true } | { ok: false; message: string }> {
-  const cfg = FREE_TOOL_RATE_LIMITS[toolId];
-  const windows: Array<{ policy: WindowPolicy; keySuffix: string }> = [
-    { policy: cfg, keySuffix: '' },
-  ];
-  if (cfg.secondary) {
-    windows.push({ policy: cfg.secondary, keySuffix: ':daily' });
+): Promise<FreeToolLimitResult> {
+  const windows = buildFreeToolWindows(toolId, subject);
+  const result = await checkMultiWindowRateLimit(windows, { failClosed: options.failClosed });
+  if (result.allowed) return { ok: true };
+
+  if (result.redisUnavailable) {
+    return {
+      ok: false,
+      code: 'RATE_LIMIT_UNAVAILABLE',
+      message: RATE_LIMIT_UNAVAILABLE_MESSAGE,
+      retryAfterSeconds: result.retryAfterSeconds,
+    };
   }
 
-  for (const { policy, keySuffix } of windows) {
-    const windowSeconds = Math.max(1, Math.ceil(policy.windowMs / 1000));
-    const result = await checkRateLimit(
-      `free-tool:${toolId}${keySuffix}:${ip || 'unknown'}`,
-      windowSeconds,
-      policy.limit,
-      { failClosed: options.failClosed },
-    );
-
-    if (result.allowed) continue;
-
-    if (result.redisUnavailable) {
-      // Only reachable when the caller opted into failClosed.
-      return { ok: false, message: REDIS_UNAVAILABLE_MESSAGE };
-    }
-
-    return { ok: false, message: `${policy.userMessage} Please wait and try again.` };
-  }
-
-  return { ok: true };
+  const window = windows[result.blockedIndex];
+  return {
+    ok: false,
+    code: 'RATE_LIMITED',
+    message: limitMessage(toolId, result.blockedIndex, window?.limit ?? 0, result.retryAfterSeconds),
+    retryAfterSeconds: result.retryAfterSeconds,
+  };
 }

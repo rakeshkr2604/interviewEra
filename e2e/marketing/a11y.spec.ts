@@ -8,8 +8,8 @@ const MARKETING_ROUTES: { path: string; heading?: RegExp }[] = [
   // Default /campus is Coming Soon until Platform Admin sets live.
   { path: '/campus', heading: /coming soon/i },
 
-  // /pricing accessible copy is "InterviewEra plans" (sr-only <h2 id="pricing-plans">).
-  { path: '/pricing', heading: /interviewera plans/i },
+  // /pricing h1: "Your complete interview preparation starts here."
+  { path: '/pricing', heading: /complete interview preparation/i },
   { path: '/how-it-works', heading: /before the interview/i },
   { path: '/privacy', heading: /privacy policy/i },
   { path: '/terms', heading: /terms/i },

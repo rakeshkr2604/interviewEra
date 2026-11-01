@@ -304,7 +304,7 @@ export default async function StarTopicPage({ params }: Props) {
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             The free STAR Builder tool helps you structure a complete answer for any behavioral question,
-            then scores it on specificity, relevance, and impact. No sign-up required.
+            then scores it on specificity, relevance, and impact. Free with a registered InterviewEra account.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link

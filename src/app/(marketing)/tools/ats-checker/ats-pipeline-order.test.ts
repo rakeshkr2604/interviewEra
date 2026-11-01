@@ -12,6 +12,18 @@ vi.mock('@/lib/security/free-tool-rate-limit', () => ({
     checkAndConsumeFreeToolLimitMock(...args),
 }));
 
+const requireFreeToolUserMock = vi.fn();
+
+vi.mock('@/lib/security/free-tool-access', () => ({
+  requireFreeToolUser: () => requireFreeToolUserMock(),
+  clientIpFromHeaders: (h: Headers) => h.get('x-forwarded-for') ?? 'unknown',
+}));
+
+vi.mock('@/lib/analytics/free-tool-events', () => ({
+  recordFreeToolCompleted: () => undefined,
+}));
+
+
 vi.mock('@/lib/pdf/parser', () => ({
   extractText: (...args: unknown[]) => extractTextMock(...args),
   normalizeFileName: (name: string) => name,
@@ -44,6 +56,10 @@ vi.mock('@/lib/ai/tool-chat-completion', () => ({
   getToolChatClient: () => ({ route: 'openrouter' }),
 }));
 
+vi.mock('@/lib/telemetry/tool-usage-logger', () => ({
+  logToolUsage: () => undefined,
+}));
+
 vi.mock('next/headers', () => ({
   headers: async () =>
     new Headers({
@@ -55,6 +71,7 @@ import { checkAtsAction } from './actions';
 
 describe('checkAtsAction rate-limit ordering', () => {
   beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({ ok: true, userId: 'u1', tier: 'free' });
     checkAndConsumeFreeToolLimitMock.mockReset();
     extractTextMock.mockReset();
     extractDocxTextMock.mockReset();
@@ -80,7 +97,7 @@ describe('checkAtsAction rate-limit ordering', () => {
     expect(state.code).toBe('RATE_LIMIT');
     expect(checkAndConsumeFreeToolLimitMock).toHaveBeenCalledWith(
       'ats-checker',
-      '203.0.113.10',
+      { userId: 'u1', ip: '203.0.113.10', tier: 'free' },
       { failClosed: true },
     );
     expect(extractTextMock).not.toHaveBeenCalled();
@@ -206,6 +223,30 @@ Internship at Labs
 
     const state = await checkAtsAction({}, fd);
     expect(state.code).toBe('WRONG_JD_TYPE');
+    expect(runAtsAnalysisMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('checkAtsAction — verified account required', () => {
+  beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({
+      ok: false,
+      code: 'AUTH_REQUIRED',
+      message: 'Create a free InterviewEra account or sign in to use this tool.',
+      status: 401,
+    });
+    checkAndConsumeFreeToolLimitMock.mockReset();
+    extractTextMock.mockReset();
+  });
+
+  it('returns AUTH_REQUIRED before rate limiting or any AI / parsing work', async () => {
+    const fd = new FormData();
+    fd.set('file', new File(['%PDF-1.4 fake'], 'resume.pdf', { type: 'application/pdf' }));
+    const state = await checkAtsAction({}, fd);
+    expect(state.code).toBe('AUTH_REQUIRED');
+    expect(state.error).toMatch(/sign in/i);
+    expect(checkAndConsumeFreeToolLimitMock).not.toHaveBeenCalled();
+    expect(extractTextMock).not.toHaveBeenCalled();
     expect(runAtsAnalysisMock).not.toHaveBeenCalled();
   });
 });

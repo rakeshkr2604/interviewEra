@@ -22,6 +22,11 @@ import { ATS_RESULT_STORAGE_KEY, serializeAtsResult } from './ats-result-storage
 import { AtsResultsView } from './AtsResultsView';
 import { initialState } from './ats-types';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import {
+  FreeToolAuthGate,
+  isFreeToolGateCode,
+  useFreeToolAuthGate,
+} from '@/components/tools/FreeToolAuthGate';
 import { ATS_JD_MAX_CHARS } from '@/lib/ats/jd-input';
 import { cn } from '@/lib/utils';
 
@@ -63,6 +68,13 @@ export function AtsCheckerForm() {
   const [jdMode, setJdMode] = useState<JdMode>('paste');
   const [jdFileLabel, setJdFileLabel] = useState<string | null>(null);
   const [jdCharCount, setJdCharCount] = useState(0);
+  const { gateReason, openGate, closeGate, blockIfSignedOut } = useFreeToolAuthGate('ats');
+  const serverGateCode = isFreeToolGateCode(state.code) ? state.code : null;
+
+  // Server is authoritative: an expired or forged session still lands on the gate.
+  useEffect(() => {
+    if (serverGateCode) openGate(serverGateCode);
+  }, [state, serverGateCode, openGate]);
 
   useEffect(() => {
     if (!state.result || redirectDoneRef.current) return;
@@ -116,6 +128,12 @@ export function AtsCheckerForm() {
           className="space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8"
           onSubmit={(e) => {
             setClientError(null);
+            // Never upload a resume for a visitor the server would reject anyway.
+            if (blockIfSignedOut()) {
+              e.preventDefault();
+              return;
+            }
+            closeGate();
             const f = fileInputRef.current?.files?.[0];
             if (!f) {
               e.preventDefault();
@@ -311,7 +329,9 @@ export function AtsCheckerForm() {
             )}
           </div>
 
-          {(clientError ?? state.error) ? (
+          {gateReason ? (
+            <FreeToolAuthGate tool="ats" reason={gateReason} onDismiss={closeGate} />
+          ) : (clientError ?? (serverGateCode ? null : state.error)) ? (
             <AuthErrorBanner message={clientError ?? state.error ?? ''} />
           ) : null}
 

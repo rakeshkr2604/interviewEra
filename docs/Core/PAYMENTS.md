@@ -1,7 +1,7 @@
 # Payments
 
 > Status: CANONICAL
-> Last Verified: 2026-10-15
+> Last Verified: 2026-11-01
 > Verification Scope: Dual-path activation + Phase 7A recovery (PAYMENTS + PAYMENT_ARCHITECTURE merge) + user-facing billing routes
 > Authority: Razorpay plan activation
 
@@ -43,7 +43,17 @@ flowchart LR
 | `pricing/plans.ts` / `effective-price.ts` | Server amounts + campaigns |
 | Migration `088_phase7a_payment_activation_recovery.sql` | Snapshot + replay RPC |
 
-Plans (list / promo floors): starter ₹299 / ₹149 · pro ₹799 / ₹399 — **code is SoT**, not marketing copy.
+Plans (list / promo floors): starter ₹399 / ₹339 · pro ₹999 / ₹849 (8 / 25 credits, 30 days, one-time) — **code is SoT** (`PAID_PLANS` in `src/lib/pricing/plans.ts`), not marketing copy. Free: ₹0, `FREE_PLAN.credits = 2` lifetime credits for **new** accounts only (migration `119`; existing balances grandfathered).
+
+Price change safety: verify/webhook compare the provider against the frozen `payments.amount` written at create-order, so orders created at the old ₹299 / ₹799 list price still verify after deploy. Historical `payments` rows are never rewritten.
+
+Floors cap every discount (coupon or global campaign) at ~15%: a 20%+ campaign now returns `CODE_BELOW_MINIMUM` / is skipped. Admin PATCH only re-validates floors for codes that stay **active**, so legacy deep-discount codes can still be deactivated.
+
+### Launch coupon `EARLY100`
+
+Ordinary `campaign_codes` row — no parallel coupon system. Approved config (`LAUNCH_CAMPAIGN_CONFIG` in `src/lib/pricing/launch-offer.ts`): 10% percent, Starter + Pro, `max_redemptions = 100`, kind `promo` → ₹359 / ₹899. Existing RPCs provide: atomic cap (`redemption_count < max_redemptions` conditional update), one consumed redemption per user (`CODE_ALREADY_USED`), consume only after verified paid payment, idempotent webhook replay, abandoned reservations released by cron. No stacking: `chooseCheckoutAmount` picks the single best of coupon vs global campaign.
+
+Guard: admin create/PATCH refuses `is_active = true` for `EARLY100` without an explicit `starts_at` or with a cap ≠ 100 (`launchActivationError`). Public `/pricing` shows the offer only when active, started, unexpired and `max − consumed > 0` (consumed = `campaign_code_redemptions.status = 'consumed'`, never reservations). Activation runbook: [PRICING_GROWTH_LAUNCH_RELEASE](../Operations/PRICING_GROWTH_LAUNCH_RELEASE.md).
 
 Credit RPCs / ledger inserts: **service-role-only** (Invariant #2).
 

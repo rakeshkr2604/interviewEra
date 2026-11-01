@@ -1,7 +1,7 @@
 # Security
 
 > Status: CANONICAL
-> Last Verified: 2026-10-04
+> Last Verified: 2026-11-01
 > Verification Scope: Authz, CSP, RLS, campus/admin gates, upload classification
 > Authority: Security-relevant house rules
 
@@ -24,7 +24,8 @@ Non-bypassable security posture for agents.
 | Secrets | Vercel env; never commit; CI placeholders only; no secrets in query strings |
 | Resume files | Ownership checks + short-lived signed URLs; positive resume-content classification on upload; bucket `resumes` private (migration 112 on staging + production) |
 | Interview complete | Do not trust client `performanceBucket` |
-| LLM free tools RL | ATS / QG / STAR / QG-answer: `failClosed: true` on Redis errors (opaque 503 message) |
+| Free tools auth | ATS / QG / QG-answer / STAR / Prompt Builder server entry points call `requireFreeToolUser()` (`src/lib/security/free-tool-access.ts`) **first**: verified `auth.getUser()` + `hasVerifiedEmail`; `sb-` cookie presence never counts. 401 `AUTH_REQUIRED` · 403 `EMAIL_UNVERIFIED` · 503 `AUTH_UNAVAILABLE`. Public `/tools/*` pages stay crawlable; only the action is gated. Results live in the user's `sessionStorage` — no server-side saved-results endpoint exists. |
+| Free tools RL | `checkAndConsumeFreeToolLimit` → one atomic Lua `checkMultiWindowRateLimit`: per-account hourly + daily (Free: ATS 5/15, QG 5/15, answer 10/30, STAR 5/15, Prompt 20/40; paid/campus never below pre-launch limits) + per-IP abuse ceiling (10× Free). LLM tools `failClosed: true` (Redis error, or Upstash unset when `VERCEL_ENV=production`). Never touches mock-interview credits. |
 | Campus remind email | Only enrolled org student emails; Zod caps; fail-closed RL |
 | Script answer bodies | Server max 12_000 chars (`script-turn-request-schema`) |
 

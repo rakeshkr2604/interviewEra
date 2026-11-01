@@ -6,7 +6,7 @@ import { BlogStartFreeCta } from '@/components/analytics/BlogStartFreeCta';
 import { BRAND_ICON_192_PATH, brandArticleOgTitle, generateMetadata, siteConfig } from '@/lib/seo/metadata';
 import { BlogMarketingShell } from '@/components/blog/BlogMarketingShell';
 import { AiMockBlogReadingProgress } from '@/components/blog/AiMockBlogReadingProgress';
-import { PAID_PLANS } from '@/lib/pricing/plans';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
 
 const CANONICAL_PATH = '/blog/ai-mock-interviews-smartest-prep-2026';
 const PUBLISHED_ISO = '2026-05-08';
@@ -190,7 +190,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
               <p className="text-sm text-blue-800 m-0">
                 <strong>Update (May 14, 2026):</strong> InterviewEra pricing updated.
                 New plans: Starter ₹{PAID_PLANS.starter.amountInr} for 30-day access (8 credits), Pro ₹{PAID_PLANS.pro.amountInr} for 30-day access (25 credits).
-                Free tier now offers 3 lifetime credits.
+                New free accounts get {FREE_PLAN.credits} lifetime credits.
               </p>
             </div>
             <div
@@ -529,7 +529,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
             <Link href="/signup" className="ie-blog-inline-link font-medium">
               InterviewEra&apos;s free plan
             </Link>
-            , which gives you 3 free credits to start practicing without needing a credit card. It&apos;s up to you to be
+            , which gives you {FREE_PLAN.credits} free credits to start practicing without needing a credit card. It&apos;s up to you to be
             more confident in your interviews. In 2026, the job market will be more competitive than ever, and you
             need to stand out. Your future self will thank you!
           </p>
@@ -543,7 +543,7 @@ export default function AiMockInterviewsSmartestPrep2026Page() {
                 Stop Reading. Start Practicing.
               </h3>
               <p className="mb-0 mt-6 text-lg leading-[1.75] text-white/95 sm:text-xl">
-                InterviewEra gives you 3 free credits — no card needed, no catch. The job market in 2026 won&apos;t wait
+                InterviewEra gives new free accounts {FREE_PLAN.credits} credits — no card needed, no catch. The job market in 2026 won&apos;t wait
                 for you.
               </p>
               <Link

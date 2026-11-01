@@ -10,7 +10,19 @@ import {
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 describe('pricing campaign admin validation', () => {
-  it('accepts a 20% both-plan campaign', () => {
+  it('accepts a 10% both-plan campaign', () => {
+    expect(
+      validatePricingCampaignInput({
+        discount_type: 'percent',
+        discount_value: 10,
+        applies_to_plans: [],
+        starts_at: '2026-08-18T00:00:00.000Z',
+        ends_at: '2026-08-20T00:00:00.000Z',
+      }),
+    ).toBeNull();
+  });
+
+  it('rejects a 20% campaign that undercuts the ₹339 Starter floor', () => {
     expect(
       validatePricingCampaignInput({
         discount_type: 'percent',
@@ -19,7 +31,7 @@ describe('pricing campaign admin validation', () => {
         starts_at: '2026-08-18T00:00:00.000Z',
         ends_at: '2026-08-20T00:00:00.000Z',
       }),
-    ).toBeNull();
+    ).toMatch(/cannot be below ₹339/);
   });
 
   it('rejects 51% and inverted windows', () => {

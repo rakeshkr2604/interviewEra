@@ -13,7 +13,7 @@ import { buildStarBuilderLandingLinks } from '@/lib/seo/internal-linking';
 export const metadata: Metadata = generateMetadata({
   title: 'STAR answer builder',
   description:
-    'Structure your behavioral interview answers using the STAR method. Get a polished, ready-to-use answer with quality scores and improvement tips. Free tool, no sign-up required.',
+    'Structure your behavioral interview answers using the STAR method. Get a polished, ready-to-use answer with quality scores and improvement tips. Free with a registered InterviewEra account.',
   path: '/tools/star-builder',
   keywords: [
     'STAR method examples',
@@ -30,7 +30,7 @@ const ORIGIN = getCanonicalSiteOrigin();
 const STAR_WEBAPP_LD = webApplicationJsonLd({
   name: 'STAR Answer Builder',
   description:
-    'Structure behavioral interview answers using the STAR method. Get a polished, scored answer with improvement tips — free, no sign-up required.',
+    'Structure behavioral interview answers using the STAR method. Get a polished, scored answer with improvement tips — free with a registered InterviewEra account.',
   url: canonicalUrl('/tools/star-builder'),
   providerId: schemaIds.organization,
 });
@@ -58,7 +58,7 @@ const BULLETS = [
   {
     icon: Shield,
     title: 'Private & free',
-    body: 'No account for this tool. Your draft is used only to generate this response — not stored as a profile.',
+    body: 'Free with a registered InterviewEra account. Your draft is used only to generate this response — not stored as a profile.',
   },
 ] as const;
 
@@ -77,10 +77,10 @@ export default function StarBuilderPage() {
       <JsonLdScript id="star-webapp-ld" data={STAR_WEBAPP_LD} />
       <JsonLdScript id="star-breadcrumb-ld" data={STAR_BREADCRUMB_LD} />
       <FreeToolPageLayout
-      eyebrow="Free tool · no sign-up"
+      eyebrow="Free tool · free account"
       eyebrowIcon={Sparkles}
       title="STAR method answer builder"
-      description="Turn your Situation → Task → Action → Result notes into a confident spoken answer, with scores and fixes — about two minutes, no sign-up."
+      description="Turn your Situation → Task → Action → Result notes into a confident spoken answer, with scores and fixes — about two minutes, with a free account."
       bullets={BULLETS}
       leftSlot={
         <div className="mx-auto grid max-w-md grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3 lg:mx-0 lg:max-w-none">

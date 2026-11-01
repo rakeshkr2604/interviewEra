@@ -8,10 +8,8 @@ import {
 import { PAID_PLANS } from './plans';
 
 describe('pricing copy — launch tax honesty', () => {
-  it('uses neutral INR checkout language without GST-inclusive claims', () => {
+  it('uses neutral checkout language without GST-inclusive claims', () => {
     const bullets = PAYMENT_TRUST_BULLETS.join(' ');
-    expect(bullets).toMatch(/Prices are displayed in INR/i);
-    expect(bullets).toMatch(/total amount payable is shown before you complete checkout/i);
     expect(bullets.toLowerCase()).not.toContain('gst');
     expect(UPGRADE_PAGE_FOOTER.toLowerCase()).not.toContain('gst');
     expect(UPGRADE_PAGE_FOOTER).toMatch(/No auto-renewal/i);

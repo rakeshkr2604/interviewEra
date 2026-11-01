@@ -21,7 +21,7 @@ const QGEN_OG_TITLE = 'Free Interview Question Generator';
 export const metadata: Metadata = generateMetadata({
   title: QGEN_OG_TITLE,
   description:
-    'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. No sign-up.',
+    'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. Free with a registered InterviewEra account.',
   path: '/tools/question-generator',
   socialTitle: brandPageTitle(QGEN_OG_TITLE),
   keywords: [
@@ -41,7 +41,7 @@ const ORIGIN = getCanonicalSiteOrigin();
 const QGEN_WEBAPP_LD = webApplicationJsonLd({
   name: 'Free Interview Question Generator',
   description:
-    'Generate 10 role-specific interview questions in seconds. Tailored by role, experience level, and domain — free, no sign-up required.',
+    'Generate 10 role-specific interview questions in seconds. Tailored by role, experience level, and domain — free with a registered InterviewEra account.',
   url: canonicalUrl('/tools/question-generator'),
   providerId: schemaIds.organization,
 });
@@ -59,7 +59,7 @@ const QGEN_FAQ_LD = faqPageJsonLd([...QGEN_FAQ_ITEMS]);
 
 const QGEN_HOWTO_LD = howToJsonLd(
   'How to use the free interview question generator',
-  'Generate random or role-specific interview questions in seconds — free, no sign-up required.',
+  'Generate random or role-specific interview questions in seconds — free with a registered InterviewEra account.',
   [
     {
       name: 'Pick your role',
@@ -93,8 +93,8 @@ const BULLETS = [
   },
   {
     icon: ShieldCheck,
-    title: 'No account needed',
-    body: 'Try the tool instantly. Upgrade when you want AI mock practice.',
+    title: 'Free with your account',
+    body: 'Create a free account and try the tool instantly. Upgrade when you want AI mock practice.',
   },
 ] as const;
 
@@ -106,10 +106,10 @@ export default function QuestionGeneratorPage() {
       <JsonLdScript id="qgen-faq-ld" data={QGEN_FAQ_LD} />
       <JsonLdScript id="qgen-howto-ld" data={QGEN_HOWTO_LD} />
       <FreeToolPageLayout
-        eyebrow="Free tool · no sign-up"
+        eyebrow="Free tool · free account"
         eyebrowIcon={Sparkles}
         title="Free Interview Question Generator"
-        description="Generate random or role-specific interview questions in seconds — tailored by role, experience level, and domain. No sign-up required."
+        description="Generate random or role-specific interview questions in seconds — tailored by role, experience level, and domain. Free with a registered InterviewEra account."
         bullets={BULLETS}
         footerSlot={
           <p

@@ -371,7 +371,7 @@ export default function HowToGetInternshipOpportunitiesPage() {
               </Link>
               . You can{' '}
               <Link href="/signup" className="ie-blog-inline-link">
-                start with three free mock sessions
+                start with two free mock sessions
               </Link>{' '}
               or check{' '}
               <Link href="/pricing" className="ie-blog-inline-link">
@@ -537,7 +537,7 @@ export default function HowToGetInternshipOpportunitiesPage() {
                 Start Free Mock Interview
                 <ArrowRight className="size-4" aria-hidden />
               </BlogStartFreeCta>
-              <p className="ie-blog-anxiety-cta__note">Three free sessions. No card required.</p>
+              <p className="ie-blog-anxiety-cta__note">Two free sessions. No card required.</p>
             </aside>
 
             <section className="ie-blog-anxiety-related ie-blog-anxiety-related--spaced" aria-labelledby="continue-reading-heading">
@@ -559,7 +559,7 @@ export default function HowToGetInternshipOpportunitiesPage() {
               <Link href="/signup" className="ie-blog-inline-link font-medium not-italic">
                 Practice for free on InterviewEra
               </Link>{' '}
-              — three mock interviews, real feedback, no card required.
+              — two mock interviews, real feedback, no card required.
             </p>
           </div>
         </article>

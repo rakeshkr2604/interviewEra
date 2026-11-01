@@ -399,7 +399,7 @@ export default function EnglishConfidenceInterviewsPage() {
               &ldquo;I think I&apos;m getting better&rdquo; becomes &ldquo;my confidence score went from 5.2 to
               7.4,&rdquo; which is a very different feeling to carry into a real interview. You can{' '}
               <Link href="/signup" className="ie-blog-inline-link">
-                start with three free mock sessions
+                start with two free mock sessions
               </Link>{' '}
               or see{' '}
               <Link href="/pricing" className="ie-blog-inline-link">
@@ -487,7 +487,7 @@ export default function EnglishConfidenceInterviewsPage() {
                 Start Free Mock Interview
                 <ArrowRight className="size-4" aria-hidden />
               </BlogStartFreeCta>
-              <p className="ie-blog-anxiety-cta__note">Three free sessions. No card required.</p>
+              <p className="ie-blog-anxiety-cta__note">Two free sessions. No card required.</p>
             </aside>
 
             <section className="ie-blog-anxiety-related ie-blog-anxiety-related--spaced" aria-labelledby="continue-reading-heading">

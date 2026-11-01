@@ -9,6 +9,18 @@ vi.mock('@/lib/security/free-tool-rate-limit', () => ({
     checkAndConsumeFreeToolLimitMock(...args),
 }));
 
+const requireFreeToolUserMock = vi.fn();
+
+vi.mock('@/lib/security/free-tool-access', () => ({
+  requireFreeToolUser: () => requireFreeToolUserMock(),
+  clientIpFromHeaders: (h: Headers) => h.get('x-forwarded-for') ?? 'unknown',
+}));
+
+vi.mock('@/lib/analytics/free-tool-events', () => ({
+  recordFreeToolCompleted: () => undefined,
+}));
+
+
 vi.mock('@/lib/ai/tool-chat-completion', () => ({
   isFreeToolAiConfigured: () => true,
   completeFreeToolChatChain: (...args: unknown[]) => completeFreeToolChatChainMock(...args),
@@ -46,6 +58,7 @@ const VALID_LLM_JSON = JSON.stringify({
 
 describe('buildStarAction — error-event logging on primary-AI failure (dashboard visibility fix)', () => {
   beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({ ok: true, userId: 'u1', tier: 'free' });
     checkAndConsumeFreeToolLimitMock.mockReset().mockResolvedValue({ ok: true });
     completeFreeToolChatChainMock.mockReset();
     logToolUsageMock.mockReset();
@@ -110,5 +123,27 @@ describe('buildStarAction — error-event logging on primary-AI failure (dashboa
     expect(logToolUsageMock).toHaveBeenCalledWith(
       expect.objectContaining({ tool: 'star', event: 'error' }),
     );
+  });
+});
+
+describe('buildStarAction — verified account required', () => {
+  beforeEach(() => {
+    requireFreeToolUserMock.mockReset().mockResolvedValue({
+      ok: false,
+      code: 'AUTH_REQUIRED',
+      message: 'Create a free InterviewEra account or sign in to use this tool.',
+      status: 401,
+    });
+    checkAndConsumeFreeToolLimitMock.mockReset();
+    completeFreeToolChatChainMock.mockReset();
+  });
+
+  it('returns AUTH_REQUIRED before rate limiting or any AI / parsing work', async () => {
+    const state = await buildStarAction({}, starFormData());
+    expect(state.code).toBe('AUTH_REQUIRED');
+    expect(state.error).toMatch(/sign in/i);
+    expect(checkAndConsumeFreeToolLimitMock).not.toHaveBeenCalled();
+    expect(completeFreeToolChatChainMock).not.toHaveBeenCalled();
+    expect(completeFreeToolChatChainMock).not.toHaveBeenCalled();
   });
 });

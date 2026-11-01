@@ -10,7 +10,7 @@ import { SignupPageClient } from './SignupPageClient';
 import { generateMetadata } from '@/lib/seo/metadata';
 import { isSafePath } from '@/lib/auth/auth-params';
 import { parseAuthIntent, type AuthIntent } from '@/lib/auth/auth-intent';
-import { isPaidPlanId, type PaidPlanId } from '@/lib/pricing/plans';
+import { FREE_PLAN, isPaidPlanId, type PaidPlanId } from '@/lib/pricing/plans';
 import {
   buildUpgradeIntentPath,
   normalizePricingCampaignCode,
@@ -38,7 +38,7 @@ const COPY: Record<
     subtitle:
       'Practice with measurable feedback while keeping your interview history, resume insights, and progress in one account.',
     bullets: [
-      { icon: CheckCircle2, text: '3 interview credits included — no payment required' },
+      { icon: CheckCircle2, text: `${FREE_PLAN.credits} interview credits included — no payment required` },
       { icon: Target, text: 'Resume-personalized practice with advanced scoring' },
       { icon: MailCheck, text: 'Email verification required before protected product access' },
     ],

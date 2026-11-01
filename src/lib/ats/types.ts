@@ -116,6 +116,9 @@ export type AtsErrorCode =
   | 'NO_FILE'
   | 'AI_ERROR'
   | 'RATE_LIMIT'
+  | 'AUTH_REQUIRED'
+  | 'EMAIL_UNVERIFIED'
+  | 'AUTH_UNAVAILABLE'
   | 'NOT_CONFIGURED'
   | 'TOO_SHORT'
   /** Uploaded resume slot failed positive resume / anti-tracker classification. */

@@ -1,7 +1,7 @@
 # Backend Schema
 
 > Status: CANONICAL
-> Last Verified: 2026-10-22
+> Last Verified: 2026-11-01
 > Verification Scope: Core + V2.1 + billing tables (migrations + code usage) + stale-abandon RPC + V2.1 question-plan columns on questions + dashboard perf indexes / RLS init-plan (116)
 > Authority: Schema overview for agents (migrations remain legal SoT)
 
@@ -15,7 +15,7 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 
 | Table / object | Notes |
 |---|---|
-| `users` | plan_tier, credits, `last_payment_id`, platform_role; UPDATE allowlist (Invariant #3) |
+| `users` | plan_tier, credits, `last_payment_id`, platform_role; UPDATE allowlist (Invariant #3). `credits_remaining` default **2** and `handle_new_user()` grants 2 to new signups (migration 119; app fallback `ensure-public-user.ts` uses `FREE_PLAN.credits`). Existing rows never bulk-updated. |
 | `campus_organizations` | verification_status gating |
 | Credit RPCs | service-role-only (Invariant #2) |
 | `credit_transactions` | ledger; payment-linked uniqueness for grants |
@@ -38,13 +38,14 @@ Orientation to tables agents touch most. Full history = `supabase/migrations/`. 
 |---|---|
 | `payments` | order authority + entitlement snapshot (Phase 7A) |
 | `pricing_campaigns` | timed sales; server quote |
+| `campaign_codes` / `campaign_code_redemptions` | coupons incl. launch code `EARLY100` (admin-created row, not seeded by migration); status `reserved` → `consumed` / `released` |
 
 ### Telemetry / product
 
 | Table | Notes |
 |---|---|
 | `ai_call_logs`, `voice_usage_logs`, `provider_health_logs`, … | migration 023 (+033 grants) |
-| `product_events` | service-role writes; funnel SoT |
+| `product_events` | service-role writes; funnel SoT. Partial unique index `uq_product_events_free_tool_first_completed (event_name, user_id)` (migration 120) dedupes the first-free-tool milestone |
 
 ### Historical / do-not-assume-active
 

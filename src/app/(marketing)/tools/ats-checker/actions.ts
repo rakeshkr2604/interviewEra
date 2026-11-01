@@ -5,7 +5,9 @@ import { headers } from 'next/headers';
 import OpenAI from 'openai';
 import { getToolChatClient, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
-import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
+import { clientIpFromHeaders, requireFreeToolUser } from '@/lib/security/free-tool-access';
+import { recordFreeToolCompleted } from '@/lib/analytics/free-tool-events';
+import { logToolUsage } from '@/lib/telemetry/tool-usage-logger';
 import {
   extractText,
   normalizeFileName,
@@ -102,14 +104,6 @@ const ENGINE_CACHE_PREFIX = 'ats-v3';
 // that's fine because local reads are skipped entirely (see above).
 const DEPLOY_ID = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) || 'local-dev';
 
-function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
-  return (
-    headersList.get('x-forwarded-for')?.split(',')[0].trim() ??
-    headersList.get('x-real-ip') ??
-    'unknown'
-  );
-}
-
 function buildCacheKey(text: string, jd: string, routeTag: string): string {
   return createHash('sha256')
     .update(`${ENGINE_CACHE_PREFIX}|${DEPLOY_ID}|${text}|${jd}|${routeTag}`)
@@ -154,6 +148,11 @@ function userFacingError(err: unknown): string {
  * 5) analyze + cache write
  */
 export async function checkAtsAction(_prevState: AtsState, formData: FormData): Promise<AtsState> {
+  const access = await requireFreeToolUser();
+  if (!access.ok) {
+    return { error: access.message, code: access.code };
+  }
+
   if (!isFreeToolAiConfigured()) {
     return {
       error:
@@ -163,7 +162,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   }
 
   const headersList = await headers();
-  const ip = getClientIp(headersList);
+  const ip = clientIpFromHeaders(headersList);
 
   const file = formData.get('file');
   const rawJd = formData.get('jobDescription');
@@ -217,12 +216,14 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     }
   }
 
-  const signedIn = isSignedInFromHeaders(headersList);
+  const signedIn = true;
 
   // Rate limit BEFORE any resume/JD parsing or LLM work.
-  const limited = await checkAndConsumeFreeToolLimit('ats-checker', ip, {
-    failClosed: true,
-  });
+  const limited = await checkAndConsumeFreeToolLimit(
+    'ats-checker',
+    { userId: access.userId, ip, tier: access.tier },
+    { failClosed: true },
+  );
   if (!limited.ok) {
     logToolUsage({ tool: 'ats', event: 'rate_limited', signed_in: signedIn });
     return { error: limited.message, code: 'RATE_LIMIT' };
@@ -319,6 +320,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
   const cached = await getCachedAtsResult(cacheKey);
   if (cached) {
     logToolUsage({ tool: 'ats', event: 'cache_hit', signed_in: signedIn });
+    recordFreeToolCompleted(access.userId, 'ats');
     return { result: cached };
   }
 
@@ -349,6 +351,7 @@ export async function checkAtsAction(_prevState: AtsState, formData: FormData): 
     // cost_usd is null here — per-call cost lands in ai_call_logs
     // (ats_field_extraction / ats_jd_extraction / ats_embedding rows).
     logToolUsage({ tool: 'ats', event: 'run', signed_in: signedIn });
+    recordFreeToolCompleted(access.userId, 'ats');
     return { result };
   } catch (err) {
     console.error('[ats-checker] analyze failed', err);

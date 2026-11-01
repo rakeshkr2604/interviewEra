@@ -3,7 +3,13 @@
 import { headers } from 'next/headers';
 import { completeFreeToolChatChain, isFreeToolAiConfigured } from '@/lib/ai/tool-chat-completion';
 import { checkAndConsumeFreeToolLimit } from '@/lib/security/free-tool-rate-limit';
-import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
+import {
+  clientIpFromHeaders,
+  requireFreeToolUser,
+  type FreeToolAuthErrorCode,
+} from '@/lib/security/free-tool-access';
+import { recordFreeToolCompleted } from '@/lib/analytics/free-tool-events';
+import { logToolUsage } from '@/lib/telemetry/tool-usage-logger';
 
 export interface StarScores {
   structure: number;
@@ -20,6 +26,7 @@ export interface StarResult {
 export interface StarState {
   result?: StarResult;
   error?: string;
+  code?: FreeToolAuthErrorCode | 'RATE_LIMITED' | 'RATE_LIMIT_UNAVAILABLE';
   /** Shown when the answer was produced by the backup model or after a retry path */
   notice?: string;
 }
@@ -39,14 +46,6 @@ const FALLBACK_SUGGESTIONS = [
   'In Action, stress what you personally did — verbs like shipped, debugged, aligned, negotiated.',
   'Keep Situation to 2–3 sentences: who, where, and why it mattered.',
 ];
-
-function getClientIp(headersList: Awaited<ReturnType<typeof headers>>): string {
-  return (
-    headersList.get('x-forwarded-for')?.split(',')[0].trim() ??
-    headersList.get('x-real-ip') ??
-    'unknown'
-  );
-}
 
 function extractJSON(content: string): string {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -278,6 +277,11 @@ export async function buildStarAction(
   _prevState: StarState,
   formData: FormData,
 ): Promise<StarState> {
+  const access = await requireFreeToolUser();
+  if (!access.ok) {
+    return { error: access.message, code: access.code };
+  }
+
   const situation = (formData.get('situation') as string | null)?.trim() ?? '';
   const task = (formData.get('task') as string | null)?.trim() ?? '';
   const action = (formData.get('action') as string | null)?.trim() ?? '';
@@ -314,14 +318,16 @@ export async function buildStarAction(
   }
 
   const headersList = await headers();
-  const ip = getClientIp(headersList);
-  const signedIn = isSignedInFromHeaders(headersList);
-  const limited = await checkAndConsumeFreeToolLimit('star-builder', ip, {
-    failClosed: true,
-  });
+  const ip = clientIpFromHeaders(headersList);
+  const signedIn = true;
+  const limited = await checkAndConsumeFreeToolLimit(
+    'star-builder',
+    { userId: access.userId, ip, tier: access.tier },
+    { failClosed: true },
+  );
   if (!limited.ok) {
     logToolUsage({ tool: 'star', event: 'rate_limited', signed_in: signedIn });
-    return { error: limited.message };
+    return { error: limited.message, code: limited.code };
   }
 
   const prompt = buildPrompt(targetRole, level, domain, situation, task, action, resultText);
@@ -361,6 +367,7 @@ export async function buildStarAction(
     // cost_usd is null here — per-call cost lands in ai_call_logs (star_builder).
     logToolUsage({ tool: 'star', event: 'run', signed_in: signedIn });
   }
+  recordFreeToolCompleted(access.userId, 'star');
 
   return {
     result,

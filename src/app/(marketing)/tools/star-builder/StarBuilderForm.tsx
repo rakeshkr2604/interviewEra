@@ -12,6 +12,11 @@ import type { StarState } from './actions';
 import { STAR_RESULT_STORAGE_KEY, serializeStarPayload } from './star-result-storage';
 import { StarBuilderResultsView } from './StarBuilderResultsView';
 import { FreeToolFormCard } from '@/components/landing/FreeToolFormCard';
+import {
+  FreeToolAuthGate,
+  isFreeToolGateCode,
+  useFreeToolAuthGate,
+} from '@/components/tools/FreeToolAuthGate';
 import { AuthErrorBanner, FormWarningBanner } from '@/components/auth/AuthErrorBanner';
 import { FormSubmitButton } from '@/components/auth/AuthLoadingButton';
 import {
@@ -123,13 +128,66 @@ const textareaClass = cn(IE_TEXTAREA_TOOL_CLASS, 'bg-transparent');
 
 const MIN_LEN = 10;
 
+const DRAFT_KEY = 'ie-tool-draft:star';
+const DRAFT_FIELDS = ['targetRole', 'level', 'domain', 'situation', 'task', 'action', 'result'] as const;
+
+function saveStarDraft(form: HTMLFormElement | null) {
+  if (!form) return;
+  const data = new FormData(form);
+  const draft: Record<string, string> = {};
+  for (const name of DRAFT_FIELDS) {
+    const value = data.get(name);
+    if (typeof value === 'string' && value) draft[name] = value.slice(0, 2500);
+  }
+  try {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+function restoreStarDraft(form: HTMLFormElement | null) {
+  if (!form) return;
+  try {
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    if (!raw) return;
+    sessionStorage.removeItem(DRAFT_KEY);
+    const draft = JSON.parse(raw) as Record<string, unknown>;
+    for (const name of DRAFT_FIELDS) {
+      const el = form.elements.namedItem(name);
+      const value = draft[name];
+      if (typeof value !== 'string') continue;
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) {
+        el.value = value;
+      } else if (el instanceof HTMLSelectElement && [...el.options].some((o) => o.value === value)) {
+        el.value = value;
+      }
+    }
+  } catch {
+    /* ignore malformed draft */
+  }
+}
+
 export function StarBuilderForm() {
   const router = useRouter();
   const redirectDoneRef = useRef(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const { resolvedTheme } = useTheme();
   const { optionProps, selectFieldStyle } = useNativeSelectFieldStyles(resolvedTheme);
   const [state, formAction, isPending] = useActionState(buildStarAction, initialState);
   const [inlineFallback, setInlineFallback] = useState(false);
+  const { gateReason, openGate, closeGate, blockIfSignedOut } = useFreeToolAuthGate('star');
+  const serverGateCode = isFreeToolGateCode(state.code) ? state.code : null;
+
+  useEffect(() => {
+    restoreStarDraft(formRef.current);
+  }, []);
+
+  useEffect(() => {
+    if (!serverGateCode) return;
+    saveStarDraft(formRef.current);
+    openGate(serverGateCode);
+  }, [state, serverGateCode, openGate]);
 
   useEffect(() => {
     const res = state.result;
@@ -172,7 +230,19 @@ export function StarBuilderForm() {
           </p>
         }
       >
-        <form action={formAction} className="space-y-6 p-5 sm:p-7 lg:p-8">
+        <form
+          ref={formRef}
+          action={formAction}
+          className="space-y-6 p-5 sm:p-7 lg:p-8"
+          onSubmit={(e) => {
+            if (blockIfSignedOut()) {
+              e.preventDefault();
+              saveStarDraft(e.currentTarget);
+              return;
+            }
+            closeGate();
+          }}
+        >
           <div className={IE_FIELD_GROUP_CLASS}>
             <Label htmlFor="targetRole" className={IE_LABEL_CLASS}>
               Target role
@@ -274,7 +344,11 @@ export function StarBuilderForm() {
             ))}
           </div>
 
-          {state.error ? <AuthErrorBanner message={state.error} /> : null}
+          {gateReason ? (
+            <FreeToolAuthGate tool="star" reason={gateReason} onDismiss={closeGate} />
+          ) : state.error && !serverGateCode ? (
+            <AuthErrorBanner message={state.error} />
+          ) : null}
 
           <FormSubmitButton
             loading={isPending}

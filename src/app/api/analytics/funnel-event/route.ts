@@ -60,7 +60,11 @@ const EVENT_PROP_KEYS: Partial<Record<ProductEventName, readonly string[]>> = {
   ],
   payment_started: ['order_id', 'source'],
   pricing_page_viewed: ['source_page', 'authenticated'],
+  roadmap_interest_submitted: ['item', 'vote'],
 };
+
+const ROADMAP_ITEMS = new Set(['dsa']);
+const ROADMAP_VOTES = new Set(['interested', 'not_interested']);
 
 function clientIp(request: Request): string {
   const fwd = request.headers.get('x-forwarded-for');
@@ -122,6 +126,12 @@ export async function POST(request: Request): Promise<NextResponse> {
     let props = pickAllowedProps(event_name, record);
     const attribution = resolveDurableEventAttribution(request, record);
     props = { ...props, ...attributionToEventProps(attribution) };
+
+    if (event_name === 'roadmap_interest_submitted') {
+      const item = typeof props.item === 'string' ? props.item : null;
+      const vote = typeof props.vote === 'string' ? props.vote : null;
+      if (!item || !vote || !ROADMAP_ITEMS.has(item) || !ROADMAP_VOTES.has(vote)) return NO_CONTENT;
+    }
 
     if (event_name === 'payment_started') {
       const orderId = typeof props.order_id === 'string' ? props.order_id : null;

@@ -8,6 +8,7 @@ import LandingHeroCommunityLinks from '@/components/landing/LandingHeroCommunity
 import { LANDING_HOME_INNER } from '@/lib/landing/container';
 import { LANDING_DEMO_DISCLOSURE } from '@/lib/landing/demo-disclosure';
 import { cn } from '@/lib/utils';
+import { FREE_PLAN } from '@/lib/pricing/plans';
 
 const TRUST_ITEMS = [
   { dot: T.ok, label: 'Free to start' },
@@ -71,7 +72,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
                 className="hero-copy-body__offer mt-2 text-[13px] leading-[1.5] sm:mt-2.5 sm:text-[14px] sm:leading-[1.7]"
                 style={{ color: T.text2 }}
               >
-                3 free Mock Interviews, no card required.
+                {FREE_PLAN.credits} free Mock Interviews, no card required.
               </p>
             </div>
 
@@ -102,7 +103,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               <p className="hero-free-offer" role="status">
                 <span className="hero-free-offer__dot" aria-hidden />
                 <span className="hero-free-offer__text">
-                  First 3 interviews free — try it once.
+                  First {FREE_PLAN.credits} interviews free — try it once.
                 </span>
               </p>
               <div className="w-full">

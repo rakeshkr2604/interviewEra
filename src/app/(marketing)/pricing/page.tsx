@@ -5,7 +5,7 @@ import { JsonLdScript } from '@/components/seo/JsonLdScript';
 import { faqPageJsonLd, breadcrumbListJsonLd } from '@/lib/seo/schema/jsonld';
 import { PRICING_FAQ } from '@/lib/landing/home-content';
 import { getCanonicalSiteOrigin } from '@/lib/seo/site-url';
-import { PAID_PLANS } from '@/lib/pricing/plans';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
 import type { PaidPlanId } from '@/lib/pricing/plans';
 import { createServiceClient } from '@/lib/supabase/server';
 import { quoteCampaignDiscount } from '@/lib/campaign-codes';
@@ -16,10 +16,14 @@ import {
   publicSnapshotToPromoQuotes,
   type PromoDisplayQuote,
 } from '@/lib/pricing/effective-price';
+import { loadLaunchOffer, type LaunchOffer } from '@/lib/pricing/launch-offer';
+import { buildFairUseComparisonGroup } from '@/lib/pricing/fair-use';
+import { PRICING_COMPARISON_GROUPS } from '@/lib/pricing/tiers';
+import { isSupabasePlaceholderCredential } from '@/lib/analytics/product-events-store';
 
 export const metadata: Metadata = generateMetadata({
   title: 'Pricing',
-  description: `Simple, transparent pricing for InterviewEra. Start free with 3 credits. One-time 30-day plans from ₹${PAID_PLANS.starter.amountInr}.`,
+  description: `InterviewEra pricing: free preparation tools with every account, ${FREE_PLAN.credits} free mock-interview credits for new accounts, and one-time 30-day plans from ₹${PAID_PLANS.starter.amountInr}. No auto-renewal.`,
   path: '/pricing',
   keywords: 'InterviewEra pricing, AI mock interview price, placement prep cost, interview practice India',
 });
@@ -101,6 +105,26 @@ async function loadCampaignQuotes(
   }
 }
 
+const COMPARISON_GROUPS = [...PRICING_COMPARISON_GROUPS, buildFairUseComparisonGroup()];
+
+async function loadPublicLaunchOffer(now: Date): Promise<LaunchOffer | null> {
+  // E2E / CI placeholder credentials: never show an offer that was not loaded from a real DB.
+  if (
+    isSupabasePlaceholderCredential(
+      process.env.NEXT_PUBLIC_SUPABASE_URL?.trim(),
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+    )
+  ) {
+    return null;
+  }
+  try {
+    return await loadLaunchOffer(createServiceClient(), now);
+  } catch (error) {
+    console.warn('[pricing] launch offer unavailable', error);
+    return null;
+  }
+}
+
 export default async function PricingPage({
   searchParams,
 }: {
@@ -110,11 +134,19 @@ export default async function PricingPage({
   const campaignCode = normalizePricingCampaignCode(params.code);
   const codeQuotes = await loadCampaignQuotes(campaignCode);
   const quotes = codeQuotes ?? (await loadGlobalPricingQuotes());
+  const now = new Date();
+  const launchOffer = await loadPublicLaunchOffer(now);
   return (
     <>
       <JsonLdScript id="pricing-faq-ld" data={PRICING_FAQ_LD} />
       <JsonLdScript id="pricing-breadcrumb-ld" data={PRICING_BREADCRUMB_LD} />
-      <PricingPageClient campaignCode={quotes ? campaignCode : undefined} initialQuotes={quotes} />
+      <PricingPageClient
+        campaignCode={quotes ? campaignCode : undefined}
+        initialQuotes={quotes}
+        launchOffer={launchOffer}
+        serverNow={now.toISOString()}
+        comparisonGroups={COMPARISON_GROUPS}
+      />
     </>
   );
 }

@@ -109,7 +109,10 @@ export type ProductEventName =
   | 'prep_prompt_copied'
   | 'readiness_checklist_completed'
   | 'prep_guide_opened'
-  | 'prep_to_mock_cta_clicked';
+  | 'prep_to_mock_cta_clicked'
+  | 'free_tool_first_completed'
+  | 'free_tool_auth_gate_shown'
+  | 'roadmap_interest_submitted';
 
 export type ProductEventPayload = {
   /** @deprecated Legacy field — use event_name at emit boundary. */

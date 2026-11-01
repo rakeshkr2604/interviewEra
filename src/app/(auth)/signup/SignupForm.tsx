@@ -22,7 +22,7 @@ import { displayNameSchema } from '@/lib/validations/schemas';
 import { isAuthV2Enabled } from '@/lib/auth/flags';
 import type { AuthIntent } from '@/lib/auth/auth-intent';
 import type { PaidPlanId } from '@/lib/pricing/plans';
-import { PAID_PLANS } from '@/lib/pricing/plans';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
 import { useOAuthSignIn } from '@/hooks/use-oauth-sign-in';
 import { useAuthAnalytics } from '@/hooks/use-auth-analytics';
 import { trackLandingCtaClicked } from '@/lib/analytics/cta';
@@ -198,7 +198,7 @@ export function SignupForm({
       <AuthFormCard
         eyebrow="Free account"
         title="Create your account"
-        subtitle="3 interview credits included. Verify your email before accessing protected interview features."
+        subtitle={`${FREE_PLAN.credits} interview credits included. Verify your email before accessing protected interview features.`}
         badge={<ThemeToggle />}
       >
         <div className="space-y-5 p-5 sm:p-6">

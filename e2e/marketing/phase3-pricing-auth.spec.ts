@@ -20,7 +20,7 @@ for (const viewport of viewports) {
   test(`pricing is responsive at ${viewport.name}`, async ({ page }) => {
     await page.setViewportSize(viewport);
     await page.goto('/pricing');
-    await expect(page.getByRole('heading', { name: /Practice smarter/i })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /Your complete interview preparation/i })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Free', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Starter', exact: true })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Pro', exact: true })).toBeVisible();

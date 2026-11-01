@@ -12,6 +12,7 @@ import {
   normalizeCampaignCode,
 } from '@/lib/campaign-codes';
 import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
+import { launchActivationError } from '@/lib/pricing/launch-offer';
 
 const createSchema = z.object({
   code: z.string().min(2).max(64),
@@ -100,6 +101,10 @@ export async function POST(request: Request) {
   const input = parsed.data;
   if (input.kind === 'sponsorship' && !input.partner_name?.trim()) {
     return NextResponse.json({ error: 'partner_name is required for sponsorship codes' }, { status: 400 });
+  }
+  const activationError = launchActivationError({ ...input, code: input.code.trim().toUpperCase() });
+  if (activationError) {
+    return NextResponse.json({ error: activationError }, { status: 400 });
   }
   const pricingError = validateCampaignPricing(input);
   if (pricingError) {

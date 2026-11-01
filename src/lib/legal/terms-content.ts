@@ -1,7 +1,7 @@
 import { FileText } from 'lucide-react';
 import type { LegalDocumentMeta } from './types';
 import { COMPANY_ADDRESS } from './privacy-content';
-import { PAID_PLANS } from '@/lib/pricing/plans';
+import { FREE_PLAN, PAID_PLANS } from '@/lib/pricing/plans';
 
 /**
  * Terms & Conditions — production content (founder-reviewed July 2026).
@@ -53,7 +53,7 @@ export const termsDocument: LegalDocumentMeta = {
       content: [
         {
           sub: 'Free Tier',
-          text: 'New free accounts receive 3 lifetime credits at no cost. No payment method is required to start. Free credits do not expire.',
+          text: `New free accounts receive ${FREE_PLAN.credits} lifetime credits at no cost. No payment method is required to start. Free credits do not expire.`,
         },
         {
           sub: 'Credit Deduction',

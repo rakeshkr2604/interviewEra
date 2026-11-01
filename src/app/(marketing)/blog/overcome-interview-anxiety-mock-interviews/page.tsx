@@ -314,7 +314,7 @@ export default function OvercomeInterviewAnxietyPage() {
             then company-style patterns, then a full mock panel — so the difficulty rises with you instead of
             overwhelming you on day one. You can{' '}
             <Link href="/signup" className="ie-blog-inline-link">
-              start with three free mock sessions
+              start with two free mock sessions
             </Link>{' '}
             and scale up through{' '}
             <Link href="/pricing" className="ie-blog-inline-link">
@@ -474,7 +474,7 @@ export default function OvercomeInterviewAnxietyPage() {
               Start Free Mock Interview
               <ArrowRight className="size-4" aria-hidden />
             </BlogStartFreeCta>
-            <p className="ie-blog-anxiety-cta__note">Three free sessions. No card required.</p>
+            <p className="ie-blog-anxiety-cta__note">Two free sessions. No card required.</p>
           </aside>
 
           <section className="ie-blog-anxiety-related ie-blog-anxiety-related--spaced" aria-labelledby="continue-reading-heading">
@@ -494,7 +494,7 @@ export default function OvercomeInterviewAnxietyPage() {
           <p className="mt-10 text-base italic" style={{ color: 'var(--text-secondary)' }}>
             Interview confidence comes from reps, not theory.{' '}
             <Link href="/signup" className="ie-blog-inline-link font-medium not-italic">
-              Start with three free mock sessions on InterviewEra
+              Start with two free mock sessions on InterviewEra
             </Link>{' '}
             — no card needed. See{' '}
             <Link href="/pricing" className="ie-blog-inline-link font-medium not-italic">

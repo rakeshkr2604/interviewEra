@@ -23,25 +23,26 @@ export const FREE_PLAN = {
   amountPaise: 0,
   amountInr: 0,
   durationDays: null,
-  credits: 3,
+  /** Lifetime credits granted to NEW signups only. Must match migration 119 trigger + column default. */
+  credits: 2,
 } as const;
 
 export const PAID_PLANS: Record<PaidPlanId, PaidPlanConfig> = {
   starter: {
     id: 'starter',
     label: 'Starter',
-    amountPaise: 29900,
-    amountInr: 299,
-    promoFloorPaise: 14900,
+    amountPaise: 39900,
+    amountInr: 399,
+    promoFloorPaise: 33900,
     durationDays: 30,
     credits: 8,
   },
   pro: {
     id: 'pro',
     label: 'Pro',
-    amountPaise: 79900,
-    amountInr: 799,
-    promoFloorPaise: 39900,
+    amountPaise: 99900,
+    amountInr: 999,
+    promoFloorPaise: 84900,
     durationDays: 30,
     credits: 25,
   },

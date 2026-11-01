@@ -19,11 +19,11 @@ function campaign(overrides: Partial<PricingCampaignRecord> = {}): PricingCampai
     slug: 'limited-time-offer',
     is_active: true,
     discount_type: 'percent',
-    discount_value: 20,
+    discount_value: 10,
     applies_to_plans: [],
     starts_at: '2026-08-18T00:00:00.000Z',
     ends_at: '2026-08-20T00:00:00.000Z',
-    display_label: '20% OFF',
+    display_label: '10% OFF',
     display_badge: 'LIMITED TIME OFFER',
     ...overrides,
   };
@@ -33,64 +33,73 @@ describe('global pricing campaign', () => {
   it('returns list price when no campaign is present', () => {
     const starter = applyCampaignToPlan('starter', null, NOW);
     const pro = applyCampaignToPlan('pro', null, NOW);
-    expect(starter.finalPrice).toBe(29900);
-    expect(pro.finalPrice).toBe(79900);
+    expect(starter.finalPrice).toBe(39900);
+    expect(pro.finalPrice).toBe(99900);
     expect(starter.campaignId).toBeNull();
   });
 
-  it('applies an active 20% campaign to both plans', () => {
+  it('applies an active 10% campaign to both plans (₹399 → ₹359, ₹999 → ₹899)', () => {
     const row = campaign();
     const starter = applyCampaignToPlan('starter', row, NOW);
     const pro = applyCampaignToPlan('pro', row, NOW);
-    expect(starter.finalPrice).toBe(23900);
-    expect(starter.discountAmount).toBe(6000);
-    expect(starter.discountPercent).toBe(20);
-    expect(pro.finalPrice).toBe(63900);
-    expect(pro.discountAmount).toBe(16000);
+    expect(starter.finalPrice).toBe(35900);
+    expect(starter.discountAmount).toBe(4000);
+    expect(starter.discountPercent).toBe(10);
+    expect(pro.finalPrice).toBe(89900);
+    expect(pro.discountAmount).toBe(10000);
     expect(starter.campaignName).toBe('Limited Time Offer');
+  });
+
+  it('rejects a 20% campaign that would undercut the ₹339 / ₹849 promotional floors', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const row = campaign({ discount_value: 20 });
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
+    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(99900);
+    expect(applyCampaignToPlan('starter', row, NOW).campaignId).toBeNull();
+    errorSpy.mockRestore();
   });
 
   it('ignores a campaign that has not started', () => {
     const row = campaign({ starts_at: '2026-08-19T00:00:00.000Z' });
     expect(isPricingCampaignLive(row, NOW)).toBe(false);
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
   });
 
   it('ignores an expired campaign even when is_active is still true', () => {
     const row = campaign({ ends_at: '2026-08-18T12:00:00.000Z' });
     expect(isPricingCampaignLive(row, NOW)).toBe(false);
-    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(79900);
+    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(99900);
   });
 
   it('ignores a paused campaign even during its active window', () => {
     const row = campaign({ status: 'paused', is_active: false });
     expect(isPricingCampaignLive(row, NOW)).toBe(false);
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
   });
 
   it('ignores an archived campaign', () => {
     const row = campaign({ status: 'archived', is_active: false });
     expect(isPricingCampaignLive(row, NOW)).toBe(false);
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
   });
 
   it('ignores a draft campaign', () => {
     const row = campaign({ status: 'draft', is_active: false });
     expect(isPricingCampaignLive(row, NOW)).toBe(false);
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
   });
 
   it('applies only to Starter when targeted', () => {
     const row = campaign({ applies_to_plans: ['starter'] });
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(23900);
-    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(79900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(35900);
+    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(99900);
     expect(selectLiveCampaignForPlan([row], 'pro', NOW)).toBeNull();
   });
 
   it('applies only to Pro when targeted', () => {
     const row = campaign({ applies_to_plans: ['pro'] });
     expect(applyCampaignToPlan('starter', row, NOW).campaignId).toBeNull();
-    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(63900);
+    expect(applyCampaignToPlan('pro', row, NOW).finalPrice).toBe(89900);
   });
 
   it('treats empty applies_to_plans as both plans', () => {
@@ -102,7 +111,7 @@ describe('global pricing campaign', () => {
   it('applies a 0% campaign without changing the price', () => {
     const row = campaign({ discount_value: 0 });
     const starter = applyCampaignToPlan('starter', row, NOW);
-    expect(starter.finalPrice).toBe(29900);
+    expect(starter.finalPrice).toBe(39900);
     expect(starter.discountAmount).toBe(0);
     expect(starter.campaignId).toBe('camp-1');
   });
@@ -110,7 +119,7 @@ describe('global pricing campaign', () => {
   it('skips an invalid percent above 50% and keeps list price', () => {
     const row = campaign({ discount_value: 51 });
     const starter = applyCampaignToPlan('starter', row, NOW);
-    expect(starter.finalPrice).toBe(29900);
+    expect(starter.finalPrice).toBe(39900);
     expect(starter.campaignId).toBeNull();
   });
 
@@ -119,28 +128,28 @@ describe('global pricing campaign', () => {
       discount_type: 'flat_paise',
       discount_value: 999999,
     });
-    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(29900);
+    expect(applyCampaignToPlan('starter', row, NOW).finalPrice).toBe(39900);
   });
 
   it('does not expose a public quote when the live campaign has a 0% discount', () => {
     const snapshot = {
       plans: {
         starter: {
-          basePrice: 299,
-          finalPrice: 299,
+          basePrice: 399,
+          finalPrice: 399,
           discountAmount: 0,
           discountPercent: 0,
-          basePricePaise: 29900,
-          finalPricePaise: 29900,
+          basePricePaise: 39900,
+          finalPricePaise: 39900,
           discountAmountPaise: 0,
         },
         pro: {
-          basePrice: 799,
-          finalPrice: 799,
+          basePrice: 999,
+          finalPrice: 999,
           discountAmount: 0,
           discountPercent: 0,
-          basePricePaise: 79900,
-          finalPricePaise: 79900,
+          basePricePaise: 99900,
+          finalPricePaise: 99900,
           discountAmountPaise: 0,
         },
       },
@@ -161,47 +170,47 @@ describe('coupon vs global campaign precedence', () => {
   it('uses the coupon when it is the lower final amount', () => {
     const campaignPrice = applyCampaignToPlan('starter', campaign({ discount_value: 10 }), NOW);
     const decision = chooseCheckoutAmount({
-      listAmountPaise: 29900,
+      listAmountPaise: 39900,
       campaign: campaignPrice,
-      coupon: { final_amount_paise: 20900, discount_paise: 9000 },
+      coupon: { final_amount_paise: 34900, discount_paise: 5000 },
     });
     expect(decision.source).toBe('coupon');
-    expect(decision.finalAmountPaise).toBe(20900);
+    expect(decision.finalAmountPaise).toBe(34900);
     expect(decision.pricingCampaignId).toBeNull();
   });
 
   it('uses the global campaign when it is strictly better than the coupon', () => {
-    const campaignPrice = applyCampaignToPlan('starter', campaign({ discount_value: 20 }), NOW);
+    const campaignPrice = applyCampaignToPlan('starter', campaign({ discount_value: 10 }), NOW);
     const decision = chooseCheckoutAmount({
-      listAmountPaise: 29900,
+      listAmountPaise: 39900,
       campaign: campaignPrice,
-      coupon: { final_amount_paise: 26900, discount_paise: 3000 },
+      coupon: { final_amount_paise: 37900, discount_paise: 2000 },
     });
     expect(decision.source).toBe('campaign');
-    expect(decision.finalAmountPaise).toBe(23900);
+    expect(decision.finalAmountPaise).toBe(35900);
     expect(decision.pricingCampaignId).toBe('camp-1');
   });
 
   it('does not stack coupon and campaign percentages', () => {
-    const campaignPrice = applyCampaignToPlan('starter', campaign({ discount_value: 20 }), NOW);
+    const campaignPrice = applyCampaignToPlan('starter', campaign({ discount_value: 10 }), NOW);
     const decision = chooseCheckoutAmount({
-      listAmountPaise: 29900,
+      listAmountPaise: 39900,
       campaign: campaignPrice,
-      coupon: { final_amount_paise: 20900, discount_paise: 9000 },
+      coupon: { final_amount_paise: 34900, discount_paise: 5000 },
     });
-    expect(decision.finalAmountPaise).not.toBeLessThan(20900);
+    expect(decision.finalAmountPaise).not.toBeLessThan(34900);
     expect(decision.source).toBe('coupon');
   });
 
   it('uses the campaign when no coupon is supplied', () => {
     const campaignPrice = applyCampaignToPlan('starter', campaign(), NOW);
     const decision = chooseCheckoutAmount({
-      listAmountPaise: 29900,
+      listAmountPaise: 39900,
       campaign: campaignPrice,
       coupon: null,
     });
     expect(decision.source).toBe('campaign');
-    expect(decision.finalAmountPaise).toBe(23900);
+    expect(decision.finalAmountPaise).toBe(35900);
   });
 });
 
@@ -231,8 +240,8 @@ describe('getPublicPricingSnapshot (placeholder E2E credentials)', () => {
     const snapshot = await getPublicPricingSnapshot(svc, NOW);
 
     expect(from).not.toHaveBeenCalled();
-    expect(snapshot.plans.starter.finalPrice).toBe(299);
-    expect(snapshot.plans.pro.finalPrice).toBe(799);
+    expect(snapshot.plans.starter.finalPrice).toBe(399);
+    expect(snapshot.plans.pro.finalPrice).toBe(999);
     expect(snapshot.campaign.active).toBe(false);
     expect(infoSpy).toHaveBeenCalledWith(
       '[pricing-campaign] placeholder credentials; using list prices',

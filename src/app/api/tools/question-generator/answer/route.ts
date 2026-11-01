@@ -1,6 +1,6 @@
 /**
  * Question Engine v2 — lazy per-question answer coaching (decision D2).
- * Anonymous free-tool endpoint: rate-limited per IP (30/day), Redis-cached
+ * Verified-account free-tool endpoint: per-user fair-use limits + IP abuse ceiling, Redis-cached
  * on hash(question, level) for 30 days, zod-validated with a single retry.
  */
 
@@ -15,7 +15,8 @@ import {
   setCachedQgAnswer,
 } from '@/lib/question-engine/cache';
 import { QG_CATEGORIES, QG_TOPIC_MAX_CHARS } from '@/lib/question-engine/schemas';
-import { isSignedInFromHeaders, logToolUsage } from '@/lib/telemetry/tool-usage-logger';
+import { logToolUsage } from '@/lib/telemetry/tool-usage-logger';
+import { clientIpFromHeaders, requireFreeToolUser } from '@/lib/security/free-tool-access';
 
 export const maxDuration = 30;
 
@@ -27,15 +28,15 @@ const answerRequestSchema = z.object({
   topic: z.string().trim().max(QG_TOPIC_MAX_CHARS).optional(),
 });
 
-function clientIp(request: NextRequest): string {
-  return (
-    request.headers.get('x-forwarded-for')?.split(',')[0].trim() ??
-    request.headers.get('x-real-ip') ??
-    'unknown'
-  );
-}
-
 export async function POST(request: NextRequest) {
+  const access = await requireFreeToolUser();
+  if (!access.ok) {
+    return NextResponse.json(
+      { error: access.message, code: access.code },
+      { status: access.status },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -49,14 +50,22 @@ export async function POST(request: NextRequest) {
   }
   const { question, category, role, level, topic } = parsed.data;
 
-  const ip = clientIp(request);
-  const signedIn = isSignedInFromHeaders(request.headers);
-  const limited = await checkAndConsumeFreeToolLimit('question-generator-answer', ip, {
-    failClosed: true,
-  });
+  const ip = clientIpFromHeaders(request.headers);
+  const signedIn = true;
+  const limited = await checkAndConsumeFreeToolLimit(
+    'question-generator-answer',
+    { userId: access.userId, ip, tier: access.tier },
+    { failClosed: true },
+  );
   if (!limited.ok) {
     logToolUsage({ tool: 'question_generator', mode: 'answer', event: 'rate_limited', signed_in: signedIn });
-    return NextResponse.json({ error: limited.message }, { status: 429 });
+    return NextResponse.json(
+      { error: limited.message, code: limited.code, retryAfterSeconds: limited.retryAfterSeconds },
+      {
+        status: limited.code === 'RATE_LIMIT_UNAVAILABLE' ? 503 : 429,
+        headers: { 'Retry-After': String(limited.retryAfterSeconds) },
+      },
+    );
   }
 
   const cacheKey = buildQgAnswerCacheKey(question, level ?? '', topic ?? '');

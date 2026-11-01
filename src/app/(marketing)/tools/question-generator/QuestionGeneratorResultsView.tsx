@@ -23,6 +23,11 @@ import {
   trackQgQuestionRated,
 } from './qg-analytics';
 import { cn } from '@/lib/utils';
+import {
+  FreeToolAuthGate,
+  isFreeToolGateCode,
+  useFreeToolAuthGate,
+} from '@/components/tools/FreeToolAuthGate';
 import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-start-path';
 
 function categoryBadgeStyle(category: QgQuestion['category']): CSSProperties {
@@ -109,6 +114,7 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
   const [revealed, setRevealed] = useState(false);
   const [revealTracked, setRevealTracked] = useState(false);
   const [rating, setRating] = useState<QuestionRating | null>(null);
+  const { gateReason, openGate, closeGate } = useFreeToolAuthGate('question_generator');
 
   const practiceHref = meta.role
     ? `${getDefaultInterviewStartPath()}?role=${encodeURIComponent(meta.role)}&src=qg`
@@ -135,7 +141,12 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
         }),
       });
 
-      const data = (await res.json()) as { answer?: unknown; error?: string };
+      const data = (await res.json()) as { answer?: unknown; error?: string; code?: string };
+      if ((res.status === 401 || res.status === 403) && isFreeToolGateCode(data.code)) {
+        setAnswerState({ status: 'idle' });
+        openGate(data.code);
+        return;
+      }
       if (!res.ok) {
         setAnswerState({
           status: 'error',
@@ -349,6 +360,10 @@ function QuestionCard({ question, meta }: { question: QgQuestion; meta: QgResult
               {answerState.message}
             </p>
           )}
+
+          {gateReason ? (
+            <FreeToolAuthGate tool="question_generator" reason={gateReason} onDismiss={closeGate} />
+          ) : null}
 
           {answerState.status === 'ready' && revealed && (
             <div

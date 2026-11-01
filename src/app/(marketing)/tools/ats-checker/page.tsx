@@ -14,7 +14,7 @@ const ATS_OG_TITLE = 'Free Resume Parser Check';
 export const metadata: Metadata = generateMetadata({
   title: ATS_OG_TITLE,
   description:
-    'See exactly how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match, with explainable fixes. Free, no sign-up.',
+    'See exactly how a typical parser reads your resume — Parseability, Field Extraction, Structure Quality, and optional JD Match, with explainable fixes. Free with a registered InterviewEra account.',
   path: '/tools/ats-checker',
   socialTitle: brandPageTitle(ATS_OG_TITLE),
   keywords:
@@ -29,7 +29,7 @@ const ORIGIN = getCanonicalSiteOrigin();
 const ATS_WEBAPP_LD = webApplicationJsonLd({
   name: 'Free Resume Parser Check',
   description:
-    'See exactly how a typical parser reads your resume. InterviewEra reports Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes — free, no sign-up. Not a single universal ATS score.',
+    'See exactly how a typical parser reads your resume. InterviewEra reports Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes — free with a registered InterviewEra account. Not a single universal ATS score.',
   url: canonicalUrl('/tools/ats-checker'),
   providerId: schemaIds.organization,
 });
@@ -49,7 +49,7 @@ const BULLETS = [
     text: 'Four explainable scores — never one blended “ATS %”',
   },
   { icon: Zap, text: 'See the exact fields a parser pulls from your file' },
-  { icon: Shield, text: 'Free · no account · file analyzed then discarded' },
+  { icon: Shield, text: 'Free with a registered InterviewEra account · file analyzed then discarded' },
 ] as const;
 
 export default function AtsCheckerPage() {
@@ -58,7 +58,7 @@ export default function AtsCheckerPage() {
       <JsonLdScript id="ats-webapp-ld" data={ATS_WEBAPP_LD} />
       <JsonLdScript id="ats-breadcrumb-ld" data={ATS_BREADCRUMB_LD} />
       <FreeToolPageLayout
-        eyebrow="Free tool · no sign-up"
+        eyebrow="Free tool · free account"
         eyebrowIcon={FileSearch}
         title="See how a parser reads your resume"
         description="Upload a PDF, Word, or TXT. We show what a typical ATS recovers — and which layout risks bury your details."

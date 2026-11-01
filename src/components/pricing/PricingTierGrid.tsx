@@ -354,7 +354,9 @@ export function PricingPlanGrid(props: PricingGridProps) {
             </div>
             <div>
               <p className="text-3xl font-bold">₹0</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Free forever</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Lifetime credits · account required
+              </p>
             </div>
             <p className="text-sm font-semibold" style={{ color: 'var(--accent-primary)' }}>
               {PLAN_POSITIONING.free.title}

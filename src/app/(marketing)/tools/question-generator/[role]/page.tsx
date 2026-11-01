@@ -46,7 +46,7 @@ const ORIGIN = getCanonicalSiteOrigin()
 const WEBAPP_LD = webApplicationJsonLd({
   name: 'Free Interview Question Generator',
   description:
-    'Generate AI-powered, role-specific interview questions in seconds. Free to use, no sign-up required.',
+    'Generate AI-powered, role-specific interview questions in seconds. Free with a registered InterviewEra account.',
   url: canonicalUrl('/tools/question-generator'),
   providerId: schemaIds.organization,
 })
@@ -58,7 +58,7 @@ const HOWTO_STEPS = [
   },
   {
     name: 'Generate questions',
-    text: 'Click "Generate questions" to get 10 curated interview questions in under 10 seconds — no account or sign-up needed.',
+    text: 'Click "Generate questions" to get 10 curated interview questions in under 10 seconds — free with a registered InterviewEra account.',
   },
   {
     name: 'Practice your answers',
@@ -113,7 +113,7 @@ export default async function QGenRolePage({ params }: Props) {
             className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Free tool · no sign-up · 10 seconds
+            Free tool · free account · 10 seconds
           </p>
           <h1
             className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl"

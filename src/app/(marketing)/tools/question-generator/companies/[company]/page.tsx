@@ -47,7 +47,7 @@ const ORIGIN = getCanonicalSiteOrigin()
 const WEBAPP_LD = webApplicationJsonLd({
   name: 'Free Interview Question Generator',
   description:
-    'Generate AI-powered, company-specific interview questions in seconds. Free to use, no sign-up required.',
+    'Generate AI-powered, company-specific interview questions in seconds. Free with a registered InterviewEra account.',
   url: canonicalUrl('/tools/question-generator'),
   providerId: schemaIds.organization,
 })
@@ -112,7 +112,7 @@ export default async function QGenCompanyPage({ params }: Props) {
             className="text-xs font-bold uppercase tracking-[0.14em] sm:text-sm"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Free tool · no sign-up · {company.typicalRounds} interview rounds
+            Free tool · free account · {company.typicalRounds} interview rounds
           </p>
           <h1
             className="mt-3 max-w-3xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl"

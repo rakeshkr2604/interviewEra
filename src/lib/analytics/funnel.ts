@@ -128,6 +128,7 @@ export const CLIENT_DURABLE_FUNNEL_PRODUCT_EVENT_NAMES = [
   'coupon_entered',
   'payment_started',
   'pricing_page_viewed',
+  'roadmap_interest_submitted',
 ] as const satisfies readonly ProductEventName[];
 
 function resolveProductEventName(eventName: FunnelEventName): ProductEventName {

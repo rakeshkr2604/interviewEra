@@ -41,7 +41,7 @@ function request(body: unknown): Request {
 const baseCampaign = {
   name: 'Limited Time Offer',
   discount_type: 'percent',
-  discount_value: 20,
+  discount_value: 10,
   applies_to_plans: ['starter', 'pro'],
   starts_at: '2026-08-18T00:00:00.000Z',
   ends_at: '2026-08-20T00:00:00.000Z',
@@ -83,13 +83,13 @@ describe('POST /api/admin/pricing-campaigns', () => {
     expect(campaignInsert).not.toHaveBeenCalled();
   });
 
-  it('creates a draft 20% campaign with reusable display name', async () => {
+  it('creates a draft 10% campaign with reusable display name', async () => {
     const response = await POST(request(baseCampaign));
     expect(response.status).toBe(201);
     expect(campaignInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Limited Time Offer',
-        discount_value: 20,
+        discount_value: 10,
         is_active: false,
         status: 'draft',
       }),

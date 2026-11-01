@@ -3,6 +3,7 @@ import { T } from '@/components/landing/landing-home-tokens';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
+import { FREE_PLAN } from '@/lib/pricing/plans';
 
 /**
  * Hero CTAs as a Server Component shell + thin TrackedCtaLink client leaves.
@@ -54,7 +55,7 @@ export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: Reac
       >
         {(
           [
-            { label: 'Students: 3 free interviews', sep: T.ok },
+            { label: `Students: ${FREE_PLAN.credits} free interviews`, sep: T.ok },
             { label: 'Colleges run campus placements', sep: T.acc },
           ] as const
         ).map((item, i) => (

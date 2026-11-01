@@ -32,7 +32,9 @@ export function CreditsOverviewCard({
   const isPaidTier = planTier === 'starter' || planTier === 'pro';
   const showExpiredWarning = isPaidTier && !isPaidActive;
   const isPracticePrimary = !demotePracticeCta;
-  const allotment = creditAllotment(planTier);
+  const planAllotment = creditAllotment(planTier);
+  // Grandfathered Free accounts can hold more than today's signup grant.
+  const allotment = planAllotment == null ? null : Math.max(planAllotment, creditsRemaining);
   // Clamp at 100% rather than hide the bar — a manual admin top-up beyond the
   // plan's normal allotment is rare and still reads fine as "fully stocked up".
   const allotmentPercent =

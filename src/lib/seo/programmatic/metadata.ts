@@ -249,7 +249,7 @@ export function toolVariantRoleMetadata(role: Role): Metadata {
 
   return generateMetadata({
     title: `${role.shortLabel} Interview Question Generator`,
-    description: `Generate AI ${role.label} interview questions for Indian campus placements in ${PLACEMENT_YEAR}. Free — no signup required.`,
+    description: `Generate AI ${role.label} interview questions for Indian campus placements in ${PLACEMENT_YEAR}. Free with a registered InterviewEra account.`,
     path,
     keywords: [
       `${role.label} interview question generator`,
@@ -269,7 +269,7 @@ export function toolQGenCompanyMetadata(company: Company): Metadata {
 
   return generateMetadata({
     title: `${company.label} Interview Question Generator`,
-    description: `Generate ${company.label} interview questions for ${PLACEMENT_YEAR} placements. Covers ${company.typicalRounds} rounds — free, no sign-up.`,
+    description: `Generate ${company.label} interview questions for ${PLACEMENT_YEAR} placements. Covers ${company.typicalRounds} rounds — free with a registered InterviewEra account.`,
     path,
     keywords: [
       `${company.label} interview question generator`,
@@ -290,7 +290,7 @@ export function toolAtsRoleMetadata(role: Role): Metadata {
 
   return generateMetadata({
     title: `ATS Resume Check: ${role.shortLabel}`,
-    description: `Check how parsers read your ${role.label} resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free, no sign-up.`,
+    description: `Check how parsers read your ${role.label} resume — Parseability, Field Extraction, Structure Quality, and optional JD Match with explainable fixes. Free with a registered InterviewEra account.`,
     path,
     keywords: [
       `${role.label} ATS resume checker`,

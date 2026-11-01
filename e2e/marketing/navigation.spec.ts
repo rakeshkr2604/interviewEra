@@ -27,9 +27,9 @@ test.describe('Phase 1 marketing navigation', () => {
       HOME_CTA_SAMPLE_REPORT_HREF,
     );
     await expect(page.getByRole('list', { name: 'Who InterviewEra is for' })).toBeVisible();
-    await expect(page.getByText('Students: 3 free interviews')).toBeVisible();
+    await expect(page.getByText('Students: 2 free interviews')).toBeVisible();
     await expect(page.getByText('Colleges run campus placements')).toBeVisible();
-    await expect(page.getByText('First 3 interviews free — try it once.')).toBeVisible();
+    await expect(page.getByText('First 2 interviews free — try it once.')).toBeVisible();
     await expect(page.getByRole('heading', { name: /who is interviewera for/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /students/i })).toBeVisible();
   });

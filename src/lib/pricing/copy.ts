@@ -12,7 +12,6 @@ export const PAYMENT_TRUST_BULLETS = [
   'One-time payment',
   'No auto-renewal',
   'Renew manually anytime',
-  'Prices are displayed in INR. The total amount payable is shown before you complete checkout.',
   'UPI • Cards • Wallets • Net Banking',
   'Payments secured by Razorpay',
 ] as const;
@@ -29,7 +28,7 @@ export const PAYMENT_METHOD_KEYWORDS = [
 ] as const;
 
 export const UPGRADE_PAGE_FOOTER =
-  'Payments processed securely by Razorpay. Prices are displayed in INR. The total amount payable is shown before you complete checkout. No auto-renewal. Renew whenever you need.';
+  'Payments processed securely by Razorpay. No auto-renewal. Renew whenever you need.';
 
 export const BILLING_PAYMENT_METHODS_NOTE =
   'One-time payments via Razorpay. Available payment methods are shown at checkout. Credits deduct when an interview starts.';
@@ -65,12 +64,12 @@ export function planPriceLine(plan: PaidPlanId): string {
 /**
  * Approximate USD hint for marketing pricing cards (international clarity).
  * Rate used: ~₹83 = US$1 (mid-2026 ballpark). Rounded to whole dollars — not FX-precise.
- *   Starter ₹299 → ~$3.60 → ~$4
- *   Pro     ₹799 → ~$9.63 → ~$10
+ *   Starter ₹399 → ~$4.81 → ~$5
+ *   Pro     ₹999 → ~$12.04 → ~$12
  */
 export const PLAN_USD_APPROX: Record<PaidPlanId, string> = {
-  starter: '~$4',
-  pro: '~$10',
+  starter: '~$5',
+  pro: '~$12',
 } as const;
 
 export function planUsdApproxHint(plan: PaidPlanId): string {

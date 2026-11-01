@@ -316,7 +316,7 @@ export default function WhatIsStarMethodWithExamples() {
             STAR answer builder
           </Link>{' '}
           to enter your bullet points and get a polished, structured answer with quality scores
-          and improvement suggestions — no signup required.
+          and improvement suggestions — free with a registered InterviewEra account.
         </p>
         <p>
           For full mock interviews that include behavioral rounds evaluated by AI, create a free

@@ -59,6 +59,7 @@ Single map of live documentation. Start at [`AGENTS.md`](../AGENTS.md).
 | [QUALITY_GATES.md](Operations/QUALITY_GATES.md) | Gate levels and philosophy |
 | [STAGING_PROD_ALIGNMENT_CLOSURE.md](Operations/STAGING_PROD_ALIGNMENT_CLOSURE.md) | Prod–staging alignment / privilege cleanup record (point-in-time) |
 | [LEGACY_PROD_TABLES_OWNER_DECISIONS.md](Operations/LEGACY_PROD_TABLES_OWNER_DECISIONS.md) | Prod-only orphan table owner decision packet |
+| [PRICING_GROWTH_LAUNCH_RELEASE.md](Operations/PRICING_GROWTH_LAUNCH_RELEASE.md) | ₹399/₹999 pricing, Free 2 credits, gated free tools, EARLY100 activation runbook |
 | [DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md](Operations/DIAGNOSTICS_STAGING_ROLLOUT_RUNBOOK.md) | Diagnostics 110/111 staging gates, apply sequence, E2E matrix |
 | [SECURITY_AUDIT_2026-10-04.md](Operations/SECURITY_AUDIT_2026-10-04.md) | 2026-10-04 security audit, resume upload hardening, residual risks |
 | [API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md](Operations/API_ROUTE_VALIDATION_INVENTORY_2026-10-04.md) | Point-in-time API route validation inventory (132 routes) |

@@ -4,6 +4,7 @@ import { generateMetadata } from '@/lib/seo/metadata';
 import { canonicalUrl } from '@/lib/seo/site-url';
 import { LANDING_PAGE_CONTAINER } from '@/lib/landing/container';
 import { planPriceLine } from '@/lib/pricing/copy';
+import { FREE_PLAN } from '@/lib/pricing/plans';
 import { TECHNICAL_ISSUE_FEEDBACK_HREF } from '@/lib/technical-failures/ux';
 
 /** FAQ anchor page — canonical hub is /help-center (no duplicate indexing). */
@@ -38,7 +39,7 @@ const SECTIONS = [
       },
       {
         q: 'Do I need to create an account?',
-        a: 'Yes — a free account gives you 3 interview credits with no credit card required. Sign up with email/password or Google.',
+        a: `Yes — a free account gives you ${FREE_PLAN.credits} interview credits with no credit card required. Sign up with email/password or Google.`,
       },
       {
         q: 'What browsers and devices are supported?',
@@ -64,7 +65,7 @@ const SECTIONS = [
       },
       {
         q: 'How many free credits do I get?',
-        a: '3 credits on sign-up, no card needed. Free credits never expire.',
+        a: `${FREE_PLAN.credits} credits on sign-up, no card needed. Free credits never expire.`,
       },
       {
         q: 'What are the paid plans?',

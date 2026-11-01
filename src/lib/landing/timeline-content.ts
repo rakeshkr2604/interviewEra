@@ -1,5 +1,7 @@
 /** Homepage timeline section — copy + stage config (approved Claude design). */
 
+import { FREE_PLAN } from '@/lib/pricing/plans';
+
 export const TIMELINE_INTRO = {
   eyebrow: 'ONE SESSION · ONE INTERVIEWER · SCROLL',
   headline: 'The interview, before',
@@ -62,7 +64,7 @@ export const TIMELINE_STAGE_COPY: readonly TimelineStageCopy[] = [
     index: 5,
     kicker: '05 · READY',
     title: 'Walk in ready.',
-    body: 'Three free interviews. No card. Meera is ready when you are.',
+    body: `${FREE_PLAN.credits} free interviews. No card. Meera is ready when you are.`,
   },
 ] as const;
 
@@ -124,9 +126,9 @@ export const TIMELINE_INSIGHT = {
 export const TIMELINE_READY = {
   headline: 'Walk in having already answered',
   headlineEmphasis: 'the hard one.',
-  body: 'Your first 3 AI mock interviews are completely free. No credit card — you’ll be in a live session in under two minutes.',
+  body: `Your first ${FREE_PLAN.credits} AI mock interviews are completely free. No credit card — you’ll be in a live session in under two minutes.`,
   cta: 'Start your first interview',
-  footnote: '3 FREE INTERVIEWS · NO CARD · ENGLISH + HINDI',
+  footnote: `${FREE_PLAN.credits} FREE INTERVIEWS · NO CARD · ENGLISH + HINDI`,
 } as const;
 
 export const TIMELINE_CONTEXT_BY_STAGE = [

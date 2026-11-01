@@ -188,16 +188,34 @@ export type PricingFaqCategory = {
 
 export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
   {
+    id: 'tools',
+    label: 'Free Preparation Tools',
+    items: [
+      {
+        q: 'Are the preparation tools free?',
+        a: 'Yes. The ATS Resume Checker, Interview Question Generator, STAR Answer Builder and Interview Prompt Builder are free with every registered InterviewEra account. Sign-up is free and needs no card.',
+      },
+      {
+        q: 'Do free tools consume interview credits?',
+        a: 'No. Using the preparation tools never deducts mock-interview credits. Credits are only used when you start a mock interview.',
+      },
+      {
+        q: 'What happens when I reach a fair-use limit?',
+        a: 'Each tool has hourly and daily fair-use limits per account. If you reach one, the tool tells you when you can try again, and the limit resets automatically. Your mock-interview credits are not affected.',
+      },
+      {
+        q: 'Why do I need an account to use the tools?',
+        a: 'An account lets us apply fair-use limits per person instead of per network, so students sharing a college or hostel connection are not blocked by each other. Tool information and guides stay public.',
+      },
+    ],
+  },
+  {
     id: 'credits',
     label: 'Credits & Free Plan',
     items: [
       {
-        q: 'What is an interview credit?',
-        a: `One interview credit starts one mock interview session with a report. Free includes ${FREE_PLAN.credits} credits; Starter includes ${PAID_PLANS.starter.credits}, and Pro includes ${PAID_PLANS.pro.credits}.`,
-      },
-      {
-        q: 'Does the free plan require payment?',
-        a: `No. New accounts receive ${FREE_PLAN.credits} free interview credits. No card or payment method is required.`,
+        q: 'How many mock-interview credits are included?',
+        a: `One credit starts one mock interview session with a report. New Free accounts receive ${FREE_PLAN.credits} lifetime credits (existing accounts keep their current balance). Starter includes ${PAID_PLANS.starter.credits} credits and Pro includes ${PAID_PLANS.pro.credits}.`,
       },
       {
         q: 'When is an interview credit deducted?',
@@ -205,7 +223,11 @@ export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
       },
       {
         q: 'Do my free interview credits expire?',
-        a: 'No. The 3 credits included with a new free account are lifetime credits and do not expire. They cannot be transferred to another account.',
+        a: 'No. Credits included with a Free account are lifetime credits and do not expire. They cannot be transferred to another account.',
+      },
+      {
+        q: 'What happens when my credits run out?',
+        a: 'You can keep using the free preparation tools. To start more mock interviews, make a one-time Starter or Pro purchase. If a confirmed technical issue interrupted an interview, the credit may be restored after review.',
       },
     ],
   },
@@ -215,7 +237,7 @@ export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
     items: [
       {
         q: 'How long does Starter or Pro access last?',
-        a: `Each Starter or Pro purchase gives ${PAID_PLANS.starter.durationDays} days of plan access. Both are one-time purchases and do not auto-renew.`,
+        a: `Each Starter or Pro purchase gives ${PAID_PLANS.starter.durationDays} days of plan access. Paid-plan credits are valid during that period and do not carry over after the plan expires. Both are one-time purchases and do not auto-renew.`,
       },
       {
         q: 'Can I renew after my plan expires?',
@@ -223,11 +245,15 @@ export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
       },
       {
         q: 'What is included in Starter?',
-        a: `Starter includes ${PAID_PLANS.starter.credits} interview credits, ${PAID_PLANS.starter.durationDays}-day access, full answer feedback, dimension notes, a 30-day improvement roadmap, progress tracking, and a post-interview report by email.`,
+        a: `Starter includes ${PAID_PLANS.starter.credits} interview credits, ${PAID_PLANS.starter.durationDays}-day access, everything in Free, full answer feedback, dimension notes, a 30-day improvement roadmap, progress tracking, and a post-interview report by email.`,
       },
       {
         q: 'What is included in Pro?',
-        a: `Pro includes ${PAID_PLANS.pro.credits} interview credits, ${PAID_PLANS.pro.durationDays}-day access, deeper feedback and analysis, advanced scoring and score guide, model-answer comparison, progress tracking, and PDF report export.`,
+        a: `Pro includes ${PAID_PLANS.pro.credits} interview credits, ${PAID_PLANS.pro.durationDays}-day access, everything in Starter, model-answer comparison, and PDF report export.`,
+      },
+      {
+        q: 'When will DSA preparation become available?',
+        a: 'DSA Interview Preparation is planned for January 2027. It is not available yet and is not included in any current plan.',
       },
     ],
   },
@@ -236,16 +262,20 @@ export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
     label: 'Payments & Offers',
     items: [
       {
-        q: 'Are payments auto-renewing?',
-        a: 'No. Starter and Pro are one-time Razorpay payments. Your account returns to the Free plan after paid access expires unless you choose to purchase again.',
+        q: 'Are payments recurring?',
+        a: 'No. Starter and Pro are one-time Razorpay payments with no auto-renewal. Your account returns to the Free plan after paid access expires unless you choose to purchase again.',
       },
       {
         q: 'Which payment methods can I use?',
         a: 'Razorpay supports UPI, cards, net banking, wallets, and other methods shown during checkout. InterviewEra does not store your card or bank account details.',
       },
       {
+        q: 'How does the launch offer work?',
+        a: 'When a launch offer is live, this page shows the code, the standard and discounted prices, and how many offer purchases remain. Each account can redeem it once, it applies to eligible paid plans only, and it cannot be combined with other offers. The server confirms the final amount before payment. When no offer is shown, none is running.',
+      },
+      {
         q: 'Can I use a promo code?',
-        a: 'Yes. Signed-in users can expand “Have a promo code?” on the pricing page. The server validates eligibility and shows the final amount before checkout.',
+        a: 'Yes. Sign in and open the upgrade page to apply a promo code. The server validates eligibility and shows the final amount before checkout.',
       },
       {
         q: 'What if payment succeeds but my plan does not update?',

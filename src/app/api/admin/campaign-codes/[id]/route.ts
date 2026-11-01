@@ -8,6 +8,7 @@ import { requirePlatformAdmin } from '@/lib/admin/auth';
 import { createServiceClient } from '@/lib/supabase/server';
 import { computeCampaignDiscountQuote } from '@/lib/campaign-codes';
 import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
+import { launchActivationError } from '@/lib/pricing/launch-offer';
 
 const patchSchema = z.object({
   label: z.string().min(1).max(120).optional(),
@@ -68,11 +69,18 @@ export async function PATCH(
     );
   }
 
+  const activationError = launchActivationError(candidate);
+  if (activationError) {
+    return NextResponse.json({ error: activationError }, { status: 400 });
+  }
+
   const plans: PaidPlanId[] =
     candidate.applies_to_plans.length > 0
       ? (candidate.applies_to_plans as PaidPlanId[])
       : ['starter', 'pro'];
-  for (const plan of plans) {
+  // Inactive codes cannot be charged, so pricing floors only gate codes that stay live.
+  // This keeps legacy deep-discount codes deactivatable after floors are raised.
+  for (const plan of candidate.is_active ? plans : []) {
     const config = getPaidPlan(plan);
     const quote = computeCampaignDiscountQuote({
       listAmountPaise: config.amountPaise,

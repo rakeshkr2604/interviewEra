@@ -29,6 +29,7 @@ export type MilestoneEventName = Extract<
   | 'interview_started'
   | 'interview_completed'
   | 'interview_abandoned'
+  | 'free_tool_first_completed'
 >;
 
 export type PersistMilestoneResult =

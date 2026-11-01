@@ -3,15 +3,15 @@ import { computePlanExpiry, FREE_PLAN, getPaidPlan, PAID_PLANS } from '@/lib/pri
 
 describe('PAID_PLANS', () => {
   it('defines the canonical credit and access entitlements', () => {
-    expect(FREE_PLAN.credits).toBe(3);
+    expect(FREE_PLAN.credits).toBe(2);
     expect(FREE_PLAN.amountPaise).toBe(0);
     expect(FREE_PLAN.durationDays).toBeNull();
-    expect(getPaidPlan('starter').amountPaise).toBe(29900);
-    expect(getPaidPlan('starter').amountInr).toBe(299);
-    expect(getPaidPlan('starter').promoFloorPaise).toBe(14900);
-    expect(getPaidPlan('pro').amountPaise).toBe(79900);
-    expect(getPaidPlan('pro').amountInr).toBe(799);
-    expect(getPaidPlan('pro').promoFloorPaise).toBe(39900);
+    expect(getPaidPlan('starter').amountPaise).toBe(39900);
+    expect(getPaidPlan('starter').amountInr).toBe(399);
+    expect(getPaidPlan('starter').promoFloorPaise).toBe(33900);
+    expect(getPaidPlan('pro').amountPaise).toBe(99900);
+    expect(getPaidPlan('pro').amountInr).toBe(999);
+    expect(getPaidPlan('pro').promoFloorPaise).toBe(84900);
     expect(PAID_PLANS.starter.durationDays).toBe(30);
     expect(PAID_PLANS.starter.credits).toBe(8);
     expect(PAID_PLANS.pro.durationDays).toBe(30);

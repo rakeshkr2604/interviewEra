@@ -261,7 +261,7 @@ export const PAGE_SEO = {
   questionGenerator: generateMetadata({
     title: 'Free Interview Question Generator',
     description:
-      'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. No sign-up.',
+      'Free interview question generator — get 10 random or role-specific questions in 10 seconds. Technical, behavioral, and HR prompts. Free with a registered InterviewEra account.',
     path: '/tools/question-generator',
   }),
   atsChecker: generateMetadata({
