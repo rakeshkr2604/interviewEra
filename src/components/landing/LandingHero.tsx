@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { AmbientLayer } from '@/components/landing/AmbientLayer';
 import LandingHeroCtaIsland from '@/components/landing/LandingHeroCtaIsland';
@@ -11,11 +11,15 @@ import { cn } from '@/lib/utils';
 import { FREE_PLAN } from '@/lib/pricing/plans';
 
 const TRUST_ITEMS = [
-  { dot: T.ok, label: 'Free to start' },
-  { dot: T.acc, label: 'Answer Feedback on every response' },
-  { dot: T.ok, label: 'Voice-first Mock Interview' },
-  { dot: T.acc, label: 'Your resume stays private' },
+  { dot: T.acc, label: 'Resume-aware interview preparation' },
+  { dot: T.ok, label: 'Voice-based mock interviews' },
+  { dot: T.acc, label: 'Adaptive follow-up questions' },
+  { dot: T.ok, label: 'Five-dimension answer evaluation' },
+  { dot: T.acc, label: 'Four free preparation tools with registration' },
 ] as const;
+
+/** Labels for what the sample simulator below is demonstrating. */
+const SIMULATOR_LABELS = ['Resume-aware question', 'Live captions', 'Adaptive follow-up'] as const;
 
 export default function LandingHero({ countPill }: { countPill: ReactNode }) {
   return (
@@ -43,7 +47,7 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
         >
           <div className="hero-copy-col min-w-0">
             <div
-              className="mb-3.5 inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold leading-snug sm:mb-6 sm:px-3.5 sm:py-1.5 sm:text-xs"
+              className="ie-hero-enter mb-3.5 inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-[11px] font-semibold leading-snug sm:mb-6 sm:px-3.5 sm:py-1.5 sm:text-xs"
               style={{
                 background: T.accdim,
                 border: `1px solid ${T.accbrd}`,
@@ -58,21 +62,26 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
               <span className="min-w-0 text-pretty">{countPill}</span>
             </div>
 
-            <LandingHeroHeadline />
+            <div className="ie-hero-enter ie-hero-enter--rise" style={{ '--ie-hero-delay': '40ms' } as CSSProperties}>
+              <LandingHeroHeadline />
+            </div>
 
-            <div className="hero-copy-body mb-5 max-w-[30rem] sm:mb-8">
+            <div
+              className="hero-copy-body ie-hero-enter mb-5 max-w-[30rem] sm:mb-8"
+              style={{ '--ie-hero-delay': '90ms' } as CSSProperties}
+            >
               <p
                 className="hero-copy-body__lead text-[14px] leading-[1.55] sm:text-base sm:leading-[1.7]"
                 style={{ color: T.text, fontWeight: 500 }}
               >
-                AI-powered, voice-first Mock Interviews with adaptive follow-ups and feedback on
-                every answer.
+                Practise realistic AI mock interviews, handle adaptive follow-up questions and
+                understand exactly where your answers need improvement.
               </p>
               <p
                 className="hero-copy-body__offer mt-2 text-[13px] leading-[1.5] sm:mt-2.5 sm:text-[14px] sm:leading-[1.7]"
                 style={{ color: T.text2 }}
               >
-                {FREE_PLAN.credits} free Mock Interviews, no card required.
+                {FREE_PLAN.credits} lifetime mock-interview credits for new accounts. No card required.
               </p>
             </div>
 
@@ -98,14 +107,25 @@ export default function LandingHero({ countPill }: { countPill: ReactNode }) {
             />
           </div>
 
-          <div className="hero-mockup-col min-w-0 w-full">
+          <div
+            className="hero-mockup-col ie-hero-enter ie-hero-enter--rise min-w-0 w-full"
+            style={{ '--ie-hero-delay': '120ms' } as CSSProperties}
+          >
             <div className="mx-auto flex w-full max-w-[560px] flex-col items-center">
               <p className="hero-free-offer" role="status">
                 <span className="hero-free-offer__dot" aria-hidden />
                 <span className="hero-free-offer__text">
-                  First {FREE_PLAN.credits} interviews free — try it once.
+                  {FREE_PLAN.credits} free mock-interview credits for new accounts
                 </span>
               </p>
+              <ul className="hero-sim-labels" aria-label="What this sample interview shows">
+                {SIMULATOR_LABELS.map((label) => (
+                  <li key={label} className="hero-sim-labels__item">
+                    <span className="hero-sim-labels__dot" aria-hidden />
+                    {label}
+                  </li>
+                ))}
+              </ul>
               <div className="w-full">
                 <LandingHeroSimulatorIsland />
               </div>

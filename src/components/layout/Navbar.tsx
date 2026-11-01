@@ -150,10 +150,16 @@ const PRODUCT_ITEMS = [
     desc: 'Adaptive interview, live captions, scoring',
   },
   {
-    icon: TrendingUp,
-    label: 'Resume-aware Scoring',
+    icon: Layers,
+    label: 'All Free Tools',
+    href: '/#free-tools',
+    desc: 'Four preparation tools, free with an account',
+  },
+  {
+    icon: Users,
+    label: 'About',
     href: '/about',
-    desc: 'CV-native questions + 5-dimension feedback',
+    desc: 'Founder, mission, and how scoring works',
   },
 ] as const;
 
@@ -196,7 +202,7 @@ const INTERVIEW_QUESTIONS_ITEMS = [
   },
 ] as const;
 
-const TOOL_ICONS = [Sparkles, Shield, Award] as const;
+const TOOL_ICONS = [Sparkles, Shield, Award, Layers] as const;
 
 const TOOLS_ITEMS = [
   ...NAV_TOOLS_ITEMS.map((item, index) => ({
@@ -619,8 +625,9 @@ function NavHoverMenu({
         role="menu"
         aria-labelledby={`${menuId}-trigger`}
         className={cn(
-          'absolute left-0 top-[calc(100%+6px)] z-50 rounded-xl border p-1.5 shadow-xl',
-          columns === 2 ? 'flex min-w-[36rem] gap-0.5' : 'min-w-71',
+          'absolute top-[calc(100%+6px)] z-50 rounded-xl border p-1.5 shadow-xl',
+          // Two-column menu is 36rem wide — anchor right so it cannot overflow a 1024px viewport.
+          columns === 2 ? 'right-0 flex min-w-[36rem] gap-0.5' : 'left-0 min-w-71',
           'transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none',
           open
             ? 'pointer-events-auto opacity-100 translate-y-0'
@@ -947,10 +954,7 @@ function AnonymousNav({
     }
   };
 
-  const MOBILE_PRACTICE_LINKS = [
-    { href: '/interview-questions', label: 'Interview Questions' },
-    ...NAV_TOOLS_LINKS,
-  ] as const;
+  const MOBILE_PRACTICE_LINKS = [{ href: '/interview-questions', label: 'Interview Questions' }] as const;
 
   const MOBILE_RESOURCE_LINKS = [
     { href: '/resources', label: 'Resources' },
@@ -967,7 +971,7 @@ function AnonymousNav({
         className="mr-2 shrink-0"
       />
 
-      {/* Desktop: Product / Interview Questions / Tools / Resources / Pricing */}
+      {/* Desktop: Product / Free Tools / Interview Questions / Resources / Pricing */}
       <div
         inert={scrolled ? true : undefined}
         className={cn(
@@ -979,12 +983,12 @@ function AnonymousNav({
         )}
       >
         <NavHoverMenu label="Product" items={PRODUCT_ITEMS} menuId="nav-product" />
+        <NavHoverMenu label="Free Tools" items={TOOLS_ITEMS} menuId="nav-tools" />
         <NavHoverMenu
           label="Interview Questions"
           items={INTERVIEW_QUESTIONS_ITEMS}
           menuId="nav-interview-questions"
         />
-        <NavHoverMenu label="Tools" items={TOOLS_ITEMS} menuId="nav-tools" />
         <NavHoverMenu
           label="Resources"
           items={RESOURCES_ITEMS}
@@ -994,14 +998,14 @@ function AnonymousNav({
         <MarketingNavLink href="/pricing">Pricing</MarketingNavLink>
       </div>
 
-      {/* Floating: Tools / Resources / Pricing centered between logo and actions */}
+      {/* Floating: Free Tools / Resources / Pricing centered between logo and actions */}
       {scrolled ? (
         <div
           data-nav-surface="floating"
           className="hidden min-w-0 flex-1 justify-center sm:flex"
         >
           <div className="flex items-center gap-0.5">
-            <NavHoverMenu label="Tools" items={TOOLS_ITEMS} menuId="nav-tools-floating" />
+            <NavHoverMenu label="Free Tools" items={TOOLS_ITEMS} menuId="nav-tools-floating" />
             <NavHoverMenu
               label="Resources"
               items={RESOURCES_ITEMS}
@@ -1152,6 +1156,12 @@ function AnonymousNav({
                 label="How It Works"
                 onNavigate={closeMobile}
               />
+              <MobileNavLink href="/about" label="About" onNavigate={closeMobile} />
+
+              <p className={NAV_MOBILE_SECTION_LABEL}>Free Tools</p>
+              {NAV_TOOLS_LINKS.map(({ href, label }) => (
+                <MobileNavLink key={href} href={href} label={label} onNavigate={closeMobile} />
+              ))}
 
               <p className={NAV_MOBILE_SECTION_LABEL}>Practice</p>
               {MOBILE_PRACTICE_LINKS.map(({ href, label }) => (
@@ -1233,7 +1243,7 @@ function AnonymousNav({
 // ─── Navbar (main export) ─────────────────────────────────────────────────────
 
 /**
- * Marketing navbar — always Product/Tools/Resources links on marketing routes.
+ * Marketing navbar — always Product/Free Tools/Resources links on marketing routes.
  * Logged-in users keep marketing IA; right side shows credits + Dashboard + avatar
  * (Dashboard/History/Analytics live in DashboardChrome sidebar, not here).
  *

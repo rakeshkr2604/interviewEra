@@ -299,8 +299,11 @@ function ComingSoonRow({ item }: { item: NavComingSoonItem }) {
       <span
         className="shrink-0 rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
         style={{
-          background: 'color-mix(in srgb, var(--accent-warning) 18%, transparent)',
-          color: 'var(--accent-warning)',
+          // Solid fill + fixed dark ink (not a theme var) — tint-on-tint measured
+          // 2.41:1 against the sidebar background. This pairing is ≥6:1 in both
+          // themes (--accent-warning is #d97706 light / #f59e0b dark).
+          background: 'var(--accent-warning)',
+          color: '#0a0f1e',
         }}
       >
         Soon

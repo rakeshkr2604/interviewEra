@@ -24,6 +24,7 @@ import {
   siteOrganizationStructured,
 } from '@/lib/seo/metadata';
 import type { SeoTextLink } from '@/lib/seo/internal-links';
+import { FREE_PLAN } from '@/lib/pricing/plans';
 
 const PAGE_PATH = '/interviewera';
 
@@ -110,7 +111,7 @@ const FAQS = [
   {
     question: 'Is InterviewEra free to use?',
     answer:
-      'Yes. You can start practising AI mock interviews on InterviewEra for free, with no credit card required. Paid plans and campus plans add more credits and analytics.',
+      `Yes, you can start free with no card required. New accounts get ${FREE_PLAN.credits} lifetime mock-interview credits, and the four preparation tools are free with a registered account (fair-use limits apply). Starter and Pro are one-time purchases with 30-day access, and campus plans are available for colleges.`,
   },
   {
     question: 'Where can I find InterviewEra online?',

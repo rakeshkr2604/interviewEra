@@ -29,6 +29,8 @@ Non-bypassable security posture for agents.
 | Campus remind email | Only enrolled org student emails; Zod caps; fail-closed RL |
 | Script answer bodies | Server max 12_000 chars (`script-turn-request-schema`) |
 
+- **Local production guard:** `next.config.ts` calls `assertNotLocalProductionTarget` (`src/lib/env/local-production-guard.ts`). Outside Vercel/CI, `next dev`, `build` and `start` fail closed on a production Supabase URL, a production-project Supabase JWT, or a live Razorpay key. It cannot identify production Redis, which has no fixed host in the repo.
+
 ## Dependencies
 
 [PAYMENTS](../Core/PAYMENTS.md) · [BACKEND_SCHEMA](../Core/BACKEND_SCHEMA.md) · [FEATURE_FLAGS](../Operations/FEATURE_FLAGS.md)

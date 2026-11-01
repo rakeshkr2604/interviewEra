@@ -80,6 +80,19 @@ Loader: `src/lib/settings/load-billing-data.ts`. Card: `src/components/settings/
 
 Razorpay · users/payments/credit_transactions · Redis rate limit (fail-closed) · product_events
 
+## Preview / staging checkout readiness (verified 2026-11-01)
+
+`POST /api/payments/create-order` refuses to create an order when `auditRazorpayConfig()` returns any `critical` issue (`src/lib/razorpay/config.ts`). One such check — `TEST_KEYS_IN_PRODUCTION` — fires whenever `NODE_ENV === 'production'` and the configured `RAZORPAY_KEY_ID` is a `rzp_test_*` key, returning `503` with `{ error: 'Payment system is misconfigured… (code: RAZORPAY_CONFIG)' }`.
+
+A local production build (`next build && next start`, which sets `NODE_ENV=production` the same way `next start` does on every Vercel environment, Preview included) with staging Supabase + Razorpay **test-mode** credentials reproduced this exactly: `create-order` returned 503 / `TEST_KEYS_IN_PRODUCTION` for both `starter` and `pro`. This was not tested against an actual Vercel Preview deployment — no deploy was made — but the `NODE_ENV` posture is identical, so the same refusal is expected there too.
+
+Consequences for anyone using a Preview deployment on this branch:
+
+- **Checkout is not currently exercisable on Preview** with test-mode keys. Treat Preview as marketing-page validation only until this is addressed (e.g. an `APP_ENV=staging` carve-out in the config audit, mirroring the webhook isolation in `evaluateWebhookSupabaseIsolation`).
+- Real Razorpay **test-mode** orders (not on Preview — against a locally-run staging-configured server) create successfully and return a live `order_id`/amount; no payment was completed and no webhook was exercised.
+- The Razorpay webhook secret in this workspace's `.env.local` has an **uncertain environment origin** (carried over from an earlier, since-replaced local file) and must not be treated as a verified staging webhook secret until confirmed against the actual staging Razorpay webhook endpoint. It was blanked locally pending that confirmation.
+- Do not infer from the above that checkout "works" anywhere beyond: order creation succeeds against a staging-configured **local** server with test-mode keys.
+
 ## Failure Modes
 
 | Mistake | Result |

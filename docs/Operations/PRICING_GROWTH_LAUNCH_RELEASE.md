@@ -18,6 +18,7 @@ What this release changes, how to verify it on staging, and the exact steps to l
 | Free tools | Interactive use needs a signed-in, verified account; public pages stay indexable | `src/lib/security/free-tool-access.ts`, `src/components/tools/FreeToolAuthGate.tsx` |
 | Fair use | Per-account hourly + daily, per-IP ceiling, one atomic Redis script | `src/lib/security/free-tool-rate-limit.ts` |
 | Launch coupon | `EARLY100`: 10%, Starter + Pro, cap 100, one per user → ₹359 / ₹899 | `src/lib/pricing/launch-offer.ts` + existing campaign RPCs |
+| Homepage offer notice | `/` is ISR, so the pricing preview fetches `GET /api/pricing/launch-offer` (read-only, reuses `loadLaunchOffer`, CDN cache 60s) when it nears the viewport. It renders nothing unless the offer is live. Pausing an offer can take up to 60s to clear on the homepage; checkout always re-validates | `src/components/landing/LandingLaunchOfferNotice.tsx` |
 | Funnel | `free_tool_auth_gate_shown`, `free_tool_first_completed` (once per user, migration `120`) | `src/lib/analytics/free-tool-events.ts` |
 
 Out of scope: AI / voice cost estimation, the cost engine, and the mock-interview credit lifecycle.
@@ -33,7 +34,7 @@ Out of scope: AI / voice cost estimation, the cost engine, and the mock-intervie
 
 Follow [DATABASE_MIGRATIONS](../Guidelines/DATABASE_MIGRATIONS.md).
 
-1. Confirm the project is staging, ref `iiowrzfwemaxytbykjrg`. The local `.env.local` in this workspace points at a **different** project, so do not use it for this step.
+1. Confirm the project is staging, ref `iiowrzfwemaxytbykjrg`. Do not assume `.env.local` is staging: verify its project ref first. Local `next dev/build/start` refuse the production project (`src/lib/env/local-production-guard.ts`).
 2. Compare the `schema_migrations` ledger with the repo. 118 should be the highest applied migration.
 3. Apply 119, then 120.
 4. Probes:

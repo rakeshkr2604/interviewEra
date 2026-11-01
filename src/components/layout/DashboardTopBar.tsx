@@ -234,8 +234,9 @@ export function DashboardTopBar({
   oauthPictureUrl: string | null
 }) {
   return (
-    <div
+    <header
       className="sticky top-0 z-20 hidden items-center gap-4 px-6 py-3 lg:flex"
+      aria-label="Dashboard top bar"
     >
       <DashboardSearchBox />
       <div className="ml-auto flex shrink-0 items-center gap-3">
@@ -247,6 +248,6 @@ export function DashboardTopBar({
           oauthPictureUrl={oauthPictureUrl}
         />
       </div>
-    </div>
+    </header>
   )
 }

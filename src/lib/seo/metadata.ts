@@ -267,7 +267,7 @@ export const PAGE_SEO = {
   atsChecker: generateMetadata({
     title: 'Free Resume Parser Check',
     description:
-      'See how a typical parser reads your resume — Parseability, Field Extraction, and Structure. Free tool.',
+      'See how a typical parser reads your resume — Parseability, Field Extraction, and Structure. Free with a registered InterviewEra account.',
     path: '/tools/ats-checker',
   }),
   campus: generateMetadata({

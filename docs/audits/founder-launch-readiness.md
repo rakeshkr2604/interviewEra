@@ -64,7 +64,7 @@ Engineering tasks: **DONE** (soften copy + consistency tests). Founder/legal: **
 | Field | Value |
 |---|---|
 | **Current status** | OPEN — **out of scope for this engineering PR**; UI left unchanged |
-| **Evidence already available** | Hardcoded public values in `src/lib/landing/trust-metrics.ts` (537 / 2143 / 5186 / 8742 candidates/interviews/ATS/questions; 4.5 average rating) continue to render on homepage and auth. No DB query, sample size, as-of date, or rating methodology found in repository |
+| **Evidence already available** | Hardcoded public values in `src/lib/landing/trust-metrics.ts` (537 / 1500 / 3630 / 4719 candidates/interviews/ATS/questions; 4.5 average rating) continue to render on homepage and auth. No DB query, sample size, as-of date, or rating methodology found in repository |
 | **Exact unresolved decision** | For each metric: SoT query, eligibility, dedupe rules, window, as-of date; for rating: feedback source, n, calculation, public-testimonial consent |
 | **Required person / document** | Founder attestation + (optional) analytics export — **manual future to-do** |
 | **Deadline** | Before claiming verified public social proof (founder-owned timing) |

@@ -1,9 +1,8 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { T } from '@/components/landing/landing-home-tokens';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { cn } from '@/lib/utils';
-import { FREE_PLAN } from '@/lib/pricing/plans';
 
 /**
  * Hero CTAs as a Server Component shell + thin TrackedCtaLink client leaves.
@@ -13,36 +12,40 @@ import { FREE_PLAN } from '@/lib/pricing/plans';
  * the idle Supabase probe competed with LCP/TBT on mobile (Loop 16/17 traces).
  *
  * Hierarchy: CTAs → trust strip → audience line.
+ * Primary keeps the `start_free_interview` key so hero signup reporting stays continuous.
  */
 export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: ReactNode }) {
   return (
-    <div className="hero-cta-island max-w-[32rem]">
+    <div
+      className="hero-cta-island ie-hero-enter max-w-[32rem]"
+      style={{ '--ie-hero-delay': '140ms' } as CSSProperties}
+    >
       <div className="hero-cta-island__actions flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:gap-3">
         <TrackedCtaLink
           href="/signup"
           ctaKey={CTA_KEYS.START_FREE_INTERVIEW}
-          ctaText="Start Free Mock Interview"
+          ctaText="Create Free Account"
           section="hero"
           className="v3-btn-primary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold no-underline sm:w-auto sm:px-8"
           style={{
             color: '#fff',
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: 'var(--font-dm-sans), sans-serif',
           }}
         >
-          Start Free Mock Interview
+          Create Free Account
         </TrackedCtaLink>
         <TrackedCtaLink
-          href="/#interview-report"
-          ctaKey={CTA_KEYS.SEE_SAMPLE_REPORT}
-          ctaText="See Sample Interview Report"
+          href="/#free-tools"
+          ctaKey={CTA_KEYS.EXPLORE_FREE_TOOLS}
+          ctaText="Explore Free Tools"
           section="hero_secondary"
           className="v3-btn-secondary hero-v3-btn-secondary inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-[1.5px] px-6 py-3.5 text-[14.5px] font-semibold no-underline sm:w-auto sm:px-7 sm:text-[15px]"
           style={{
             borderColor: T.bord2,
-            fontFamily: "'DM Sans', sans-serif",
+            fontFamily: 'var(--font-dm-sans), sans-serif',
           }}
         >
-          See Sample Interview Report
+          Explore Free Tools
         </TrackedCtaLink>
       </div>
 
@@ -55,8 +58,8 @@ export default function LandingHeroCtaIsland({ trustStrip }: { trustStrip?: Reac
       >
         {(
           [
-            { label: `Students: ${FREE_PLAN.credits} free interviews`, sep: T.ok },
-            { label: 'Colleges run campus placements', sep: T.acc },
+            { label: 'Students, freshers & interns', sep: T.ok },
+            { label: 'Early-career professionals', sep: T.acc },
           ] as const
         ).map((item, i) => (
           <li key={item.label} className="flex items-center gap-1.5">

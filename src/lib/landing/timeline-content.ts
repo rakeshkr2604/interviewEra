@@ -3,10 +3,10 @@
 import { FREE_PLAN } from '@/lib/pricing/plans';
 
 export const TIMELINE_INTRO = {
-  eyebrow: 'ONE SESSION · ONE INTERVIEWER · SCROLL',
+  eyebrow: 'HOW IT WORKS · FIVE STEPS',
   headline: 'The interview, before',
   headlineEmphasis: 'the interview.',
-  body: 'One real InterviewEra session, start to finish. Nothing scripted for the demo — it builds every question from you.',
+  body: 'From resume to report: prepare with the free tools, then practise a mock interview that builds every question from you. Shown with a representative sample session.',
 } as const;
 
 export const TIMELINE_INTERVIEWER = {
@@ -20,10 +20,10 @@ export const TIMELINE_INTERVIEWER = {
 
 export const TIMELINE_SPINE_LABELS = [
   'Resume',
-  'Question',
-  'Pressure',
-  'Insight',
-  'Ready',
+  'Questions',
+  'Practise',
+  'Evaluation',
+  'Improve',
 ] as const;
 
 export type TimelineStageIndex = 1 | 2 | 3 | 4 | 5;
@@ -38,33 +38,33 @@ export type TimelineStageCopy = {
 export const TIMELINE_STAGE_COPY: readonly TimelineStageCopy[] = [
   {
     index: 1,
-    kicker: '01 · RESUME',
+    kicker: '01 · ANALYSE YOUR RESUME',
     title: 'It studies you first.',
-    body: 'Projects, claims, and the one line worth probing — read the way a senior interviewer would.',
+    body: 'Check how your resume reads with the free ATS Resume Checker. In a mock interview, your interviewer reads the same resume for projects, claims and the one line worth probing.',
   },
   {
     index: 2,
-    kicker: '02 · QUESTION',
-    title: 'Then it asks. Out loud.',
-    body: 'You speak — it listens and transcribes in real time. No typing, no multiple choice.',
+    kicker: '02 · PREPARE RELEVANT QUESTIONS',
+    title: 'Questions built for your role.',
+    body: 'Rehearse role questions with the free Question Generator and STAR Answer Builder. In the interview, questions come from your resume — you answer out loud while it transcribes.',
   },
   {
     index: 3,
-    kicker: '03 · PRESSURE',
+    kicker: '03 · PRACTISE WITH AN AI INTERVIEWER',
     title: 'It notices what you avoided.',
-    body: 'The follow-up is built from your own answer — then Meera waits, the way a real interviewer does.',
+    body: 'The adaptive follow-up is built from your own answer — then Meera waits, the way a real interviewer does. One credit starts one session.',
   },
   {
     index: 4,
-    kicker: '04 · INSIGHT',
+    kicker: '04 · RECEIVE STRUCTURED EVALUATION',
     title: 'The truth, kindly.',
     body: 'Five dimensions against a rubric — every score with the reason behind it and the exact next step.',
   },
   {
     index: 5,
-    kicker: '05 · READY',
-    title: 'Walk in ready.',
-    body: `${FREE_PLAN.credits} free interviews. No card. Meera is ready when you are.`,
+    kicker: '05 · IMPROVE AND REPEAT',
+    title: 'Fix one thing. Run it again.',
+    body: `Your report sets the next practice focus, and progress shows across sessions. New accounts get ${FREE_PLAN.credits} free mock-interview credits.`,
   },
 ] as const;
 
@@ -126,9 +126,9 @@ export const TIMELINE_INSIGHT = {
 export const TIMELINE_READY = {
   headline: 'Walk in having already answered',
   headlineEmphasis: 'the hard one.',
-  body: `Your first ${FREE_PLAN.credits} AI mock interviews are completely free. No credit card — you’ll be in a live session in under two minutes.`,
-  cta: 'Start your first interview',
-  footnote: `${FREE_PLAN.credits} FREE INTERVIEWS · NO CARD · ENGLISH + HINDI`,
+  body: `New accounts get ${FREE_PLAN.credits} lifetime mock-interview credits. No credit card — create a free account and start your first session.`,
+  cta: 'Create your free account',
+  footnote: `${FREE_PLAN.credits} FREE CREDITS · NO CARD · ENGLISH + HINDI`,
 } as const;
 
 export const TIMELINE_CONTEXT_BY_STAGE = [

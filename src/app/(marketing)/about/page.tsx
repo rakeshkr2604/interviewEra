@@ -136,7 +136,7 @@ export default function AboutPage() {
             className="text-xs font-medium tracking-wide"
             style={{ color: 'var(--text-muted)' }}
           >
-            Now in private beta — join the waitlist · Built for placement season · Resume-aware · Rubric-scored feedback
+            Built for placement season · Resume-aware · Rubric-scored feedback
           </p>
 
           {/* Secondary nav */}
@@ -247,9 +247,24 @@ export default function AboutPage() {
       </section>
 
       {/* ── FOUNDER ── */}
-      <section className="mt-14 sm:mt-16 lg:mt-20" aria-label="Founder">
+      <section className="mt-14 sm:mt-16 lg:mt-20" aria-labelledby="about-founder-heading">
+        <div className="mb-6 max-w-2xl sm:mb-8">
+          <p
+            className="text-[11px] font-bold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--accent-hover)' }}
+          >
+            Built by someone in the same race
+          </p>
+          <h2
+            id="about-founder-heading"
+            className="mt-2 text-2xl font-bold tracking-tight text-balance sm:text-3xl"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            Why trust the person building your practice system?
+          </h2>
+        </div>
         <div
-          className="flex flex-col items-start gap-5 rounded-[22px] border-2 p-6 sm:flex-row sm:items-center sm:gap-7 sm:p-7 lg:rounded-3xl"
+          className="flex flex-col items-start gap-5 rounded-[22px] border-2 p-6 sm:flex-row sm:gap-7 sm:p-7 lg:rounded-3xl"
           style={{
             borderColor: 'var(--card-border)',
             background: 'color-mix(in srgb, var(--card-bg) 80%, transparent)',
@@ -284,14 +299,18 @@ export default function AboutPage() {
                 {siteOrganizationStructured.founder.jobTitle}
               </span>
             </div>
-            <p className="mt-2 max-w-xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-              InterviewEra exists because placement panels reward structured answers under pressure — not longer AI chats with
-              no rubric. We focus on resume-grounded questions, dimension-level scoring, and a practice loop you can repeat until
-              the weak spots are obvious.
+            <p className="mt-2 max-w-2xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+              InterviewEra is a solo-built product. I built it as someone who has navigated the same Indian campus and
+              early-career job market myself, so the gaps it closes are ones I felt in practice, not slide decks.
             </p>
-            <p className="mt-3 max-w-xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
-              If you are preparing for Indian campus or your first full-time role, the goal is the same: walk in knowing how you
-              will be read, not hoping the panel fills in the gaps.
+            <p className="mt-3 max-w-2xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+              I needed a repeatable practice loop, not another list of questions to memorise. That is why InterviewEra
+              focuses on resume-grounded questions, dimension-level scoring, and practice you can repeat until the weak
+              spots are obvious.
+            </p>
+            <p className="mt-3 max-w-2xl text-sm leading-[1.8] sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+              If you are preparing for Indian campus or your first full-time role, the goal is the same: walk into Day 1
+              knowing how you will be read, not hoping the panel fills in the gaps.
             </p>
 
             {/* Links */}

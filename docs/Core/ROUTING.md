@@ -46,6 +46,7 @@ Find the entry file for common surfaces. Not an exhaustive OpenAPI catalog.
 | `/api/resume/*` | Upload, parse, file |
 | `/api/payments/*` | create-order, verify, webhook |
 | `/api/stt/*`, `/api/tts` | Voice |
+| `GET /api/pricing/public`, `GET /api/pricing/launch-offer` | Public list + campaign prices; read-only live launch offer for the ISR homepage (no redemption side effects) |
 | `/api/product-events` | Funnel beacon ingest |
 | `/api/cron/*` | Bearer `CRON_SECRET` (includes `prune-interview-diagnostics` for 90d diagnostic retention) |
 | `/api/report/*` | Legacy report generate / PDF |

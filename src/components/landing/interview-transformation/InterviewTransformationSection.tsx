@@ -7,7 +7,6 @@ import {
 } from '@/lib/landing/interview-transformation-content';
 import { CapabilityCard } from '@/components/landing/interview-transformation/CapabilityCard';
 import { JourneyVisualization } from '@/components/landing/interview-transformation/JourneyVisualization';
-import { TransformationFootnotes } from '@/components/landing/interview-transformation/TransformationFootnotes';
 import { TransformationRibbon } from '@/components/landing/interview-transformation/TransformationRibbon';
 import { TrustStatement } from '@/components/landing/interview-transformation/TrustStatement';
 import './InterviewTransformation.css';
@@ -65,7 +64,6 @@ export default function InterviewTransformationSection() {
           </div>
         </div>
 
-        <TransformationFootnotes />
       </div>
     </section>
   );

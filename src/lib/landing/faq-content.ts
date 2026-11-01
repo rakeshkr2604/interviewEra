@@ -7,7 +7,19 @@ export type LandingFaqItem = { q: string; a: string };
 export const LANDING_FAQ_REGISTRY = {
   whatIs: {
     q: 'What is InterviewEra?',
-    a: 'InterviewEra is Mock Interview practice for campus placements and early-career hiring. Upload your resume for Resume-aware questions, answer by voice, face Adaptive Follow-up Questions, get Answer Feedback on every response, and finish with an Interview Report — the same path every session.',
+    a: 'InterviewEra is a complete AI interview preparation platform for students, freshers, internship candidates and early-career professionals. Four free preparation tools — ATS Resume Checker, Interview Question Generator, STAR Answer Builder and Interview Prompt Builder — help you get ready, and resume-aware AI Mock Interviews let you practise out loud with Adaptive Follow-up Questions, Answer Feedback on every response and an Interview Report at the end.',
+  },
+  freeTools: {
+    q: 'How do the free preparation tools work?',
+    a: 'Open any tool from the Free Tools menu. The ATS Resume Checker scores how your resume reads and suggests fixes, the Question Generator creates questions by role, company, topic or job description, the STAR Answer Builder structures and scores a behavioural answer, and the Prompt Builder writes a focused preparation prompt in your browser. Each tool has hourly and daily fair-use limits per account that reset automatically.',
+  },
+  freeToolsAccount: {
+    q: 'Is an account required to use the free tools?',
+    a: 'Yes. The tool pages and guides are public to read, but running a tool needs a free, registered InterviewEra account with a verified email. Accounts let fair-use limits apply per person, so students sharing a college or hostel network are not blocked by each other. Sign-up is free and needs no card.',
+  },
+  freeToolsCredits: {
+    q: 'Do the free tools consume mock-interview credits?',
+    a: 'No. Using the preparation tools never deducts mock-interview credits. Credits are only used when you start a mock interview. Reaching a fair-use limit does not affect your credits either.',
   },
   chatgpt: {
     q: 'How is InterviewEra different from ChatGPT or other AI tools?',
@@ -32,6 +44,10 @@ export const LANDING_FAQ_REGISTRY = {
   resume: {
     q: 'Do I need to upload my resume?',
     a: 'Yes. Real interviewers spend most of the session on your resume — your projects, skills, and experience — not generic textbook questions. InterviewEra follows the same approach: questions and follow-ups tie to what you actually built and claimed. Without your resume, the interview cannot mirror what a panel would probe.',
+  },
+  resumeAware: {
+    q: 'What makes the mock interviews resume-aware?',
+    a: 'Before the session, InterviewEra reads your uploaded resume — projects, skills, experience and target role — and builds the question plan from it. Follow-up questions then respond to what you actually said, so you practise defending your own work instead of generic textbook questions.',
   },
   voice: {
     q: 'Do I speak my answers or type them?',
@@ -65,9 +81,33 @@ export const LANDING_FAQ_REGISTRY = {
     q: 'Does InterviewEra work on mobile?',
     a: 'Yes — on mobile, laptop, and desktop. Mock Interviews run in the browser; Chrome on Android gives the most reliable mic experience. The same Resume-aware flow, Answer Feedback, and Interview Report apply on any screen size.',
   },
+  freeCredits: {
+    q: 'How many free mock-interview credits do new users get?',
+    a: `New Free accounts receive ${FREE_PLAN.credits} lifetime mock-interview credits, with no card required. They do not expire. Accounts created before this change keep their existing balance.`,
+  },
   credits: {
-    q: 'How do credits and pricing work?',
-    a: `One credit starts one mock interview session. Credits deduct when the session starts. A session that is started but left incomplete still uses that credit. Free sign-up includes ${FREE_PLAN.credits} lifetime credits with no card required. Paid plans add more credits on one-time 30-day access: Starter (₹${PAID_PLANS.starter.amountInr}, 8 credits) and Pro (₹${PAID_PLANS.pro.amountInr}, 25 credits). When you run out, buy or renew a plan for more credits, or report a technical issue if the session failed because of a technical problem — see pricing for current limits.`,
+    q: 'What does a mock-interview credit mean?',
+    a: `One credit starts one mock interview session with a report. The credit is deducted when the session starts, so a session that is started but left incomplete still uses that credit. Free sign-up includes ${FREE_PLAN.credits} lifetime credits; Starter (₹${PAID_PLANS.starter.amountInr}) includes ${PAID_PLANS.starter.credits} credits and Pro (₹${PAID_PLANS.pro.amountInr}) includes ${PAID_PLANS.pro.credits}. If a confirmed technical problem interrupted a session, report it so the credit can be reviewed.`,
+  },
+  starterVsPro: {
+    q: 'What is the difference between Starter and Pro?',
+    a: `Starter (₹${PAID_PLANS.starter.amountInr}) includes ${PAID_PLANS.starter.credits} credits, full answer feedback, dimension notes, a 30-day improvement roadmap, progress tracking and a post-interview report by email. Pro (₹${PAID_PLANS.pro.amountInr}) includes ${PAID_PLANS.pro.credits} credits, everything in Starter, model-answer comparison and PDF report export. Both give ${PAID_PLANS.starter.durationDays}-day access.`,
+  },
+  validity: {
+    q: 'How long are paid plans valid?',
+    a: `Each Starter or Pro purchase gives ${PAID_PLANS.starter.durationDays} days of plan access. Paid-plan credits are valid during that period and do not carry over after the plan expires.`,
+  },
+  recurring: {
+    q: 'Are paid plans recurring subscriptions?',
+    a: 'No. Starter and Pro are one-time Razorpay payments with no auto-renewal. Your account returns to the Free plan after paid access ends unless you choose to buy again.',
+  },
+  afterCredits: {
+    q: 'What happens after my credits are used?',
+    a: 'You can keep using the free preparation tools. To start more mock interviews, make a one-time Starter or Pro purchase whenever you need more practice. Renewing adds the new plan\'s credits to any remaining balance.',
+  },
+  dsa: {
+    q: 'When is DSA interview preparation expected?',
+    a: 'DSA-focused interview preparation is planned for January 2027. It is a planned feature, not currently available, and it is not included in any current plan.',
   },
   privacy: {
     q: 'Is my interview data private?',
@@ -96,12 +136,17 @@ export const LANDING_FAQ_CATEGORIES: readonly LandingFaqCategory[] = [
   {
     id: 'getting-started',
     label: 'Getting Started',
-    faqs: ['whatIs', 'chatgpt', 'whyPractice', 'mockInterview', 'whoIsFor', 'questionBank', 'guarantee'],
+    faqs: ['whatIs', 'chatgpt', 'whyPractice', 'mockInterview', 'whoIsFor', 'questionBank', 'guarantee', 'dsa'],
+  },
+  {
+    id: 'free-tools',
+    label: 'Free Tools',
+    faqs: ['freeTools', 'freeToolsAccount', 'freeToolsCredits'],
   },
   {
     id: 'mock-interviews',
     label: 'Mock Interviews',
-    faqs: ['resume', 'voice', 'followUps', 'roles', 'differentQuestions', 'practiceMultiple'],
+    faqs: ['resume', 'resumeAware', 'voice', 'followUps', 'roles', 'differentQuestions', 'practiceMultiple'],
   },
   {
     id: 'ai-evaluation',
@@ -111,7 +156,7 @@ export const LANDING_FAQ_CATEGORIES: readonly LandingFaqCategory[] = [
   {
     id: 'pricing',
     label: 'Pricing & Credits',
-    faqs: ['credits'],
+    faqs: ['freeCredits', 'credits', 'starterVsPro', 'validity', 'recurring', 'afterCredits'],
   },
   {
     id: 'privacy',

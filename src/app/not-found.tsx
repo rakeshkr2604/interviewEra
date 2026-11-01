@@ -12,6 +12,7 @@ import { getDefaultInterviewStartPath } from '@/lib/interview/default-interview-
 export default function NotFound() {
   return (
     <main
+      id="main-content"
       className="flex min-h-screen flex-col items-center justify-center px-4 text-center"
       style={{ background: 'var(--page-gradient, #f8fafc)' }}
     >

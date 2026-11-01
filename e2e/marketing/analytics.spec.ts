@@ -1,10 +1,11 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
 import { seedAnalyticsConsent } from '../helpers/analytics-consent';
 import {
-  HOME_CTA_SAMPLE_REPORT,
-  HOME_CTA_SAMPLE_REPORT_HREF,
+  HOME_CTA_FREE_TOOLS,
+  HOME_CTA_FREE_TOOLS_HREF,
   HOME_CTA_START_FREE,
   HOME_HERO_HEADING,
+  revealDeferredSection,
 } from '../helpers/marketing-home';
 import { NAV_SIGN_UP, gotoMarketingPage } from '../helpers/marketing-nav';
 
@@ -38,7 +39,7 @@ async function waitForTrackedCtaHydration(page: Page, locator: Locator) {
 async function waitForHomeHeroCtas(page: Page) {
   await page.waitForFunction(
     (href) => Boolean(document.querySelector(`main a[href="${href}"]`)),
-    HOME_CTA_SAMPLE_REPORT_HREF,
+    HOME_CTA_FREE_TOOLS_HREF,
     { timeout: 15_000 },
   );
   // LandingHeroCtaIsland hydrates on requestIdleCallback — brief settle.
@@ -72,36 +73,39 @@ test.describe('Marketing CTA analytics', () => {
   });
 
   test('homepage audience cards fire distinct keys', async ({ page }) => {
-    await gotoMarketingPage(page, '/', { heading: /who is interviewera for/i });
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
+    await revealDeferredSection(page, '#audience-path-heading');
     const audienceCards = page.locator('#audience-path-heading').locator('xpath=ancestor::section[1]');
 
     await installCtaSpy(page);
     await clickTrackedCta(page, audienceCards.getByRole('link', { name: /Students/i }).first());
     expect((await getCtaEvents(page))[0]?.cta_key).toBe('audience_students');
 
-    await gotoMarketingPage(page, '/', { heading: /who is interviewera for/i });
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
+    await revealDeferredSection(page, '#audience-path-heading');
     await installCtaSpy(page);
     await clickTrackedCta(page, audienceCards.getByRole('link', { name: /Colleges/i }).first());
     expect((await getCtaEvents(page)).some((e) => e.cta_key === 'audience_colleges')).toBe(true);
 
-    await gotoMarketingPage(page, '/', { heading: /who is interviewera for/i });
+    await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
+    await revealDeferredSection(page, '#audience-path-heading');
     await installCtaSpy(page);
     await clickTrackedCta(page, audienceCards.getByRole('link', { name: /Hiring Teams/i }).first());
     expect((await getCtaEvents(page)).some((e) => e.cta_key === 'audience_hiring_teams')).toBe(true);
   });
 
-  test('homepage See Sample Interview Report hero CTA fires once', async ({ page }) => {
+  test('homepage Explore Free Tools hero CTA fires once', async ({ page }) => {
     await gotoMarketingPage(page, '/', { heading: HOME_HERO_HEADING });
     await waitForHomeHeroCtas(page);
     await installCtaSpy(page);
-    const heroSampleReport = page
+    const heroFreeTools = page
       .locator('main')
-      .getByRole('link', { name: HOME_CTA_SAMPLE_REPORT, exact: true })
+      .getByRole('link', { name: HOME_CTA_FREE_TOOLS, exact: true })
       .first();
-    await clickTrackedCta(page, heroSampleReport);
+    await clickTrackedCta(page, heroFreeTools);
     const events = await getCtaEvents(page);
     expect(events).toHaveLength(1);
-    expect(events[0]?.cta_key).toBe('see_sample_report');
+    expect(events[0]?.cta_key).toBe('explore_free_tools');
   });
 
   test('navbar Sign up fires once', async ({ page }) => {
@@ -122,10 +126,10 @@ test.describe('Marketing CTA analytics', () => {
   test.skip(
     'campus bridge Set up Campus Workspace fires once',
     async ({ page }) => {
-      await gotoMarketingPage(page, '/campus', { heading: /placement outcomes/i });
+      await gotoMarketingPage(page, '/campus', { heading: /interview-ready/i });
       await installCtaSpy(page);
       const bridge = page
-        .locator('section[aria-labelledby="campus-workspace-bridge-heading"]')
+        .locator('#campus-final-cta')
         .getByRole('link', {
           name: 'Set up Campus Workspace',
           exact: true,

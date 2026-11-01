@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 import bundleAnalyzer from "@next/bundle-analyzer";
+import { assertNotLocalProductionTarget } from "./src/lib/env/local-production-guard";
+
+assertNotLocalProductionTarget();
 
 const withBundleAnalyzer = bundleAnalyzer({
   enabled: process.env.ANALYZE === "true",

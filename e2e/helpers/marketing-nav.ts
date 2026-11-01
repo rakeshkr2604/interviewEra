@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test';
 /** Current anonymous marketing navbar IA (For Teams / Campus nav removed). */
 export const NAV_PRODUCT_MENU = 'Product';
 export const NAV_INTERVIEW_QUESTIONS_MENU = 'Interview Questions';
-export const NAV_TOOLS_MENU = 'Tools';
+export const NAV_TOOLS_MENU = 'Free Tools';
 export const NAV_RESOURCES_MENU = 'Resources';
 export const NAV_PRICING_LINK = 'Pricing';
 export const NAV_SIGN_IN = 'Sign in';

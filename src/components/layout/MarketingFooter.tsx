@@ -20,7 +20,7 @@ const PRODUCT_LINKS = [
   { href: '/help-center', label: 'Help Center' },
 ] as const;
 
-/** Matches top-nav "Tools" dropdown — room to grow as free tools ship. */
+/** Matches top-nav "Free Tools" dropdown — room to grow as free tools ship. */
 const TOOLS_LINKS = NAV_TOOLS_LINKS;
 
 /** Prep content — hub links preserve SEO paths for deeper guides. */
@@ -49,7 +49,7 @@ const LEGAL_LINKS = [
 
 const LINK_SECTIONS = [
   { heading: 'Product', links: PRODUCT_LINKS },
-  { heading: 'Tools', links: TOOLS_LINKS },
+  { heading: 'Free Tools', links: TOOLS_LINKS },
   { heading: 'Resources', links: RESOURCES_LINKS },
   {
     heading: 'Company',

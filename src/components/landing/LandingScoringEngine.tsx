@@ -170,7 +170,7 @@ export default function LandingScoringEngine() {
             <h2
               id="scoring-engine-heading"
               style={{
-                fontFamily: "'Bricolage Grotesque', sans-serif",
+                fontFamily: 'var(--font-bricolage), sans-serif',
                 fontSize: 'clamp(26px,3.4vw,42px)',
                 fontWeight: 800,
                 marginBottom: '18px',
@@ -316,7 +316,7 @@ export default function LandingScoringEngine() {
                     section="scoring_engine_report"
                     ctaText={cta.primaryText}
                     className="v3-btn-primary ie-scoring-report-cta inline-flex min-h-12 w-full max-w-full items-center justify-center gap-2 rounded-xl px-6 py-3.5 text-[15px] font-semibold no-underline sm:w-auto sm:px-8"
-                    style={{ color: '#fff', fontFamily: "'DM Sans', sans-serif" }}
+                    style={{ color: '#fff', fontFamily: 'var(--font-dm-sans), sans-serif' }}
                   >
                     {cta.primaryText} →
                   </StartFreeCtaLink>

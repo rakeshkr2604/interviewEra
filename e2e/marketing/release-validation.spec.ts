@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { seedAnalyticsConsent } from '../helpers/analytics-consent';
-import { HOME_HERO_HEADING } from '../helpers/marketing-home';
+import { HOME_HERO_HEADING, revealDeferredSection } from '../helpers/marketing-home';
 import {
   NAV_PRICING_LINK,
   NAV_PRODUCT_MENU,
@@ -22,11 +22,14 @@ const HOMEPAGE_SECTIONS = [
   { selector: '#landing-hero-heading', name: 'hero' },
   { selector: '#audience-path-heading', name: 'audience-path' },
   { selector: '.landing-trust-metrics', name: 'trust-metrics' },
+  { selector: '#landing-problem-heading', name: 'problem' },
+  { selector: '#free-tools', name: 'free-tools' },
+  { selector: '#practice-transformation', name: 'benefits' },
+  { selector: '#prep-comparison-heading', name: 'comparison' },
   { selector: '#how', name: 'timeline' },
   { selector: '#interview-report', name: 'scoring-engine' },
-  { selector: '#landing-founder-heading', name: 'founder' },
   { selector: '#meet-interviewers', name: 'meet-interviewers' },
-  { selector: '#practice-transformation', name: 'transformation' },
+  { selector: '#pricing-preview', name: 'pricing-preview' },
   { selector: '#home-faq-heading', name: 'faq' },
   { selector: '#landing-final-cta-heading', name: 'final-cta' },
 ] as const;
@@ -71,35 +74,6 @@ async function settleHomepage(page: Page) {
  * until IntersectionObserver mounts the island, then bring it into view.
  * Polls on DOM attachment (not fixed sleeps) after each scroll step.
  */
-async function revealDeferredSection(page: Page, selector: string, timeoutMs = 30_000) {
-  const target = page.locator(selector).first();
-  const deadline = Date.now() + timeoutMs;
-
-  while (Date.now() < deadline) {
-    if ((await target.count()) > 0) {
-      await target.scrollIntoViewIfNeeded({ timeout: Math.max(1_000, deadline - Date.now()) });
-      return target;
-    }
-    await page.evaluate(() => {
-      const step = Math.max(240, Math.floor(window.innerHeight * 0.75));
-      window.scrollBy(0, step);
-    });
-    // Short attachment poll so IntersectionObserver can mount after the scroll.
-    try {
-      await target.waitFor({ state: 'attached', timeout: 250 });
-      await target.scrollIntoViewIfNeeded({ timeout: Math.max(1_000, deadline - Date.now()) });
-      return target;
-    } catch {
-      // Keep scrolling until deadline.
-    }
-  }
-
-  await expect(target, `deferred section ${selector} never mounted`).toBeAttached({
-    timeout: 1_000,
-  });
-  return target;
-}
-
 test.describe('Release validation — homepage', () => {
   for (const viewport of VIEWPORTS) {
     test(`layout + sections @ ${viewport.label}`, async ({ page }, testInfo) => {
@@ -149,9 +123,8 @@ test.describe('Release validation — homepage', () => {
     await expect(nav.getByRole('link', { name: NAV_SIGN_IN })).toBeVisible();
     await expect(nav.getByRole('link', { name: 'For Teams' })).toHaveCount(0);
 
-    await page.getByRole('link', { name: /See Sample Interview Report/i }).first().click();
-    await revealDeferredSection(page, '#interview-report');
-    await expect(page.locator('#interview-report')).toBeInViewport();
+    await page.getByRole('link', { name: /Explore Free Tools/i }).first().click();
+    await expect(page.locator('#free-tools')).toBeInViewport();
 
     await revealDeferredSection(page, '#home-faq-heading');
     const faqTab = page.getByRole('tab').first();

@@ -309,3 +309,178 @@ export const PRICING_FAQ_CATEGORIES: readonly PricingFaqCategory[] = [
 
 /** Flat list keeps visible FAQ copy and FAQPage JSON-LD in the same order. */
 export const PRICING_FAQ = PRICING_FAQ_CATEGORIES.flatMap((category) => category.items);
+
+/* ── Homepage redesign (2026-11) — problem, free toolkit, comparison, roadmap ── */
+
+/** Problem narrative — real candidate pain points, no invented statistics. */
+export const HOME_PROBLEM = {
+  eyebrow: 'The real gap',
+  title: 'Knowing the answer and communicating it under pressure are two different skills.',
+  subtitle:
+    'Tutorials, question lists and solved answers help you learn. They rarely show you how your answer sounds to an interviewer.',
+  items: [
+    {
+      id: 'structure',
+      label: '01',
+      title: 'Unstructured answers',
+      body: 'You know your projects, but explaining your decisions, your contribution and the outcome clearly is harder than it looks.',
+      symptom: '“So basically we used different things and it worked…”',
+    },
+    {
+      id: 'follow-ups',
+      label: '02',
+      title: 'Unexpected follow-up questions',
+      body: 'Memorised answers cover the first question. Interviewers go one level deeper — why that choice, what broke, what you would change.',
+      symptom: '“Why Redis and not a database index?”',
+    },
+    {
+      id: 'measurement',
+      label: '03',
+      title: 'No measurable improvement',
+      body: 'You practise again and again without knowing which part of your answer is still weak — clarity, structure, accuracy or detail.',
+      symptom: 'Ten practice rounds, the same blind spot.',
+    },
+  ],
+} as const;
+
+export type HomeFreeToolId = 'ats-checker' | 'question-generator' | 'star-builder' | 'prompt-builder';
+
+export type HomeFreeTool = {
+  id: HomeFreeToolId;
+  name: string;
+  href: string;
+  headline: string;
+  points: readonly string[];
+  cta: string;
+};
+
+/** Free toolkit Bento — capabilities verified against each tool's server action / component. */
+export const HOME_FREE_TOOLS: readonly HomeFreeTool[] = [
+  {
+    id: 'ats-checker',
+    name: 'ATS Resume Checker',
+    href: '/tools/ats-checker',
+    headline: 'Know how your resume reads before recruiters see it.',
+    points: [
+      'Parses your resume the way a typical ATS would',
+      'Overall score with dimension-level findings',
+      'Optional job-description match',
+      'Explainable fixes you can act on',
+    ],
+    cta: 'Check Your Resume',
+  },
+  {
+    id: 'question-generator',
+    name: 'Interview Question Generator',
+    href: '/tools/question-generator',
+    headline: 'Prepare for the questions your target role demands.',
+    points: [
+      'Questions by role, company, topic or job description',
+      'Answer coaching for each question',
+    ],
+    cta: 'Generate Questions',
+  },
+  {
+    id: 'star-builder',
+    name: 'STAR Answer Builder',
+    href: '/tools/star-builder',
+    headline: 'Structure better answers using Situation, Task, Action and Result.',
+    points: [
+      'Turns a rough experience into a structured answer',
+      'Quality scores with 2–3 specific improvement tips',
+    ],
+    cta: 'Build STAR Answers',
+  },
+  {
+    id: 'prompt-builder',
+    name: 'Interview Prompt Builder',
+    href: '/tools/prompt-builder',
+    headline: 'Create focused prompts for better interview preparation.',
+    points: [
+      'Builds a preparation prompt for your own AI chat',
+      'Written locally in your browser',
+    ],
+    cta: 'Build Interview Prompts',
+  },
+] as const;
+
+export const HOME_FREE_TOOLS_NOTE = {
+  badge: 'Free with a registered InterviewEra account.',
+  detail: 'Use preparation tools without consuming mock-interview credits. Fair-use limits apply.',
+} as const;
+
+export const HOME_MOCK_INTERVIEW_CARD = {
+  name: 'AI Mock Interviews',
+  headline: 'Practise before the real interview.',
+  points: [
+    'Voice-based interview simulation',
+    'Questions built from your resume',
+    'Adaptive follow-up questions',
+    'Five-dimension scoring on every answer',
+    'Detailed feedback and an interview report',
+  ],
+  cta: 'Start Mock Interview',
+} as const;
+
+/** Balanced comparison against generic approaches — no named competitors, no outcome claims. */
+export type PrepComparisonCell = { value: 'yes' | 'partial' | 'no'; note: string };
+
+export const HOME_PREP_COMPARISON = {
+  eyebrow: 'How preparation approaches compare',
+  title: 'Use every approach for what it does best.',
+  subtitle:
+    'Videos and AI chat are good for learning concepts. A structured simulation is built for practising the interview itself.',
+  columns: ['Videos & question lists', 'Open-ended AI chat', 'InterviewEra simulation'] as const,
+  rows: [
+    {
+      capability: 'Practice based on your resume',
+      cells: [
+        { value: 'no', note: 'Generic questions' },
+        { value: 'partial', note: 'If you paste and prompt it' },
+        { value: 'yes', note: 'Built from your resume' },
+      ],
+    },
+    {
+      capability: 'Follow-ups based on your answer',
+      cells: [
+        { value: 'no', note: 'Fixed list' },
+        { value: 'partial', note: 'Depends on your prompting' },
+        { value: 'yes', note: 'Adaptive follow-up questions' },
+      ],
+    },
+    {
+      capability: 'Structured interview flow',
+      cells: [
+        { value: 'no', note: 'Self-paced reading' },
+        { value: 'partial', note: 'Open-ended conversation' },
+        { value: 'yes', note: 'Timed, voice-first session' },
+      ],
+    },
+    {
+      capability: 'Repeatable evaluation',
+      cells: [
+        { value: 'no', note: 'Self-assessment' },
+        { value: 'partial', note: 'Varies between chats' },
+        { value: 'yes', note: 'Same five dimensions every time' },
+      ],
+    },
+    {
+      capability: 'Progress across sessions',
+      cells: [
+        { value: 'no', note: 'Not tracked' },
+        { value: 'no', note: 'Not tracked' },
+        { value: 'yes', note: 'Reports and progress history' },
+      ],
+    },
+  ] satisfies readonly { capability: string; cells: readonly PrepComparisonCell[] }[],
+  footnote:
+    'InterviewEra does not guarantee selection. Outcomes depend on the company, the role and your performance on the day.',
+} as const;
+
+/** Planned roadmap item — never an entitlement, never sold. */
+export const HOME_DSA_ROADMAP = {
+  eyebrow: 'On the roadmap',
+  title: 'Preparing for technical coding interviews?',
+  body: 'DSA-focused interview preparation is planned for January 2027.',
+  disclosure: 'Planned feature. Not currently available.',
+} as const;

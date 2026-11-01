@@ -10,41 +10,58 @@ import {
   Calendar,
   Check,
   ChevronDown,
-  FileText,
+  ClipboardCheck,
+  FileSearch,
   Layers,
+  LifeBuoy,
   LineChart,
-  Lock,
   Mail,
   MessageSquare,
-  Target,
   Users,
-  Zap,
 } from 'lucide-react';
 import { TrackedCtaLink } from '@/components/analytics/TrackedCta';
 import { CTA_KEYS } from '@/lib/analytics/cta-keys';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import {
+  ABOUT_FOR_COLLEGES,
   BEFORE_AFTER,
+  CAPABILITIES,
+  CAPABILITIES_SECTION,
+  DEMO_SECTION,
+  DESIGNED_FOR,
   FAQ_ITEMS,
-  FEATURES_PRIMARY,
-  FEATURES_SECONDARY,
-  FEATURES_SECTION,
   FINAL_CTA,
+  FOUNDER_SECTION,
+  HERO,
   HERO_BULLETS,
   HERO_PRICE_LINE,
   HOW_IT_WORKS_STEPS,
-  PAIN_POINTS,
+  PILOT_CRITERIA,
   PLACEMENT_PREP_COMPARISON,
+  PLATFORM_FACTS,
   PRICING_CONTEXT,
   PRICING_FEATURES,
-  SOLUTION_PILLARS,
+  WHY_POINTS,
 } from '@/lib/landing/campus-content';
 import { CampusHeroHeadline } from '@/components/landing/campus/CampusHeroHeadline';
+import { siteOrganizationStructured } from '@/lib/seo/metadata';
 import { cn } from '@/lib/utils';
 
-const PRIMARY_FEATURE_ICONS = [Layers, Users, LineChart] as const;
-const SECONDARY_FEATURE_ICONS = [MessageSquare, BarChart3, FileText] as const;
+const CAPABILITY_ICONS = {
+  batch: Users,
+  evaluation: Layers,
+  resume: FileSearch,
+  tracking: LineChart,
+  reports: BarChart3,
+  onboarding: LifeBuoy,
+} as const satisfies Record<(typeof CAPABILITIES)[number]['id'], unknown>;
+
+const FOUNDER = siteOrganizationStructured.founder;
+
+const SECTION_EYEBROW = 'text-xs font-semibold uppercase tracking-[0.2em]';
+const SECTION_TITLE = 'mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl';
+const SECTION_PAD = 'px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10';
 
 function AmbientOrbs() {
   const reduce = useReducedMotion();
@@ -98,7 +115,7 @@ function Reveal({
   );
 }
 
-/** Question + STAR + evaluation friction (incomplete = locked / flagged — feels strict, not decorative). */
+/** Illustrative question + STAR answer + feedback. A missing part is flagged in feedback; scores are never withheld. */
 function InterviewMechanismMockup() {
   const starBlocks = [
     { label: 'Situation' as const, sample: 'Team split on DB vs cache for peak load…' },
@@ -146,7 +163,7 @@ function InterviewMechanismMockup() {
               className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide"
               style={{ borderColor: 'var(--card-border)', color: 'var(--accent-primary)' }}
             >
-              STAR capture
+              Illustrative
             </span>
           </div>
 
@@ -189,13 +206,13 @@ function InterviewMechanismMockup() {
                       {missing && (
                         <span className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: 'var(--accent-warning)' }}>
                           <AlertTriangle className="size-3 shrink-0" aria-hidden />
-                          Required
+                          Missing
                         </span>
                       )}
                     </div>
                     {missing ? (
                       <p className="mt-1 text-xs font-medium leading-relaxed" style={{ color: 'var(--accent-warning)' }}>
-                        Result missing — evaluation incomplete
+                        Result missing — flagged in feedback
                       </p>
                     ) : (
                       <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
@@ -210,7 +227,7 @@ function InterviewMechanismMockup() {
         </div>
 
         <div
-          className="flex flex-col justify-between rounded-xl border p-4 lg:max-w-[min(100%,20rem)] lg:shrink-0"
+          className="hidden flex-col justify-between rounded-xl border p-4 sm:flex lg:max-w-[min(100%,20rem)] lg:shrink-0"
           style={{ borderColor: 'color-mix(in srgb, var(--accent-primary) 25%, var(--card-border))', background: 'var(--bg-secondary)' }}
         >
           <div
@@ -220,9 +237,9 @@ function InterviewMechanismMockup() {
               background: 'color-mix(in srgb, var(--accent-warning) 10%, transparent)',
             }}
           >
-            <Lock className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--accent-warning)' }} aria-hidden />
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" style={{ color: 'var(--accent-warning)' }} aria-hidden />
             <p className="text-[11px] font-semibold leading-snug" style={{ color: 'var(--text-primary)' }}>
-              Score locked until all sections are filled
+              Answer Structure: Result is missing
             </p>
           </div>
 
@@ -231,7 +248,7 @@ function InterviewMechanismMockup() {
               Evaluation preview
             </p>
             <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-              Five dimensions: communication, technical depth, structure, confidence, relevance — same bar for every student.
+              Five dimensions: Communication Clarity, Content Accuracy, Answer Structure, Specificity, Relevance — same bar for every student.
             </p>
             <ul className="mt-4 space-y-3">
               <li
@@ -254,12 +271,12 @@ function InterviewMechanismMockup() {
                   Relevance
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Conflict-resolution intent matched — pending full STAR for score release.
+                  Conflict-resolution intent matched the question.
                 </p>
               </li>
               <li className="text-sm">
                 <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                  Communication
+                  Communication Clarity
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                   Action sequence is clear; trim hedging once Result is added.
@@ -268,7 +285,7 @@ function InterviewMechanismMockup() {
             </ul>
           </div>
           <p className="mt-4 border-t pt-3 text-[11px] leading-snug" style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}>
-            Cohort rollups use the same rubric — weak dimensions surface before drives.
+            Illustrative sample. Cohort analytics use the same rubric, so weak dimensions surface before drives.
           </p>
         </div>
       </div>
@@ -278,7 +295,6 @@ function InterviewMechanismMockup() {
 
 export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: string }) {
   const reduce = useReducedMotion();
-  const embedSrc = `${calendlyUrl}?embed_type=Inline&hide_gdpr_banner=1`;
 
   return (
     <main id="main-content" className="relative" style={{ color: 'var(--text-primary)' }}>
@@ -302,7 +318,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
               >
                 <Badge
                   variant="secondary"
-                  className="border px-3 py-1 text-xs font-medium tracking-wide"
+                  className="h-auto max-w-full whitespace-normal border px-3 py-1 text-left text-xs font-medium leading-snug tracking-wide"
                   style={{
                     background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
                     borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, var(--card-border))',
@@ -310,18 +326,12 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                   }}
                 >
                   <Building2 className="mr-1.5 inline size-3.5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                  For T&amp;P (Training &amp; Placement) and campus leadership
+                  {HERO.badge}
                 </Badge>
               </motion.div>
 
-              <motion.div
-                className="w-full"
-                initial={reduce ? false : { opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.04 }}
-              >
-                <CampusHeroHeadline className="mx-auto lg:mx-0" />
-              </motion.div>
+              {/* No entrance animation: the H1 is the LCP element and must paint immediately. */}
+              <CampusHeroHeadline className="mx-auto lg:mx-0" />
 
               <motion.div
                 className="w-full max-w-[36rem] space-y-1.5 lg:max-w-none"
@@ -330,10 +340,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 transition={{ duration: 0.45, delay: 0.08 }}
               >
                 <p className="text-[15px] font-medium leading-snug sm:text-lg lg:text-xl lg:leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                  Run structured mock interviews for entire batches and track performance before Day 1.
-                </p>
-                <p className="text-[15px] leading-snug sm:text-lg lg:text-xl lg:leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                  Without increasing placement team workload.
+                  {HERO.body}
                 </p>
               </motion.div>
 
@@ -346,27 +353,31 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 {/* Primary actions */}
                 <div className="space-y-3">
                   <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
-                    <a
+                    <TrackedCtaLink
                       href={calendlyUrl}
                       target="_blank"
                       rel="noopener noreferrer"
+                      prefetch={false}
+                      ctaKey={CTA_KEYS.CAMPUS_DEMO}
+                      ctaText="Book a Campus Demo"
+                      section="campus_hero"
                       className={cn(
                         buttonVariants({ size: 'lg' }),
-                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl px-5 text-[15px] font-semibold shadow-lg transition-transform hover:-translate-y-0.5'
+                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl px-5 text-[15px] font-semibold shadow-lg transition-transform hover:-translate-y-0.5 motion-reduce:transform-none'
                       )}
                       style={{ background: 'var(--accent-primary)', color: '#fff' }}
                     >
-                      Book a 20-min demo
+                      Book a Campus Demo
                       <ArrowRight className="ml-2 size-4 shrink-0" aria-hidden />
-                    </a>
+                    </TrackedCtaLink>
                     <TrackedCtaLink
-                      href="/signup?intent=college"
-                      ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
-                      ctaText="Set up Campus Workspace"
+                      href="#campus-capabilities"
+                      ctaKey={CTA_KEYS.FOR_COLLEGES}
+                      ctaText="Explore Campus Solution"
                       section="campus_hero"
                       className={cn(
                         buttonVariants({ variant: 'outline', size: 'lg' }),
-                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl border-[1.5px] px-5 text-[15px] font-semibold transition-transform hover:-translate-y-0.5'
+                        'inline-flex h-12 min-h-[44px] w-full items-center justify-center rounded-xl border-[1.5px] px-5 text-[15px] font-semibold transition-transform hover:-translate-y-0.5 motion-reduce:transform-none'
                       )}
                       style={{
                         borderColor: 'var(--accent-primary)',
@@ -374,18 +385,30 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                         background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
                       }}
                     >
-                      Set up Campus Workspace
-                      <ArrowRight className="ml-2 size-4 shrink-0" aria-hidden />
+                      Explore Campus Solution
                     </TrackedCtaLink>
                   </div>
-                  <a
-                    href="mailto:campus@interviewera.com"
-                    className="inline-flex min-h-[44px] items-center gap-2 self-start text-sm font-semibold underline-offset-4 hover:underline"
-                    style={{ color: 'var(--accent-primary)' }}
-                  >
-                    <Mail className="size-4 opacity-90" aria-hidden />
-                    Email campus team
-                  </a>
+                  <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                    <TrackedCtaLink
+                      href="/signup?intent=college"
+                      ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
+                      ctaText="Set up Campus Workspace"
+                      section="campus_hero"
+                      className="inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold underline-offset-4 hover:underline"
+                      style={{ color: 'var(--accent-primary)' }}
+                    >
+                      Set up Campus Workspace
+                      <ArrowRight className="size-3.5" aria-hidden />
+                    </TrackedCtaLink>
+                    <a
+                      href="mailto:campus@interviewera.com"
+                      className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold underline-offset-4 hover:underline"
+                      style={{ color: 'var(--accent-primary)' }}
+                    >
+                      <Mail className="size-4 opacity-90" aria-hidden />
+                      Email campus team
+                    </a>
+                  </div>
                 </div>
 
                 {/* Proof points */}
@@ -440,9 +463,115 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
         </div>
       </section>
 
-      {/* Before / after — no fake logos or testimonials */}
+      {/* 03 · Institutional credibility without logos — operational problems addressed */}
+      <section className="border-b px-5 py-12 sm:px-6 md:py-16 lg:px-8 xl:px-10" style={{ borderColor: 'var(--card-border)' }} aria-labelledby="campus-designed-for-heading">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-10">
+            <p className={SECTION_EYEBROW} style={{ color: 'var(--accent-primary)' }}>
+              {DESIGNED_FOR.eyebrow}
+            </p>
+            <h2 id="campus-designed-for-heading" className="mt-3 text-2xl font-bold tracking-tight text-balance md:text-3xl" style={{ color: 'var(--text-primary)' }}>
+              {DESIGNED_FOR.title}
+            </h2>
+          </Reveal>
+          <ul className="grid list-none gap-3 p-0 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4" role="list">
+            {DESIGNED_FOR.items.map((item, i) => (
+              <li key={item.title} className="h-full">
+                <Reveal delay={i * 0.05} className="h-full">
+                  <div className="h-full rounded-2xl border p-4 sm:p-5" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </p>
+                    <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {item.body}
+                    </p>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
+      {/* 04 · About InterviewEra for colleges (problem → solution) */}
+      <section className={SECTION_PAD} aria-labelledby="campus-about-heading">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-16">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
+              {ABOUT_FOR_COLLEGES.eyebrow}
+            </p>
+            <h2 id="campus-about-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
+              {ABOUT_FOR_COLLEGES.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
+              {ABOUT_FOR_COLLEGES.body}
+            </p>
+          </Reveal>
+
+        </div>
+      </section>
+
+      {/* 05 · Platform capabilities — each maps to shipped functionality */}
       <section
-        className="border-y px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
+        id="campus-capabilities"
+        className={cn('scroll-mt-20 border-t', SECTION_PAD)}
+        style={{
+          borderColor: 'var(--card-border)',
+          background:
+            'linear-gradient(180deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--bg-secondary) 92%, var(--accent-primary)) 100%)',
+        }}
+        aria-labelledby="campus-capabilities-heading"
+      >
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-14">
+            <p className={SECTION_EYEBROW} style={{ color: 'var(--accent-primary)' }}>
+              {CAPABILITIES_SECTION.eyebrow}
+            </p>
+            <h2 id="campus-capabilities-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
+              {CAPABILITIES_SECTION.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
+              {CAPABILITIES_SECTION.subtitle}
+            </p>
+          </Reveal>
+          <ul className="grid list-none gap-3 p-0 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3" role="list">
+            {CAPABILITIES.map((item, i) => {
+              const Icon = CAPABILITY_ICONS[item.id];
+              return (
+                <li key={item.id} className="h-full">
+                  <Reveal delay={i * 0.05} className="h-full">
+                    <div
+                      className="grid h-full grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 rounded-2xl border p-4 transition-shadow duration-200 hover:shadow-xl sm:flex sm:flex-col sm:p-6"
+                      style={{
+                        borderColor: 'color-mix(in srgb, var(--accent-primary) 22%, var(--card-border))',
+                        background: 'var(--card-bg)',
+                      }}
+                    >
+                      <div
+                        className="row-span-2 flex h-10 w-10 items-center justify-center rounded-xl sm:mb-4 sm:h-11 sm:w-11"
+                        style={{ background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)' }}
+                      >
+                        <Icon className="size-5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+                      </div>
+                      <h3 className="text-base font-semibold sm:text-lg" style={{ color: 'var(--text-primary)' }}>
+                        {item.title}
+                      </h3>
+                      <p className="mt-1 text-sm leading-relaxed sm:mt-2 sm:text-base" style={{ color: 'var(--text-secondary)' }}>
+                        {item.body}
+                      </p>
+                    </div>
+                  </Reveal>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
+
+      {/* 06 · Why InterviewEra — before / after, no fake logos or testimonials */}
+      <section
+        aria-labelledby="campus-why-heading"
+        className="border-y px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10"
         style={{
           borderColor: 'var(--card-border)',
           background:
@@ -451,23 +580,35 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
       >
         <div className="mx-auto max-w-6xl">
           <Reveal>
-            <div className="mb-12 text-center md:mb-14">
+            <div className="mb-8 text-center md:mb-14">
               <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
-                Outcomes
+                What changes
               </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
+              <h2 id="campus-why-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
                 {BEFORE_AFTER.title}
               </h2>
               <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
                 {BEFORE_AFTER.subtitle}
               </p>
+              <ul className="mx-auto mt-6 hidden max-w-3xl flex-wrap justify-center gap-2 sm:flex" role="list">
+                {WHY_POINTS.map((point) => (
+                  <li
+                    key={point}
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
+                    style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)', color: 'var(--text-primary)' }}
+                  >
+                    <Check className="size-3.5" style={{ color: 'var(--accent-success)' }} aria-hidden />
+                    {point}
+                  </li>
+                ))}
+              </ul>
             </div>
           </Reveal>
 
-          <div className="grid gap-6 lg:grid-cols-2 lg:gap-10">
+          <div className="grid gap-3 sm:gap-6 lg:grid-cols-2 lg:gap-10">
             <Reveal>
               <div
-                className="h-full rounded-2xl border p-6 md:p-8"
+                className="h-full rounded-2xl border p-4 sm:p-6 md:p-8"
                 style={{
                   borderColor: 'var(--card-border)',
                   background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
@@ -476,9 +617,9 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 <p className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--text-muted)' }}>
                   Before
                 </p>
-                <ul className="mt-5 space-y-4">
+                <ul className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
                   {BEFORE_AFTER.before.map((line) => (
-                    <li key={line} className="flex gap-3 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <li key={line} className="flex gap-3 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
                       <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: 'var(--text-muted)' }} aria-hidden />
                       {line}
                     </li>
@@ -488,7 +629,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
             </Reveal>
             <Reveal delay={0.06}>
               <div
-                className="h-full rounded-2xl border p-6 md:p-8"
+                className="h-full rounded-2xl border p-4 sm:p-6 md:p-8"
                 style={{
                   borderColor: 'color-mix(in srgb, var(--accent-primary) 30%, var(--card-border))',
                   background: 'color-mix(in srgb, var(--accent-primary) 5%, var(--card-bg))',
@@ -497,9 +638,9 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 <p className="text-xs font-bold uppercase tracking-[0.15em]" style={{ color: 'var(--accent-primary)' }}>
                   After
                 </p>
-                <ul className="mt-5 space-y-4">
+                <ul className="mt-4 space-y-3 sm:mt-5 sm:space-y-4">
                   {BEFORE_AFTER.after.map((line) => (
-                    <li key={line} className="flex gap-3 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    <li key={line} className="flex gap-3 text-sm leading-relaxed sm:text-base" style={{ color: 'var(--text-secondary)' }}>
                       <Check className="mt-0.5 size-4 shrink-0" style={{ color: 'var(--accent-success)' }} aria-hidden />
                       {line}
                     </li>
@@ -511,268 +652,13 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
         </div>
       </section>
 
-      {/* Problem → Solution */}
-      <section className="px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10">
-        <div className="mx-auto max-w-6xl">
-          <Reveal className="mb-12 text-center md:mb-16">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
-              Problem → solution
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
-              Placement prep breaks at structure, scale, and measurement
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              InterviewEra is the operational layer: same interview bar for every student, unlimited reps, cohort signal for
-              the office.
-            </p>
-          </Reveal>
-
-          <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
-            <Reveal>
-              <div
-                className="h-full rounded-2xl border p-6 md:p-8"
-                style={{
-                  borderColor: 'var(--card-border)',
-                  background: 'color-mix(in srgb, var(--bg-secondary) 88%, transparent)',
-                }}
-              >
-                <div
-                  className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                  style={{ borderColor: 'var(--card-border)', color: 'var(--text-muted)' }}
-                >
-                  <Target className="size-3.5" aria-hidden />
-                  Problems
-                </div>
-                <ul className="space-y-6">
-                  {PAIN_POINTS.map((p) => (
-                    <li key={p.title}>
-                      <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                        {p.title}
-                      </p>
-                      <p className="mt-1.5 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                        {p.description}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-            <Reveal delay={0.06}>
-              <div
-                className="h-full rounded-2xl border p-6 md:p-8"
-                style={{
-                  borderColor: 'color-mix(in srgb, var(--accent-primary) 32%, var(--card-border))',
-                  background: 'color-mix(in srgb, var(--accent-primary) 5%, var(--card-bg))',
-                }}
-              >
-                <div
-                  className="mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold"
-                  style={{ borderColor: 'var(--card-border)', color: 'var(--accent-primary)' }}
-                >
-                  <Zap className="size-3.5" aria-hidden />
-                  What InterviewEra does
-                </div>
-                <ul className="space-y-6">
-                  {SOLUTION_PILLARS.map((p) => (
-                    <li key={p.title} className="flex gap-3">
-                      <span
-                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white"
-                        style={{ background: 'var(--accent-primary)' }}
-                      >
-                        <Check className="size-3.5" aria-hidden />
-                      </span>
-                      <div>
-                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {p.title}
-                        </p>
-                        <p className="mt-1.5 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                          {p.description}
-                        </p>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </Reveal>
-          </div>
-        </div>
-      </section>
-
-      {/* Features — primary + secondary hierarchy */}
-      <section
-        className="border-t px-5 py-16 sm:px-6 md:py-28 lg:px-8 xl:px-10"
-        style={{
-          borderColor: 'var(--card-border)',
-          background:
-            'linear-gradient(180deg, var(--bg-secondary) 0%, color-mix(in srgb, var(--bg-secondary) 92%, var(--accent-primary)) 100%)',
-        }}
-      >
-        <div className="mx-auto max-w-6xl">
-          <Reveal className="mb-14 text-center md:mb-16">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
-              {FEATURES_SECTION.eyebrow}
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
-              {FEATURES_SECTION.title}
-            </h2>
-            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              {FEATURES_SECTION.subtitle}
-            </p>
-          </Reveal>
-
-          <div className="grid gap-6 md:grid-cols-3">
-            {FEATURES_PRIMARY.map((item, i) => {
-              const Icon = PRIMARY_FEATURE_ICONS[i];
-              return (
-                <Reveal key={item.title} delay={i * 0.06}>
-                  <div
-                    className="flex h-full flex-col rounded-2xl border p-6 shadow-lg transition-shadow duration-200 hover:shadow-xl md:p-7"
-                    style={{
-                      borderColor: 'color-mix(in srgb, var(--accent-primary) 28%, var(--card-border))',
-                      background:
-                        'linear-gradient(160deg, color-mix(in srgb, var(--card-bg) 95%, var(--accent-primary)) 0%, var(--card-bg) 55%)',
-                      boxShadow: 'var(--card-shadow)',
-                    }}
-                  >
-                    <div
-                      className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl"
-                      style={{ background: 'color-mix(in srgb, var(--accent-primary) 18%, transparent)' }}
-                    >
-                      <Icon className="size-6" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                    </div>
-                    <p className="text-lg font-bold leading-snug md:text-xl" style={{ color: 'var(--text-primary)' }}>
-                      {item.title}
-                    </p>
-                    <dl className="mt-5 flex flex-1 flex-col gap-4 text-base leading-relaxed">
-                      <div>
-                        <dt className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                          What it does
-                        </dt>
-                        <dd className="mt-1" style={{ color: 'var(--text-secondary)' }}>
-                          {item.does}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                          How it works
-                        </dt>
-                        <dd className="mt-1" style={{ color: 'var(--text-secondary)' }}>
-                          {item.works}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className="text-[10px] font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-                          Why outcomes improve
-                        </dt>
-                        <dd className="mt-1" style={{ color: 'var(--text-secondary)' }}>
-                          {item.outcome}
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                </Reveal>
-              );
-            })}
-          </div>
-
-          <Reveal delay={0.12}>
-            <p className="mb-5 mt-14 text-center text-xs font-semibold uppercase tracking-[0.2em] md:mt-16" style={{ color: 'var(--text-muted)' }}>
-              Also included
-            </p>
-            <ul className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-3">
-              {FEATURES_SECONDARY.map((item, i) => {
-                const Icon = SECONDARY_FEATURE_ICONS[i];
-                return (
-                  <li
-                    key={item.title}
-                    className="rounded-xl border px-4 py-4"
-                    style={{
-                      borderColor: 'var(--card-border)',
-                      background: 'color-mix(in srgb, var(--card-bg) 88%, transparent)',
-                    }}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-                        style={{ background: 'color-mix(in srgb, var(--accent-primary) 10%, transparent)' }}
-                      >
-                        <Icon className="size-4" style={{ color: 'var(--accent-primary)' }} aria-hidden />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                          {item.title}
-                        </p>
-                        <p className="mt-1 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                          {item.body}
-                        </p>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </Reveal>
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10">
-        <div className="mx-auto max-w-6xl">
-          <Reveal className="mb-12 text-center md:mb-16">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
-              Rollout
-            </p>
-            <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
-              How implementation runs on your campus
-            </h2>
-          </Reveal>
-
-          <div className="relative grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            <div
-              className="pointer-events-none absolute left-4 right-4 top-12 hidden h-px lg:block"
-              style={{
-                background: `linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-primary) 35%, transparent), transparent)`,
-              }}
-              aria-hidden
-            />
-            {HOW_IT_WORKS_STEPS.map((step, i) => (
-              <Reveal key={step.step} delay={i * 0.06}>
-                <div
-                  className="relative flex h-full flex-col rounded-2xl border p-6 text-center md:text-left"
-                  style={{
-                    borderColor: 'var(--card-border)',
-                    background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
-                  }}
-                >
-                  <div
-                    className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl text-lg font-bold text-white md:mx-0"
-                    style={{
-                      background: 'var(--accent-primary)',
-                      boxShadow: '0 6px 20px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
-                    }}
-                  >
-                    {step.step}
-                  </div>
-                  <h3 className="text-base font-semibold md:text-lg" style={{ color: 'var(--text-primary)' }}>
-                    {step.title}
-                  </h3>
-                  <p className="mt-3 flex-1 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-                    {step.body}
-                  </p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* InterviewEra vs alternatives */}
       <section
-        className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
+        className="border-t px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
         <div className="mx-auto max-w-6xl">
-          <Reveal className="mb-10 text-center md:mb-14">
+          <Reveal className="mb-8 text-center md:mb-14">
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
               Differentiation
             </p>
@@ -822,7 +708,7 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                       key={row.criterion}
                       style={{
                         background:
-                          row.criterion === 'Placement readiness'
+                          row.criterion === 'Readiness signal'
                             ? 'color-mix(in srgb, var(--accent-primary) 7%, var(--card-bg))'
                             : 'var(--card-bg)',
                       }}
@@ -862,18 +748,275 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
         </div>
       </section>
 
+      {/* 07 · Platform facts — product capabilities, never adoption numbers */}
+      <section className="px-5 py-12 sm:px-6 md:py-16 lg:px-8 xl:px-10" aria-labelledby="campus-facts-heading">
+        <div className="mx-auto max-w-6xl">
+          <h2 id="campus-facts-heading" className="sr-only">
+            Platform facts
+          </h2>
+          <ul className="grid list-none grid-cols-2 gap-4 p-0 lg:grid-cols-4" role="list">
+            {PLATFORM_FACTS.map((fact, i) => (
+              <li key={fact.label} className="h-full">
+                <Reveal delay={i * 0.05} className="h-full">
+                  <div className="h-full rounded-2xl border p-5 text-center" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+                    <p className="text-3xl font-extrabold tabular-nums md:text-4xl" style={{ color: 'var(--accent-primary)' }}>
+                      {fact.value}
+                    </p>
+                    <p className="mt-2 text-sm leading-snug" style={{ color: 'var(--text-secondary)' }}>
+                      {fact.label}
+                    </p>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            Product capabilities, not usage or placement statistics.
+          </p>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-16">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
+              Campus process
+            </p>
+            <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
+              How it works on your campus
+            </h2>
+          </Reveal>
+
+          <ol className="relative grid list-none gap-3 p-0 md:grid-cols-2 md:gap-6 lg:grid-cols-5" role="list">
+            <div
+              className="pointer-events-none absolute left-4 right-4 top-12 hidden h-px lg:block"
+              style={{
+                background: `linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent-primary) 35%, transparent), transparent)`,
+              }}
+              aria-hidden
+            />
+            {HOW_IT_WORKS_STEPS.map((step, i) => (
+              <li key={step.step} className="h-full">
+                <Reveal delay={i * 0.06} className="h-full">
+                  <div
+                    className="relative grid h-full grid-cols-[2.5rem_minmax(0,1fr)] gap-x-3 rounded-2xl border p-4 md:flex md:flex-col md:p-6"
+                    style={{
+                      borderColor: 'var(--card-border)',
+                      background: 'color-mix(in srgb, var(--card-bg) 92%, transparent)',
+                    }}
+                  >
+                    <div
+                      className="row-span-2 flex h-10 w-10 items-center justify-center rounded-xl text-base font-bold text-white md:mb-4 md:h-12 md:w-12 md:rounded-2xl md:text-lg"
+                      style={{
+                        background: 'var(--accent-primary)',
+                        boxShadow: '0 6px 20px color-mix(in srgb, var(--accent-primary) 28%, transparent)',
+                      }}
+                    >
+                      {step.step}
+                    </div>
+                    <h3 className="text-base font-semibold md:text-lg" style={{ color: 'var(--text-primary)' }}>
+                      {step.title}
+                    </h3>
+                    <p className="mt-1 flex-1 text-sm leading-relaxed md:mt-3 md:text-base" style={{ color: 'var(--text-secondary)' }}>
+                      {step.body}
+                    </p>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 09 · Product walkthrough — illustrative data only */}
+      <section className={cn('border-t', SECTION_PAD)} style={{ borderColor: 'var(--card-border)' }} aria-labelledby="campus-demo-heading">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-12">
+            <p className={SECTION_EYEBROW} style={{ color: 'var(--accent-primary)' }}>
+              {DEMO_SECTION.eyebrow}
+            </p>
+            <h2 id="campus-demo-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
+              {DEMO_SECTION.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
+              {DEMO_SECTION.subtitle}
+            </p>
+          </Reveal>
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Reveal>
+              <figure className="m-0 h-full rounded-2xl border p-5 sm:p-6" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+                <figcaption className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Campus dashboard · cohort view
+                  </span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: 'color-mix(in srgb, var(--text-muted) 14%, transparent)', color: 'var(--text-muted)' }}>
+                    Illustrative
+                  </span>
+                </figcaption>
+                <div aria-hidden className="mt-5 space-y-3">
+                  {[
+                    ['Communication Clarity', 68],
+                    ['Content Accuracy', 72],
+                    ['Answer Structure', 54],
+                    ['Specificity', 49],
+                    ['Relevance', 77],
+                  ].map(([label, value]) => (
+                    <div key={label as string} className="grid grid-cols-[9.5rem_minmax(0,1fr)_2.5rem] items-center gap-3 text-xs sm:text-sm">
+                      <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                      <span className="h-2 overflow-hidden rounded-full" style={{ background: 'color-mix(in srgb, var(--text-muted) 16%, transparent)' }}>
+                        <span
+                          className="block h-full rounded-full"
+                          style={{
+                            width: `${value}%`,
+                            background: (value as number) < 55 ? 'var(--accent-warning)' : 'var(--accent-primary)',
+                          }}
+                        />
+                      </span>
+                      <span className="text-right font-semibold tabular-nums" style={{ color: 'var(--text-primary)' }}>
+                        {((value as number) / 10).toFixed(1)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-5 rounded-xl border px-3 py-2 text-xs leading-relaxed" style={{ borderColor: 'color-mix(in srgb, var(--accent-warning) 35%, var(--card-border))', color: 'var(--text-secondary)' }}>
+                  Weakest batch dimensions: Specificity and Answer Structure — a focus for this week’s clinic.
+                </p>
+              </figure>
+            </Reveal>
+            <Reveal delay={0.06}>
+              <figure className="m-0 h-full rounded-2xl border p-5 sm:p-6" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+                <figcaption className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    Students · practice deadline
+                  </span>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide" style={{ background: 'color-mix(in srgb, var(--text-muted) 14%, transparent)', color: 'var(--text-muted)' }}>
+                    Illustrative
+                  </span>
+                </figcaption>
+                <ul aria-hidden className="mt-5 divide-y text-sm" style={{ borderColor: 'var(--card-border)' }}>
+                  {[
+                    ['Student A', '3 sessions', 'On track'],
+                    ['Student B', '1 session', 'Needs a nudge'],
+                    ['Student C', '4 sessions', 'On track'],
+                    ['Student D', '0 sessions', 'Not started'],
+                  ].map(([name, sessions, status]) => (
+                    <li key={name} className="flex items-center justify-between gap-3 py-2.5" style={{ borderColor: 'var(--card-border)' }}>
+                      <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{name}</span>
+                      <span style={{ color: 'var(--text-muted)' }}>{sessions}</span>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-xs font-semibold"
+                        style={{
+                          color: status === 'On track' ? 'var(--accent-success)' : 'var(--accent-warning)',
+                          background: status === 'On track'
+                            ? 'color-mix(in srgb, var(--accent-success) 12%, transparent)'
+                            : 'color-mix(in srgb, var(--accent-warning) 12%, transparent)',
+                        }}
+                      >
+                        {status}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-4 text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                  Deadlines with reminders, per-student history and a CSV export are part of the campus dashboard.
+                </p>
+              </figure>
+            </Reveal>
+          </div>
+          <p className="mt-5 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+            {DEMO_SECTION.disclosure}
+          </p>
+        </div>
+      </section>
+
+      {/* 10 · Founder — real person only, no fictional team */}
+      <section className={cn('border-t', SECTION_PAD)} style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }} aria-labelledby="campus-founder-heading">
+        <div className="mx-auto max-w-3xl">
+          <Reveal className="mb-8 text-center">
+            <p className={SECTION_EYEBROW} style={{ color: 'var(--accent-primary)' }}>
+              {FOUNDER_SECTION.eyebrow}
+            </p>
+            <h2 id="campus-founder-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
+              {FOUNDER_SECTION.title}
+            </h2>
+          </Reveal>
+          <Reveal delay={0.05}>
+            <div className="flex flex-col gap-5 rounded-2xl border p-6 sm:flex-row sm:items-start sm:p-8" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+              <div
+                className="flex size-14 shrink-0 items-center justify-center rounded-2xl text-base font-bold"
+                style={{ background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)', color: 'var(--accent-primary)' }}
+                aria-hidden
+              >
+                RK
+              </div>
+              <div className="min-w-0 space-y-3">
+                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {FOUNDER.name}{' '}
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
+                    · {FOUNDER.jobTitle}
+                  </span>
+                </p>
+                {FOUNDER_SECTION.body.map((line) => (
+                  <p key={line} className="text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                    {line}
+                  </p>
+                ))}
+                <Link href="/about" className="inline-flex min-h-[44px] items-center text-sm font-semibold underline-offset-4 hover:underline" style={{ color: 'var(--accent-primary)' }}>
+                  About InterviewEra
+                </Link>
+              </div>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* 11 · Pilot evaluation criteria — replaces testimonials until approved ones exist */}
+      <section className={SECTION_PAD} aria-labelledby="campus-pilot-heading">
+        <div className="mx-auto max-w-6xl">
+          <Reveal className="mb-8 text-center md:mb-12">
+            <p className={SECTION_EYEBROW} style={{ color: 'var(--accent-primary)' }}>
+              {PILOT_CRITERIA.eyebrow}
+            </p>
+            <h2 id="campus-pilot-heading" className={SECTION_TITLE} style={{ color: 'var(--text-primary)' }}>
+              {PILOT_CRITERIA.title}
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
+              {PILOT_CRITERIA.subtitle}
+            </p>
+          </Reveal>
+          <ul className="grid list-none gap-3 p-0 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4" role="list">
+            {PILOT_CRITERIA.items.map((item, i) => (
+              <li key={item.title} className="h-full">
+                <Reveal delay={i * 0.05} className="h-full">
+                  <div className="h-full rounded-2xl border p-4 sm:p-5" style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}>
+                    <ClipboardCheck className="size-5" style={{ color: 'var(--accent-primary)' }} aria-hidden />
+                    <p className="mt-3 font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {item.title}
+                    </p>
+                    <p className="mt-1.5 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+                      {item.body}
+                    </p>
+                  </div>
+                </Reveal>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* Pricing */}
-      <section className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10" style={{ borderColor: 'var(--card-border)' }}>
+      <section className="border-t px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10" style={{ borderColor: 'var(--card-border)' }}>
         <div className="mx-auto max-w-3xl text-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.2em]" style={{ color: 'var(--accent-primary)' }}>
               Pricing
             </p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-balance md:text-4xl" style={{ color: 'var(--text-primary)' }}>
-              Seat economics with context leadership expects
+              Campus pricing
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              Annual campus contract · minimum batch size · volume relief at 200+ seats.
+              Annual campus contract · minimum batch size · volume discounts at 200+ seats. Separate from individual Starter and Pro plans.
             </p>
           </Reveal>
 
@@ -902,10 +1045,9 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 Minimum 50 seats · ₹39,950 minimum annual contract · discounts at 200+ seats
               </p>
 
-              <ul className="mt-6 space-y-3 rounded-xl border p-4 text-base leading-relaxed" style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}>
-                <li>{PRICING_CONTEXT.agencyComparison}</li>
-                <li>{PRICING_CONTEXT.roi}</li>
-              </ul>
+              <p className="mt-6 rounded-xl border p-4 text-base leading-relaxed" style={{ borderColor: 'var(--card-border)', color: 'var(--text-secondary)' }}>
+                Free 30-day pilot for up to 20 students before any contract.
+              </p>
 
               <ul className="mt-6 space-y-2.5 text-base" style={{ color: 'var(--text-secondary)' }}>
                 {PRICING_FEATURES.map((f) => (
@@ -916,21 +1058,25 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                 ))}
               </ul>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <a
+                <TrackedCtaLink
                   href={calendlyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={cn(buttonVariants({ size: 'lg' }), 'h-11 flex-1 rounded-xl font-semibold')}
+                  prefetch={false}
+                  ctaKey={CTA_KEYS.CAMPUS_DEMO}
+                  ctaText="Start pilot"
+                  section="campus_pricing"
+                  className={cn(buttonVariants({ size: 'lg' }), 'h-11 min-h-11 rounded-xl font-semibold sm:flex-1')}
                   style={{ background: 'var(--accent-primary)', color: '#fff' }}
                 >
                   <Calendar className="mr-2 size-4" aria-hidden />
                   Start pilot
-                </a>
+                </TrackedCtaLink>
                 <Link
-                  href="/join"
+                  href="/pricing"
                   className={cn(
                     buttonVariants({ variant: 'outline', size: 'lg' }),
-                    'h-11 flex-1 rounded-xl font-semibold'
+                    'h-11 min-h-11 rounded-xl font-semibold sm:flex-1'
                   )}
                   style={{ borderColor: 'var(--card-border)' }}
                 >
@@ -944,19 +1090,19 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
 
       {/* FAQ */}
       <section
-        className="border-t px-5 py-16 sm:px-6 md:py-24 lg:px-8 xl:px-10"
+        className="border-t px-5 py-10 sm:px-6 sm:py-16 md:py-24 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
         <div className="mx-auto max-w-3xl">
-          <Reveal className="mb-10 text-center">
+          <Reveal className="mb-8 text-center">
             <h2 className="text-3xl font-bold tracking-tight md:text-4xl" style={{ color: 'var(--text-primary)' }}>
               Placement officer FAQs
             </h2>
             <p className="mt-3 text-base leading-relaxed md:text-lg" style={{ color: 'var(--text-secondary)' }}>
-              Straight answers for committees evaluating vendors this season.
+              Onboarding, seats, pilots, pricing, reporting, privacy and support.
             </p>
           </Reveal>
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {FAQ_ITEMS.map((item, i) => (
               <Reveal key={item.q} delay={i * 0.04}>
                 <details
@@ -987,58 +1133,10 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
         </div>
       </section>
 
-      {/* Campus workspace bridge — qualified visitors toward activation */}
-      <section
-        className="border-t px-5 py-16 sm:px-6 md:py-20 lg:px-8 xl:px-10"
-        style={{ borderColor: 'var(--card-border)' }}
-        aria-labelledby="campus-workspace-bridge-heading"
-      >
-        <div className="mx-auto w-full max-w-3xl text-center">
-          <Reveal>
-            <h2
-              id="campus-workspace-bridge-heading"
-              className="text-2xl font-bold tracking-tight text-balance sm:text-3xl"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              Ready to set up your campus workspace?
-            </h2>
-            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
-              <TrackedCtaLink
-                href="/signup?intent=college"
-                ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
-                ctaText="Set up Campus Workspace"
-                section="campus_bridge"
-                className={cn(
-                  buttonVariants({ size: 'lg' }),
-                  'inline-flex h-12 min-h-[44px] rounded-xl px-8 text-base font-semibold shadow-lg sm:h-[3.25rem] sm:text-lg',
-                )}
-                style={{ background: 'var(--accent-primary)', color: '#fff' }}
-              >
-                Set up Campus Workspace
-                <ArrowRight className="ml-2 size-4" aria-hidden />
-              </TrackedCtaLink>
-              <TrackedCtaLink
-                href="#campus-final-cta"
-                ctaKey={CTA_KEYS.FOR_COLLEGES}
-                ctaText="See pilot timeline"
-                section="campus_bridge"
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'lg' }),
-                  'inline-flex h-12 min-h-[44px] rounded-xl px-8 text-base font-semibold sm:h-[3.25rem] sm:text-lg',
-                )}
-                style={{ borderColor: 'var(--card-border)', color: 'var(--text-primary)' }}
-              >
-                See pilot timeline
-              </TrackedCtaLink>
-            </div>
-          </Reveal>
-        </div>
-      </section>
-
       {/* Final CTA — two columns on lg: copy + CTAs left, timeline right; Calendly full width below */}
       <section
         id="campus-final-cta"
-        className="border-t px-5 py-20 sm:px-6 md:py-28 lg:px-8 xl:px-10"
+        className="border-t px-5 py-12 sm:px-6 sm:py-20 md:py-28 lg:px-8 xl:px-10"
         style={{ borderColor: 'var(--card-border)', background: 'var(--bg-secondary)' }}
       >
         <div className="relative mx-auto w-full max-w-6xl xl:max-w-7xl">
@@ -1091,19 +1189,23 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
               delay={0.06}
             >
               <div className="flex w-full flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
-                <a
+                <TrackedCtaLink
                   href={calendlyUrl}
                   target="_blank"
                   rel="noopener noreferrer"
+                  prefetch={false}
+                  ctaKey={CTA_KEYS.CAMPUS_DEMO}
+                  ctaText="Book a Campus Demo"
+                  section="campus_final_cta"
                   className={cn(
                     buttonVariants({ size: 'lg' }),
                     'inline-flex h-12 rounded-xl px-8 text-base font-semibold shadow-lg sm:h-[3.25rem] sm:text-lg'
                   )}
                   style={{ background: 'var(--accent-primary)', color: '#fff' }}
                 >
-                  Book a 20-min demo
+                  Book a Campus Demo
                   <ArrowRight className="ml-2 size-4 sm:size-[1.125rem]" aria-hidden />
-                </a>
+                </TrackedCtaLink>
                 <TrackedCtaLink
                   href="/signup?intent=college"
                   ctaKey={CTA_KEYS.CAMPUS_WORKSPACE}
@@ -1134,34 +1236,9 @@ export default function CampusLandingClient({ calendlyUrl }: { calendlyUrl: stri
                   Email campus team
                 </a>
               </div>
-              <p className="w-full max-w-2xl text-center text-balance text-base md:text-lg" style={{ color: 'var(--text-muted)' }}>
-                Questions before booking?{' '}
-                <a
-                  href="mailto:campus@interviewera.com"
-                  className="font-medium underline-offset-4 hover:underline"
-                  style={{ color: 'var(--accent-primary)' }}
-                >
-                  campus@interviewera.com
-                </a>
-              </p>
             </Reveal>
           </div>
 
-          <Reveal delay={0.1}>
-            <div
-              className="mx-auto mt-12 h-[min(680px,85vh)] w-full max-w-[720px] overflow-hidden rounded-2xl border shadow-xl lg:mt-14 lg:max-w-none"
-              style={{ borderColor: 'var(--card-border)' }}
-            >
-              <iframe
-                src={embedSrc}
-                width="100%"
-                height="100%"
-                className="h-full min-h-[560px] w-full border-0 sm:min-h-[640px]"
-                title="Book a 20-minute campus demo"
-                loading="lazy"
-              />
-            </div>
-          </Reveal>
         </div>
       </section>
     </main>

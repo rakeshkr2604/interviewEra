@@ -90,6 +90,15 @@ export function DashboardChrome({
   return (
     <ActiveInterviewNavGuardProvider>
     <div className={cn('flex', !isImmersiveViewport && 'min-h-screen')} style={{ background: 'var(--bg-secondary)' }}>
+      {/* Skip-to-content for keyboard users — dashboard routes render this chrome
+          instead of the marketing Navbar, so they need their own skip link. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-60 focus:rounded-lg focus:px-3 focus:py-1.5 focus:text-sm focus:font-medium focus:text-white"
+        style={{ background: 'var(--accent-primary)' }}
+      >
+        Skip to content
+      </a>
       {mobileOpen ? (
         <button
           type="button"
@@ -220,6 +229,7 @@ export function DashboardChrome({
          * Drawer rubber-banding is already handled by the body scroll lock above.
          */}
         <main
+          id="main-content"
           className={cn(
             'ie-landing-premium ie-landing-type relative z-10 flex min-w-0 flex-1 flex-col overflow-x-hidden',
             isImmersiveViewport

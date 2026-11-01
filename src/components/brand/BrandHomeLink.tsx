@@ -66,7 +66,7 @@ export function BrandHomeLink({
               src={BRAND_WORDMARK_NAV_PATH}
               width={720}
               height={180}
-              className="h-5 w-auto max-w-[11rem] object-contain object-left sm:h-6 sm:max-w-[13rem]"
+              className="h-6 w-auto max-w-[12.5rem] object-contain object-left sm:h-7 sm:max-w-[15rem]"
               alt="InterviewEra"
               priority
               unoptimized
