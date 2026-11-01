@@ -68,6 +68,17 @@ const RATE_LIMITS: [string, number, number][] = [
   ['/forgot-password',       5, 60],
   ['/api/auth/forgot-password', 5, 60],
   ['/api/coach', 20, 60],
+  // Programmatic SEO pages (company x role x topic combinations). robots.txt
+  // leaves these fully open to every crawler with no crawl-delay, and they
+  // had no rate limit at all — a single aggressive bot (AI-training
+  // crawlers, scrapers) could hit them as fast as it wanted. Per-IP limits
+  // here are generous enough that real crawling (Google/Bing) and genuine
+  // visitors never notice, but cap a runaway single-IP burst. 100/min on an
+  // IP this site has never needed real users to exceed.
+  ['/interview-questions', 100, 60],
+  ['/tools/question-generator', 100, 60],
+  ['/tools/star-builder', 60, 60],
+  ['/tools/ats-checker', 60, 60],
 ];
 /** Apex hostname — www always redirects here (CSP 'self' + chunk URLs assume one canonical site). */
 const PRODUCTION_APEX = 'interviewera.com';
