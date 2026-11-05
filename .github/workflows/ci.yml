@@ -384,7 +384,7 @@ jobs:
 
     steps:
       - name: Post merge-readiness comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const code = '${{ needs.changes.outputs.code }}';
