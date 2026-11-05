@@ -227,7 +227,9 @@ jobs:
   # ── Job 1b: E2E auth (Playwright) — reuses Build artifact ───────────────────
   e2e_auth:
     name: E2E Auth
-    runs-on: ubuntu-latest
+    # Pinned below ubuntu-latest: Playwright 1.56.x doesn't yet support
+    # chromium-headless-shell on Ubuntu 26.04 (ubuntu-latest's current default).
+    runs-on: ubuntu-24.04
     needs: [changes, quality, build]
     if: github.event_name != 'push'
     env:

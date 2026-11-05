@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { z } from 'zod';
 import { checkRateLimit } from '@/lib/redis/rate-limit';
+import { SupabaseTimeoutError, withSupabaseTimeout } from '@/lib/supabase/with-timeout';
 
 const BodySchema = z.object({
   current_page: z.string().max(500).optional(),
@@ -25,8 +26,20 @@ const BodySchema = z.object({
 
 export async function POST(request: NextRequest) {
   // ── Auth ─────────────────────────────────────────────────────────────────
+  // Called every 2 minutes from every open tab — an unbounded auth check here
+  // was 3 of the 36 "Task timed out after 300s" events in the 2026-10-31
+  // incident (see src/lib/supabase/with-timeout.ts).
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  let authResult;
+  try {
+    authResult = await withSupabaseTimeout('heartbeat.auth.getUser', () => supabase.auth.getUser());
+  } catch (err) {
+    if (err instanceof SupabaseTimeoutError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    throw err;
+  }
+  const { data: { user }, error: authError } = authResult;
   if (authError || !user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -59,11 +72,17 @@ export async function POST(request: NextRequest) {
     console.warn('[heartbeat] createServiceClient failed (non-blocking):', err instanceof Error ? err.message : String(err));
     return NextResponse.json({ ok: true, skipped: true, reason: 'svc_unavailable' });
   }
-  const { data: existing } = await svc
-    .from('user_activity')
-    .select('last_seen_at')
-    .eq('user_id', user.id)
-    .single();
+  let existing: { last_seen_at: string } | null = null;
+  try {
+    const result = await withSupabaseTimeout('heartbeat.select_existing', () =>
+      svc.from('user_activity').select('last_seen_at').eq('user_id', user.id).single(),
+    );
+    existing = result.data;
+  } catch (err) {
+    // Non-blocking: proceed to the upsert below as if there were no prior row
+    // (same effect as a genuine first heartbeat) rather than hanging.
+    console.warn('[heartbeat] select existing failed (non-blocking):', err instanceof Error ? err.message : String(err));
+  }
 
   const SKIP_THRESHOLD_MS = 90_000;
   if (existing?.last_seen_at) {
@@ -74,16 +93,24 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Upsert ────────────────────────────────────────────────────────────────
-  const { error: upsertError } = await svc.from('user_activity').upsert(
-    {
-      user_id:      user.id,
-      last_seen_at: now.toISOString(),
-      current_page: currentPage ?? null,
-      user_agent:   userAgent,
-      updated_at:   now.toISOString(),
-    },
-    { onConflict: 'user_id' },
-  );
+  let upsertError: { message: string } | null = null;
+  try {
+    const result = await withSupabaseTimeout('heartbeat.upsert', () =>
+      svc.from('user_activity').upsert(
+        {
+          user_id:      user.id,
+          last_seen_at: now.toISOString(),
+          current_page: currentPage ?? null,
+          user_agent:   userAgent,
+          updated_at:   now.toISOString(),
+        },
+        { onConflict: 'user_id' },
+      ),
+    );
+    upsertError = result.error;
+  } catch (err) {
+    upsertError = { message: err instanceof Error ? err.message : String(err) };
+  }
 
   if (upsertError) {
     // Non-blocking: heartbeat is best-effort telemetry. A missing RLS policy
