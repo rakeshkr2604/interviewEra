@@ -1,4 +1,5 @@
 import type { SupabaseClient, User } from '@supabase/supabase-js';
+import { withSupabaseTimeout } from '@/lib/supabase/with-timeout';
 
 /** Auth errors that mean stored cookies are useless — clear them to stop refresh retries and console noise. */
 export function shouldClearStaleAuthCookies(error: unknown): boolean {
@@ -33,17 +34,24 @@ export async function signOutIfStaleAuth(client: SupabaseClient, error: unknown)
 }
 
 export async function getServerUser(client: SupabaseClient): Promise<User | null> {
-  const {
-    data: { user },
-    error,
-  } = await client.auth.getUser();
-  if (error) {
-    if (isAuthInfrastructureError(error)) {
-      throw error;
+  try {
+    const {
+      data: { user },
+      error,
+    } = await withSupabaseTimeout('getServerUser', () => client.auth.getUser());
+    if (error) {
+      if (isAuthInfrastructureError(error)) {
+        throw error;
+      }
+      return null;
+    }
+    return user ?? null;
+  } catch (err) {
+    if (isAuthInfrastructureError(err)) {
+      throw err;
     }
     return null;
   }
-  return user ?? null;
 }
 
 /** Determines if an auth failure is an infrastructure/network outage rather than an invalid credential. */
@@ -54,8 +62,8 @@ export function isAuthInfrastructureError(error: unknown): boolean {
   if (typeof e.status === 'number' && e.status >= 500) {
     return true;
   }
-  // Supabase Auth retryable network fetch failure
-  if (e.name === 'AuthRetryableFetchError') {
+  // Supabase Auth retryable network fetch failure, or our own bounded-wait timeout
+  if (e.name === 'AuthRetryableFetchError' || e.name === 'SupabaseTimeoutError') {
     return true;
   }
   // Generic network / connection errors

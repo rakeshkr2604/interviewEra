@@ -8,6 +8,7 @@
 
 import { cache } from 'react';
 import { createClient } from '@/lib/supabase/server';
+import { withSupabaseTimeout } from '@/lib/supabase/with-timeout';
 import { MAX_TIER } from './constants';
 import { logger } from './logger';
 import { updateStreak } from './streak-tracker';
@@ -38,11 +39,9 @@ export async function updateStreakFromInterviewSession(
 export async function getUserProgress(userId: string): Promise<UserProgressRow | null> {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('user_progress')
-      .select('*')
-      .eq('user_id', userId)
-      .maybeSingle();
+    const { data, error } = await withSupabaseTimeout('getUserProgress', () =>
+      supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+    );
 
     if (error) {
       logger.error('helper_get_user_progress_failed', {
@@ -83,11 +82,9 @@ export const getTierConfig = cache(async function getTierConfig(
   const bounded = Math.min(MAX_TIER, Math.max(1, Math.round(tierId)));
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('tier_config')
-      .select('*')
-      .eq('tier_id', bounded)
-      .maybeSingle();
+    const { data, error } = await withSupabaseTimeout('getTierConfig', () =>
+      supabase.from('tier_config').select('*').eq('tier_id', bounded).maybeSingle(),
+    );
 
     if (error) {
       /** `42P01`: Postgres undefined_table; `PGRST205`: table not exposed / absent from REST schema cache */

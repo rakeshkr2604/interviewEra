@@ -8,6 +8,7 @@
  */
 
 import { isAbandonedContinueEligible, isResumableInterviewStatus } from '@/lib/interview/interview-status';
+import { withSupabaseTimeout } from '@/lib/supabase/with-timeout';
 
 export const RECOVERY_INTERVIEW_SELECT =
   'id, role, status, engine, started_at, credit_deducted, abandoned_resume_used' as const;
@@ -121,7 +122,15 @@ export async function fetchPrimaryRecoveryInterview(
       ? builder.or(RECOVERY_ELIGIBLE_FILTER)
       : builder.in('status', ['pending', 'in_progress', 'abandoned']);
 
-  const result = await filtered.order('started_at', { ascending: false }).limit(50);
+  let result: { data: RecoveryInterviewRow[] | null; error: { message: string } | null };
+  try {
+    result = await withSupabaseTimeout('fetchPrimaryRecoveryInterview', () =>
+      filtered.order('started_at', { ascending: false }).limit(50),
+    );
+  } catch (err) {
+    console.error('[recovery] query failed', err instanceof Error ? err.message : String(err));
+    return null;
+  }
 
   if (result.error) {
     console.error('[recovery] query failed', result.error.message);
