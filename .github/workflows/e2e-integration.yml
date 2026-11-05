@@ -11,7 +11,9 @@ concurrency:
 jobs:
   e2e_integration:
     name: Staging resume integration E2E
-    runs-on: ubuntu-latest
+    # Pinned below ubuntu-latest: Playwright 1.56.x doesn't yet support
+    # chromium-headless-shell on Ubuntu 26.04 (ubuntu-latest's current default).
+    runs-on: ubuntu-24.04
     environment: staging
     env:
       APP_ENV: staging
