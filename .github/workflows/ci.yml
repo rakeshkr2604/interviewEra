@@ -266,7 +266,7 @@ jobs:
 
       - name: Download Next.js build artifact
         if: needs.changes.outputs.code == 'true'
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: next-build-${{ github.sha }}
           path: .
