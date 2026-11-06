@@ -11,11 +11,13 @@ import {
   Check,
   Calculator,
   Tag,
+  FileSearch,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { computeCampaignDiscountQuote } from '@/lib/campaign-codes';
 import { getPaidPlan, type PaidPlanId } from '@/lib/pricing/plans';
 import { GlobalOffersPanel } from '@/components/admin/GlobalOffersPanel';
+import { formatDateTimeEnIn } from '@/lib/datetime/ist';
 
 const cardStyle: React.CSSProperties = {
   borderRadius: 18,
@@ -24,7 +26,24 @@ const cardStyle: React.CSSProperties = {
   boxShadow: 'var(--card-shadow)',
 };
 
-type Tab = 'offers' | 'codes' | 'referrals' | 'manual' | 'activity';
+type Tab = 'offers' | 'codes' | 'referrals' | 'manual' | 'resume-reviews' | 'activity';
+
+interface ResumeReviewRequest {
+  id: string;
+  userId: string;
+  userEmail: string | null;
+  userName: string | null;
+  resumeId: string | null;
+  planTier: string;
+  cycleStart: string;
+  status: 'pending' | 'scheduled' | 'completed' | 'cancelled';
+  notes: string | null;
+  adminNotes: string | null;
+  scheduledAt: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
 
 interface CampaignCode {
   id: string;
@@ -173,13 +192,27 @@ export default function PlatformRewardsPage() {
   const [quoting, setQuoting] = useState(false);
 
   // Manual grant
+  const MAX_MANUAL_CREDIT_GRANT = 30;
   const [grantEmail, setGrantEmail] = useState('');
   const [grantAmount, setGrantAmount] = useState(1);
   const [grantReason, setGrantReason] = useState('');
+  const [granting, setGranting] = useState(false);
+
+  // Manual plan tier change (same email field as the credit grant above)
+  const [tierTarget, setTierTarget] = useState<'free' | 'starter' | 'pro'>('starter');
+  const [tierReason, setTierReason] = useState('');
+  const [changingTier, setChangingTier] = useState(false);
 
   // Settings
   const [referrerCredits, setReferrerCredits] = useState(1);
   const [referredCredits, setReferredCredits] = useState(1);
+
+  // Resume review requests (Starter/Pro perk fulfillment queue)
+  const [resumeReviews, setResumeReviews] = useState<ResumeReviewRequest[]>([]);
+  const [resumeReviewStatusFilter, setResumeReviewStatusFilter] = useState<
+    'pending' | 'scheduled' | 'completed' | 'cancelled' | 'all'
+  >('pending');
+  const [resumeReviewUpdatingId, setResumeReviewUpdatingId] = useState<string | null>(null);
 
   const loadStats = useCallback(async () => {
     const res = await fetch('/api/admin/rewards-stats');
@@ -214,6 +247,13 @@ export default function PlatformRewardsPage() {
     setActivity(json.events);
   }, []);
 
+  const loadResumeReviews = useCallback(async () => {
+    const res = await fetch(`/api/admin/resume-reviews?status=${resumeReviewStatusFilter}&limit=50`);
+    if (!res.ok) throw new Error('Failed to load resume review requests');
+    const json = (await res.json()) as { requests: ResumeReviewRequest[] };
+    setResumeReviews(json.requests);
+  }, [resumeReviewStatusFilter]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
@@ -221,6 +261,7 @@ export default function PlatformRewardsPage() {
       if (tab === 'codes') await loadCodes();
       else if (tab === 'referrals') await loadReferrals();
       else if (tab === 'activity') await loadActivity();
+      else if (tab === 'resume-reviews') await loadResumeReviews();
       else if (tab === 'manual') {
         const res = await fetch('/api/admin/reward-settings');
         if (res.ok) {
@@ -236,7 +277,33 @@ export default function PlatformRewardsPage() {
     } finally {
       setLoading(false);
     }
-  }, [tab, loadCodes, loadReferrals, loadActivity, loadStats]);
+  }, [tab, loadCodes, loadReferrals, loadActivity, loadResumeReviews, loadStats]);
+
+  async function updateResumeReviewStatus(
+    id: string,
+    patch: { status?: ResumeReviewRequest['status']; adminNotes?: string },
+  ) {
+    setResumeReviewUpdatingId(id);
+    try {
+      const res = await fetch(`/api/admin/resume-reviews/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const json = (await res.json()) as { request?: ResumeReviewRequest; error?: string };
+      if (!res.ok || !json.request) throw new Error(json.error ?? 'Update failed');
+      if (patch.status && patch.status !== resumeReviewStatusFilter && resumeReviewStatusFilter !== 'all') {
+        setResumeReviews((prev) => prev.filter((r) => r.id !== id));
+      } else {
+        setResumeReviews((prev) => prev.map((r) => (r.id === id ? json.request! : r)));
+      }
+      toast.success('Request updated');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Update failed');
+    } finally {
+      setResumeReviewUpdatingId(null);
+    }
+  }
 
   useEffect(() => {
     void refresh();
@@ -377,23 +444,88 @@ export default function PlatformRewardsPage() {
   }
 
   async function grantCredits() {
-    const res = await fetch('/api/admin/credits/grant', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: grantEmail.trim().toLowerCase(),
-        amount: grantAmount,
-        reason: grantReason,
-      }),
-    });
-    const json = (await res.json()) as { error?: string; user?: { credits_remaining: number } };
-    if (!res.ok) {
-      toast.error(json.error ?? 'Grant failed');
+    const email = grantEmail.trim().toLowerCase();
+    const reason = grantReason.trim();
+    if (!email) {
+      toast.error('Enter the user’s email first');
       return;
     }
-    toast.success(`Granted ${grantAmount} credit(s). Balance: ${json.user?.credits_remaining}`);
-    setGrantReason('');
-    await loadStats();
+    if (!Number.isInteger(grantAmount) || grantAmount < 1 || grantAmount > MAX_MANUAL_CREDIT_GRANT) {
+      toast.error(`Amount must be between 1 and ${MAX_MANUAL_CREDIT_GRANT}`);
+      return;
+    }
+    if (reason.length < 3) {
+      toast.error('Reason is required (at least 3 characters)');
+      return;
+    }
+    setGranting(true);
+    try {
+      const res = await fetch('/api/admin/credits/grant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, amount: grantAmount, reason }),
+      });
+      const json = (await res.json()) as { error?: string; user?: { credits_remaining: number } };
+      if (!res.ok) {
+        toast.error(json.error ?? 'Grant failed');
+        return;
+      }
+      toast.success(`Granted ${grantAmount} credit(s). Balance: ${json.user?.credits_remaining}`);
+      setGrantReason('');
+      await loadStats();
+    } catch {
+      toast.error('Grant failed — network error');
+    } finally {
+      setGranting(false);
+    }
+  }
+
+  async function changeTier() {
+    const email = grantEmail.trim().toLowerCase();
+    const reason = tierReason.trim();
+    if (!email) {
+      toast.error('Enter the user’s email first');
+      return;
+    }
+    if (reason.length < 3) {
+      toast.error('Reason is required (at least 3 characters)');
+      return;
+    }
+    setChangingTier(true);
+    try {
+      const res = await fetch('/api/admin/users/plan-tier', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, tier: tierTarget, reason }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        warning?: string;
+        noop?: boolean;
+        user?: { plan_tier: string; credits_remaining: number; plan_expires_at: string | null };
+      };
+      if (!res.ok) {
+        toast.error(json.error ?? 'Plan tier change failed');
+        return;
+      }
+      if (json.noop) {
+        toast('Already on Free tier — nothing to change.');
+        return;
+      }
+      if (json.warning) {
+        toast.warning(json.warning);
+      } else {
+        toast.success(
+          `Plan tier set to ${json.user?.plan_tier}. Balance: ${json.user?.credits_remaining}`,
+        );
+      }
+      setTierReason('');
+      await loadStats();
+    } catch {
+      toast.error('Plan tier change failed — network error');
+    } finally {
+      setChangingTier(false);
+    }
   }
 
   async function saveSettings() {
@@ -417,6 +549,7 @@ export default function PlatformRewardsPage() {
     { id: 'codes', label: 'Codes', icon: Ticket },
     { id: 'referrals', label: 'Referrals', icon: Users },
     { id: 'manual', label: 'Manual credit', icon: Gift },
+    { id: 'resume-reviews', label: 'Resume reviews', icon: FileSearch },
     { id: 'activity', label: 'Usage log', icon: ScrollText },
   ];
 
@@ -912,45 +1045,224 @@ export default function PlatformRewardsPage() {
       )}
 
       {tab === 'manual' && (
-        <div style={cardStyle} className="max-w-lg space-y-3 p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-            Grant credits
-          </h2>
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-            Writes through add_credit → credit_transactions. Positive grants only.
-          </p>
-          <input
-            type="email"
-            placeholder="user@email.com"
-            value={grantEmail}
-            onChange={(e) => setGrantEmail(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
-          />
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={grantAmount}
-            onChange={(e) => setGrantAmount(parseInt(e.target.value, 10) || 1)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
-          />
-          <input
-            placeholder="Reason (required)"
-            value={grantReason}
-            onChange={(e) => setGrantReason(e.target.value)}
-            className="w-full rounded-lg border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
-          />
-          <button
-            type="button"
-            onClick={() => void grantCredits()}
-            className="rounded-lg border px-4 py-2 text-sm font-semibold"
-            style={{ borderColor: 'var(--card-border)' }}
-          >
-            Grant
-          </button>
+        <div className="max-w-lg space-y-4">
+          <div style={cardStyle} className="space-y-3 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Target user
+            </h2>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Shared by both actions below — credit grant and plan tier change.
+            </p>
+            <input
+              type="email"
+              placeholder="user@email.com"
+              value={grantEmail}
+              onChange={(e) => setGrantEmail(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            />
+          </div>
+
+          <div style={cardStyle} className="space-y-3 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Grant credits
+            </h2>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Writes through add_credit → credit_transactions. {MAX_MANUAL_CREDIT_GRANT} credits max per grant, positive only.
+            </p>
+            <input
+              type="number"
+              min={1}
+              max={MAX_MANUAL_CREDIT_GRANT}
+              value={grantAmount}
+              onChange={(e) =>
+                setGrantAmount(
+                  Math.min(
+                    MAX_MANUAL_CREDIT_GRANT,
+                    Math.max(1, parseInt(e.target.value, 10) || 1),
+                  ),
+                )
+              }
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            />
+            <input
+              placeholder="Reason (required, min 3 characters)"
+              value={grantReason}
+              onChange={(e) => setGrantReason(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            />
+            <button
+              type="button"
+              disabled={granting}
+              onClick={() => void grantCredits()}
+              className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              {granting ? 'Granting…' : 'Grant'}
+            </button>
+          </div>
+
+          <div style={cardStyle} className="space-y-3 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Change plan tier
+            </h2>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              Starter/Pro grants that plan&rsquo;s credits and extends (or starts) its billing
+              cycle, same as a real purchase. Setting Free zeroes remaining credits and ends the
+              plan — use to revert a mistaken grant. Campus/workspace plans are not editable here.
+            </p>
+            <select
+              value={tierTarget}
+              onChange={(e) => setTierTarget(e.target.value as 'free' | 'starter' | 'pro')}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            >
+              <option value="free">Free</option>
+              <option value="starter">
+                Starter (+{getPaidPlan('starter').credits} credits, {getPaidPlan('starter').durationDays}d)
+              </option>
+              <option value="pro">
+                Pro (+{getPaidPlan('pro').credits} credits, {getPaidPlan('pro').durationDays}d)
+              </option>
+            </select>
+            <input
+              placeholder="Reason (required, min 3 characters)"
+              value={tierReason}
+              onChange={(e) => setTierReason(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            />
+            <button
+              type="button"
+              disabled={changingTier}
+              onClick={() => void changeTier()}
+              className="rounded-lg border px-4 py-2 text-sm font-semibold disabled:opacity-50"
+              style={{ borderColor: 'var(--card-border)' }}
+            >
+              {changingTier ? 'Updating…' : 'Change tier'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'resume-reviews' && (
+        <div style={cardStyle} className="space-y-4 p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                Resume review requests
+              </h2>
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Starter (1) / Pro (2) per billing cycle. Fulfill from here — status changes are visible to the
+                candidate on their request page.
+              </p>
+            </div>
+            <select
+              value={resumeReviewStatusFilter}
+              onChange={(e) =>
+                setResumeReviewStatusFilter(
+                  e.target.value as typeof resumeReviewStatusFilter,
+                )
+              }
+              className="rounded-lg border px-3 py-1.5 text-sm"
+              style={{ borderColor: 'var(--card-border)', background: 'var(--card-bg)' }}
+            >
+              <option value="pending">Pending</option>
+              <option value="scheduled">Scheduled</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="all">All</option>
+            </select>
+          </div>
+
+          {resumeReviews.length === 0 ? (
+            <p className="py-6 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+              No {resumeReviewStatusFilter === 'all' ? '' : resumeReviewStatusFilter} requests.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {resumeReviews.map((r) => (
+                <div
+                  key={r.id}
+                  className="rounded-xl border p-4"
+                  style={{ borderColor: 'var(--card-border)' }}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {r.userName || r.userEmail || r.userId}
+                      </p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {r.userEmail} · {r.planTier} · requested {formatDateTimeEnIn(r.createdAt)}
+                      </p>
+                    </div>
+                    <span
+                      className="rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize"
+                      style={{
+                        background: 'color-mix(in srgb, var(--accent-primary) 14%, transparent)',
+                        color: 'var(--accent-primary)',
+                      }}
+                    >
+                      {r.status}
+                    </span>
+                  </div>
+                  {r.notes ? (
+                    <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      &ldquo;{r.notes}&rdquo;
+                    </p>
+                  ) : null}
+                  {r.resumeId ? (
+                    <a
+                      href={`/api/admin/resume-reviews/${r.id}/resume-file`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-2 inline-block text-xs font-semibold underline"
+                      style={{ color: 'var(--accent-primary)' }}
+                    >
+                      Open attached resume
+                    </a>
+                  ) : null}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {r.status === 'pending' && (
+                      <button
+                        type="button"
+                        disabled={resumeReviewUpdatingId === r.id}
+                        onClick={() => void updateResumeReviewStatus(r.id, { status: 'scheduled' })}
+                        className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                        style={{ borderColor: 'var(--card-border)' }}
+                      >
+                        Mark scheduled
+                      </button>
+                    )}
+                    {(r.status === 'pending' || r.status === 'scheduled') && (
+                      <button
+                        type="button"
+                        disabled={resumeReviewUpdatingId === r.id}
+                        onClick={() => void updateResumeReviewStatus(r.id, { status: 'completed' })}
+                        className="rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-50"
+                        style={{ borderColor: 'var(--card-border)' }}
+                      >
+                        Mark completed
+                      </button>
+                    )}
+                    {r.status !== 'cancelled' && r.status !== 'completed' && (
+                      <button
+                        type="button"
+                        disabled={resumeReviewUpdatingId === r.id}
+                        onClick={() => void updateResumeReviewStatus(r.id, { status: 'cancelled' })}
+                        className="rounded-lg border px-3 py-1.5 text-xs font-semibold text-(--accent-danger) disabled:opacity-50"
+                        style={{ borderColor: 'var(--card-border)' }}
+                      >
+                        Cancel (frees quota slot)
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
