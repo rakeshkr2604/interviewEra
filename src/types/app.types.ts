@@ -82,6 +82,7 @@ export interface User {
   last_payment_id?: string | null;
   last_order_id?: string | null;
   placement_date: string | null;
+  phone_number?: string | null;
   created_at: string;
 }
 

@@ -45,7 +45,7 @@ function loaded(candidateProfile: Record<string, unknown> = {}) {
     hasActiveResume: false,
     hasInterviewHistory: false,
   });
-  return { resolution, candidateProfile, activeResume: null };
+  return { resolution, candidateProfile, activeResume: null, phoneNumber: null };
 }
 
 function request(body: unknown) {
@@ -75,6 +75,7 @@ describe('PATCH /api/account/onboarding', () => {
         step: 1,
         name: 'Rakesh Kumar',
         preferredRole: 'Backend Developer',
+        phoneNumber: '+919876543210',
       }),
     );
 
@@ -82,6 +83,7 @@ describe('PATCH /api/account/onboarding', () => {
     expect(usersQuery.update).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Rakesh Kumar',
+        phone_number: '+919876543210',
         candidate_profile: expect.objectContaining({
           preferred_role: 'Backend Developer',
           custom_future_field: { keep: true },

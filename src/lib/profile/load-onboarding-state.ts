@@ -17,6 +17,7 @@ export type LoadedProfileOnboarding = {
   resolution: ProfileOnboardingResolution;
   candidateProfile: unknown;
   activeResume: ActiveProfileResume | null;
+  phoneNumber: string | null;
 };
 
 export async function loadProfileOnboardingState(
@@ -27,7 +28,7 @@ export async function loadProfileOnboardingState(
     await Promise.all([
       supabase
         .from('users')
-        .select('name, candidate_profile')
+        .select('name, candidate_profile, phone_number')
         .eq('id', userId)
         .maybeSingle(),
       supabase
@@ -69,5 +70,6 @@ export async function loadProfileOnboardingState(
     }),
     candidateProfile: profile.candidate_profile,
     activeResume,
+    phoneNumber: (profile.phone_number as string | null) ?? null,
   };
 }

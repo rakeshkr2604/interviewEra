@@ -13,6 +13,20 @@ export const displayNameSchema = z
     'Name must be 2–50 characters (letters, spaces, apostrophes, or hyphens only).',
   );
 
+/**
+ * Phone number collected at onboarding. Loose on purpose — international
+ * formats vary and this is a contact field, not a login credential — but
+ * catches obvious garbage. Accepts an optional leading `+`, 7–15 digits
+ * total (E.164 range), with spaces/hyphens stripped before the digit count.
+ */
+export const phoneNumberSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter your phone number.')
+  .max(20, 'Phone number is too long.')
+  .regex(/^\+?[0-9\s-]{7,20}$/, 'Enter a valid phone number.')
+  .refine((v) => v.replace(/[^0-9]/g, '').length >= 7, 'Enter a valid phone number.');
+
 /** Shared auth password policy so campus clients cannot drift from the signup API. */
 export const authPasswordSchema = z
   .string()
@@ -157,9 +171,15 @@ export const referralApplySchema = z.object({
     .transform((s) => safeText(s, 80)),
 });
 
-export const profileNamePatchSchema = z.object({
-  name: displayNameSchema,
-})
+/** PATCH /api/account/profile — name and/or phone, both optional but at least one required. */
+export const accountProfilePatchSchema = z
+  .object({
+    name: displayNameSchema.optional(),
+    phoneNumber: phoneNumberSchema.optional(),
+  })
+  .refine((v) => v.name !== undefined || v.phoneNumber !== undefined, {
+    message: 'Nothing to update.',
+  })
 
 /**
  * In-app feedback submission. user_id/email come from the authenticated session

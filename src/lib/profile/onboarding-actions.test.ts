@@ -9,6 +9,7 @@ describe('onboardingActionSchema', () => {
         step: 1,
         name: 'Rakesh Kumar',
         preferredRole: 'Backend Developer',
+        phoneNumber: '+919876543210',
       }).success,
     ).toBe(true);
     expect(
@@ -74,5 +75,34 @@ describe('onboardingActionSchema', () => {
         name: 'Rakesh Kumar',
       }).success,
     ).toBe(false);
+  });
+
+  it('requires a valid phone number on step 1', () => {
+    expect(
+      onboardingActionSchema.safeParse({
+        action: 'save-step',
+        step: 1,
+        name: 'Rakesh Kumar',
+        preferredRole: 'Backend Developer',
+      }).success,
+    ).toBe(false);
+    expect(
+      onboardingActionSchema.safeParse({
+        action: 'save-step',
+        step: 1,
+        name: 'Rakesh Kumar',
+        preferredRole: 'Backend Developer',
+        phoneNumber: 'abc',
+      }).success,
+    ).toBe(false);
+    expect(
+      onboardingActionSchema.safeParse({
+        action: 'save-step',
+        step: 1,
+        name: 'Rakesh Kumar',
+        preferredRole: 'Backend Developer',
+        phoneNumber: '9876543210',
+      }).success,
+    ).toBe(true);
   });
 });
