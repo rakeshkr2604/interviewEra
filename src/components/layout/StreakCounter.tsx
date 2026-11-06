@@ -12,6 +12,13 @@ const STREAK_EVENT = 'ie-streak-updated'
 
 let streakFetchInFlight: Promise<number> | null = null
 
+/**
+ * Module-level (not per-instance) so the toast fires once even though
+ * StreakCounter is mounted twice at once — mobile header (DashboardChrome)
+ * and desktop sidebar (Sidebar) both listen to the same window event.
+ */
+let lastToastedStreak = -1
+
 async function fetchStreak(): Promise<number> {
   if (streakFetchInFlight) return streakFetchInFlight
 
@@ -60,16 +67,19 @@ export function StreakCounter({
       const next = e.detail.streak
       if (next > lastKnown.current) {
         setPulse((p) => p + 1)
-        const msg =
-          next === 1
-            ? '🔥 Streak started! Keep it going tomorrow.'
-            : next >= 7
-              ? `🔥 ${next}-day streak! You're on fire!`
-              : `🔥 ${next}-day streak! Great consistency.`
-        toast.success(msg, {
-          description: 'Quality session counted toward your streak.',
-          duration: 5000,
-        })
+        if (next > lastToastedStreak) {
+          lastToastedStreak = next
+          const msg =
+            next === 1
+              ? '🔥 Streak started! Keep it going tomorrow.'
+              : next >= 7
+                ? `🔥 ${next}-day streak! You're on fire!`
+                : `🔥 ${next}-day streak! Great consistency.`
+          toast.success(msg, {
+            description: 'Quality session counted toward your streak.',
+            duration: 5000,
+          })
+        }
       }
       lastKnown.current = next
       setStreak(next)

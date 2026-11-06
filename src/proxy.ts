@@ -93,6 +93,22 @@ function forwardedHost(request: NextRequest): string {
 }
 
 /**
+ * `npm run dev` binds `-H 0.0.0.0` (so the app is reachable from other devices
+ * on the LAN). If a request reaches us with Host: 0.0.0.0 — someone opened the
+ * dev server's bind-all address directly instead of localhost — every redirect
+ * built from `request.url` would inherit that host. Supabase's OAuth redirect
+ * allowlist and cookie scoping are configured for localhost, not 0.0.0.0, so
+ * that silently breaks login. Normalize before building any redirect URL.
+ */
+function requestOrigin(request: NextRequest): string {
+  const url = new URL(request.url);
+  if (url.hostname === '0.0.0.0') {
+    url.hostname = 'localhost';
+  }
+  return url.origin;
+}
+
+/**
  * Known crawlers / preview tooling — allowlist only (no generic `bot`/`crawler`).
  * Spoofing these UAs must NOT skip rate limits; see middleware body.
  * SEO: Googlebot, Bing, IndexNow, LinkedIn, Facebook, Twitter/X.
@@ -155,7 +171,7 @@ export async function proxy(request: NextRequest) {
   if (isAuthV2Enabled() && pathname === '/login') {
     const legacyError = request.nextUrl.searchParams.get('error');
     if (legacyError) {
-      const errorUrl = new URL('/auth/error', request.url);
+      const errorUrl = new URL('/auth/error', requestOrigin(request));
       errorUrl.searchParams.set('code', normalizeAuthErrorCode(legacyError));
       const email = request.nextUrl.searchParams.get('email');
       const next = request.nextUrl.searchParams.get('next');
@@ -207,7 +223,7 @@ export async function proxy(request: NextRequest) {
     pathname !== '/auth/error' &&
     !isApi
   ) {
-    const callbackUrl = new URL('/auth/callback', request.url);
+    const callbackUrl = new URL('/auth/callback', requestOrigin(request));
     callbackUrl.searchParams.set('code', oauthCode);
     const next = request.nextUrl.searchParams.get('next');
     if (next) callbackUrl.searchParams.set('next', next);
@@ -325,7 +341,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (verificationDecision === 'redirect_pending' && user) {
-    const pendingUrl = new URL(VERIFICATION_PENDING_PATH, request.url);
+    const pendingUrl = new URL(VERIFICATION_PENDING_PATH, requestOrigin(request));
     pendingUrl.searchParams.set('email', user.email ?? '');
     pendingUrl.searchParams.set('status', 'verification_required');
     pendingUrl.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
@@ -339,7 +355,7 @@ export async function proxy(request: NextRequest) {
 
   // Unauthenticated user on a protected route → send to login (API returns JSON 401 from handlers)
   if (!user && !isPublic && !isApi) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/login', requestOrigin(request));
     loginUrl.searchParams.set('next', pathname);
     if (isAuthV2Enabled()) {
       loginUrl.searchParams.set('reason', 'session_required');
@@ -361,7 +377,7 @@ export async function proxy(request: NextRequest) {
     } else if (isSafePath(rawNext)) {
       dest = rawNext!;
     }
-    const redirect = NextResponse.redirect(new URL(dest, request.url));
+    const redirect = NextResponse.redirect(new URL(dest, requestOrigin(request)));
     response.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
     return redirect;
   }
