@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { loadProfileOnboardingState } from '@/lib/profile/load-onboarding-state';
+import { parseStoredCandidateProfile } from '@/lib/candidate/candidate-profile';
 import { privatePageMetadata } from '@/lib/seo/metadata';
 import { WelcomeOnboardingClient } from './WelcomeOnboardingClient';
 
@@ -29,6 +30,8 @@ export default async function WelcomePage({
   const edit = (await searchParams).edit === '1';
   if (loaded.resolution.state === 'complete' && !edit) redirect('/dashboard');
 
+  const targetCompanies = parseStoredCandidateProfile(loaded.candidateProfile).targetCompanies ?? [];
+
   return (
     <WelcomeOnboardingClient
       initial={{
@@ -41,7 +44,16 @@ export default async function WelcomePage({
           name: loaded.resolution.name,
           preferredRole: loaded.resolution.preferredRole,
           experienceLevel: loaded.resolution.experienceLevel,
+          phoneNumber: loaded.phoneNumber,
+          targetCompanies,
         },
+        resume: loaded.activeResume
+          ? {
+              id: loaded.activeResume.id,
+              status: loaded.activeResume.status,
+              isPrimary: loaded.activeResume.isPrimary,
+            }
+          : null,
       }}
     />
   );

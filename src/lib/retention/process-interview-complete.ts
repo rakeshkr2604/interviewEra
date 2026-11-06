@@ -9,7 +9,7 @@ import { createServiceClient } from '@/lib/supabase/server';
 import type { DimensionScores } from '@/types/app.types';
 import type { SessionQualityRow, UserProgressRow } from '@/lib/retention/types';
 import { checkAndUnlockTier } from './tier-unlock';
-import { type BadgeKey } from './constants';
+import { MAX_TIER, type BadgeKey } from './constants';
 import { logger } from './logger';
 import { buildSessionQualityFeedback, type SessionQualityFeedback } from './quality-feedback';
 import { evaluateQuality, updateStreak } from './streak-tracker';
@@ -22,6 +22,7 @@ import {
   summarize,
 } from './scoring';
 import { buildCompletionReinforcement } from './completion-reinforcement';
+import { computeNextTierProgressPercent, formatProgressMessage } from './format-progress-message';
 import { trackFunnelEvent } from '@/lib/analytics/funnel';
 import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import { applyReferralBonus } from '@/lib/referral/apply-referral';
@@ -58,6 +59,15 @@ export interface InterviewRetentionClientPayload {
   nextUnlockTeaser?: string | null;
   streakLabel?: string;
   recoveryHint?: string | null;
+  /**
+   * Tier the user is now progressing toward (null at max tier). Present on
+   * every response — not just unlock moments — so a celebration dialog
+   * wired to this payload can show "Next: Tier N" immediately after the
+   * unlock it just displayed, without a second round trip.
+   */
+  nextTierNumber?: number | null;
+  /** 0–100 visual fill toward {@link nextTierNumber}. */
+  nextTierProgressPercent?: number;
 }
 
 async function aggregateV1EvaluationsFromInterview(
@@ -248,33 +258,77 @@ function computeAvgAnswerDurationSec(opts: {
   return Math.round(mean);
 }
 
-async function idlePayload(
+/**
+ * Builds the real outcome of THIS session's retention processing when it was
+ * already logged by a prior call (background `after()` from the turn route,
+ * a retry, or the concurrent-insert loser) rather than by the caller that is
+ * awaiting this return value.
+ *
+ * Root cause this fixes: the old `idlePayload` short-circuit on this path
+ * always reported `tierUnlocked: false, newBadges: []` — even when a tier
+ * genuinely unlocked — because it never looked at what the processing that
+ * actually ran had produced. For v2.1 interviews specifically, the turn
+ * route's background `after()` almost always wins the race to insert
+ * `session_quality_log` before the client's own `/api/interview/script/complete`
+ * call arrives, so that client call is the one a celebration UI awaits — and
+ * it always saw the blank idle shape. `session_quality_log.unlock_contribution`
+ * already durably records what that earlier run produced (tier_unlocked,
+ * badge_earned, xp_gained) — read it instead of assuming nothing happened.
+ */
+async function buildPayloadFromExistingLog(
+  supabase: ReturnType<typeof createServiceClient>,
   userId: string,
   interviewId: string,
-  reason: string,
 ): Promise<InterviewRetentionClientPayload> {
-  const supabase = createServiceClient();
-  const { data: progress } = await supabase
-    .from('user_progress')
-    .select('current_tier, current_streak, total_xp')
-    .eq('user_id', userId)
-    .maybeSingle();
+  const [{ data: logRow }, { data: progressRaw }] = await Promise.all([
+    supabase
+      .from('session_quality_log')
+      .select('session_score, quality_met, unlock_contribution')
+      .eq('interview_id', interviewId)
+      .maybeSingle(),
+    supabase.from('user_progress').select('*').eq('user_id', userId).maybeSingle(),
+  ]);
 
-  logger.info('retention_session_skip', {
-    interviewId,
-    reason,
-  });
+  const progress = progressRaw as UserProgressRow | null;
+  const currentTier = Number(progress?.current_tier ?? 1) || 1;
+  const contribution =
+    logRow?.unlock_contribution && typeof logRow.unlock_contribution === 'object'
+      ? (logRow.unlock_contribution as Record<string, unknown>)
+      : {};
+
+  const newTier =
+    typeof contribution.tier_unlocked === 'number' ? contribution.tier_unlocked : null;
+  const badgeEarned =
+    typeof contribution.badge_earned === 'string' ? (contribution.badge_earned as BadgeKey) : null;
+  const xpGained =
+    typeof contribution.xp_gained === 'number' && Number.isFinite(contribution.xp_gained)
+      ? Math.max(0, Math.round(contribution.xp_gained))
+      : 0;
+
+  const progressSlice = {
+    total_sessions: Number(progress?.total_sessions ?? 0) || 0,
+    sessions_at_current_tier: Number(progress?.sessions_at_current_tier ?? 0) || 0,
+    max_dimension_score: progress?.max_dimension_score ?? null,
+    last_5_sessions_avg: progress?.last_5_sessions_avg ?? null,
+    overall_avg_score: progress?.overall_avg_score ?? null,
+  };
+  const { nextTierNumber, percentTowardNext: nextTierProgressPercent } =
+    computeNextTierProgressPercent(currentTier, progressSlice);
 
   return {
-    currentTier: (progress?.current_tier as number) ?? 1,
-    streak: (progress?.current_streak as number) ?? 0,
-    totalXp: (progress?.total_xp as number) ?? 0,
+    currentTier,
+    streak: Number(progress?.current_streak ?? 0) || 0,
+    totalXp: Number(progress?.total_xp ?? 0) || 0,
     sessionLogged: false,
-    qualityMet: false,
-    tierUnlocked: false,
-    previousTier: null,
-    newTier: null,
-    newBadges: [],
+    qualityMet: Boolean(logRow?.quality_met),
+    tierUnlocked: newTier !== null,
+    previousTier: newTier !== null ? newTier - 1 : null,
+    newTier,
+    newBadges: badgeEarned ? [badgeEarned] : [],
+    xpEarned: xpGained,
+    nextUnlockTeaser: currentTier < MAX_TIER ? formatProgressMessage(currentTier, progressSlice) : null,
+    nextTierNumber,
+    nextTierProgressPercent,
   };
 }
 
@@ -557,7 +611,8 @@ export async function processInterviewRetention(
   if (existingLog) {
     // Self-repair partial writes (log inserted, streak/XP/roll-up never landed).
     await reconcileExistingSessionLog(supabase, userId, interviewId);
-    return idlePayload(userId, interviewId, 'session_quality_log exists');
+    logger.info('retention_session_skip', { interviewId, reason: 'session_quality_log exists' });
+    return buildPayloadFromExistingLog(supabase, userId, interviewId);
   }
 
   const { data: progressRowBeforeRaw, error: progErrBefore } = await supabase
@@ -728,7 +783,7 @@ export async function processInterviewRetention(
     // returning idle and permanently stranding a partial write (prod 3195be3e).
     logger.info('retention_unique_conflict_reconcile', { userId, interviewId });
     await reconcileExistingSessionLog(supabase, userId, interviewId);
-    return idlePayload(userId, interviewId, 'unique interview_id conflict');
+    return buildPayloadFromExistingLog(supabase, userId, interviewId);
   }
   if (insErr) {
     logger.error('session_quality_insert_failed', { interviewId, error: insErr.message });
@@ -904,20 +959,25 @@ export async function processInterviewRetention(
     // Progress already written — do not throw (would look like total failure).
   }
 
+  const progressSliceAfter = {
+    total_sessions: totalSessionsFinal,
+    sessions_at_current_tier: sessionsAtTier,
+    max_dimension_score: maxDimRollup,
+    last_5_sessions_avg: last5AvgRollup,
+    overall_avg_score: overallAvgRollup,
+  };
+
   const reinforcement = buildCompletionReinforcement({
     xpEarned: xpAdded,
     qualityMet,
     newStreak: streakForPayload,
     previousStreak: streakResult.previousStreak,
     currentTier: tierAfterRpc,
-    progressSlice: {
-      total_sessions: totalSessionsFinal,
-      sessions_at_current_tier: sessionsAtTier,
-      max_dimension_score: maxDimRollup,
-      last_5_sessions_avg: last5AvgRollup,
-      overall_avg_score: overallAvgRollup,
-    },
+    progressSlice: progressSliceAfter,
   });
+
+  const { nextTierNumber, percentTowardNext: nextTierProgressPercent } =
+    computeNextTierProgressPercent(tierAfterRpc, progressSliceAfter);
 
   return {
     currentTier: tierAfterRpc,
@@ -934,6 +994,8 @@ export async function processInterviewRetention(
     nextUnlockTeaser: reinforcement.nextUnlockTeaser,
     streakLabel: reinforcement.streakLabel,
     recoveryHint: reinforcement.recoveryHint,
+    nextTierNumber,
+    nextTierProgressPercent,
   };
 }
 

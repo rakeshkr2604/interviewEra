@@ -22,7 +22,8 @@ import { AccountManagementPanel } from '@/components/settings/AccountManagementP
 import { DangerZoneCard } from '@/components/settings/DangerZoneCard'
 import { ReferralShareCard } from '@/components/settings/ReferralShareCard'
 import { CandidateProfilePanel } from '@/components/candidate/CandidateProfilePanel'
-import type { CandidateProfileFields } from '@/lib/candidate/types'
+import { ResumeManagementPanel } from '@/components/settings/ResumeManagementPanel'
+import type { CandidateProfileFields, ResumeSnapshot } from '@/lib/candidate/types'
 import type { NotificationPreferences } from '@/lib/settings/notification-preferences'
 import type { PlanTier } from '@/types/app.types'
 import type { User } from '@supabase/supabase-js'
@@ -34,6 +35,7 @@ export function SettingsPageClient({
   authUser,
   profileName,
   profileEmail,
+  profilePhone,
   profileJoinedAt,
   profileAvatarPath,
   planTier,
@@ -46,10 +48,12 @@ export function SettingsPageClient({
   weeklyImprovementSummaryOn,
   candidateProfile,
   referralCode,
+  resume,
 }: {
   authUser: User
   profileName: string | null
   profileEmail: string
+  profilePhone: string | null
   profileJoinedAt: string
   profileAvatarPath: string | null
   planTier: PlanTier
@@ -62,6 +66,7 @@ export function SettingsPageClient({
   weeklyImprovementSummaryOn: boolean
   candidateProfile: CandidateProfileFields
   referralCode: string | null
+  resume: ResumeSnapshot | null
 }) {
   const lastSignIn = authUser.last_sign_in_at ?? null
   const hasGoogle = Boolean(authUser.identities?.some((i) => i.provider === 'google'))
@@ -198,10 +203,24 @@ export function SettingsPageClient({
                 authUser={authUser}
                 displayName={profileName}
                 email={profileEmail}
+                phone={profilePhone}
                 joinedAt={profileJoinedAt}
                 accountId={authUser.id}
                 initialAvatarPath={profileAvatarPath}
               />
+            </div>
+          </SettingsSection>
+
+          <SettingsSection
+            id="settings-resume"
+            className="lg:col-span-2"
+            eyebrow="Placement"
+            title="Resume"
+            description="The resume your interviews and resume review sessions are personalized from."
+            density="compact"
+          >
+            <div className={SETTINGS_CARD_SHELL}>
+              <ResumeManagementPanel initial={resume} />
             </div>
           </SettingsSection>
         </div>

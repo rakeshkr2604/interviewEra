@@ -35,12 +35,14 @@ const STARTER_PREVIEW: readonly StarterFeature[] = [
   'Full answer feedback',
   '30-day improvement roadmap',
   'Progress tracking across sessions',
+  '1 human resume review session per billing cycle',
 ];
 const PRO_PREVIEW: readonly ProFeature[] = [
   PRO_FEATURES[0],
   'Everything in Starter',
   'Model-answer comparison',
   'PDF report export',
+  '2 human resume review sessions per billing cycle',
 ];
 const FREE_PREVIEW = FREE_TIER_FEATURES.filter((feature) => feature.included)
   .slice(0, 3)

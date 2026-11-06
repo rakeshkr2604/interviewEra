@@ -59,12 +59,21 @@ describe('pricing entitlement truth', () => {
     expect(copy).toMatch(/Full answer feedback/);
     expect(copy).toMatch(/Dimension notes and report synthesis/);
     expect(copy).toMatch(/30-day improvement roadmap/);
+    expect(copy).toMatch(/1 human resume review session per billing cycle/);
   });
 
   it('keeps verified Pro differentiation', () => {
     const copy = PRO_FEATURES.join(' ');
     expect(copy).toMatch(/Model-answer comparison/);
     expect(copy).toMatch(/PDF report export/);
+    expect(copy).toMatch(/2 human resume review sessions per billing cycle/);
+  });
+
+  it('gates the resume review session perk to paid tiers, 1 on Starter and 2 on Pro', () => {
+    const row = PRICING_COMPARISON.find((candidate) => candidate.feature === 'Human resume review session');
+    expect(row?.free).toBe('not_included');
+    expect(row?.starter).toBe('1 per billing cycle');
+    expect(row?.pro).toBe('2 per billing cycle');
   });
 
   it('does not advertise unverified or prohibited features', () => {
@@ -73,8 +82,6 @@ describe('pricing entitlement truth', () => {
       ...STARTER_FEATURES,
       ...PRO_FEATURES,
     ].join(' ');
-    expect(allCopy).not.toMatch(
-      /keyword gap|premium preparation|priority support|resume review session|interview replay/i,
-    );
+    expect(allCopy).not.toMatch(/keyword gap|premium preparation|priority support|interview replay/i);
   });
 });

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Bell, LogOut, Search, Settings } from 'lucide-react'
+import { Bell, FileSearch, LogOut, Search, Settings, UserPen } from 'lucide-react'
 import { UserAvatar } from '@/components/profile/UserAvatar'
 import {
   DropdownMenu,
@@ -26,6 +26,8 @@ const SEARCH_DESTINATIONS = [
   { label: 'Interview question generator', href: '/tools/question-generator', keywords: 'question generator tool' },
   { label: 'STAR answer builder', href: '/tools/star-builder', keywords: 'star answer builder tool' },
   { label: 'Notifications', href: '/notifications', keywords: 'notifications alerts' },
+  { label: 'Update profile', href: '/welcome?edit=1', keywords: 'update profile onboarding name role phone resume experience' },
+  { label: 'Resume review session', href: '/resume-review', keywords: 'resume review starter pro perk' },
   { label: 'Badges', href: '/profile/badges', keywords: 'badges achievements streak' },
   { label: 'Settings', href: '/settings', keywords: 'settings account profile' },
 ] as const
@@ -205,6 +207,20 @@ function AvatarDropdown({
           {email}
         </div>
         <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onClick={() => router.push('/welcome?edit=1')}
+          className="flex cursor-pointer items-center gap-2"
+        >
+          <UserPen className="size-4" aria-hidden />
+          Update profile
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => router.push('/resume-review')}
+          className="flex cursor-pointer items-center gap-2"
+        >
+          <FileSearch className="size-4" aria-hidden />
+          Resume review session
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push('/settings')} className="flex cursor-pointer items-center gap-2">
           <Settings className="size-4" aria-hidden />
           Settings

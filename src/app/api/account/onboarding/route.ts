@@ -5,6 +5,7 @@ import { trackProductEventServer } from '@/lib/analytics/product-events-server';
 import type { ProductEventPayload } from '@/lib/analytics/product-events';
 import { loadProfileOnboardingState } from '@/lib/profile/load-onboarding-state';
 import { onboardingActionSchema } from '@/lib/profile/onboarding-actions';
+import { parseStoredCandidateProfile } from '@/lib/candidate/candidate-profile';
 import {
   mergeCandidateProfileJson,
   parseProfileOnboardingMetadata,
@@ -25,6 +26,8 @@ type ResumeOwnershipResult =
 function responseState(
   resolution: ProfileOnboardingResolution,
   activeResume: { id: string; status: string; isPrimary: boolean } | null,
+  phoneNumber: string | null,
+  candidateProfileJson: unknown,
 ) {
   return {
     state: resolution.state,
@@ -36,6 +39,8 @@ function responseState(
       name: resolution.name,
       preferredRole: resolution.preferredRole,
       experienceLevel: resolution.experienceLevel,
+      phoneNumber,
+      targetCompanies: parseStoredCandidateProfile(candidateProfileJson).targetCompanies ?? [],
     },
     resume: activeResume,
   };
@@ -101,6 +106,8 @@ export async function GET(): Promise<NextResponse> {
               isPrimary: loaded.activeResume.isPrimary,
             }
           : null,
+        loaded.phoneNumber,
+        loaded.candidateProfile,
       ),
     );
   } catch (error) {
@@ -144,6 +151,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
     const now = new Date().toISOString();
     let candidateProfile = loaded.candidateProfile;
     let name = before.name;
+    let phoneNumber = loaded.phoneNumber;
     let hasActiveResume = before.hasActiveResume;
     let metadata: ProfileOnboardingMetadata = previousMetadata ?? {
       version: 1,
@@ -173,8 +181,12 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
       if (parsed.data.step === 1) {
         name = parsed.data.name;
+        phoneNumber = parsed.data.phoneNumber;
         candidateProfile = mergeCandidateProfileJson(candidateProfile, {
           preferred_role: parsed.data.preferredRole,
+          ...(parsed.data.targetCompanies !== undefined
+            ? { target_companies: parsed.data.targetCompanies }
+            : {}),
         });
       } else if (parsed.data.step === 2) {
         candidateProfile = mergeCandidateProfileJson(candidateProfile, {
@@ -247,7 +259,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
 
     const { error: updateError } = await supabase
       .from('users')
-      .update({ name, candidate_profile: candidateProfile })
+      .update({ name, candidate_profile: candidateProfile, phone_number: phoneNumber })
       .eq('id', user.id);
     if (updateError) {
       console.error('[account/onboarding] update error', updateError.message);
@@ -272,7 +284,7 @@ export async function PATCH(request: Request): Promise<NextResponse> {
       trackProductEventServer(payload);
     }
 
-    return NextResponse.json(responseState(after, loaded.activeResume));
+    return NextResponse.json(responseState(after, loaded.activeResume, phoneNumber, candidateProfile));
   } catch (error) {
     console.error('[account/onboarding] PATCH error', error);
     return NextResponse.json({ error: 'Failed to save onboarding.' }, { status: 500 });

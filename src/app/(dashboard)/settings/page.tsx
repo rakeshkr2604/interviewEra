@@ -22,7 +22,7 @@ export default async function SettingsPage() {
   const supabase = await getCachedSupabase()
 
   const profileSelectFull =
-    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path, referral_code' as const
+    'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, notification_preferences, plan_status, plan_expires_at, plan_started_at, avatar_path, referral_code, phone_number' as const
   const profileSelectBase =
     'name, email, plan_tier, credits_remaining, created_at, email_digest_unsubscribed, plan_status, plan_expires_at, plan_started_at, referral_code' as const
 
@@ -39,6 +39,7 @@ export default async function SettingsPage() {
     plan_started_at?: string | null
     avatar_path?: string | null
     referral_code?: string | null
+    phone_number?: string | null
   } | null = null
 
   const full = await supabase
@@ -97,12 +98,15 @@ export default async function SettingsPage() {
   const profileName = profile.name ?? (user.user_metadata?.name as string | undefined) ?? null
   const profileAvatarPath =
     typeof profile.avatar_path === 'string' ? profile.avatar_path : null
+  const profilePhone =
+    typeof profile.phone_number === 'string' ? profile.phone_number : null
 
   return (
     <SettingsPageClient
       authUser={user}
       profileName={profileName}
       profileEmail={profileEmail}
+      profilePhone={profilePhone}
       profileJoinedAt={profile.created_at as string}
       profileAvatarPath={profileAvatarPath}
       planTier={planTier}
@@ -115,6 +119,7 @@ export default async function SettingsPage() {
       weeklyImprovementSummaryOn={!digestUnsub}
       candidateProfile={candidateSnapshot.profile}
       referralCode={profile.referral_code ?? null}
+      resume={candidateSnapshot.latestResume}
     />
   )
 }

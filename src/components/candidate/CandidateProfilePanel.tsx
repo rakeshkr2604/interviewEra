@@ -54,13 +54,19 @@ export function CandidateProfilePanel({ initial }: { initial: CandidateProfileFi
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="graduation-year">Graduation year</Label>
+          <Label htmlFor="graduation-year">
+            Graduation year{' '}
+            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+              (optional)
+            </span>
+          </Label>
           <Input
             id="graduation-year"
             type="number"
             inputMode="numeric"
             min={1990}
             max={new Date().getFullYear() + 6}
+            placeholder="e.g. 2026"
             value={draft.graduationYear ?? ''}
             onChange={(e) => {
               const raw = e.target.value.trim();
@@ -72,9 +78,15 @@ export function CandidateProfilePanel({ initial }: { initial: CandidateProfileFi
           />
         </div>
         <div className="space-y-2 sm:col-span-2">
-          <Label htmlFor="college-name">College</Label>
+          <Label htmlFor="college-name">
+            College{' '}
+            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+              (optional)
+            </span>
+          </Label>
           <Input
             id="college-name"
+            placeholder="Not added yet"
             value={draft.collegeName}
             onChange={(e) => setDraft((d) => ({ ...d, collegeName: e.target.value }))}
             maxLength={200}

@@ -28,6 +28,7 @@ export const FREE_TIER_FEATURES = [
   { text: 'Full answer feedback', included: false as const },
   { text: '30-day improvement roadmap', included: false as const },
   { text: 'Model-answer comparison and PDF export', included: false as const },
+  { text: 'Human resume review session', included: false as const },
 ] as const;
 
 /** Paid tiers — same strings everywhere */
@@ -42,6 +43,7 @@ export const STARTER_FEATURES = [
   'Resume-personalized questions',
   'Progress tracking across sessions',
   'Post-interview report and email',
+  '1 human resume review session per billing cycle',
 ] as const;
 
 export const PRO_FEATURES = [
@@ -53,6 +55,7 @@ export const PRO_FEATURES = [
   'Model-answer comparison',
   'PDF report export',
   'Resume-personalized practice and progress tracking',
+  '2 human resume review sessions per billing cycle',
 ] as const;
 
 export const PLAN_POSITIONING = {
@@ -135,6 +138,12 @@ export const PRICING_COMPARISON_GROUPS: readonly ComparisonGroup[] = [
       { feature: 'Score guide', free: 'included', starter: 'included', pro: 'included' },
       { feature: 'Detailed answer feedback', free: 'not_included', starter: 'included', pro: 'included' },
       { feature: 'Model-answer comparison', free: 'not_included', starter: 'not_included', pro: 'included' },
+      {
+        feature: 'Human resume review session',
+        free: 'not_included',
+        starter: '1 per billing cycle',
+        pro: '2 per billing cycle',
+      },
     ],
   },
   {

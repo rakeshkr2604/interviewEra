@@ -15,6 +15,13 @@ describe('getAuthRedirectOrigin', () => {
     expect(getAuthRedirectOrigin()).toBe('https://interviewera-git-feat.vercel.app');
   });
 
+  it('normalizes the dev server bind-all address (0.0.0.0) to localhost', () => {
+    vi.stubGlobal('window', {
+      location: { hostname: '0.0.0.0', protocol: 'http:', port: '3000', origin: 'http://0.0.0.0:3000' },
+    });
+    expect(getAuthRedirectOrigin()).toBe('http://localhost:3000');
+  });
+
   it('falls back to NEXT_PUBLIC_APP_URL when window is unavailable', () => {
     vi.stubEnv('NEXT_PUBLIC_APP_URL', 'https://interviewera.com');
     expect(getAuthRedirectOrigin()).toBe('https://interviewera.com');

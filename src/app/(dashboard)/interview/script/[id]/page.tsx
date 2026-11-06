@@ -9,6 +9,10 @@ import { TimerCircle } from '@/components/interview/TimerCircle'
 import { CandidatePreview } from '@/components/interview/CandidatePreview'
 import { AfterInterviewFeedback } from '@/components/interview/AfterInterviewFeedback'
 import { InterviewExitFeedbackModal } from '@/components/interview/InterviewExitFeedbackModal'
+import {
+  TierUnlockCelebrationDialog,
+  type TierCelebrationPayload,
+} from '@/components/retention/TierUnlockCelebrationDialog'
 import { useRegisterActiveInterviewNavGuard } from '@/components/interview/active-interview-nav-guard'
 import { isResumableInterviewStatus } from '@/lib/interview/interview-status'
 import { getInterviewerById, readInitialScriptInterviewerId, stashScriptInterviewerId } from '@/lib/config/interviewers'
@@ -250,6 +254,7 @@ export default function ScriptInterviewPage() {
   const [currentPhase, setCurrentPhase] = useState<string>('warmup')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [isExitModalOpen, setIsExitModalOpen] = useState(false)
+  const [celebration, setCelebration] = useState<TierCelebrationPayload | null>(null)
 
   const openExitFlow = useCallback(() => {
     setIsExitModalOpen(true)
@@ -996,7 +1001,15 @@ export default function ScriptInterviewPage() {
       })
       if (!res.ok) return
       const data = (await res.json()) as {
-        retention?: { streak?: number } | null
+        retention?: {
+          streak?: number
+          tierUnlocked?: boolean
+          newTier?: number | null
+          newBadges?: string[]
+          nextUnlockTeaser?: string | null
+          nextTierNumber?: number | null
+          nextTierProgressPercent?: number
+        } | null
       }
       if (data.retention && typeof data.retention.streak === 'number') {
         window.dispatchEvent(
@@ -1004,6 +1017,21 @@ export default function ScriptInterviewPage() {
             detail: { streak: data.retention.streak },
           }),
         )
+      }
+
+      if (
+        data.retention?.tierUnlocked &&
+        typeof data.retention.newTier === 'number' &&
+        data.retention.newTier != null
+      ) {
+        setCelebration({
+          newTier: data.retention.newTier,
+          newBadges: [...(data.retention.newBadges ?? [])],
+          reportHref: `/report/script/${interviewId}`,
+          progressHint: data.retention.nextUnlockTeaser ?? null,
+          nextTierNumber: data.retention.nextTierNumber ?? null,
+          nextTierProgressPercent: data.retention.nextTierProgressPercent ?? 0,
+        })
       }
     } catch {
       /* completion is best-effort for the UI — never block the closing screen */
@@ -3847,6 +3875,15 @@ export default function ScriptInterviewPage() {
           onLeave={leaveSessionToDashboard}
         />
       )}
+
+      <TierUnlockCelebrationDialog
+        key={celebration ? `${celebration.newTier}-${interviewId}` : 'idle'}
+        open={celebration !== null}
+        onOpenChange={(open) => {
+          if (!open) setCelebration(null)
+        }}
+        data={celebration}
+      />
     </div>
   )
 }

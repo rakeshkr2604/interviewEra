@@ -12,8 +12,8 @@ import { addCredit } from '@/lib/utils/credits';
 const schema = z.object({
   email: z.string().email().optional(),
   user_id: z.string().uuid().optional(),
-  amount: z.number().int().min(1).max(100),
-  reason: z.string().min(3).max(500),
+  amount: z.number().int().min(1).max(30),
+  reason: z.string().trim().min(3).max(500),
 }).refine((v) => Boolean(v.email || v.user_id), {
   message: 'email or user_id required',
 });
