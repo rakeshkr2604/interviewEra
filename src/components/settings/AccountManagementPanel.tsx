@@ -6,6 +6,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ProfilePhotoEditor } from '@/components/settings/ProfilePhotoEditor'
 import { resolveOAuthPictureUrl } from '@/lib/profile/user-display'
+import { formatPhoneDisplay } from '@/lib/utils/phone-format'
 import { cn } from '@/lib/utils'
 import { Copy, Check } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
@@ -14,6 +15,7 @@ export function AccountManagementPanel({
   authUser,
   displayName,
   email,
+  phone,
   joinedAt,
   accountId,
   initialAvatarPath,
@@ -21,6 +23,7 @@ export function AccountManagementPanel({
   authUser: User
   displayName: string | null
   email: string
+  phone: string | null
   joinedAt: string
   accountId: string
   initialAvatarPath: string | null
@@ -32,6 +35,10 @@ export function AccountManagementPanel({
   const [savedName, setSavedName] = useState(displayName ?? '')
   const [savingName, setSavingName] = useState(false)
   const [nameStatus, setNameStatus] = useState<{ tone: 'ok' | 'err'; message: string } | null>(null)
+  const [phoneDraft, setPhoneDraft] = useState(formatPhoneDisplay(phone ?? ''))
+  const [savedPhone, setSavedPhone] = useState(formatPhoneDisplay(phone ?? ''))
+  const [savingPhone, setSavingPhone] = useState(false)
+  const [phoneStatus, setPhoneStatus] = useState<{ tone: 'ok' | 'err'; message: string } | null>(null)
   const [avatarPath, setAvatarPath] = useState(initialAvatarPath)
 
   const oauthPictureUrl = resolveOAuthPictureUrl(authUser.user_metadata)
@@ -73,6 +80,32 @@ export function AccountManagementPanel({
     }
   }
 
+  const savePhone = async () => {
+    setSavingPhone(true)
+    setPhoneStatus(null)
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phoneNumber: phoneDraft.trim() }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string; phoneNumber?: string } | null
+      if (!res.ok) {
+        setPhoneStatus({ tone: 'err', message: data?.error ?? 'Could not update phone number.' })
+        return
+      }
+      const next = data?.phoneNumber ?? phoneDraft.trim()
+      setSavedPhone(next)
+      setPhoneDraft(next)
+      setPhoneStatus({ tone: 'ok', message: 'Phone number updated.' })
+      window.setTimeout(() => setPhoneStatus(null), 3000)
+    } catch {
+      setPhoneStatus({ tone: 'err', message: 'Network error. Try again.' })
+    } finally {
+      setSavingPhone(false)
+    }
+  }
+
   const downloadExport = async () => {
     setExporting(true)
     setExportStatus(null)
@@ -99,6 +132,8 @@ export function AccountManagementPanel({
   }
 
   const nameDirty = nameDraft.trim() !== savedName.trim()
+  const phoneDirty = phoneDraft.trim() !== savedPhone.trim()
+  const phoneDigitCount = phoneDraft.replace(/[^0-9]/g, '').length
 
   return (
     <div className="space-y-6">
@@ -152,6 +187,57 @@ export function AccountManagementPanel({
             )}
           >
             {nameStatus.message}
+          </p>
+        ) : null}
+      </div>
+
+      <div
+        className="h-px w-full"
+        style={{ background: 'var(--card-border)' }}
+        aria-hidden
+      />
+
+      <div className="space-y-3">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Phone number{' '}
+            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>
+              (optional)
+            </span>
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Used to reach you about your interview preparation — never shared publicly.
+          </p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+          <Input
+            type="tel"
+            value={phoneDraft}
+            onChange={(e) => setPhoneDraft(e.target.value)}
+            onBlur={(e) => setPhoneDraft(formatPhoneDisplay(e.target.value))}
+            maxLength={20}
+            autoComplete="tel"
+            placeholder="Not added yet"
+            className="sm:max-w-xs"
+          />
+          <Button
+            type="button"
+            size="sm"
+            disabled={!phoneDirty || savingPhone || phoneDigitCount < 7}
+            onClick={() => void savePhone()}
+          >
+            {savingPhone ? 'Saving…' : 'Save phone'}
+          </Button>
+        </div>
+        {phoneStatus ? (
+          <p
+            role="status"
+            className={cn(
+              'text-xs font-medium',
+              phoneStatus.tone === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive',
+            )}
+          >
+            {phoneStatus.message}
           </p>
         ) : null}
       </div>
