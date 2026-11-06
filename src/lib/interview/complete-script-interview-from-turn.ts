@@ -19,6 +19,7 @@ import {
   waitForScoredEvaluations,
 } from '@/lib/email/lifecycle/try-send-script-completion-email'
 import { processInterviewRetentionSafely } from '@/lib/retention/process-interview-complete'
+import { loadOrGenerateScriptReport } from '@/lib/interview/script-report/generate'
 
 const LOG_PREFIX = '[script-turn-complete]'
 
@@ -144,7 +145,36 @@ export async function completeScriptInterviewFromTurn(
           interviewId,
           scored,
         })
-        const payload = await processInterviewRetentionSafely(userId, interviewId)
+        // Retention and the v2.1 report both only need scores — run them
+        // together so the report is pre-warmed in the cache by the time the
+        // candidate opens it (feedback step is optional and often skipped,
+        // so View Report is frequently the very next click).
+        const [payload] = await Promise.all([
+          processInterviewRetentionSafely(userId, interviewId),
+          loadOrGenerateScriptReport({
+            serviceClient,
+            interviewId,
+            userId,
+            // Email is already queued by voidCompletionEmail() above.
+            skipOwedCompletionEmail: true,
+          })
+            .then((result) => {
+              console.info(`${LOG_PREFIX} report pre-warm done`, {
+                interviewId,
+                ok: result.ok,
+                status: result.ok ? result.report.status : undefined,
+                created: result.ok ? result.created : undefined,
+              })
+            })
+            .catch((err) => {
+              // Best-effort: the report route regenerates on first view if
+              // this is cut off (e.g. function timeout) or fails.
+              console.error(`${LOG_PREFIX} report pre-warm threw`, {
+                interviewId,
+                error: err instanceof Error ? err.message : String(err),
+              })
+            }),
+        ])
         if (!payload) {
           console.warn(`${LOG_PREFIX} retention returned null`, { interviewId })
         }

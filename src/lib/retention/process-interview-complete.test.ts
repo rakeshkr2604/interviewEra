@@ -201,6 +201,95 @@ describe('processInterviewRetention — existingLog self-repair', () => {
     expect(prog.overall_avg_score).toBe(5);
     expect(prog.max_dimension_score).toBe(5);
   });
+
+  it('surfaces the real unlock/badge/XP outcome on the existingLog short-circuit (root-cause fix: client callers must not see a blank idle payload when a tier genuinely unlocked)', async () => {
+    db.session_quality_log = [
+      {
+        id: 'sql-1',
+        interview_id: IV,
+        user_id: USER,
+        session_score: 7,
+        quality_met: true,
+        dimension_scores: dims(7),
+        max_dimension_score: 7,
+        completed_at: '2026-07-01T00:00:00Z',
+        unlock_contribution: {
+          tier_unlocked: 2,
+          badge_earned: 'consistent_learner',
+          xp_gained: 70,
+          streak_delta: 1,
+          progress_applied: true,
+        },
+      },
+    ];
+    db.interviews = [{ id: IV, user_id: USER, status: 'completed' }];
+    db.user_progress = [
+      {
+        user_id: USER,
+        current_tier: 2,
+        current_streak: 3,
+        total_xp: 70,
+        sessions_at_current_tier: 0,
+        total_sessions: 1,
+        overall_avg_score: 7,
+        last_5_sessions_avg: 7,
+        max_dimension_score: 7,
+      },
+    ];
+
+    const result = await processInterviewRetention(USER, IV);
+
+    expect(result.sessionLogged).toBe(false);
+    expect(result.tierUnlocked).toBe(true);
+    expect(result.newTier).toBe(2);
+    expect(result.previousTier).toBe(1);
+    expect(result.newBadges).toEqual(['consistent_learner']);
+    expect(result.xpEarned).toBe(70);
+    expect(result.qualityMet).toBe(true);
+    expect(result.currentTier).toBe(2);
+  });
+
+  it('reports no unlock on the existingLog short-circuit when the earlier run genuinely did not unlock anything', async () => {
+    db.session_quality_log = [
+      {
+        id: 'sql-1',
+        interview_id: IV,
+        user_id: USER,
+        session_score: 6,
+        quality_met: true,
+        dimension_scores: dims(6),
+        max_dimension_score: 6,
+        completed_at: '2026-07-01T00:00:00Z',
+        unlock_contribution: {
+          tier_unlocked: null,
+          badge_earned: null,
+          xp_gained: 60,
+          streak_delta: 1,
+          progress_applied: true,
+        },
+      },
+    ];
+    db.interviews = [{ id: IV, user_id: USER, status: 'completed' }];
+    db.user_progress = [
+      {
+        user_id: USER,
+        current_tier: 1,
+        current_streak: 1,
+        total_xp: 60,
+        sessions_at_current_tier: 1,
+        total_sessions: 1,
+        overall_avg_score: 6,
+        last_5_sessions_avg: 6,
+        max_dimension_score: 6,
+      },
+    ];
+
+    const result = await processInterviewRetention(USER, IV);
+
+    expect(result.tierUnlocked).toBe(false);
+    expect(result.newTier).toBeNull();
+    expect(result.newBadges).toEqual([]);
+  });
 });
 
 describe('processInterviewRetention — first-time completion (no retry needed)', () => {

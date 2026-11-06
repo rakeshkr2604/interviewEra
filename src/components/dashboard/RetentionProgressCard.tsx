@@ -4,6 +4,7 @@ import {
   SkillBreakdownDetailsDialog,
   type SkillDetailRow,
 } from '@/components/dashboard/SkillBreakdownDetailsDialog';
+import { PlacementTrackGuideDialog } from '@/components/dashboard/PlacementTrackGuideDialog';
 import type { RetentionTierProgressView } from '@/lib/retention/dashboard-tier-progress';
 import { MAX_TIER } from '@/lib/retention/constants';
 import type { SessionQualityFeedback } from '@/lib/retention/quality-feedback';
@@ -31,7 +32,10 @@ export function RetentionProgressCard({ snap }: { snap: RetentionDashboardSnapsh
 
   return (
     <section className="dashboard-section dashboard-premium-card px-4 py-4 sm:px-6 sm:py-5 lg:px-7">
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between sm:gap-4">
+      <div className="flex justify-end">
+        <PlacementTrackGuideDialog />
+      </div>
+      <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <p className="dashboard-section-eyebrow">Placement track</p>
           <p className="dashboard-section-title">{tierLabel}</p>
